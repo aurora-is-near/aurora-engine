@@ -38,10 +38,12 @@ libsecp256k1.workspace = true
 near-crypto.workspace = true
 near-primitives-core.workspace = true
 near-primitives.workspace = true
+near-sdk.workspace = true
 near-vm-errors.workspace = true
 near-vm-logic.workspace = true
 near-vm-runner.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -51,6 +53,7 @@ tokio.workspace = true
 walrus.workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
+mainnet-test = ["aurora-engine-workspace/mainnet-test"]
+testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
+ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]

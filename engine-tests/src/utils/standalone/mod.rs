@@ -46,6 +46,10 @@ impl StandaloneRunner {
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
+            #[cfg(feature = "ext-connector")]
+            mocks::init_connector(io);
+            #[cfg(not(feature = "ext-connector"))]
+            mocks::init_connector(io, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -214,12 +218,9 @@ impl StandaloneRunner {
                 PromiseResult::Failed | PromiseResult::NotReady => None,
             })
             .collect();
-        let transaction_kind = engine_standalone_storage::sync::parse_transaction_kind(
-            method_name,
-            ctx.input.clone(),
-            &promise_data,
-        )
-        .expect("All method names must be known by standalone");
+        let transaction_kind =
+            sync::parse_transaction_kind(method_name, ctx.input.clone(), &promise_data)
+                .expect("All method names must be known by standalone");
 
         let transaction_hash = if let TransactionKind::SubmitWithArgs(args) = &transaction_kind {
             aurora_engine_sdk::keccak(&args.tx_data)

@@ -7,7 +7,7 @@
 //! the smart contract and the standalone.
 
 use crate::{
-    connector::EthConnectorContract,
+    contract_methods::connector::EthConnectorContract,
     contract_methods::{
         predecessor_address, require_key_manager_only, require_owner_only, require_paused,
         require_running, ContractError,
@@ -115,9 +115,19 @@ pub fn set_owner<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractErr
     })
 }
 
-pub fn get_bridge_prover<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
-    let connector = EthConnectorContract::init_instance(io)?;
+pub fn get_bridge_prover<I: IO + Copy + PromiseHandler>(mut io: I) -> Result<(), ContractError> {
+    let connector = EthConnectorContract::init(io)?;
+
+    #[cfg(not(feature = "ext-connector"))]
     io.return_output(connector.get_bridge_prover().as_bytes());
+
+    #[cfg(feature = "ext-connector")]
+    {
+        let promise_args = connector.get_bridge_prover();
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
+        io.promise_return(promise_id);
+    }
+
     Ok(())
 }
 

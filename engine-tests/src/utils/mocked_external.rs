@@ -56,7 +56,7 @@ impl near_vm_logic::External for MockedExternalWithTrie {
     fn storage_get<'a>(
         &'a self,
         key: &[u8],
-        mode: near_vm_logic::StorageGetMode,
+        mode: StorageGetMode,
     ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);

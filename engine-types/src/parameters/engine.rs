@@ -176,14 +176,6 @@ pub struct RegisterRelayerCallArgs {
     pub address: Address,
 }
 
-pub type PausedMask = u8;
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PauseEthConnectorCallArgs {
-    pub paused_mask: PausedMask,
-}
-
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 pub struct PausePrecompilesCallArgs {
     pub paused_mask: u32,
@@ -334,6 +326,17 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct StorageUnregisterArgs {
+    pub force: bool,
+}
+
+pub fn parse_json_args<'de, T: Deserialize<'de>>(
+    bytes: &'de [u8],
+) -> Result<T, errors::ParseArgsError> {
+    serde_json::from_slice(bytes).map_err(Into::into)
+}
+
 /// Parameters for setting relayer keys manager.
 #[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct RelayerKeyManagerArgs {
@@ -350,30 +353,31 @@ pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
 
     pub const ERR_REVERT: &[u8; 10] = b"ERR_REVERT";
+    pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUNDS: &[u8; 16] = b"ERR_OUT_OF_FUNDS";
     pub const ERR_CALL_TOO_DEEP: &[u8; 17] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8; 17] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8; 14] = b"ERR_OUT_OF_GAS";
 
     #[derive(Debug)]
-    pub enum ParseTypeFromJsonError {
+    pub enum ParseArgsError {
         Json(String),
         InvalidAccount(ParseAccountError),
     }
 
-    impl From<serde_json::Error> for ParseTypeFromJsonError {
+    impl From<serde_json::Error> for ParseArgsError {
         fn from(e: serde_json::Error) -> Self {
             Self::Json(e.to_string())
         }
     }
 
-    impl From<ParseAccountError> for ParseTypeFromJsonError {
+    impl From<ParseAccountError> for ParseArgsError {
         fn from(e: ParseAccountError) -> Self {
             Self::InvalidAccount(e)
         }
     }
 
-    impl AsRef<[u8]> for ParseTypeFromJsonError {
+    impl AsRef<[u8]> for ParseArgsError {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::Json(e) => e.as_bytes(),

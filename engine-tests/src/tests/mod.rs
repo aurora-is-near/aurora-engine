@@ -3,7 +3,7 @@ mod contract_call;
 mod ecrecover;
 mod erc20;
 mod erc20_connector;
-mod eth_connector;
+mod erc20_mirror;
 mod ghsa_3p69_m8gg_fwmf;
 mod hashchain;
 #[cfg(feature = "meta-call")]
@@ -21,6 +21,7 @@ mod repro;
 pub mod sanity;
 mod self_destruct_state;
 mod serde;
+mod silo;
 mod standalone;
 mod standard_precompiles;
 mod transaction;
