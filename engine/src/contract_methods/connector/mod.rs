@@ -44,6 +44,8 @@ pub mod internal;
 pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE";
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
+/// Amount of attached gas for read-only promises.
+const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(5_000_000_000_000);
 
 /// Create new eth-connector;
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -470,7 +472,7 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
             .try_to_vec()
             .map_err(|_| crate::errors::ERR_SERIALIZE)?,
             attached_balance: Yocto::new(0),
-            attached_gas: NearGas::new(5_000_000_000_000),
+            attached_gas: READ_PROMISE_ATTACHED_GAS,
         },
         PromiseCreateArgs {
             target_account_id: args.contract_id,
@@ -478,7 +480,7 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
             args: serde_json::to_vec(&Erc20Identifier::from(args.nep141))
                 .map_err(|_| crate::errors::ERR_SERIALIZE)?,
             attached_balance: Yocto::new(0),
-            attached_gas: NearGas::new(5_000_000_000_000),
+            attached_gas: READ_PROMISE_ATTACHED_GAS,
         },
     ];
 
@@ -487,8 +489,10 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         method: "mirror_erc20_token_callback".to_string(),
         args: input,
         attached_balance: Yocto::new(0),
-        attached_gas: NearGas::new(5_000_000_000_000),
+        attached_gas: READ_PROMISE_ATTACHED_GAS,
     };
+    // Safe because these promises are read-only calls to the main engine contract
+    // and this transaction could be executed by the owner of the contract only.
     let promise_id = unsafe {
         let promise_id = handler.promise_create_and_combine(&promise);
         handler.promise_attach_callback(promise_id, &callback)

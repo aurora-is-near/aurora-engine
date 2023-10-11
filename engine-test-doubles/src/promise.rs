@@ -1,6 +1,8 @@
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::promise::PromiseId;
-use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::parameters::{
+    NearPromise, PromiseBatchAction, PromiseCreateArgs, SimpleNearPromise,
+};
 use aurora_engine_types::types::PromiseResult;
 use std::collections::HashMap;
 
@@ -13,6 +15,7 @@ pub enum PromiseArgs {
         callback: PromiseCreateArgs,
     },
     Batch(PromiseBatchAction),
+    Recursive(NearPromise),
 }
 
 /// Doesn't actually schedule any promises, only tracks what promises should be scheduled
@@ -53,10 +56,16 @@ impl PromiseHandler for PromiseTracker {
     }
 
     unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
-        args.iter()
-            .map(|arg| self.promise_create_call(arg))
-            .last()
-            .unwrap_or_else(|| PromiseId::new(0))
+        let id = self.take_id();
+        self.scheduled_promises.insert(
+            id,
+            PromiseArgs::Recursive(NearPromise::And(
+                args.iter()
+                    .map(|p| NearPromise::Simple(SimpleNearPromise::Create(p.clone())))
+                    .collect(),
+            )),
+        );
+        PromiseId::new(id)
     }
 
     unsafe fn promise_attach_callback(
