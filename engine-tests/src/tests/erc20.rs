@@ -8,8 +8,13 @@ use crate::utils::{
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
+use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, Erc20Metadata, SetErc20MetadataArgs,
+};
 use bstr::ByteSlice;
 use libsecp256k1::SecretKey;
+use std::str::FromStr;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
 const INITIAL_NONCE: u64 = 0;
@@ -235,6 +240,58 @@ fn deploy_erc_20_out_of_gas() {
         Wei::new_u64(INITIAL_BALANCE),
         (INITIAL_NONCE + 1).into(),
     );
+}
+
+#[test]
+fn test_erc20_get_and_set_metadata() {
+    let mut runner = utils::deploy_runner();
+    let token_account_id = "token";
+    let erc20_address = runner.deploy_erc20_token(token_account_id);
+    let caller = runner.aurora_account_id.clone();
+    // Getting ERC-20 metadata by Address.
+    let result = runner.one_shot().call(
+        "get_erc20_metadata",
+        &caller,
+        serde_json::to_vec::<Erc20Identifier>(&erc20_address.into()).unwrap(),
+    );
+
+    assert!(result.is_ok());
+
+    let metadata: Erc20Metadata =
+        serde_json::from_slice(&result.unwrap().return_data.as_value().unwrap()).unwrap();
+    assert_eq!(metadata, Erc20Metadata::default());
+
+    let new_metadata = Erc20Metadata {
+        name: "USD Token".to_string(),
+        symbol: "USDT".to_string(),
+        decimals: 20,
+    };
+
+    let result = runner.call(
+        "set_erc20_metadata",
+        &caller,
+        serde_json::to_vec(&SetErc20MetadataArgs {
+            erc20_identifier: erc20_address.into(),
+            metadata: new_metadata.clone(),
+        })
+        .unwrap(),
+    );
+    assert!(result.is_ok());
+
+    // Getting ERC-20 metadata by NEP-141 account id.
+    let result = runner.one_shot().call(
+        "get_erc20_metadata",
+        &caller,
+        serde_json::to_vec::<Erc20Identifier>(
+            &AccountId::from_str(token_account_id).unwrap().into(),
+        )
+        .unwrap(),
+    );
+    assert!(result.is_ok());
+
+    let metadata: Erc20Metadata =
+        serde_json::from_slice(&result.unwrap().return_data.as_value().unwrap()).unwrap();
+    assert_eq!(metadata, new_metadata);
 }
 
 fn get_address_erc20_balance(

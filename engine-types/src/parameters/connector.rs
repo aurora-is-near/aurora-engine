@@ -149,6 +149,38 @@ pub struct NEP141FtOnTransferArgs {
     pub msg: String,
 }
 
+#[derive(BorshSerialize)]
+pub struct EngineWithdrawCallArgs {
+    pub sender_id: AccountId,
+    pub recipient_address: Address,
+    pub amount: NEP141Wei,
+}
+
+/// `storage_unregister` eth-connector call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StorageUnregisterCallArgs {
+    pub force: Option<bool>,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct SetEthConnectorContractAccountArgs {
+    pub account: AccountId,
+    pub withdraw_serialize_type: WithdrawSerializeType,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub enum WithdrawSerializeType {
+    Json,
+    Borsh,
+}
+
+pub type PausedMask = u8;
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct PauseEthConnectorCallArgs {
+    pub paused_mask: PausedMask,
+}
+
 /// Fungible token Reference hash type.
 /// Used for `FungibleTokenMetadata`
 #[derive(Debug, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -217,6 +249,64 @@ impl rlp::Encodable for LogEntry {
         stream.append(&self.address);
         stream.append_list::<H256, _>(&self.topics);
         stream.append(&self.data);
+    }
+}
+
+/// Borsh-encoded parameters for `mirror_erc20_token` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct MirrorErc20TokenArgs {
+    /// AccountId of the main Aurora contract which has previously deployed ERC-20.
+    pub contract_id: AccountId,
+    /// AccountId of the bridged NEP-141 token.
+    pub nep141: AccountId,
+}
+
+/// Parameters for `set_erc20_metadata` function.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SetErc20MetadataArgs {
+    /// Address or corresponding NEP-141 account id of the ERC-20 contract.
+    pub erc20_identifier: Erc20Identifier,
+    /// Metadata of the ERC-20 contract.
+    pub metadata: Erc20Metadata,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Erc20Identifier {
+    Erc20 { address: Address },
+    Nep141 { account_id: AccountId },
+}
+
+impl From<Address> for Erc20Identifier {
+    fn from(address: Address) -> Self {
+        Self::Erc20 { address }
+    }
+}
+
+impl From<AccountId> for Erc20Identifier {
+    fn from(account_id: AccountId) -> Self {
+        Self::Nep141 { account_id }
+    }
+}
+
+/// Metadata of ERC-20 contract.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Erc20Metadata {
+    /// Name of the token.
+    pub name: String,
+    /// Symbol of the token.
+    pub symbol: String,
+    /// Number of decimals.
+    pub decimals: u8,
+}
+
+impl Default for Erc20Metadata {
+    fn default() -> Self {
+        Self {
+            name: "Empty".to_string(),
+            symbol: "EMPTY".to_string(),
+            decimals: 0,
+        }
     }
 }
 

@@ -382,7 +382,7 @@ fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
     }
 }
 
-mod workspace {
+pub mod workspace {
     use crate::tests::xcc::{check_fib_result, WNEAR_AMOUNT};
     use crate::utils;
     use crate::utils::workspace::{
@@ -704,7 +704,11 @@ mod workspace {
             engine_balance_after_xcc.max(engine_balance_before_xcc)
                 - engine_balance_after_xcc.min(engine_balance_before_xcc)
                 < 10_000_000_000_000_000_000_000,
-            "Engine lost too much NEAR funding xcc: Before={engine_balance_before_xcc} After={engine_balance_after_xcc}",
+            "Engine lost too much NEAR funding xcc: Before={:?} After={:?} Eq={:?}",
+            engine_balance_before_xcc,
+            engine_balance_after_xcc,
+            engine_balance_after_xcc.max(engine_balance_before_xcc)
+                - engine_balance_after_xcc.min(engine_balance_before_xcc)
         );
 
         let router_balance = aurora.node.get_balance(&router_account_id).await.unwrap();
@@ -752,7 +756,6 @@ mod workspace {
     async fn init_xcc() -> anyhow::Result<XccTestContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
-
         let xcc_wasm_bytes = super::contract_bytes();
         let result = aurora.factory_update(xcc_wasm_bytes).transact().await?;
         assert!(result.is_success());
@@ -851,10 +854,10 @@ mod workspace {
     }
 
     async fn get_engine_near_balance(aurora: &EngineContract) -> u128 {
-        aurora.ft_balance_of(&aurora.id()).await.unwrap().result.0
+        nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await
     }
 
-    async fn deploy_wnear(aurora: &EngineContract) -> anyhow::Result<RawContract> {
+    pub async fn deploy_wnear(aurora: &EngineContract) -> anyhow::Result<RawContract> {
         let contract_bytes = std::fs::read("src/tests/res/w_near.wasm").unwrap();
         let wrap_account = create_sub_account(&aurora.root(), "wrap", STORAGE_AMOUNT).await?;
         let contract = wrap_account.deploy(&contract_bytes).await?;

@@ -2,7 +2,7 @@ use crate::{sync::types::TransactionKindTag, TransactionIncluded};
 use aurora_engine_types::H256;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Error {
     BlockNotFound(H256),
     Borsh(String),

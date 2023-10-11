@@ -2,10 +2,14 @@ use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
 use crate::utils::solidity::exit_precompile::{
     Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS,
 };
-use crate::utils::{self, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
+use crate::utils::{self, deploy_runner, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
+    let wnear_token_address = runner.deploy_erc20_token("wrap.testnet");
+    runner
+        .factory_set_wnear_address(wnear_token_address)
+        .unwrap();
     let token = runner.deploy_erc20_token("tt.testnet");
     let mut signer = Signer::random();
     runner.create_address(
@@ -40,7 +44,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
 #[test]
 #[should_panic]
 fn test_deploy_erc20_token_with_invalid_account_id() {
-    let mut runner = AuroraRunner::new();
+    let mut runner = deploy_runner();
     let invalid_nep141 = "_";
     runner.deploy_erc20_token(invalid_nep141);
 }

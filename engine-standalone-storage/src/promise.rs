@@ -37,6 +37,10 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
         PromiseId::new(0)
     }
 
+    unsafe fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
+        PromiseId::new(0)
+    }
+
     unsafe fn promise_attach_callback(
         &mut self,
         _base: PromiseId,

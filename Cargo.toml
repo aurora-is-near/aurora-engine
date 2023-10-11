@@ -32,16 +32,16 @@ byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
 digest = "0.10"
 ethabi = { version = "18", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false, features = ["std"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.38.3-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8.0", default-features = false}
 function_name = "0.3.0"
-git2 = "0.17"
+git2 = "0.18"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
-impl-serde = { version = "0.4.0", default-features = false}
+impl-serde = { version = "0.4", default-features = false}
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.17"
@@ -56,9 +56,10 @@ num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
+reqwest = "0.11"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.5", default-features = false }
-rocksdb = { version = "0.19", default-features = false }
+rocksdb = { version = "0.21", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
@@ -83,6 +84,7 @@ members = [
     "engine-standalone-storage",
     "engine-standalone-tracing",
     "engine-tests",
+    "engine-tests-connector",
     "engine-transactions",
     "engine-types",
     "engine-workspace",

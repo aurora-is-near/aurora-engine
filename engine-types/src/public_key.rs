@@ -107,9 +107,10 @@ impl fmt::Display for PublicKey {
     }
 }
 
+#[derive(Debug, Copy, Clone, serde::Deserialize, serde::Serialize)]
 pub enum KeyType {
-    Ed25519,
-    Secp256k1,
+    Ed25519 = 0,
+    Secp256k1 = 1,
 }
 
 impl TryFrom<u8> for KeyType {
@@ -145,6 +146,15 @@ impl FromStr for KeyType {
             "ed25519" => Ok(Self::Ed25519),
             "secp256k1" => Ok(Self::Secp256k1),
             _ => Err(Self::Err::BadData(value.to_string())),
+        }
+    }
+}
+
+impl From<KeyType> for u8 {
+    fn from(key_type: KeyType) -> Self {
+        match key_type {
+            KeyType::Ed25519 => 0,
+            KeyType::Secp256k1 => 1,
         }
     }
 }
@@ -208,3 +218,21 @@ pub enum DecodeBs58Error {
     BadLength { expected: usize, received: usize },
     BadData(String),
 }
+
+#[cfg(feature = "std")]
+impl fmt::Display for DecodeBs58Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BadLength { expected, received } => {
+                write!(
+                    f,
+                    "Bad length of date: expected: {expected}, received: {received}"
+                )
+            }
+            Self::BadData(data) => write!(f, "Bad data: {data}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DecodeBs58Error {}

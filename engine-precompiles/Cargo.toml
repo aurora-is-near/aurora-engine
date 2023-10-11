@@ -37,3 +37,4 @@ borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-com
 contract = []
 log = []
 error_refund = []
+ext-connector = []

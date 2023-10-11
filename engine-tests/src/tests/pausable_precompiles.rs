@@ -19,11 +19,9 @@ fn test_paused_precompile_is_shown_when_viewing() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
+    let input = call_args.try_to_vec().unwrap();
 
-    let mut input: Vec<u8> = Vec::new();
-    call_args.serialize(&mut input).unwrap();
-
-    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
+    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let result = runner
         .one_shot()
         .call(PAUSED_PRECOMPILES, CALLED_ACCOUNT_ID, Vec::new())
@@ -42,11 +40,9 @@ fn test_executing_paused_precompile_throws_error() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
+    let input = call_args.try_to_vec().unwrap();
 
-    let mut input: Vec<u8> = Vec::new();
-    call_args.serialize(&mut input).unwrap();
-
-    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
+    let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let is_to_near = false;
     let error = tester
         .withdraw(&mut runner, &mut signer, is_to_near)
@@ -65,9 +61,7 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
-
-    let mut input: Vec<u8> = Vec::new();
-    call_args.serialize(&mut input).unwrap();
+    let input = call_args.try_to_vec().unwrap();
 
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
     let _res = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
@@ -89,10 +83,7 @@ fn test_resuming_precompile_does_not_throw_error() {
     let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
-
-    let mut input: Vec<u8> = Vec::new();
-    call_args.serialize(&mut input).unwrap();
-
+    let input = call_args.try_to_vec().unwrap();
     let result = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
 
     assert!(result.is_ok(), "{result:?}");

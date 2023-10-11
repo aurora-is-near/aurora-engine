@@ -11,13 +11,15 @@ use aurora_engine_types::{
 #[test]
 fn test_hashchain() {
     let (mut runner, mut signer, _) = crate::tests::sanity::initialize_transfer();
+    // Re-init the hashchain so we know the first tx is `start_hashchain`.
+    let account_id = runner.aurora_account_id.clone();
+    utils::init_hashchain(&mut runner, &account_id, None);
 
     // The tests initialize the hashchain with the default value.
     let hc = get_latest_hashchain(&runner);
-    // Hashchain starts 2 heights lower than the current context height because
-    // at `hc.block_height + 1` the `start_hashchain` is submitted and at
-    // `hc.block_height + 2` the signer address is created in the EVM state.
-    assert_eq!(hc.block_height, runner.context.block_height - 2);
+    // Hashchain starts 1 height lower than the current context height because
+    // at `hc.block_height + 1` the `start_hashchain` is submitted.
+    assert_eq!(hc.block_height, runner.context.block_height - 1);
     assert_eq!(hc.hashchain, hex::encode(H256::default()));
 
     // Execute a transaction and the hashchain changes
@@ -57,9 +59,7 @@ fn test_hashchain() {
             &Bloom::default(),
         )
         .unwrap();
-        // Skip a block height because at block_height + 1 there is no "real" transaction
-        // (that height is skipped when the signer address is directly inserted into the EVM state)
-        block_height += 2;
+        block_height += 1;
         hc.move_to_block(block_height).unwrap();
         // Insert the `submit` transaction we care about
         hc.add_block_tx(block_height, "submit", &input, &output, &Bloom::default())

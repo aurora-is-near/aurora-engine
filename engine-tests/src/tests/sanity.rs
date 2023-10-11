@@ -2,12 +2,12 @@ use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
-use aurora_engine::fungible_token::FungibleTokenMetadata;
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
-use evm::ExitFatal;
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
@@ -139,6 +139,7 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
+    #[cfg(not(feature = "ext-connector"))]
     let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
         let result = runner
             .one_shot()
@@ -163,6 +164,7 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
+    #[cfg(not(feature = "ext-connector"))]
     assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
@@ -176,6 +178,7 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
+    #[cfg(not(feature = "ext-connector"))]
     assert_eq!(
         get_total_supply(&mut runner),
         INITIAL_BALANCE - TRANSFER_AMOUNT
@@ -681,10 +684,12 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let num_functions = module.funcs.iter().count();
+    let expected_number = 1524;
+    let actual_number = module.funcs.iter().count();
+
     assert!(
-        num_functions <= 1445,
-        "{num_functions} is not less than 1445",
+        actual_number <= expected_number,
+        "{actual_number} is not less than {expected_number}",
     );
 }
 
@@ -1037,6 +1042,7 @@ fn test_block_hash_contract() {
     utils::panic_on_fail(result.status);
 }
 
+#[cfg(not(feature = "ext-connector"))]
 #[test]
 fn test_ft_metadata() {
     let runner = utils::deploy_runner();
@@ -1140,10 +1146,7 @@ fn test_set_owner_fail_on_same_owner() {
         .unwrap_err();
 
     // check error equality
-    assert_eq!(
-        error.kind,
-        EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_SAME_OWNER".into()))
-    );
+    assert_eq!(error.kind, EngineErrorKind::SameOwner);
 }
 
 #[test]

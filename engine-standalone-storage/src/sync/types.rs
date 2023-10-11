@@ -1,8 +1,10 @@
 use crate::Storage;
+use aurora_engine::contract_methods::connector::deposit_event;
 use aurora_engine::parameters;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::silo;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -116,16 +118,18 @@ pub enum TransactionKind {
     SetOwner(parameters::SetOwnerArgs),
     /// Admin only method; used to change upgrade delay blocks
     SetUpgradeDelayBlocks(parameters::SetUpgradeDelayBlocksArgs),
-    /// Admin only method
+    /// Set pause flags to eth-connector
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
-    /// Called if exist precompiles fail
-    RefundOnError(Option<aurora_engine_types::parameters::RefundCallArgs>),
+    /// Callback called by ExitToNear precompile, also can refund on fail
+    ExitToNear(Option<aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs>),
     /// Update eth-connector config
     SetConnectorData(parameters::SetContractDataCallArgs),
     /// Initialize eth-connector
     NewConnector(parameters::InitCallArgs),
+    /// Set account id of the external eth-connector.
+    SetEthConnectorContractAccount(parameters::SetEthConnectorContractAccountArgs),
     /// Initialize Engine
     NewEngine(parameters::NewCallArgs),
     /// Update xcc-router bytecode
@@ -133,7 +137,7 @@ pub enum TransactionKind {
     /// Update the version of a deployed xcc-router contract
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
-    FundXccSubAccound(FundXccArgs),
+    FundXccSubAccount(FundXccArgs),
     /// Pause the contract
     PauseContract,
     /// Resume the contract
@@ -145,6 +149,17 @@ pub enum TransactionKind {
     /// Remove the relayer public function call access key
     RemoveRelayerKey(parameters::RelayerKeyArgs),
     StartHashchain(parameters::StartHashchainArgs),
+    /// Set metadata of ERC-20 contract.
+    SetErc20Metadata(parameters::SetErc20MetadataArgs),
+    /// Silo operations
+    SetFixedGasCost(silo::FixedGasCostArgs),
+    SetSiloParams(Option<silo::SiloParamsArgs>),
+    AddEntryToWhitelist(silo::WhitelistArgs),
+    AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
+    RemoveEntryFromWhitelist(silo::WhitelistArgs),
+    SetWhitelistStatus(silo::WhitelistStatusArgs),
+    /// Callback which mirrors existed ERC-20 contract deployed on the main contract.
+    MirrorErc20TokenCallback(parameters::MirrorErc20TokenArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
     /// change in Aurora state, but we failed to parse the Action.
     Unknown,
@@ -215,7 +230,7 @@ impl TransactionKind {
                 let from = Self::get_implicit_address(caller);
                 let nonce =
                     Self::get_implicit_nonce(&from, block_height, transaction_position, storage);
-                let data = aurora_engine::engine::setup_deploy_erc20_input(engine_account);
+                let data = aurora_engine::engine::setup_deploy_erc20_input(engine_account, None);
                 NormalizedEthTransaction {
                     address: from,
                     chain_id: None,
@@ -231,11 +246,14 @@ impl TransactionKind {
             }
             Self::FtOnTransfer(args) => {
                 if engine_account == caller {
-                    let recipient = aurora_engine::deposit_event::FtTransferMessageData::parse_on_transfer_message(&args.msg).map(|data| data.recipient).unwrap_or_default();
+                    let recipient =
+                        deposit_event::FtTransferMessageData::parse_on_transfer_message(&args.msg)
+                            .map(|data| data.recipient)
+                            .unwrap_or_default();
                     let value = Wei::new(U256::from(args.amount.as_u128()));
                     // This transaction mints new ETH, so we'll say it comes from the zero address.
                     NormalizedEthTransaction {
-                        address: types::Address::default(),
+                        address: Address::default(),
                         chain_id: None,
                         nonce: U256::zero(),
                         gas_limit: U256::from(u64::MAX),
@@ -260,11 +278,11 @@ impl TransactionKind {
                         })
                         .result
                         .ok()
-                        .and_then(|bytes| types::Address::try_from_slice(&bytes).ok())
+                        .and_then(|bytes| Address::try_from_slice(&bytes).ok())
                         .unwrap_or_default();
                     let erc20_recipient = hex::decode(&args.msg.as_bytes()[0..40])
                         .ok()
-                        .and_then(|bytes| types::Address::try_from_slice(&bytes).ok())
+                        .and_then(|bytes| Address::try_from_slice(&bytes).ok())
                         .unwrap_or_default();
                     let data = aurora_engine::engine::setup_receive_erc20_tokens_input(
                         &args,
@@ -284,60 +302,65 @@ impl TransactionKind {
                     }
                 }
             }
-            Self::RefundOnError(maybe_args) => {
+            Self::ExitToNear(maybe_args) => {
+                let method_name = "exit_to_near_precompile_callback";
                 maybe_args.map_or_else(
-                    || Self::no_evm_execution("refund_on_error"),
+                    || Self::no_evm_execution(method_name),
                     |args| {
-                        args.erc20_address.map_or_else(
-                            || {
-                                // ETH refund
-                                let value = Wei::new(U256::from_big_endian(&args.amount));
-                                let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-                                let nonce = Self::get_implicit_nonce(
-                                    &from,
-                                    block_height,
-                                    transaction_position,
-                                    storage,
-                                );
-                                NormalizedEthTransaction {
-                                    address: from,
-                                    chain_id: None,
-                                    nonce,
-                                    gas_limit: U256::from(u64::MAX),
-                                    max_priority_fee_per_gas: U256::zero(),
-                                    max_fee_per_gas: U256::zero(),
-                                    to: Some(args.recipient_address),
-                                    value,
-                                    data: Vec::new(),
-                                    access_list: Vec::new(),
-                                }
-                            },
-                            |erc20_address| {
-                                // ERC-20 refund
-                                let from = Self::get_implicit_address(engine_account);
-                                let nonce = Self::get_implicit_nonce(
-                                    &from,
-                                    block_height,
-                                    transaction_position,
-                                    storage,
-                                );
-                                let to = erc20_address;
-                                let data = aurora_engine::engine::setup_refund_on_error_input(
-                                    U256::from_big_endian(&args.amount),
-                                    args.recipient_address,
-                                );
-                                NormalizedEthTransaction {
-                                    address: from,
-                                    chain_id: None,
-                                    nonce,
-                                    gas_limit: U256::from(u64::MAX),
-                                    max_priority_fee_per_gas: U256::zero(),
-                                    max_fee_per_gas: U256::zero(),
-                                    to: Some(to),
-                                    value: Wei::zero(),
-                                    data,
-                                    access_list: Vec::new(),
-                                }
+                        args.refund.map_or_else(
+                            || Self::no_evm_execution(method_name),
+                            |args| {
+                                args.erc20_address.map_or_else(|| {
+                                    // ETH refund
+                                    let value = Wei::new(U256::from_big_endian(&args.amount));
+                                    let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+                                    let nonce = Self::get_implicit_nonce(
+                                        &from,
+                                        block_height,
+                                        transaction_position,
+                                        storage,
+                                    );
+                                    NormalizedEthTransaction {
+                                        address: from,
+                                        chain_id: None,
+                                        nonce,
+                                        gas_limit: U256::from(u64::MAX),
+                                        max_priority_fee_per_gas: U256::zero(),
+                                        max_fee_per_gas: U256::zero(),
+                                        to: Some(args.recipient_address),
+                                        value,
+                                        data: Vec::new(),
+                                        access_list: Vec::new(),
+                                    }
+                                },
+                                   |erc20_address| {
+                                       // ERC-20 refund
+                                       let from = Self::get_implicit_address(engine_account);
+                                       let nonce = Self::get_implicit_nonce(
+                                           &from,
+                                           block_height,
+                                           transaction_position,
+                                           storage,
+                                       );
+                                       let to = erc20_address;
+                                       let data = aurora_engine::engine::setup_refund_on_error_input(
+                                           U256::from_big_endian(&args.amount),
+                                           args.recipient_address,
+                                       );
+                                       NormalizedEthTransaction {
+                                           address: from,
+                                           chain_id: None,
+                                           nonce,
+                                           gas_limit: U256::from(u64::MAX),
+                                           max_priority_fee_per_gas: U256::zero(),
+                                           max_fee_per_gas: U256::zero(),
+                                           to: Some(to),
+                                           value: Wei::zero(),
+                                           data,
+                                           access_list: Vec::new(),
+                                       }
+                                   },
+                                )
                             },
                         )
                     },
@@ -356,6 +379,9 @@ impl TransactionKind {
             Self::RegisterRelayer(_) => Self::no_evm_execution("register_relayer"),
             Self::SetConnectorData(_) => Self::no_evm_execution("set_connector_data"),
             Self::NewConnector(_) => Self::no_evm_execution("new_connector"),
+            Self::SetEthConnectorContractAccount(_) => {
+                Self::no_evm_execution("set_eth_connector_contract_account")
+            }
             Self::NewEngine(_) => Self::no_evm_execution("new_engine"),
             Self::FactoryUpdate(_) => Self::no_evm_execution("factory_update"),
             Self::FactoryUpdateAddressVersion(_) => {
@@ -367,13 +393,27 @@ impl TransactionKind {
             Self::ResumePrecompiles(_) => Self::no_evm_execution("resume_precompiles"),
             Self::SetOwner(_) => Self::no_evm_execution("set_owner"),
             Self::SetUpgradeDelayBlocks(_) => Self::no_evm_execution("set_upgrade_delay_blocks"),
-            Self::FundXccSubAccound(_) => Self::no_evm_execution("fund_xcc_sub_account"),
+            Self::FundXccSubAccount(_) => Self::no_evm_execution("fund_xcc_sub_account"),
             Self::PauseContract => Self::no_evm_execution("pause_contract"),
             Self::ResumeContract => Self::no_evm_execution("resume_contract"),
             Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
             Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
             Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
+            Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
+            Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
+            Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
+            Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
+            Self::AddEntryToWhitelistBatch(_) => {
+                Self::no_evm_execution("add_entry_to_whitelist_batch")
+            }
+            Self::RemoveEntryFromWhitelist(_) => {
+                Self::no_evm_execution("remove_entry_from_whitelist")
+            }
+            Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
+            Self::MirrorErc20TokenCallback(_) => {
+                Self::no_evm_execution("mirror_erc20_token_callback")
+            }
         }
     }
 
@@ -450,8 +490,8 @@ pub enum TransactionKindTag {
     SetPausedFlags,
     #[strum(serialize = "register_relayer")]
     RegisterRelayer,
-    #[strum(serialize = "refund_on_error")]
-    RefundOnError,
+    #[strum(serialize = "exit_to_near_precompile_callback")]
+    ExitToNear,
     #[strum(serialize = "set_eth_connector_contract_data")]
     SetConnectorData,
     #[strum(serialize = "new_eth_connector")]
@@ -471,7 +511,7 @@ pub enum TransactionKindTag {
     #[strum(serialize = "set_upgrade_delay_blocks")]
     SetUpgradeDelayBlocks,
     #[strum(serialize = "fund_xcc_sub_account")]
-    FundXccSubAccound,
+    FundXccSubAccount,
     #[strum(serialize = "pause_contract")]
     PauseContract,
     #[strum(serialize = "resume_contract")]
@@ -484,6 +524,24 @@ pub enum TransactionKindTag {
     RemoveRelayerKey,
     #[strum(serialize = "start_hashchain")]
     StartHashchain,
+    #[strum(serialize = "set_erc20_metadata")]
+    SetErc20Metadata,
+    #[strum(serialize = "set_eth_connector_contract_account")]
+    SetEthConnectorContractAccount,
+    #[strum(serialize = "set_fixed_gas_cost")]
+    SetFixedGasCost,
+    #[strum(serialize = "set_silo_params")]
+    SetSiloParams,
+    #[strum(serialize = "set_whitelist_status")]
+    SetWhitelistStatus,
+    #[strum(serialize = "add_entry_to_whitelist")]
+    AddEntryToWhitelist,
+    #[strum(serialize = "add_entry_to_whitelist_batch")]
+    AddEntryToWhitelistBatch,
+    #[strum(serialize = "remove_entry_from_whitelist")]
+    RemoveEntryFromWhitelist,
+    #[strum(serialize = "mirror_erc20_token_callback")]
+    MirrorErc20TokenCallback,
     Unknown,
 }
 
@@ -516,7 +574,7 @@ impl TransactionKind {
             Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
                 address.as_bytes().to_vec()
             }
-            Self::RefundOnError(maybe_args) => maybe_args
+            Self::ExitToNear(maybe_args) => maybe_args
                 .as_ref()
                 .and_then(|args| args.try_to_vec().ok())
                 .unwrap_or_default(),
@@ -525,13 +583,23 @@ impl TransactionKind {
             }
             Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
             Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
-            Self::FundXccSubAccound(args) => args.try_to_vec().unwrap_or_default(),
+            Self::FundXccSubAccount(args) => args.try_to_vec().unwrap_or_default(),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
             Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
             Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
                 args.try_to_vec().unwrap_or_default()
             }
             Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
+            Self::SetFixedGasCost(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetSiloParams(args) => args.try_to_vec().unwrap_or_default(),
+            Self::AddEntryToWhitelist(args) | Self::RemoveEntryFromWhitelist(args) => {
+                args.try_to_vec().unwrap_or_default()
+            }
+            Self::AddEntryToWhitelistBatch(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetWhitelistStatus(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetEthConnectorContractAccount(args) => args.try_to_vec().unwrap_or_default(),
+            Self::MirrorErc20TokenCallback(args) => args.try_to_vec().unwrap_or_default(),
         }
     }
 }
@@ -558,7 +626,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::StorageWithdraw(_) => Self::StorageWithdraw,
             TransactionKind::SetPausedFlags(_) => Self::SetPausedFlags,
             TransactionKind::RegisterRelayer(_) => Self::RegisterRelayer,
-            TransactionKind::RefundOnError(_) => Self::RefundOnError,
+            TransactionKind::ExitToNear(_) => Self::ExitToNear,
             TransactionKind::SetConnectorData(_) => Self::SetConnectorData,
             TransactionKind::NewConnector(_) => Self::NewConnector,
             TransactionKind::NewEngine(_) => Self::NewEngine,
@@ -568,14 +636,25 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::SetOwner(_) => Self::SetOwner,
             TransactionKind::SubmitWithArgs(_) => Self::SubmitWithArgs,
             TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
-            TransactionKind::FundXccSubAccound(_) => Self::FundXccSubAccound,
+            TransactionKind::FundXccSubAccount(_) => Self::FundXccSubAccount,
             TransactionKind::PauseContract => Self::PauseContract,
             TransactionKind::ResumeContract => Self::ResumeContract,
             TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
             TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
             TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
             TransactionKind::StartHashchain(_) => Self::StartHashchain,
+            TransactionKind::SetErc20Metadata(_) => Self::SetErc20Metadata,
+            TransactionKind::SetEthConnectorContractAccount(_) => {
+                Self::SetEthConnectorContractAccount
+            }
+            TransactionKind::SetFixedGasCost(_) => Self::SetFixedGasCost,
+            TransactionKind::SetSiloParams(_) => Self::SetSiloParams,
+            TransactionKind::AddEntryToWhitelist(_) => Self::AddEntryToWhitelist,
+            TransactionKind::AddEntryToWhitelistBatch(_) => Self::AddEntryToWhitelistBatch,
+            TransactionKind::RemoveEntryFromWhitelist(_) => Self::RemoveEntryFromWhitelist,
+            TransactionKind::SetWhitelistStatus(_) => Self::SetWhitelistStatus,
             TransactionKind::Unknown => Self::Unknown,
+            TransactionKind::MirrorErc20TokenCallback(_) => Self::MirrorErc20TokenCallback,
         }
     }
 }
@@ -714,6 +793,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 /// Same as `TransactionKind`, but with `Submit` variant replaced with raw bytes
 /// so that it can derive the Borsh traits. All non-copy elements are `Cow` also
 /// so that this type can be cheaply created from a `TransactionKind` reference.
+/// !!!!! New types of transactions must be added at the end of the enum. !!!!!!
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
@@ -735,7 +815,9 @@ enum BorshableTransactionKind<'a> {
     StorageWithdraw(Cow<'a, parameters::StorageWithdrawCallArgs>),
     SetPausedFlags(Cow<'a, parameters::PauseEthConnectorCallArgs>),
     RegisterRelayer(Cow<'a, Address>),
-    RefundOnError(Cow<'a, Option<aurora_engine_types::parameters::RefundCallArgs>>),
+    ExitToNear(
+        Cow<'a, Option<aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs>>,
+    ),
     SetConnectorData(Cow<'a, parameters::SetContractDataCallArgs>),
     NewConnector(Cow<'a, parameters::InitCallArgs>),
     NewEngine(Cow<'a, parameters::NewCallArgs>),
@@ -747,7 +829,7 @@ enum BorshableTransactionKind<'a> {
     Unknown,
     SetOwner(Cow<'a, parameters::SetOwnerArgs>),
     SubmitWithArgs(Cow<'a, parameters::SubmitArgs>),
-    FundXccSubAccound(Cow<'a, FundXccArgs>),
+    FundXccSubAccount(Cow<'a, FundXccArgs>),
     SetUpgradeDelayBlocks(Cow<'a, parameters::SetUpgradeDelayBlocksArgs>),
     PauseContract,
     ResumeContract,
@@ -755,6 +837,15 @@ enum BorshableTransactionKind<'a> {
     AddRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     StartHashchain(Cow<'a, parameters::StartHashchainArgs>),
+    SetErc20Metadata(Cow<'a, parameters::SetErc20MetadataArgs>),
+    SetFixedGasCost(Cow<'a, silo::FixedGasCostArgs>),
+    SetSiloParams(Cow<'a, Option<silo::SiloParamsArgs>>),
+    AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
+    AddEntryToWhitelistBatch(Cow<'a, Vec<silo::WhitelistArgs>>),
+    RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
+    SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
+    SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
+    MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -782,7 +873,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::StorageWithdraw(x) => Self::StorageWithdraw(Cow::Borrowed(x)),
             TransactionKind::SetPausedFlags(x) => Self::SetPausedFlags(Cow::Borrowed(x)),
             TransactionKind::RegisterRelayer(x) => Self::RegisterRelayer(Cow::Borrowed(x)),
-            TransactionKind::RefundOnError(x) => Self::RefundOnError(Cow::Borrowed(x)),
+            TransactionKind::ExitToNear(x) => Self::ExitToNear(Cow::Borrowed(x)),
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
             TransactionKind::NewEngine(x) => Self::NewEngine(Cow::Borrowed(x)),
@@ -796,8 +887,11 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
             TransactionKind::ResumePrecompiles(x) => Self::ResumePrecompiles(Cow::Borrowed(x)),
+            TransactionKind::SetEthConnectorContractAccount(x) => {
+                Self::SetEthConnectorContractAccount(Cow::Borrowed(x))
+            }
             TransactionKind::SetOwner(x) => Self::SetOwner(Cow::Borrowed(x)),
-            TransactionKind::FundXccSubAccound(x) => Self::FundXccSubAccound(Cow::Borrowed(x)),
+            TransactionKind::FundXccSubAccount(x) => Self::FundXccSubAccount(Cow::Borrowed(x)),
             TransactionKind::SetUpgradeDelayBlocks(x) => {
                 Self::SetUpgradeDelayBlocks(Cow::Borrowed(x))
             }
@@ -807,6 +901,20 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
             TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
             TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
+            TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
+            TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
+            TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
+            TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
+            TransactionKind::AddEntryToWhitelistBatch(x) => {
+                Self::AddEntryToWhitelistBatch(Cow::Borrowed(x))
+            }
+            TransactionKind::RemoveEntryFromWhitelist(x) => {
+                Self::RemoveEntryFromWhitelist(Cow::Borrowed(x))
+            }
+            TransactionKind::SetWhitelistStatus(x) => Self::SetWhitelistStatus(Cow::Borrowed(x)),
+            TransactionKind::MirrorErc20TokenCallback(x) => {
+                Self::MirrorErc20TokenCallback(Cow::Borrowed(x))
+            }
         }
     }
 }
@@ -845,7 +953,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::RegisterRelayer(x) => {
                 Ok(Self::RegisterRelayer(x.into_owned()))
             }
-            BorshableTransactionKind::RefundOnError(x) => Ok(Self::RefundOnError(x.into_owned())),
+            BorshableTransactionKind::ExitToNear(x) => Ok(Self::ExitToNear(x.into_owned())),
             BorshableTransactionKind::SetConnectorData(x) => {
                 Ok(Self::SetConnectorData(x.into_owned()))
             }
@@ -865,9 +973,12 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumePrecompiles(x) => {
                 Ok(Self::ResumePrecompiles(x.into_owned()))
             }
+            BorshableTransactionKind::SetEthConnectorContractAccount(x) => {
+                Ok(Self::SetEthConnectorContractAccount(x.into_owned()))
+            }
             BorshableTransactionKind::SetOwner(x) => Ok(Self::SetOwner(x.into_owned())),
-            BorshableTransactionKind::FundXccSubAccound(x) => {
-                Ok(Self::FundXccSubAccound(x.into_owned()))
+            BorshableTransactionKind::FundXccSubAccount(x) => {
+                Ok(Self::FundXccSubAccount(x.into_owned()))
             }
             BorshableTransactionKind::SetUpgradeDelayBlocks(x) => {
                 Ok(Self::SetUpgradeDelayBlocks(x.into_owned()))
@@ -880,6 +991,28 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 Ok(Self::RemoveRelayerKey(x.into_owned()))
             }
             BorshableTransactionKind::StartHashchain(x) => Ok(Self::StartHashchain(x.into_owned())),
+            BorshableTransactionKind::SetErc20Metadata(x) => {
+                Ok(Self::SetErc20Metadata(x.into_owned()))
+            }
+            BorshableTransactionKind::SetFixedGasCost(x) => {
+                Ok(Self::SetFixedGasCost(x.into_owned()))
+            }
+            BorshableTransactionKind::SetSiloParams(x) => Ok(Self::SetSiloParams(x.into_owned())),
+            BorshableTransactionKind::AddEntryToWhitelist(x) => {
+                Ok(Self::AddEntryToWhitelist(x.into_owned()))
+            }
+            BorshableTransactionKind::AddEntryToWhitelistBatch(x) => {
+                Ok(Self::AddEntryToWhitelistBatch(x.into_owned()))
+            }
+            BorshableTransactionKind::RemoveEntryFromWhitelist(x) => {
+                Ok(Self::RemoveEntryFromWhitelist(x.into_owned()))
+            }
+            BorshableTransactionKind::SetWhitelistStatus(x) => {
+                Ok(Self::SetWhitelistStatus(x.into_owned()))
+            }
+            BorshableTransactionKind::MirrorErc20TokenCallback(x) => {
+                Ok(Self::MirrorErc20TokenCallback(x.into_owned()))
+            }
         }
     }
 }

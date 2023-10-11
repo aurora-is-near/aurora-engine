@@ -8,7 +8,6 @@ use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::executor;
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
-use crate::connector::EthConnectorContract;
 use crate::map::BijectionMap;
 use crate::{errors, state};
 use aurora_engine_sdk::caching::FullCache;
@@ -17,6 +16,9 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
 use crate::accounting;
+#[cfg(not(feature = "ext-connector"))]
+use crate::contract_methods::connector;
+use crate::contract_methods::silo;
 use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
@@ -28,12 +30,17 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, ToString, Vec, Wei,
-    Yocto, ERC20_MINT_SELECTOR, H160, H256, U256,
+    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
+    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
+    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
+};
+use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use core::cell::RefCell;
 use core::iter::once;
 
@@ -113,7 +120,11 @@ pub enum EngineErrorKind {
     MaxPriorityGasFeeTooLarge,
     GasPayment(GasPaymentError),
     GasOverflow,
+    NotAllowed,
+    SameOwner,
+    NotOwner,
     NonExistedKey,
+    Erc20FromNep141,
 }
 
 impl EngineErrorKind {
@@ -147,7 +158,11 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::NotAllowed => errors::ERR_NOT_ALLOWED,
+            Self::SameOwner => errors::ERR_SAME_OWNER,
+            Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
+            Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -296,27 +311,20 @@ impl TryFrom<Vec<u8>> for NEP141Account {
     }
 }
 
-pub const ERR_INVALID_NEP141_ACCOUNT_ID: &str = "ERR_INVALID_NEP141_ACCOUNT_ID";
-
 #[derive(Debug)]
 pub enum GetErc20FromNep141Error {
     InvalidNep141AccountId,
     Nep141NotFound,
-}
-
-impl GetErc20FromNep141Error {
-    #[must_use]
-    pub const fn to_str(&self) -> &str {
-        match self {
-            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
-            Self::Nep141NotFound => "ERR_NEP141_NOT_FOUND",
-        }
-    }
+    InvalidAddress,
 }
 
 impl AsRef<[u8]> for GetErc20FromNep141Error {
     fn as_ref(&self) -> &[u8] {
-        self.to_str().as_bytes()
+        match self {
+            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
+            Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+        }
     }
 }
 
@@ -324,21 +332,37 @@ impl AsRef<[u8]> for GetErc20FromNep141Error {
 pub enum RegisterTokenError {
     InvalidNep141AccountId,
     TokenAlreadyRegistered,
-}
-
-impl RegisterTokenError {
-    #[must_use]
-    pub const fn to_str(&self) -> &str {
-        match self {
-            Self::InvalidNep141AccountId => ERR_INVALID_NEP141_ACCOUNT_ID,
-            Self::TokenAlreadyRegistered => "ERR_NEP141_TOKEN_ALREADY_REGISTERED",
-        }
-    }
+    InvalidAddress,
 }
 
 impl AsRef<[u8]> for RegisterTokenError {
     fn as_ref(&self) -> &[u8] {
-        self.to_str().as_bytes()
+        match self {
+            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
+            Self::TokenAlreadyRegistered => errors::ERR_NEP141_TOKEN_ALREADY_REGISTERED,
+            Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ReadMetadataError {
+    DecodeError,
+    WrongType,
+    NoValue,
+    Nep141NotFound,
+    EngineError(EngineErrorKind),
+}
+
+impl AsRef<[u8]> for ReadMetadataError {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::DecodeError => errors::ERR_DECODING_TOKEN,
+            Self::WrongType => errors::ERR_WRONG_TOKEN_TYPE,
+            Self::NoValue => errors::ERR_TOKEN_NO_VALUE,
+            Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
+            Self::EngineError(e) => e.as_ref(),
+        }
     }
 }
 
@@ -432,23 +456,31 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         sender: &Address,
         transaction: &NormalizedEthTransaction,
         max_gas_price: Option<U256>,
+        fixed_gas_cost: Option<Wei>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() {
+        if transaction.max_fee_per_gas.is_zero() && fixed_gas_cost.is_none() {
             return Ok(GasPaymentResult::default());
         }
 
-        let priority_fee_per_gas = transaction
-            .max_priority_fee_per_gas
-            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
-        let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
-            price.min(priority_fee_per_gas)
-        });
-        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
-        let gas_limit = transaction.gas_limit;
-        let prepaid_amount = gas_limit
-            .checked_mul(effective_gas_price)
-            .map(Wei::new)
-            .ok_or(GasPaymentError::EthAmountOverflow)?;
+        let (prepaid_amount, effective_gas_price, priority_fee_per_gas) =
+            if let Some(cost) = fixed_gas_cost {
+                (cost, cost.raw(), cost.raw())
+            } else {
+                let priority_fee_per_gas = transaction
+                    .max_priority_fee_per_gas
+                    .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+                let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
+                    price.min(priority_fee_per_gas)
+                });
+                let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+                let prepaid_amount = transaction
+                    .gas_limit
+                    .checked_mul(effective_gas_price)
+                    .map(Wei::new)
+                    .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+                (prepaid_amount, effective_gas_price, priority_fee_per_gas)
+            };
 
         let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
@@ -468,18 +500,21 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn deploy_code_with_input<P: PromiseHandler>(
         &mut self,
         input: Vec<u8>,
+        address: Option<Address>,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let origin = Address::new(self.origin());
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, u64::MAX, Vec::new(), handler)
+        self.deploy_code(origin, value, input, address, u64::MAX, Vec::new(), handler)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn deploy_code<P: PromiseHandler>(
         &mut self,
         origin: Address,
         value: Wei,
         input: Vec<u8>,
+        address: Option<Address>,
         gas_limit: u64,
         access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
         handler: &mut P,
@@ -489,11 +524,27 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
         let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
-        let address = executor.create_address(CreateScheme::Legacy {
-            caller: origin.raw(),
-        });
-        let (exit_reason, return_value) =
-            executor.transact_create(origin.raw(), value.raw(), input, gas_limit, access_list);
+        let scheme = address.map_or_else(
+            || CreateScheme::Legacy {
+                caller: origin.raw(),
+            },
+            |address| CreateScheme::Fixed(address.raw()),
+        );
+        let address = executor.create_address(scheme);
+        let (exit_reason, return_value) = match scheme {
+            CreateScheme::Legacy { caller } => {
+                executor.transact_create(caller, value.raw(), input, gas_limit, access_list)
+            }
+            CreateScheme::Fixed(address) => executor.transact_create_fixed(
+                origin.raw(),
+                address,
+                value.raw(),
+                input,
+                gas_limit,
+                access_list,
+            ),
+            CreateScheme::Create2 { .. } => unreachable!(),
+        };
         let result = if exit_reason.is_succeed() {
             address.0.to_vec()
         } else {
@@ -650,6 +701,9 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
                 return Err(RegisterTokenError::InvalidNep141AccountId);
             }
+            Err(GetErc20FromNep141Error::InvalidAddress) => {
+                return Err(RegisterTokenError::InvalidAddress);
+            }
             Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
         }
 
@@ -660,7 +714,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     }
 
     /// Transfers an amount from a given sender to a receiver, provided that
-    /// the have enough in their balance.
+    /// they have enough in their balance.
     ///
     /// If the sender can send, and the receiver can receive, then the transfer
     /// will execute successfully.
@@ -683,7 +737,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         )
     }
 
-    /// Mint tokens for recipient on a particular ERC20 token
+    /// Mint tokens for recipient on a particular ERC-20 token
     /// This function should return the amount of tokens unused,
     /// which will be always all (<amount>) if there is any problem
     /// with the input, or 0 if tokens were minted successfully.
@@ -704,7 +758,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let output_on_fail = str_amount.as_bytes();
 
         // Parse message to determine recipient
-        let recipient = {
+        let mut recipient = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
@@ -717,6 +771,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 output_on_fail,
                 self.io
             )))
+        };
+
+        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
+            if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
+                recipient = fallback_address;
+            }
         };
 
         let erc20_token = Address::from_array(unwrap_res_or_finish!(
@@ -784,6 +844,75 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         self.io.return_output(b"\"0\"");
     }
 
+    /// Read metadata of ERC-20 contract.
+    pub fn get_erc20_metadata(
+        &self,
+        erc20_identifier: &Erc20Identifier,
+    ) -> Result<Erc20Metadata, ReadMetadataError> {
+        let erc20_address = self
+            .identifier_to_address(erc20_identifier)
+            .map_err(|_| ReadMetadataError::Nep141NotFound)?;
+        let name = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_NAME_SELECTOR,
+                &[ethabi::ParamType::String],
+            )?
+            .into_string()
+            .ok_or(ReadMetadataError::WrongType)?;
+        let symbol = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_SYMBOL_SELECTOR,
+                &[ethabi::ParamType::String],
+            )?
+            .into_string()
+            .ok_or(ReadMetadataError::WrongType)?;
+        let decimals = self
+            .view_with_selector(
+                erc20_address,
+                ERC20_DIGITS_SELECTOR,
+                &[ethabi::ParamType::Uint(8)],
+            )?
+            .into_uint()
+            .ok_or(ReadMetadataError::WrongType)?
+            .try_into()
+            .map_err(|_| ReadMetadataError::WrongType)?;
+
+        Ok(Erc20Metadata {
+            name,
+            symbol,
+            decimals,
+        })
+    }
+
+    /// Set metadata of ERC-20 contract.
+    pub fn set_erc20_metadata<P: PromiseHandler>(
+        &mut self,
+        erc20_identifier: &Erc20Identifier,
+        erc20_metadata: Erc20Metadata,
+        handler: &mut P,
+    ) -> EngineResult<SubmitResult> {
+        let erc20_address = self
+            .identifier_to_address(erc20_identifier)
+            .map_err(|_| EngineErrorKind::Erc20FromNep141)?;
+        let args = ethabi::encode(&[
+            ethabi::Token::String(erc20_metadata.name),
+            ethabi::Token::String(erc20_metadata.symbol),
+            ethabi::Token::Uint(erc20_metadata.decimals.into()),
+        ]);
+        let input = [ERC20_SET_METADATA_SELECTOR, &args].concat();
+
+        self.call_with_args(
+            CallArgs::V2(FunctionCallArgsV2 {
+                contract: erc20_address,
+                value: [0; 32],
+                input,
+            }),
+            handler,
+        )
+    }
+
     fn create_precompiles<P: PromiseHandler>(
         &self,
         pause_flags: PrecompileFlags,
@@ -821,6 +950,44 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             all_precompiles: precompiles.all_precompiles,
         }
     }
+
+    fn view_with_selector(
+        &self,
+        contract_address: Address,
+        selector: &[u8],
+        output_types: &[ethabi::ParamType],
+    ) -> Result<ethabi::Token, ReadMetadataError> {
+        let result = self.view_with_args(ViewCallArgs {
+            sender: self.origin,
+            address: contract_address,
+            amount: [0; 32],
+            input: selector.to_vec(),
+        });
+
+        let output = match result.map_err(ReadMetadataError::EngineError)? {
+            TransactionStatus::Succeed(bytes) => bytes,
+            _ => Vec::new(),
+        };
+
+        ethabi::decode(output_types, &output)
+            .map_err(|_| ReadMetadataError::DecodeError)?
+            .pop()
+            .ok_or(ReadMetadataError::NoValue)
+    }
+
+    fn identifier_to_address(
+        &self,
+        identifier: &Erc20Identifier,
+    ) -> Result<Address, GetErc20FromNep141Error> {
+        match identifier {
+            Erc20Identifier::Erc20 { address } => Ok(*address),
+            Erc20Identifier::Nep141 { account_id } => get_erc20_from_nep141(&self.io, account_id)
+                .and_then(|bytes| {
+                    Address::try_from_slice(&bytes)
+                        .map_err(|_| GetErc20FromNep141Error::InvalidAddress)
+                }),
+        }
+    }
 }
 
 pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
@@ -843,6 +1010,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     )
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn submit_with_alt_modexp<
     I: IO + Copy,
     E: Env,
@@ -881,6 +1049,21 @@ pub fn submit_with_alt_modexp<
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
 
+    let fixed_gas_cost = silo::get_fixed_gas_cost(&io);
+    let transaction = if fixed_gas_cost.is_some() {
+        let mut tx = transaction;
+        // In the case of SILO, we don't care about gas value because the price is fixed.
+        // So we can change `gas_limit` to the max value for EVM. It excludes the ERR_INTRINSIC_GAS
+        // error if a user sets a gas limit value lower than needed for transaction execution.
+        tx.gas_limit = u64::MAX.into();
+        tx
+    } else {
+        transaction
+    };
+
+    // Check if the sender has rights to submit transactions or deploy code on SILO mode.
+    assert_access(&io, env, &fixed_gas_cost, &transaction)?;
+
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
         if U256::from(chain_id) != U256::from(state.chain_id) {
@@ -895,14 +1078,16 @@ pub fn submit_with_alt_modexp<
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(CONFIG) {
-        Err(_e) => {
-            return Err(EngineErrorKind::GasOverflow.into());
-        }
-        Ok(intrinsic_gas) => {
-            if transaction.gas_limit < intrinsic_gas.into() {
-                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
+    if fixed_gas_cost.is_none() {
+        // Check intrinsic gas is covered by transaction gas limit
+        match transaction.intrinsic_gas(CONFIG) {
+            Err(_e) => {
+                return Err(EngineErrorKind::GasOverflow.into());
+            }
+            Ok(intrinsic_gas) => {
+                if transaction.gas_limit < intrinsic_gas.into() {
+                    return Err(EngineErrorKind::IntrinsicGasNotMet.into());
+                }
             }
         }
     }
@@ -913,14 +1098,15 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
+    let max_gas_price = args.max_gas_price.map(Into::into);
     let prepaid_amount =
-        match engine.charge_gas(&sender, &transaction, args.max_gas_price.map(Into::into)) {
+        match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas_cost) {
             Ok(gas_result) => gas_result,
             Err(err) => {
                 return Err(EngineErrorKind::GasPayment(err).into());
             }
         };
-    let gas_limit: u64 = transaction
+    let gas_limit = transaction
         .gas_limit
         .try_into()
         .map_err(|_| EngineErrorKind::GasOverflow)?;
@@ -946,6 +1132,7 @@ pub fn submit_with_alt_modexp<
             sender,
             transaction.value,
             transaction.data,
+            None,
             gas_limit,
             access_list,
             handler,
@@ -953,17 +1140,19 @@ pub fn submit_with_alt_modexp<
         // TODO: charge for storage
     };
 
-    // Give refund
+    // Give refund.
     let gas_used = match &result {
         Ok(submit_result) => submit_result.gas_used,
         Err(engine_err) => engine_err.gas_used,
     };
+
     refund_unused_gas(
         &mut io,
         &sender,
         gas_used,
         &prepaid_amount,
         &relayer_address,
+        fixed_gas_cost,
     )
     .map_err(|e| EngineError {
         gas_used,
@@ -1075,28 +1264,40 @@ pub fn refund_unused_gas<I: IO>(
     gas_used: u64,
     gas_result: &GasPaymentResult,
     relayer: &Address,
+    fixed_gas_cost: Option<Wei>,
 ) -> Result<(), GasPaymentError> {
     if gas_result.effective_gas_price.is_zero() {
         return Ok(());
     }
 
-    let gas_to_wei = |price: U256| {
-        U256::from(gas_used)
-            .checked_mul(price)
-            .map(Wei::new)
-            .ok_or(GasPaymentError::EthAmountOverflow)
+    let (refund, relayer_reward) = if let Some(fixed_cost) = fixed_gas_cost {
+        (Wei::zero(), fixed_cost)
+    } else {
+        let gas_to_wei = |price: U256| {
+            U256::from(gas_used)
+                .checked_mul(price)
+                .map(Wei::new)
+                .ok_or(GasPaymentError::EthAmountOverflow)
+        };
+
+        let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
+        let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+
+        let refund = gas_result
+            .prepaid_amount
+            .checked_sub(spent_amount)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
+
+        (refund, reward_amount)
     };
 
-    let spent_amount = gas_to_wei(gas_result.effective_gas_price)?;
-    let reward_amount = gas_to_wei(gas_result.priority_fee_per_gas)?;
+    if !refund.is_zero() {
+        add_balance(io, sender, refund)?;
+    }
 
-    let refund = gas_result
-        .prepaid_amount
-        .checked_sub(spent_amount)
-        .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-    add_balance(io, sender, refund)?;
-    add_balance(io, relayer, reward_amount)?;
+    if !relayer_reward.is_zero() {
+        add_balance(io, relayer, relayer_reward)?;
+    }
 
     Ok(())
 }
@@ -1116,18 +1317,22 @@ pub fn setup_receive_erc20_tokens_input(
 }
 
 #[must_use]
-pub fn setup_deploy_erc20_input(current_account_id: &AccountId) -> Vec<u8> {
+pub fn setup_deploy_erc20_input(
+    current_account_id: &AccountId,
+    erc20_metadata: Option<Erc20Metadata>,
+) -> Vec<u8> {
     #[cfg(feature = "error_refund")]
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
     #[cfg(not(feature = "error_refund"))]
     let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
 
     let erc20_admin_address = current_address(current_account_id);
+    let erc20_metadata = erc20_metadata.unwrap_or_default();
 
     let deploy_args = ethabi::encode(&[
-        ethabi::Token::String("Empty".to_string()),
-        ethabi::Token::String("EMPTY".to_string()),
-        ethabi::Token::Uint(ethabi::Uint::from(0)),
+        ethabi::Token::String(erc20_metadata.name),
+        ethabi::Token::String(erc20_metadata.symbol),
+        ethabi::Token::Uint(erc20_metadata.decimals.into()),
         ethabi::Token::Address(erc20_admin_address.raw()),
     ]);
 
@@ -1142,7 +1347,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id);
+    let input = setup_deploy_erc20_input(&current_account_id, None);
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1153,7 +1358,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     )
     .map_err(DeployErc20Error::State)?;
 
-    let address = match Engine::deploy_code_with_input(&mut engine, input, handler) {
+    let address = match engine.deploy_code_with_input(input, None, handler) {
         Ok(result) => match result.status {
             TransactionStatus::Succeed(ret) => {
                 Address::new(H160(ret.as_slice().try_into().unwrap()))
@@ -1164,6 +1369,51 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     };
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
+    engine
+        .register_token(address, args.nep141)
+        .map_err(DeployErc20Error::Register)?;
+
+    Ok(address)
+}
+
+/// Used to mirror deployed ERC-20 contract on main contract to silo.
+pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
+    args: MirrorErc20TokenArgs,
+    erc20_address: Address,
+    erc20_metadata: Erc20Metadata,
+    io: I,
+    env: &E,
+    handler: &mut P,
+) -> Result<Address, DeployErc20Error> {
+    let current_account_id = env.current_account_id();
+    let input = setup_deploy_erc20_input(&current_account_id, Some(erc20_metadata));
+    let mut engine: Engine<_, _> = Engine::new(
+        aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        ),
+        current_account_id,
+        io,
+        env,
+    )
+    .map_err(DeployErc20Error::State)?;
+
+    let address = match engine.deploy_code_with_input(input, Some(erc20_address), handler) {
+        Ok(result) => match result.status {
+            TransactionStatus::Succeed(ret) => {
+                Address::new(H160(ret.as_slice().try_into().unwrap()))
+            }
+            other => return Err(DeployErc20Error::Failed(other)),
+        },
+        Err(e) => return Err(DeployErc20Error::Engine(e)),
+    };
+
+    assert_eq!(address, erc20_address);
+
+    sdk::log!(
+        "ERC-20 on: {} at address: {} has been mirrored",
+        args.contract_id.as_ref(),
+        address.encode()
+    );
     engine
         .register_token(address, args.nep141)
         .map_err(DeployErc20Error::Register)?;
@@ -1481,6 +1731,30 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
     handler.promise_attach_callback(base_id, promise)
 }
 
+fn assert_access<I: IO + Copy, E: Env>(
+    io: &I,
+    env: &E,
+    fixed_gas_cost: &Option<Wei>,
+    transaction: &NormalizedEthTransaction,
+) -> Result<(), EngineError> {
+    if fixed_gas_cost.is_some() {
+        let allowed = if transaction.to.is_some() {
+            silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
+        } else {
+            silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
+        };
+
+        if !allowed {
+            return Err(EngineError {
+                kind: EngineErrorKind::NotAllowed,
+                gas_used: 0,
+            });
+        }
+    }
+
+    Ok(())
+}
+
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
@@ -1734,10 +2008,12 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
         match accounting.net() {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
             accounting::Net::Lost(amount) => {
+                let _ = amount;
                 sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
                 // if we cannot read the storage then there is nothing to remove.
-                EthConnectorContract::init_instance(self.io)
+                #[cfg(not(feature = "ext-connector"))]
+                connector::EthConnectorContract::init(self.io)
                     .map(|mut connector| {
                         // The `unwrap` is safe here because (a) if the connector
                         // is implemented correctly then the total supply will never underflow and (b) we are passing
@@ -1749,7 +2025,7 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {
                 // It should be impossible to gain ETH using normal EVM operations in production.
-                // In tests we have convenience functions that can poof addresses with ETH out of nowhere.
+                // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
                 #[cfg(all(not(feature = "integration-test"), feature = "contract"))]
                 {
                     panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
@@ -1757,7 +2033,7 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             }
         }
         // These variable are only used if logging feature is enabled.
-        // In production logging is always enabled so we can ignore the warnings.
+        // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
         #[allow(unused_assignments)]
@@ -1823,11 +2099,39 @@ mod tests {
         let input = vec![];
         let mut handler = Noop;
 
-        let actual_result = engine.deploy_code_with_input(input, &mut handler).unwrap();
+        let actual_result = engine
+            .deploy_code_with_input(input, None, &mut handler)
+            .unwrap();
 
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce).as_bytes().to_vec();
         let expected_status = TransactionStatus::Succeed(expected_address);
+        let expected_gas_used = 53000;
+        let expected_logs = Vec::new();
+        let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_deploying_code_with_address_succeeds() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+        let mut engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let input = vec![];
+        let mut handler = Noop;
+
+        let address = Address::from_array([1; 20]);
+        let actual_result = engine
+            .deploy_code_with_input(input, Some(address), &mut handler)
+            .unwrap();
+
+        let expected_status = TransactionStatus::Succeed(address.as_bytes().to_vec());
         let expected_gas_used = 53000;
         let expected_logs = Vec::new();
         let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
@@ -2029,6 +2333,34 @@ mod tests {
     }
 
     #[test]
+    fn test_get_erc20_metadata() {
+        let env = Fixed::default();
+        let origin = aurora_engine_sdk::types::near_account_to_evm_address(
+            env.predecessor_account_id().as_bytes(),
+        );
+        let current_account_id = AccountId::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
+        let state = EngineState::default();
+        state::set_state(&mut io, &state).unwrap();
+
+        let engine: Engine<_, _> =
+            Engine::new_with_state(state, origin, current_account_id, io, &env);
+        let nep141 = AccountId::new("testcoin").unwrap();
+        let mut handler = Noop;
+        let args = DeployErc20TokenArgs { nep141 };
+        let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let metadata = engine
+            .get_erc20_metadata(&Erc20Identifier::Erc20 {
+                address: erc20_address,
+            })
+            .unwrap();
+
+        assert_eq!(metadata, Erc20Metadata::default());
+    }
+
+    #[test]
     fn test_gas_charge_for_empty_transaction_is_zero() {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
@@ -2051,12 +2383,62 @@ mod tests {
             data: vec![],
             access_list: vec![],
         };
-        let actual_result = engine.charge_gas(&origin, &transaction, None).unwrap();
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, None, None)
+            .unwrap();
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::zero(),
             effective_gas_price: U256::zero(),
             priority_fee_per_gas: U256::zero(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+    }
+
+    #[test]
+    fn test_gas_charge_for_non_empty_transaction() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(2_000_000)).unwrap();
+        let mut engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let transaction = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: None,
+            nonce: U256::default(),
+            gas_limit: 67_000.into(),
+            max_priority_fee_per_gas: 20.into(),
+            max_fee_per_gas: 10.into(),
+            to: None,
+            value: Wei::default(),
+            data: vec![],
+            access_list: vec![],
+        };
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, None, None)
+            .unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(67_000 * 10),
+            effective_gas_price: 10.into(),
+            priority_fee_per_gas: 10.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, Some(5.into()), None)
+            .unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(67_000 * 5),
+            effective_gas_price: 5.into(),
+            priority_fee_per_gas: 5.into(),
         };
 
         assert_eq!(expected_result, actual_result);
@@ -2212,7 +2594,7 @@ mod tests {
             priority_fee_per_gas: U256::zero(),
         };
 
-        refund_unused_gas(&mut io, &origin, 1000, &gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, 1000, &gas_result, &relayer, None).unwrap();
     }
 
     #[test]
@@ -2225,16 +2607,19 @@ mod tests {
         let relayer = make_address(1, 1);
         let gas_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(8000),
-            effective_gas_price: Wei::new_u64(1).raw(),
-            priority_fee_per_gas: U256::zero(),
+            effective_gas_price: 1.into(),
+            priority_fee_per_gas: 2.into(),
         };
         let gas_used = 4000;
 
-        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer).unwrap();
+        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer, None).unwrap();
 
         let actual_refund = get_balance(&io, &origin);
         let expected_refund = Wei::new_u64(gas_used);
+        assert_eq!(expected_refund, actual_refund);
 
+        let actual_refund = get_balance(&io, &relayer);
+        let expected_refund = Wei::new_u64(gas_used * 2);
         assert_eq!(expected_refund, actual_refund);
     }
 
