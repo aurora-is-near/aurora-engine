@@ -1,7 +1,5 @@
 pub type PausedMask = u8;
 
-pub const ERR_PAUSED: &str = "ERR_PAUSED";
-
 pub trait AdminControlled {
     /// Return the current mask representing all paused events.
     fn get_paused(&self) -> PausedMask;
@@ -30,7 +28,7 @@ pub struct PausedError;
 
 impl AsRef<[u8]> for PausedError {
     fn as_ref(&self) -> &[u8] {
-        ERR_PAUSED.as_bytes()
+        crate::errors::ERR_PAUSED
     }
 }
 

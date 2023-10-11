@@ -150,7 +150,7 @@ fn into_chain_id(value: u64) -> [u8; 32] {
 
 #[tokio::test]
 async fn test_creating_aurora_contract() {
-    let code = std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap();
+    let code = get_engine_code().unwrap();
     let contract = EngineContractBuilder::new()
         .unwrap()
         .with_owner_id("aurora.test.near")
@@ -162,4 +162,25 @@ async fn test_creating_aurora_contract() {
 
     let chain_id = contract.get_chain_id().await.unwrap().result;
     assert_eq!(chain_id, U256::from(into_chain_id(AURORA_LOCAL_CHAIN_ID)));
+}
+
+#[cfg(test)]
+fn get_engine_code() -> anyhow::Result<Vec<u8>> {
+    let path = if cfg!(feature = "mainnet-test") {
+        if cfg!(feature = "ext-connector") {
+            "../bin/aurora-mainnet-silo-test.wasm"
+        } else {
+            "../bin/aurora-mainnet-test.wasm"
+        }
+    } else if cfg!(feature = "testnet-test") {
+        if cfg!(feature = "ext-connector") {
+            "../bin/aurora-testnet-silo-test.wasm"
+        } else {
+            "../bin/aurora-testnet-test.wasm"
+        }
+    } else {
+        anyhow::bail!("Requires mainnet-test or testnet-test feature provided.")
+    };
+
+    std::fs::read(path).map_err(Into::into)
 }

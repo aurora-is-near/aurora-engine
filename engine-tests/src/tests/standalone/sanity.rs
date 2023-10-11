@@ -43,6 +43,7 @@ fn test_deploy_code() {
         origin,
         Wei::zero(),
         evm_deploy(&code_to_deploy),
+        None,
         u64::MAX,
         Vec::new(),
         &mut handler,

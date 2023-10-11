@@ -1,8 +1,12 @@
-use aurora_engine::deposit_event::TokenMessageData;
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine::contract_methods::connector::deposit_event::TokenMessageData;
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
+#[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::types::{Address, Balance, Fee, NEP141Wei, Wei};
+use aurora_engine_types::types::{Address, Balance, Wei};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::types::{Fee, NEP141Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use engine_standalone_storage::sync;
 
@@ -38,6 +42,7 @@ fn test_consume_block_message() {
     runner.close();
 }
 
+#[cfg(not(feature = "ext-connector"))]
 #[test]
 fn test_consume_deposit_message() {
     let (mut runner, block_message) = initialize();
@@ -292,7 +297,6 @@ fn test_consume_deploy_erc20_message() {
 fn test_consume_ft_on_transfer_message() {
     // Only need to check the case of aurora calling `ft_on_transfer` on itself, the other case
     // is handled in the `test_consume_deploy_erc20_message` above.
-
     let (mut runner, block_message) = initialize();
 
     let mint_amount = 8_675_309;
@@ -313,13 +317,19 @@ fn test_consume_ft_on_transfer_message() {
     };
     let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
     let raw_input = tx_kind.raw_bytes();
+    #[cfg(not(feature = "ext-connector"))]
+    let caller = runner.env.predecessor_account_id();
+    #[cfg(feature = "ext-connector")]
+    let caller = crate::utils::standalone::mocks::EXT_ETH_CONNECTOR
+        .parse()
+        .unwrap();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
         near_receipt_id: H256([8u8; 32]),
         position: 0,
         succeeded: true,
         signer: runner.env.signer_account_id(),
-        caller: runner.env.predecessor_account_id(),
+        caller,
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
@@ -443,7 +453,11 @@ fn test_consume_submit_message() {
     assert_eq!(runner.get_nonce(&signer_address), U256::one());
 }
 
+#[cfg(not(feature = "ext-connector"))]
 fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine::proof::Proof {
+    use aurora_engine::contract_methods::connector::deposit_event::{
+        DepositedEvent, DEPOSITED_EVENT,
+    };
     let eth_custodian_address = utils::standalone::mocks::ETH_CUSTODIAN_ADDRESS;
 
     let fee = Fee::new(NEP141Wei::new(0));
@@ -452,7 +466,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
         TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
             .unwrap();
 
-    let deposit_event = aurora_engine::deposit_event::DepositedEvent {
+    let deposit_event = DepositedEvent {
         eth_custodian_address,
         sender: Address::new(H160([0u8; 20])),
         token_message_data,
@@ -461,8 +475,8 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     };
 
     let event_schema = ethabi::Event {
-        name: aurora_engine::deposit_event::DEPOSITED_EVENT.into(),
-        inputs: aurora_engine::deposit_event::DepositedEvent::event_params(),
+        name: DEPOSITED_EVENT.into(),
+        inputs: DepositedEvent::event_params(),
         anonymous: false,
     };
     let log_entry = aurora_engine_types::parameters::connector::LogEntry {

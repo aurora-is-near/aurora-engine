@@ -1,6 +1,11 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawResult};
+use aurora_engine_types::parameters::connector::{
+    Erc20Metadata, FungibleTokenMetadata, WithdrawResult,
+};
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistStatusArgs,
+};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
@@ -39,6 +44,19 @@ impl_call_return![
     (CallSetKeyManager, Call::SetKeyManager),
     (CallAddRelayerKey, Call::AddRelayerKey),
     (CallRemoveRelayerKey, Call::RemoveRelayerKey),
+    (
+        CallSetEthConnectorContractAccount,
+        Call::SetEthConnectorContractAccount
+    ),
+    (CallPauseContract, Call::PauseContract),
+    (CallResumeContract, Call::ResumeContract),
+    (CallSetFixedGasCost, Call::SetFixedGasCost),
+    (CallSetSiloParams, Call::SetSiloParams),
+    (CallSetWhitelistStatus, Call::SetWhitelistStatus),
+    (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
+    (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
+    (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist),
+    (CallSetErc20Metadata, Call::SetErc20Metadata)
 ];
 
 impl_call_return![
@@ -49,6 +67,7 @@ impl_call_return![
     (CallWithdraw => WithdrawResult, Call::Withdraw, borsh),
     (CallDeployCode => SubmitResult, Call::DeployCode, borsh),
     (CallDeployErc20Token => Address, Call::DeployErc20Token, borsh_address),
+    (CallMirrorErc20Token => Address, Call::MirrorErc20Token, borsh_address),
     (CallCall => SubmitResult, Call::Call, borsh),
     (CallSubmit => SubmitResult, Call::Submit, borsh),
     (CallFtOnTransfer => U128, Call::FtOnTransfer, json),
@@ -79,7 +98,12 @@ impl_view_return![
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
     (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
-    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh)
+    (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
+    (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
+    (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
+    (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),
+    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh),
+    (ViewGetErc20Metadata => Erc20Metadata, View::GetErc20Metadata, json)
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -89,6 +113,7 @@ pub(crate) enum Call {
     NewEthConnector,
     DeployCode,
     DeployErc20Token,
+    MirrorErc20Token,
     Call,
     Submit,
     RegisterRelayer,
@@ -109,6 +134,7 @@ pub(crate) enum Call {
     FundXccSubAccount,
     FactorySetWNearAddress,
     SetEthConnectorContractData,
+    SetEthConnectorContractAccount,
     FactoryUpdateAddressVersion,
     RefundOnError,
     MintAccount,
@@ -116,6 +142,15 @@ pub(crate) enum Call {
     SetKeyManager,
     AddRelayerKey,
     RemoveRelayerKey,
+    PauseContract,
+    ResumeContract,
+    SetFixedGasCost,
+    SetSiloParams,
+    SetWhitelistStatus,
+    AddEntryToWhitelist,
+    AddEntryToWhitelistBatch,
+    RemoveEntryFromWhitelist,
+    SetErc20Metadata,
 }
 
 impl AsRef<str> for Call {
@@ -125,6 +160,7 @@ impl AsRef<str> for Call {
             Call::NewEthConnector => "new_eth_connector",
             Call::DeployCode => "deploy_code",
             Call::DeployErc20Token => "deploy_erc20_token",
+            Call::MirrorErc20Token => "mirror_erc20_token",
             Call::Call => "call",
             Call::Submit => "submit",
             Call::RegisterRelayer => "register_relayer",
@@ -145,6 +181,7 @@ impl AsRef<str> for Call {
             Call::FundXccSubAccount => "fund_xcc_sub_account",
             Call::FactorySetWNearAddress => "factory_set_wnear_address",
             Call::SetEthConnectorContractData => "set_eth_connector_contract_data",
+            Call::SetEthConnectorContractAccount => "set_eth_connector_contract_account",
             Call::FactoryUpdateAddressVersion => "factory_update_address_version",
             Call::RefundOnError => "refund_on_error",
             Call::MintAccount => "mint_account",
@@ -152,6 +189,15 @@ impl AsRef<str> for Call {
             Call::SetKeyManager => "set_key_manager",
             Call::AddRelayerKey => "add_relayer_key",
             Call::RemoveRelayerKey => "remove_relayer_key",
+            Call::PauseContract => "pause_contract",
+            Call::ResumeContract => "resume_contract",
+            Call::SetFixedGasCost => "set_fixed_gas_cost",
+            Call::SetSiloParams => "set_silo_params",
+            Call::SetWhitelistStatus => "set_whitelist_status",
+            Call::AddEntryToWhitelist => "add_entry_to_whitelist",
+            Call::AddEntryToWhitelistBatch => "add_entry_to_whitelist_batch",
+            Call::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
+            Call::SetErc20Metadata => "set_erc20_metadata",
         }
     }
 }
@@ -182,7 +228,12 @@ pub enum View {
     Erc20FromNep141,
     Nep141FromErc20,
     AccountsCounter,
+    GetEthConnectorContractAccount,
+    GetFixedGasCost,
+    GetSiloParams,
+    GetWhitelistStatus,
     FactoryWnearAddress,
+    GetErc20Metadata,
 }
 
 impl AsRef<str> for View {
@@ -212,7 +263,12 @@ impl AsRef<str> for View {
             View::Erc20FromNep141 => "get_erc20_from_nep141",
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
+            View::GetEthConnectorContractAccount => "get_eth_connector_contract_account",
+            View::GetFixedGasCost => "get_fixed_gas_cost",
+            View::GetSiloParams => "get_silo_params",
+            View::GetWhitelistStatus => "get_whitelist_status",
             View::FactoryWnearAddress => "factory_get_wnear_address",
+            View::GetErc20Metadata => "get_erc20_metadata",
         }
     }
 }

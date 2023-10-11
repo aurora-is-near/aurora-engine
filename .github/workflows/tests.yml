@@ -21,22 +21,34 @@ jobs:
         run: cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
-      - name: Build contracts
-        run: cargo make build-contracts
-      - name: Test contracts
-        run: cargo make test-contracts
-      - name: Build mainnet test WASM
-        run: cargo make --profile mainnet build-test
-      - name: List mainnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
       - name: Test mainnet
-        run: cargo make --profile mainnet test-workspace
-      - name: Build testnet test WASM
-        run: cargo make --profile testnet build-test
-      - name: List testnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
+        run: cargo make --profile mainnet test-flow
       - name: Test testnet
-        run: cargo make --profile testnet test-workspace
+        run: cargo make --profile testnet test-flow
+      - name: Save cache
+        run: cache-util save cargo_git cargo_registry yarn_cache
+
+  test_silo:
+    name: Test Silo suite (mainnet-silo, testnet-silo)
+    runs-on: [ self-hosted, heavy ]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Restore cache
+        run: cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
+      - name: Preparing rocksdb library
+        run: scripts/ci/build_rocksdb.sh
+      - name: Test mainnet
+        run: |
+          cargo make --profile mainnet build-test
+          cargo make --profile mainnet-silo test-flow
+      - name: Test testnet
+        run: |
+          cargo make --profile testnet build-test
+          cargo make --profile testnet-silo test-flow
       - name: Save cache
         run: cache-util save cargo_git cargo_registry yarn_cache
 

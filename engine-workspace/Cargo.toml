@@ -24,3 +24,8 @@ tokio = { workspace = true, features = [ "time" ] }
 [dev-dependencies]
 hex.workspace = true
 lazy_static.workspace = true
+
+[features]
+mainnet-test = []
+testnet-test = []
+ext-connector = []

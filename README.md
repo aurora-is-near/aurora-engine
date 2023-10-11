@@ -54,7 +54,9 @@ Every task with `cargo make` must have a `--profile` argument.
 
 The current available `profile`s are:
 - `mainnet`: suitable for mainnet.
+- `mainnet-silo`: silo contract suitable for mainnet.
 - `testnet`: suitable for testnet.
+- `testnet-silo`: silo contract suitable for testnet.
 - `local`: suitable for local development.
 - `custom`: suitable for custom environments, see note below.
 
@@ -102,10 +104,12 @@ shasum -a 256 bin/aurora-<profile>.wasm
 #### Running unit & integration tests
 
 To run tests, there are a few cargo make tasks we can run:
-- `test`: tests the whole cargo workspace and ETH contracts. Requires a 
-  `--profile` argument.
+- `test`: tests the whole cargo workspace and ETH contracts. Requires a `--profile` argument.
 - `test-workspace`: tests only the cargo workspace.
 - `test-contracts`: tests only the contracts.
+- `test`: tests the whole cargo workspace, ETH contracts and runs modexp benchmarks. Requires a `--profile` argument.
+- `test-flow`: tests the whole cargo workspace and ETH contracts. Requires a `--profile` argument.
+- `bench-modexp`: runs modexp benchmarks. Requires a `--profile` argument.
 
 For example, the following will test the whole workspace and ETH contracts:
 ```sh
@@ -119,7 +123,7 @@ The following tasks are available to run lints and checks:
 - `check`: checks the format, clippy and ETH contracts.
 - `check-contracts` runs yarn lints on the ETH contracts.
 - `check-fmt`: checks the workspace Rust format only.
-- `check-clippy`: checks the Rust workspace with clippy only.
+- `clippy`: checks the Rust workspace with clippy only.
 
 For example, the following command will run the checks. `profile` is not required
 here:

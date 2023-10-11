@@ -2,7 +2,15 @@ use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::types::{NEP141Wei, PromiseResult};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+#[cfg(feature = "ext-connector")]
+use aurora_engine_types::parameters::connector::{
+    SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+};
+use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
+use aurora_engine_types::parameters::silo::FixedGasCostArgs;
+use aurora_engine_types::types::PromiseResult;
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -19,11 +27,9 @@ use near_vm_runner::MockCompiledContractCache;
 use rlp::RlpStream;
 use std::borrow::Cow;
 
-use crate::prelude::fungible_token::{FungibleToken, FungibleTokenMetadata};
-use crate::prelude::parameters::{
-    InitCallArgs, LegacyNewCallArgs, RelayerKeyManagerArgs, StartHashchainArgs, SubmitResult,
-    TransactionStatus,
-};
+#[cfg(not(feature = "ext-connector"))]
+use crate::prelude::parameters::InitCallArgs;
+use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
     eip_2930::{self, SignedTransaction2930, Transaction2930},
@@ -290,51 +296,56 @@ impl AuroraRunner {
             trie.insert(code_key.to_vec(), code);
         }
 
-        let ft_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
-        );
-        let ft_value = {
-            let mut current_ft: FungibleToken = trie
-                .get(&ft_key)
-                .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_ft.total_eth_supply_on_near =
-                current_ft.total_eth_supply_on_near + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                + NEP141Wei::new(init_balance.raw().as_u128());
-            current_ft
-        };
-
-        let aurora_balance_key = [
-            ft_key.as_slice(),
-            self.context.current_account_id.as_ref().as_bytes(),
-        ]
-        .concat();
-        let aurora_balance_value = {
-            let mut current_balance: u128 = trie
-                .get(&aurora_balance_key)
-                .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                .unwrap_or_default();
-            current_balance += init_balance.raw().as_u128();
-            current_balance
-        };
-
-        let proof_key = crate::prelude::storage::bytes_to_key(
-            crate::prelude::storage::KeyPrefix::EthConnector,
-            &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
-        );
-
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
-        trie.insert(ft_key, ft_value.try_to_vec().unwrap());
-        trie.insert(proof_key, vec![0]);
-        trie.insert(
-            aurora_balance_key,
-            aurora_balance_value.try_to_vec().unwrap(),
-        );
+
+        #[cfg(not(feature = "ext-connector"))]
+        {
+            use aurora_engine::contract_methods::connector::fungible_token::FungibleToken;
+            let ft_key = crate::prelude::storage::bytes_to_key(
+                crate::prelude::storage::KeyPrefix::EthConnector,
+                &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
+            );
+            let ft_value = {
+                let mut current_ft: FungibleToken = trie
+                    .get(&ft_key)
+                    .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
+                    .unwrap_or_default();
+                current_ft.total_eth_supply_on_near = current_ft.total_eth_supply_on_near
+                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
+                current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
+                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
+                current_ft
+            };
+
+            let aurora_balance_key = [
+                ft_key.as_slice(),
+                self.context.current_account_id.as_ref().as_bytes(),
+            ]
+            .concat();
+            let aurora_balance_value = {
+                let mut current_balance: u128 = trie
+                    .get(&aurora_balance_key)
+                    .map(|bytes| u128::try_from_slice(bytes).unwrap())
+                    .unwrap_or_default();
+                current_balance += init_balance.raw().as_u128();
+                current_balance
+            };
+
+            let proof_key = crate::prelude::storage::bytes_to_key(
+                crate::prelude::storage::KeyPrefix::EthConnector,
+                &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
+            );
+
+            trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+            trie.insert(proof_key, vec![0]);
+            trie.insert(
+                aurora_balance_key,
+                aurora_balance_value.try_to_vec().unwrap(),
+            );
+        }
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
@@ -489,6 +500,15 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
+    pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
+        let outcome = self
+            .one_shot()
+            .call("get_fixed_gas_cost", "getter", vec![])
+            .unwrap();
+        let val = outcome.return_data.as_value()?;
+        FixedGasCostArgs::try_from_slice(&val).unwrap().cost
+    }
+
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
         let input = aurora_engine::parameters::GetStorageAtArgs {
             address,
@@ -529,29 +549,65 @@ impl AuroraRunner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
             // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
-            assert!(self.ext.underlying.fake_trie.len() <= standalone_state.iter().count());
+            let fake_trie_len = self.ext.underlying.fake_trie.len();
+            let stand_alone_len = standalone_state.iter().count();
+
+            if fake_trie_len > stand_alone_len {
+                let fake_keys = self
+                    .ext
+                    .underlying
+                    .fake_trie
+                    .keys()
+                    .map(Clone::clone)
+                    .collect::<std::collections::HashSet<_>>();
+                let standalone_keys = standalone_state
+                    .iter()
+                    .map(|x| x.0.clone())
+                    .collect::<std::collections::HashSet<_>>();
+                let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
+
+                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
+            }
+
             for (key, value) in standalone_state.iter() {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(
                     trie_value, standalone_value,
-                    "Standalone mismatch at {key:?}.\nStandlaone: {standalone_value:?}\nWasm: {trie_value:?}",
+                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
                 );
             }
         }
+    }
+
+    pub fn get_engine_code() -> Vec<u8> {
+        let path = if cfg!(feature = "mainnet-test") {
+            if cfg!(feature = "ext-connector") {
+                "../bin/aurora-mainnet-silo-test.wasm"
+            } else {
+                "../bin/aurora-mainnet-test.wasm"
+            }
+        } else if cfg!(feature = "testnet-test") {
+            if cfg!(feature = "ext-connector") {
+                "../bin/aurora-testnet-silo-test.wasm"
+            } else {
+                "../bin/aurora-testnet-test.wasm"
+            }
+        } else {
+            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
+        };
+
+        std::fs::read(path).unwrap()
+    }
+
+    pub const fn get_default_chain_id() -> u64 {
+        DEFAULT_CHAIN_ID
     }
 }
 
 impl Default for AuroraRunner {
     fn default() -> Self {
-        let evm_wasm_bytes = if cfg!(feature = "mainnet-test") {
-            std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
-        } else if cfg!(feature = "testnet-test") {
-            std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
-        } else {
-            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-        };
-
+        let evm_wasm_bytes = Self::get_engine_code();
         // Fetch config (mainly costs) for the latest protocol version.
         let runtime_config_store = RuntimeConfigStore::new(None);
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
@@ -621,37 +677,44 @@ impl ExecutionProfile {
 pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
     let aurora_account_id = str_to_account_id(runner.aurora_account_id.as_str());
-    let args = LegacyNewCallArgs {
+    let args = NewCallArgs::V4(NewCallArgsV4 {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
         owner_id: aurora_account_id.clone(),
-        bridge_prover_id: str_to_account_id("bridge_prover.near"),
         upgrade_delay_blocks: 1,
-    };
+        key_manager: aurora_account_id,
+        initial_hashchain: Some([0u8; 32]),
+    });
 
     let account_id = runner.aurora_account_id.clone();
     let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
 
     assert!(result.is_ok());
 
-    let args = InitCallArgs {
-        prover_account: str_to_account_id("prover.near"),
-        eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-        metadata: FungibleTokenMetadata::default(),
+    #[cfg(not(feature = "ext-connector"))]
+    let result = {
+        let args = InitCallArgs {
+            prover_account: str_to_account_id("prover.near"),
+            eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
+            metadata: FungibleTokenMetadata::default(),
+        };
+        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap())
     };
-    let result = runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap());
-    assert!(result.is_ok());
 
-    // Need to set a key manager because that is the only account that can initialize the hashchain
-    let args = RelayerKeyManagerArgs {
-        key_manager: Some(aurora_account_id),
+    #[cfg(feature = "ext-connector")]
+    let result = {
+        let args = SetEthConnectorContractAccountArgs {
+            account: AccountId::new("aurora_eth_connector.root").unwrap(),
+            withdraw_serialize_type: WithdrawSerializeType::Borsh,
+        };
+
+        runner.call(
+            "set_eth_connector_contract_account",
+            &account_id,
+            args.try_to_vec().unwrap(),
+        )
     };
-    let result: Result<VMOutcome, EngineError> = runner.call(
-        "set_key_manager",
-        &account_id,
-        serde_json::to_vec(&args).unwrap(),
-    );
+
     assert!(result.is_ok());
-    init_hashchain(&mut runner, &account_id, None);
 
     runner
 }
@@ -919,6 +982,8 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
                 "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
+                "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
+                "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }
