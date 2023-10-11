@@ -1,4 +1,6 @@
-use aurora_engine::deposit_event::{DepositedEvent, TokenMessageData, DEPOSITED_EVENT};
+use aurora_engine::contract_methods::connector::deposit_event::{
+    DepositedEvent, TokenMessageData, DEPOSITED_EVENT,
+};
 use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
 use aurora_engine::proof::Proof;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
