@@ -449,6 +449,9 @@ pub fn attach_full_access_key<I: IO + Copy, E: Env, H: PromiseHandler>(
         target_account_id: current_account_id,
         actions: vec![action],
     };
+    // SAFETY: This action is dangerous because it adds a new full access key (FAK) to the Engine account.
+    // However, it is safe to do so here because of the `require_owner_only` check above; only the
+    // (trusted) owner account can add a new FAK.
     let promise_id = unsafe { handler.promise_create_batch(&promise) };
 
     handler.promise_return(promise_id);
