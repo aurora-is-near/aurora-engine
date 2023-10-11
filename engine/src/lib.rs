@@ -28,14 +28,10 @@ pub mod proof {
     pub use aurora_engine_types::parameters::connector::Proof;
 }
 pub mod accounting;
-pub mod admin_controlled;
 #[cfg_attr(feature = "contract", allow(dead_code))]
-pub mod connector;
 pub mod contract_methods;
-pub mod deposit_event;
 pub mod engine;
 pub mod errors;
-pub mod fungible_token;
 pub mod hashchain;
 pub mod pausables;
 mod prelude;
@@ -79,29 +75,24 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use crate::connector::{self, EthConnectorContract};
     use crate::engine::{self, Engine};
-    use crate::parameters::{
-        self, FungibleTokenMetadata, GetErc20FromNep141CallArgs, GetStorageAtArgs,
-        IsUsedProofCallArgs, ViewCallArgs,
-    };
     #[cfg(feature = "evm_bully")]
     use crate::parameters::{BeginBlockArgs, BeginChainArgs};
+    use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, ERR_FAILED_PARSE, H256};
+    use crate::prelude::{sdk, u256_to_arr, Address, ToString, Vec, H256};
     use crate::{
-        contract_methods::{self, ContractError},
+        contract_methods::{self, silo, ContractError},
         errors, state,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::borsh::BorshSerialize;
-    use aurora_engine_types::parameters::engine::errors::ParseTypeFromJsonError;
-
-    #[cfg(feature = "integration-test")]
-    use crate::prelude::NearGas;
+    use aurora_engine_types::parameters::silo::{
+        FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+    };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -207,7 +198,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn deploy_upgrade() {
         // This function is intentionally not implemented in `contract_methods`
-        // because it only make sense in the context of the Near runtime.
+        // because it only makes sense in the context of the NEAR runtime.
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
         require_running(&state);
@@ -386,7 +377,7 @@ mod contract {
 
     /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
     /// created via the XCC precompile in the EVM). The purpose of this method is to enable
-    /// XCC on engine instances where wrapped NEAR (WNEAR) is not bridged.
+    /// XCC on engine instances where wrapped NEAR (`wNEAR`) is not bridged.
     #[no_mangle]
     pub extern "C" fn fund_xcc_sub_account() {
         let io = Runtime;
@@ -397,51 +388,24 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Allow receiving NEP141 tokens to the EVM contract.
-    ///
-    /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred and tokens are returned
-    /// in case of an error, or no token is returned if the transaction was successful.
+    /// Mirror existing ERC-20 token on the main Aurora contract.
+    /// Notice: It works if the SILO mode is on.
     #[no_mangle]
-    pub extern "C" fn ft_on_transfer() {
+    pub extern "C" fn mirror_erc20_token() {
         let io = Runtime;
-        let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
+        contract_methods::connector::mirror_erc20_token(io, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
 
-    /// Deploy ERC20 token mapped to a NEP141
+    /// Callback used by the `mirror_erc20_token` function.
     #[no_mangle]
-    pub extern "C" fn deploy_erc20_token() {
+    pub extern "C" fn mirror_erc20_token_callback() {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    /// Set metadata of ERC-20 contract.
-    #[no_mangle]
-    pub extern "C" fn set_erc20_metadata() {
-        let io = Runtime;
-        let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::set_erc20_metadata(io, &env, &mut handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    /// Callback invoked by exit to NEAR precompile to handle potential
-    /// errors in the exit call or to perform the near tokens transfer.
-    #[no_mangle]
-    pub extern "C" fn exit_to_near_precompile_callback() {
-        let io = Runtime;
-        let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
+        contract_methods::connector::mirror_erc20_token_callback(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -511,8 +475,7 @@ mod contract {
         let chain_id = state::get_state(&io)
             .map(|state| state.chain_id)
             .sdk_unwrap();
-        let block_hash =
-            crate::engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
+        let block_hash = engine::compute_block_hash(chain_id, block_height, account_id.as_bytes());
         io.return_output(block_hash.as_bytes());
     }
 
@@ -607,6 +570,9 @@ mod contract {
         // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
+    ///
+    /// ETH-CONNECTOR
+    ///
     #[no_mangle]
     pub extern "C" fn new_eth_connector() {
         let io = Runtime;
@@ -629,18 +595,9 @@ mod contract {
     pub extern "C" fn withdraw() {
         let io = Runtime;
         let env = Runtime;
-        let result_bytes = contract_methods::connector::withdraw(io, &env)
+        contract_methods::connector::withdraw(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
-        // We intentionally do not go through the `io` struct here because we must bypass
-        // the check that prevents output that is accepted by the eth_custodian
-        #[allow(clippy::as_conversions)]
-        unsafe {
-            exports::value_return(
-                u64::try_from(result_bytes.len()).sdk_expect(errors::ERR_VALUE_CONVERSION),
-                result_bytes.as_ptr() as u64,
-            );
-        }
     }
 
     #[no_mangle]
@@ -648,7 +605,7 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        let _ = contract_methods::connector::deposit(io, &env, &mut handler)
+        contract_methods::connector::deposit(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -665,58 +622,49 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn is_used_proof() {
-        let mut io = Runtime;
-        let args: IsUsedProofCallArgs = io.read_input_borsh().sdk_unwrap();
-
-        let is_used_proof = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .is_used_proof(&args.proof);
-        let res = is_used_proof.try_to_vec().unwrap();
-        io.return_output(&res[..]);
+        let io = Runtime;
+        contract_methods::connector::is_used_proof(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_supply() {
         let io = Runtime;
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_total_eth_supply_on_near();
+        contract_methods::connector::ft_total_eth_supply_on_near(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_near() {
         let io = Runtime;
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_total_eth_supply_on_near();
+        contract_methods::connector::ft_total_eth_supply_on_near(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_total_eth_supply_on_aurora() {
         let io = Runtime;
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_total_eth_supply_on_aurora();
+        contract_methods::connector::ft_total_eth_supply_on_aurora(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
-        let args: parameters::BalanceOfCallArgs = serde_json::from_slice(&io.read_input().to_vec())
-            .map_err(Into::<ParseTypeFromJsonError>::into)
+        contract_methods::connector::ft_balance_of(io)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_balance_of(&args);
     }
 
     #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
-        let args: parameters::BalanceOfEthCallArgs = io.read_input().to_value().sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .ft_balance_of_eth_on_aurora(&args)
+        contract_methods::connector::ft_balance_of_eth(io)
+            .map_err(ContractError::msg)
             .sdk_unwrap();
     }
 
@@ -744,7 +692,56 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        let _ = contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Allow receiving NEP141 tokens to the EVM contract.
+    ///
+    /// This function returns the amount of tokens to return to the sender.
+    /// Either all tokens are transferred and tokens are returned
+    /// in case of an error, or no token is returned if the transaction was successful.
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Deploy ERC20 token mapped to a NEP141
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_token() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Set metadata of ERC-20 contract.
+    #[no_mangle]
+    pub extern "C" fn set_erc20_metadata() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::set_erc20_metadata(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Callback invoked by exit to NEAR precompile to handle potential
+    /// errors in the exit call or to perform the near tokens transfer.
+    #[no_mangle]
+    pub extern "C" fn exit_to_near_precompile_callback() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -781,23 +778,34 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
-        let args: parameters::StorageBalanceOfCallArgs =
-            serde_json::from_slice(&io.read_input().to_vec())
-                .map_err(Into::<ParseTypeFromJsonError>::into)
-                .sdk_unwrap();
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .storage_balance_of(&args);
+        contract_methods::connector::storage_balance_of(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_eth_connector_contract_account() {
+        let io = Runtime;
+        contract_methods::connector::get_eth_connector_contract_account(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_eth_connector_contract_account() {
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::connector::set_eth_connector_contract_account(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
     pub extern "C" fn get_paused_flags() {
-        let mut io = Runtime;
-        let paused_flags = EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .get_paused_flags();
-        let data = paused_flags.try_to_vec().expect(ERR_FAILED_PARSE);
-        io.return_output(&data[..]);
+        let io = Runtime;
+        contract_methods::connector::get_paused_flags(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -810,11 +818,12 @@ mod contract {
     }
 
     #[no_mangle]
+    #[cfg(not(feature = "ext-connector"))]
     pub extern "C" fn get_accounts_counter() {
         let io = Runtime;
-        EthConnectorContract::init_instance(io)
-            .sdk_unwrap()
-            .get_accounts_counter();
+        contract_methods::connector::get_accounts_counter(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]
@@ -843,10 +852,10 @@ mod contract {
 
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
-        let mut io = Runtime;
-        let metadata: FungibleTokenMetadata = connector::get_metadata(&io).unwrap_or_default();
-        let bytes = serde_json::to_vec(&metadata).unwrap_or_default();
-        io.return_output(&bytes);
+        let io = Runtime;
+        contract_methods::connector::ft_metadata(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[cfg(feature = "integration-test")]
@@ -855,20 +864,20 @@ mod contract {
         sdk::log!("Call from verify_log_entry");
         let mut io = Runtime;
         let data = true.try_to_vec().unwrap();
-        io.return_output(&data[..]);
+        io.return_output(&data);
     }
 
     /// Function used to create accounts for tests
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
-        use crate::connector::ZERO_ATTACHED_BALANCE;
         use crate::prelude::{NEP141Wei, U256};
         use evm::backend::ApplyBackend;
-        const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
-        const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
 
+        #[cfg(not(feature = "ext-connector"))]
         let mut io = Runtime;
+        #[cfg(feature = "ext-connector")]
+        let io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect(errors::ERR_ARGS);
         let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
@@ -888,41 +897,144 @@ mod contract {
         };
         engine.apply(core::iter::once(state_change), core::iter::empty(), false);
 
-        // Call "finish_deposit" to mint the corresponding
-        // nETH NEP-141 tokens as well
-        let aurora_account_id = io.current_account_id();
-        let args = crate::parameters::FinishDepositCallArgs {
-            new_owner_id: aurora_account_id.clone(),
-            amount: balance,
-            proof_key: crate::prelude::String::new(),
-            relayer_id: aurora_account_id.clone(),
-            fee: 0.into(),
-            msg: None,
-        };
-        let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
-            target_account_id: aurora_account_id.clone(),
-            method: crate::prelude::String::from("verify_log_entry"),
-            args: crate::prelude::Vec::new(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_VERIFY,
-        };
-        let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
-            target_account_id: aurora_account_id,
-            method: crate::prelude::String::from("finish_deposit"),
-            args: args.try_to_vec().unwrap(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: GAS_FOR_FINISH,
-        };
-        // Safety: this call is safe because it is only used in integration tests.
-        unsafe {
+        #[cfg(not(feature = "ext-connector"))]
+        {
+            use crate::contract_methods::connector::ZERO_ATTACHED_BALANCE;
+            use crate::prelude::NearGas;
             use aurora_engine_sdk::promise::PromiseHandler;
-            io.promise_create_with_callback(
-                &aurora_engine_types::parameters::PromiseWithCallbackArgs {
-                    base: verify_call,
-                    callback: finish_call,
-                },
-            )
+
+            const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
+            const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
+            // Call "finish_deposit" to mint the corresponding
+            // nETH NEP-141 tokens as well
+            let aurora_account_id = io.current_account_id();
+            let args = crate::parameters::FinishDepositCallArgs {
+                new_owner_id: aurora_account_id.clone(),
+                amount: balance,
+                proof_key: crate::prelude::String::new(),
+                relayer_id: aurora_account_id.clone(),
+                fee: 0.into(),
+                msg: None,
+            };
+            let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
+                target_account_id: aurora_account_id.clone(),
+                method: crate::prelude::String::from("verify_log_entry"),
+                args: crate::prelude::Vec::new(),
+                attached_balance: ZERO_ATTACHED_BALANCE,
+                attached_gas: GAS_FOR_VERIFY,
+            };
+            let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
+                target_account_id: aurora_account_id,
+                method: crate::prelude::String::from("finish_deposit"),
+                args: args.try_to_vec().unwrap(),
+                attached_balance: ZERO_ATTACHED_BALANCE,
+                attached_gas: GAS_FOR_FINISH,
+            };
+            // Safety: this call is safe because it is only used in integration tests.
+            unsafe {
+                io.promise_create_with_callback(
+                    &aurora_engine_types::parameters::PromiseWithCallbackArgs {
+                        base: verify_call,
+                        callback: finish_call,
+                    },
+                )
+            };
+        }
+    }
+
+    ///
+    /// Silo
+    ///
+    #[no_mangle]
+    pub extern "C" fn get_fixed_gas_cost() {
+        let mut io = Runtime;
+        let cost = FixedGasCostArgs {
+            cost: silo::get_fixed_gas_cost(&io),
         };
+
+        io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_fixed_gas_cost() {
+        let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
+        args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
+        silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
+        silo::set_fixed_gas_cost(&mut io, args.cost);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_silo_params() {
+        let mut io = Runtime;
+        let params = silo::get_silo_params(&io);
+
+        io.return_output(&params.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_silo_params() {
+        let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Option<SiloParamsArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::set_silo_params(&mut io, args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_whitelist_status() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: WhitelistStatusArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_whitelist_status(&io, &args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_whitelist_status() {
+        let mut io = Runtime;
+        let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
+        let status = silo::get_whitelist_status(&io, &args)
+            .try_to_vec()
+            .map_err(|e| e.to_string())
+            .sdk_unwrap();
+
+        io.return_output(&status);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn add_entry_to_whitelist() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
+        silo::add_entry_to_whitelist(&io, &args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn add_entry_to_whitelist_batch() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Vec<WhitelistArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::add_entry_to_whitelist_batch(&io, args);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn remove_entry_from_whitelist() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
+        silo::remove_entry_from_whitelist(&io, &args);
     }
 
     // TODO: rust-2023-08-24#[allow(clippy::empty_line_after_doc_comments)]
@@ -947,7 +1059,8 @@ mod contract {
         }
     }
 
-    mod exports {
+    #[cfg(not(feature = "ext-connector"))]
+    pub mod exports {
         extern "C" {
             pub(crate) fn value_return(value_len: u64, value_ptr: u64);
         }

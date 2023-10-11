@@ -202,7 +202,7 @@ impl From<NewCallArgs> for EngineState {
 }
 
 /// Gets the state from storage, if it exists otherwise it will error.
-pub fn get_state<I: IO + Copy>(io: &I) -> Result<EngineState, error::EngineStateError> {
+pub fn get_state<I: IO + Copy>(io: &I) -> Result<EngineState, EngineStateError> {
     io.read_storage(&bytes_to_key(KeyPrefix::Config, STATE_KEY))
         .map_or_else(
             || Err(EngineStateError::NotFound),
