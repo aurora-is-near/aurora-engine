@@ -1,57 +1,57 @@
-#---
-#on:
-#  push:
-#    branches:
-#      - master
-#      - develop
-#  pull_request:
-#
-#name: Lints
-#jobs:
-#  fmt:
-#    name: Format
-#    runs-on: [self-hosted, light]
-#    steps:
-#      - name: Potential broken submodules fix
-#        run: |
-#          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-#      - name: Clone the repository
-#        uses: actions/checkout@v3
-#      - name: Run cargo fmt
-#        run: cargo make check-fmt
-#  clippy:
-#    name: Clippy
-#    runs-on: [self-hosted, heavy]
-#    steps:
-#      - name: Potential broken submodules fix
-#        run: |
-#          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-#      - name: Clone the repository
-#        uses: actions/checkout@v3
-#      - run: cargo make build-contracts
-#      - name: Run Contract cargo clippy
-#        run: cargo make clippy
-#  udeps:
-#    name: Udeps
-#    runs-on: [self-hosted, heavy]
-#    steps:
-#      - name: Potential broken submodules fix
-#        run: |
-#          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-#      - name: Clone the repository
-#        uses: actions/checkout@v3
-#      - name: Run udeps
-#        run: cargo make udeps
-#  contracts:
-#    name: Contracts
-#    runs-on: [self-hosted, light]
-#    steps:
-#      - name: Potential broken submodules fix
-#        run: |
-#          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-#      - name: Clone the repository
-#        uses: actions/checkout@v3
-#      - name: Run yarn lint
-#        run: cargo make check-contracts
-#      - name: Check committed EvmErc20.bin
-#        run: bash scripts/verify_evm_erc20.sh
+---
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+name: Lints
+jobs:
+  fmt:
+    name: Format
+    runs-on: [self-hosted, light]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Run cargo fmt
+        run: cargo make check-fmt
+  clippy:
+    name: Clippy
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - run: cargo make build-contracts
+      - name: Run Contract cargo clippy
+        run: cargo make clippy
+  udeps:
+    name: Udeps
+    runs-on: [self-hosted, heavy]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Run udeps
+        run: cargo make udeps
+  contracts:
+    name: Contracts
+    runs-on: [self-hosted, light]
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v3
+      - name: Run yarn lint
+        run: cargo make check-contracts
+      - name: Check committed EvmErc20.bin
+        run: bash scripts/verify_evm_erc20.sh

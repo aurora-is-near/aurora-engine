@@ -1,17 +1,17 @@
-#---
-#on:
-#  push:
-#    branches:
-#      - main
-#      - develop
-#  pull_request:
-#  schedule:
-#    - cron: "30 5 * * *"
-#  workflow_dispatch:
-#
-#name: "Contract Security Analysis"
-#jobs:
-#  contract_analysis:
-#    name: "Shared"
-#    uses: aurora-is-near/.github/.github/workflows/contract_analysis.yml@master
-#    secrets: inherit
+---
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch:
+
+name: "Contract Security Analysis"
+jobs:
+  contract_analysis:
+    name: "Shared"
+    uses: aurora-is-near/.github/.github/workflows/contract_analysis.yml@master
+    secrets: inherit
