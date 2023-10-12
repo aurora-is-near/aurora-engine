@@ -30,10 +30,11 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.profile }}-cargo-test
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
       - name: Install dependencies
-        run: |
-          sudo apt -y install yarn
-          cargo install cargo-make
+        run: cargo install cargo-make
       - name: Build main contract
         run: |
           case ${{ matrix.profile }} in
