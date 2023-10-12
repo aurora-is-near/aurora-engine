@@ -80,6 +80,6 @@ jobs:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  ROCKSDB_INCLUDE_DIR: $HOME/.rocksdb/include
-  ROCKSDB_LIB_DIR: $HOME/.rocksdb/lib
+  ROCKSDB_INCLUDE_DIR: /home/runner/.rocksdb/include
+  ROCKSDB_LIB_DIR: /home/runner/.rocksdb/lib
   ROCKSDB_STATIC: 1
