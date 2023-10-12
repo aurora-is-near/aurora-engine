@@ -30,9 +30,10 @@ jobs:
             ~/.cargo/git/db/
             ~/.rocksdb/
             target/
-          key: ${{ matrix.profile }}-cargo-test }}
+          key: ${{ matrix.profile }}-cargo-test
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
+      - run: cargo install cargo-make
       - run: |
           case ${{ matrix.profile }} in
             mainnet-silo)
@@ -69,9 +70,10 @@ jobs:
             ~/.cargo/git/db/
             ~/.rocksdb/
             target/
-          key: ${{ matrix.profile }}-cargo-modexp-test }}
+          key: ${{ matrix.profile }}-cargo-modexp-test
       - name: Preparing rocksdb library
         run: scripts/ci/build_rocksdb.sh
+      - run: cargo install cargo-make
       - name: Test ${{ matrix.profile }} bench-modexp
         run: cargo make --profile ${{ matrix.profile }} bench-modexp
 
