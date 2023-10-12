@@ -49,7 +49,6 @@ jobs:
           esac
       - name: Tests ${{ matrix.profile }}
         run: cargo make --profile ${{ matrix.profile }} test-flow
-      - run: cat /home/runner/work/aurora-engine/aurora-engine/engine-tests/target/limit-order-protocol/yarn-error.log
 
 #  test_modexp:
 #    name: Test modexp suite ${{ matrix.profile }}
