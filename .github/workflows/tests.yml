@@ -28,13 +28,14 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            ~/.rocksdb/
             target/
           key: ${{ matrix.profile }}-cargo-test
-      - name: Preparing rocksdb library
-        run: scripts/ci/build_rocksdb.sh
-      - run: cargo install cargo-make
-      - run: |
+      - name: Install dependencies
+        run: |
+          sudo apt -y install yarn
+          cargo install cargo-make
+      - name: Build main contract
+        run: |
           case ${{ matrix.profile }} in
             mainnet-silo)
               cargo make --profile mainnet build-test
@@ -68,11 +69,8 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            ~/.rocksdb/
             target/
           key: ${{ matrix.profile }}-cargo-modexp-test
-      - name: Preparing rocksdb library
-        run: scripts/ci/build_rocksdb.sh
       - run: cargo install cargo-make
       - name: Test ${{ matrix.profile }} bench-modexp
         run: cargo make --profile ${{ matrix.profile }} bench-modexp
@@ -80,6 +78,3 @@ jobs:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  ROCKSDB_INCLUDE_DIR: /home/runner/.rocksdb/include
-  ROCKSDB_LIB_DIR: /home/runner/.rocksdb/lib
-  ROCKSDB_STATIC: 1
