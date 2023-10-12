@@ -12,11 +12,16 @@ jobs:
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Test mainnet
-        run: cargo make --profile mainnet test
+        run: cargo make --profile mainnet test-flow
       - name: Test testnet
-        run: cargo make --profile testnet test
+        run: cargo make --profile testnet test-flow
+      - name: Test mainnet silo
+        run: cargo make --profile mainnet-silo test-flow
+      - name: Test testnet silo
+        run: cargo make --profile testnet-silo test-flow
+
   checks:
     name: Run checks
     runs-on: [self-hosted, heavy]
@@ -25,5 +30,5 @@ jobs:
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - run: cargo make check
