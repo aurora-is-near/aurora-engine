@@ -9,80 +9,85 @@ on:
 name: Tests
 jobs:
   test:
-    name: Test suite (mainnet, testnet)
-    runs-on: [self-hosted, heavy]
+    name: Test suite ${{ matrix.profile }}
+    runs-on: github-hosted-heavy-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ mainnet, testnet, mainnet-silo, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
-        run: cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
-      - name: Preparing rocksdb library
-        run: scripts/ci/build_rocksdb.sh
+        uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.profile }}-cargo-test
+      - name: Setup Node and cache
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+          cache-dependency-path: |
+            etc/eth-contracts
+            etc/tests/uniswap
+      - name: Install dependencies
+        run: cargo make -V || cargo install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
-      - name: Test mainnet
-        run: cargo make --profile mainnet test-flow
-      - name: Test testnet
-        run: cargo make --profile testnet test-flow
-      - name: Save cache
-        run: cache-util save cargo_git cargo_registry yarn_cache
-
-  test_silo:
-    name: Test Silo suite (mainnet-silo, testnet-silo)
-    runs-on: [ self-hosted, heavy ]
-    steps:
-      - name: Potential broken submodules fix
+      - name: Build main contract
         run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
-        run: cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
-      - name: Preparing rocksdb library
-        run: scripts/ci/build_rocksdb.sh
-      - name: Test mainnet
-        run: |
-          cargo make --profile mainnet build-test
-          cargo make --profile mainnet-silo test-flow
-      - name: Test testnet
-        run: |
-          cargo make --profile testnet build-test
-          cargo make --profile testnet-silo test-flow
-      - name: Save cache
-        run: cache-util save cargo_git cargo_registry yarn_cache
+          case ${{ matrix.profile }} in
+            mainnet-silo)
+              cargo make --profile mainnet build-test
+              ;;
+            testnet-silo)
+              cargo make --profile testnet build-test
+              ;;
+            *)
+              ;;
+          esac
+      - name: Tests ${{ matrix.profile }}
+        run: cargo make --profile ${{ matrix.profile }} test-flow
 
   test_modexp:
-    name: Test modexp suite (mainnet, testnet)
-    runs-on: [ self-hosted, heavy ]
+    name: Test modexp suite ${{ matrix.profile }}
+    runs-on: github-hosted-heavy-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
-        run: |
-          cache-util restore cargo_git cargo_registry yarn_cache rocksdb:/root/rocksdb
-          cache-util restore aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
-      - name: Preparing rocksdb library
-        run: scripts/ci/build_rocksdb.sh
+        uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.profile }}-cargo-modexp-test
+      - name: Install dependencies
+        run: cargo make -V || cargo install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
-      - name: Test mainnet bench-modexp
-        run: cargo make --profile mainnet bench-modexp
-      - name: Test testnet bench-modexp
-        run: cargo make --profile testnet bench-modexp
-      - name: Save cache
-        run: |
-          cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@modexp@${{ hashFiles('**/Cargo.lock') }}:target
+      - name: Test ${{ matrix.profile }} bench-modexp
+        run: cargo make --profile ${{ matrix.profile }} bench-modexp
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  ROCKSDB_INCLUDE_DIR: /root/rocksdb/include
-  ROCKSDB_LIB_DIR: /root/rocksdb/lib
-  ROCKSDB_STATIC: 1

@@ -307,7 +307,7 @@ category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.wasm-opt]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "mainnet-silo", "testnet-silo", "custom"] }
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${WASM_FILE} | awk '{print $1}')

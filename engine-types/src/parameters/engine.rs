@@ -349,6 +349,8 @@ pub struct RelayerKeyArgs {
     pub public_key: PublicKey,
 }
 
+pub type FullAccessKeyArgs = RelayerKeyArgs;
+
 pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
 
