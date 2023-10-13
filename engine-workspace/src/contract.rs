@@ -1,15 +1,15 @@
 use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
-    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey, CallCall,
-    CallDeployCode, CallDeployErc20Token, CallDeployUpgrade, CallDeposit,
-    CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
+    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
+    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
+    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
     CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
     CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
     CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
     CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGasCost,
-    CallSetKeyManager, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
+    CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
     CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash,
     ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress,
@@ -27,7 +27,8 @@ use aurora_engine_types::parameters::connector::{
     SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
+    CallArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs,
+    RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
     FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
@@ -351,6 +352,14 @@ impl EngineContract {
 
     pub fn set_erc20_metadata(&self, metadata: SetErc20MetadataArgs) -> CallSetErc20Metadata {
         CallSetErc20Metadata::call(&self.contract).args_json(metadata)
+    }
+
+    pub fn attach_full_access_key(&self, args: FullAccessKeyArgs) -> CallAttachFullAccessKey {
+        CallAttachFullAccessKey::call(&self.contract).args_json(args)
+    }
+
+    pub fn set_owner(&self, account: &AccountId) -> CallSetOwner {
+        CallSetOwner::call(&self.contract).args_borsh(account)
     }
 }
 

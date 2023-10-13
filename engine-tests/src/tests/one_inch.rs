@@ -10,8 +10,7 @@ use std::sync::Once;
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 
-static DOWNLOAD_ONCE: Once = Once::new();
-static COMPILE_ONCE: Once = Once::new();
+static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 #[test]
 fn test_1inch_liquidity_protocol() {
@@ -116,8 +115,7 @@ fn deploy_1_inch_limit_order_contract(
 ) -> VMOutcome {
     let artifacts_path = utils::one_inch::download_and_compile_solidity_sources(
         "limit-order-protocol",
-        &DOWNLOAD_ONCE,
-        &COMPILE_ONCE,
+        &DOWNLOAD_COMPILE_ONCE,
     );
     let contract_path = artifacts_path.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
     let constructor =

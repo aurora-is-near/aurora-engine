@@ -453,8 +453,19 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Attach a full access key.
+    #[no_mangle]
+    pub extern "C" fn attach_full_access_key() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::admin::attach_full_access_key(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     ///
-    /// NONMUTATIVE METHODS
+    /// READ-ONLY METHODS
     ///
     #[no_mangle]
     pub extern "C" fn view() {

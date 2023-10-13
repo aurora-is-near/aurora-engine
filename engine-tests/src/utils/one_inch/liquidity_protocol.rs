@@ -6,8 +6,7 @@ use aurora_engine_types::types::Wei;
 use std::path::PathBuf;
 use std::sync::Once;
 
-static DOWNLOAD_ONCE: Once = Once::new();
-static COMPILE_ONCE: Once = Once::new();
+static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 pub struct Helper<'a> {
     pub runner: &'a mut utils::AuroraRunner,
@@ -19,7 +18,7 @@ impl<'a> Helper<'a> {
         &mut self,
     ) -> (SubmitResult, ExecutionProfile, PoolDeployer) {
         let artifacts_path = download_and_compile_solidity_sources();
-        let deployer_constructor = utils::solidity::ContractConstructor::compile_from_extended_json(
+        let deployer_constructor = solidity::ContractConstructor::compile_from_extended_json(
             artifacts_path.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
         );
         let data = deployer_constructor.code;
@@ -54,7 +53,7 @@ impl<'a> Helper<'a> {
         pool_deployer: &PoolDeployer,
     ) -> (SubmitResult, ExecutionProfile, PoolFactory) {
         let artifacts_path = download_and_compile_solidity_sources();
-        let constructor = utils::solidity::ContractConstructor::compile_from_extended_json(
+        let constructor = solidity::ContractConstructor::compile_from_extended_json(
             artifacts_path.join("MooniswapFactory.sol/MooniswapFactory.json"),
         );
 
@@ -251,9 +250,5 @@ impl Pool {
 }
 
 fn download_and_compile_solidity_sources() -> PathBuf {
-    super::download_and_compile_solidity_sources(
-        "liquidity-protocol",
-        &DOWNLOAD_ONCE,
-        &COMPILE_ONCE,
-    )
+    super::download_and_compile_solidity_sources("liquidity-protocol", &DOWNLOAD_COMPILE_ONCE)
 }
