@@ -3,6 +3,7 @@ use aurora_engine_types::types::Address;
 use aurora_engine_types::{H256, U256};
 use near_sdk::{json_types::U128, PromiseOrValue};
 use serde::de::DeserializeOwned;
+use std::fmt::Debug;
 use workspaces::result::{ExecutionFinalResult, ExecutionOutcome, ViewResultDetails};
 use workspaces::types::Gas;
 
@@ -58,6 +59,19 @@ impl ViewResult<H256> {
         buf.copy_from_slice(view.result.as_slice());
         Ok(Self {
             result: H256::from(buf),
+            logs: view.logs,
+        })
+    }
+}
+
+impl<T> ViewResult<T>
+where
+    T: for<'a> TryFrom<&'a [u8]>,
+{
+    pub fn from_bytes(view: ViewResultDetails) -> anyhow::Result<Self> {
+        Ok(Self {
+            result: T::try_from(view.result.as_slice())
+                .map_err(|_| anyhow::anyhow!("couldn't create T from bytes"))?,
             logs: view.logs,
         })
     }

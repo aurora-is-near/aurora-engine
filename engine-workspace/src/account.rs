@@ -52,6 +52,7 @@ impl Account {
 
     pub fn public_key(&self) -> anyhow::Result<PublicKey> {
         let pk = self.inner.secret_key().public_key();
-        PublicKey::from_str(&serde_json::to_string(&pk)?).map_err(|e| anyhow::anyhow!("{e:?}"))
+        PublicKey::from_str(serde_json::to_string(&pk)?.trim_matches('"'))
+            .map_err(|e| anyhow::anyhow!("{e:?}"))
     }
 }

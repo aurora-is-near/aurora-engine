@@ -29,6 +29,7 @@ impl_call_return![
         CallFactoryUpdateAddressVersion,
         Call::FactoryUpdateAddressVersion
     ),
+    (CallSetOwner, Call::SetOwner),
     (CallRegisterRelayer, Call::RegisterRelayer),
     (CallRefundOnError, Call::RefundOnError),
     (CallFactoryUpdate, Call::FactoryUpdate),
@@ -56,7 +57,8 @@ impl_call_return![
     (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
     (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
     (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist),
-    (CallSetErc20Metadata, Call::SetErc20Metadata)
+    (CallSetErc20Metadata, Call::SetErc20Metadata),
+    (CallAttachFullAccessKey, Call::AttachFullAccessKey)
 ];
 
 impl_call_return![
@@ -79,7 +81,7 @@ impl_view_return![
     (ViewStorageBalanceOf => StorageBalance, View::StorageBalanceOf, json),
     (ViewFtMetadata => FungibleTokenMetadata, View::FtMetadata, json),
     (ViewVersion => String, View::Version, borsh),
-    (ViewOwner => AccountId, View::Owner, borsh),
+    (ViewOwner => AccountId, View::Owner, from_bytes),
     (ViewBridgeProver => AccountId, View::BridgeProver, borsh),
     (ViewChainId => U256, View::ChainId, borsh_U256),
     (ViewUpgradeIndex => u64, View::UpgradeIndex, borsh),
@@ -116,6 +118,7 @@ pub(crate) enum Call {
     MirrorErc20Token,
     Call,
     Submit,
+    SetOwner,
     RegisterRelayer,
     FtOnTransfer,
     Withdraw,
@@ -151,6 +154,7 @@ pub(crate) enum Call {
     AddEntryToWhitelistBatch,
     RemoveEntryFromWhitelist,
     SetErc20Metadata,
+    AttachFullAccessKey,
 }
 
 impl AsRef<str> for Call {
@@ -163,6 +167,7 @@ impl AsRef<str> for Call {
             Call::MirrorErc20Token => "mirror_erc20_token",
             Call::Call => "call",
             Call::Submit => "submit",
+            Call::SetOwner => "set_owner",
             Call::RegisterRelayer => "register_relayer",
             Call::FtOnTransfer => "ft_on_transfer",
             Call::Withdraw => "withdraw",
@@ -198,6 +203,7 @@ impl AsRef<str> for Call {
             Call::AddEntryToWhitelistBatch => "add_entry_to_whitelist_batch",
             Call::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
             Call::SetErc20Metadata => "set_erc20_metadata",
+            Call::AttachFullAccessKey => "attach_full_access_key",
         }
     }
 }

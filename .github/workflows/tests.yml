@@ -12,6 +12,7 @@ jobs:
     name: Test suite ${{ matrix.profile }}
     runs-on: github-hosted-heavy-runner
     strategy:
+      fail-fast: false
       matrix:
         profile: [ mainnet, testnet, mainnet-silo, testnet-silo ]
     steps:
@@ -59,6 +60,7 @@ jobs:
     name: Test modexp suite ${{ matrix.profile }}
     runs-on: github-hosted-heavy-runner
     strategy:
+      fail-fast: false
       matrix:
         profile: [ mainnet, testnet ]
     steps:
