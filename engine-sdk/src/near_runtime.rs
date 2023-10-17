@@ -1,5 +1,5 @@
 use crate::io::StorageIntermediate;
-use crate::prelude::NearGas;
+use crate::prelude::{NearGas, Vec};
 use crate::promise::PromiseId;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
@@ -8,7 +8,7 @@ use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
 #[cfg(all(feature = "mainnet", not(feature = "testnet")))]
-/// The mainnet eth_custodian address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
+/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
 const CUSTODIAN_ADDRESS: &[u8] = &[
     107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
 ];
@@ -312,6 +312,16 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
+    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+        let ids = args
+            .iter()
+            .map(|args| self.promise_create_call(args))
+            .collect::<Vec<_>>();
+        let id = exports::promise_and(ids.as_ptr() as _, ids.len() as _);
+
+        PromiseId::new(id)
+    }
+
     unsafe fn promise_attach_callback(
         &mut self,
         base: PromiseId,
@@ -399,16 +409,14 @@ impl crate::promise::PromiseHandler for Runtime {
                     });
                 }
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
-                    feature_gated!("all-promise-actions", {
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_add_key_with_full_access(
-                            id,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                            *nonce,
-                        );
-                    });
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_add_key_with_full_access(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                        *nonce,
+                    );
                 }
                 PromiseAction::AddFunctionCallKey {
                     public_key,
@@ -648,7 +656,7 @@ pub(crate) mod exports {
             amount_ptr: u64,
             gas: u64,
         ) -> u64;
-        fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64;
+        pub(crate) fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64;
         pub(crate) fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64;
         fn promise_batch_then(promise_index: u64, account_id_len: u64, account_id_ptr: u64) -> u64;
         // #######################

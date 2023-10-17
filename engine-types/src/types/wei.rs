@@ -3,13 +3,13 @@ use crate::types::balance::error;
 use crate::types::Fee;
 use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
 #[cfg(not(feature = "borsh-compat"))]
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
+use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
-pub const ZERO_WEI: Wei = Wei::new_u64(0);
+pub const ZERO_WEI: Wei = Wei::zero();
 
 /// Wei compatible Borsh-encoded raw value to attach an ETH balance to the transaction
 pub type WeiU256 = [u8; 32];
@@ -107,7 +107,7 @@ impl Wei {
 
     #[must_use]
     pub const fn zero() -> Self {
-        Self(U256([0, 0, 0, 0]))
+        Self(U256::zero())
     }
 
     #[must_use]
@@ -213,6 +213,47 @@ pub fn u256_to_arr(value: &U256) -> [u8; 32] {
     let mut result = [0u8; 32];
     value.to_big_endian(&mut result);
     result
+}
+
+impl BorshSerialize for Wei {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        writer.write_all(&self.to_bytes())
+    }
+}
+
+#[cfg(feature = "borsh-compat")]
+impl BorshDeserialize for Wei {
+    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
+        if buf.len() < 32 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid length of the input",
+            ));
+        }
+
+        let mut buffer = [0; 32];
+        buffer.copy_from_slice(&buf[..32]);
+        *buf = &buf[32..];
+
+        Ok(Self::from(buffer))
+    }
+}
+
+#[cfg(not(feature = "borsh-compat"))]
+impl BorshDeserialize for Wei {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 32];
+        let maybe_read = reader.read_exact(&mut buf);
+
+        if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid length of the input",
+            ));
+        }
+        maybe_read?;
+        Ok(Self::from(buf))
+    }
 }
 
 #[cfg(test)]

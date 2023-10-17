@@ -10,8 +10,7 @@ use std::sync::Once;
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
 
-static DOWNLOAD_ONCE: Once = Once::new();
-static COMPILE_ONCE: Once = Once::new();
+static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 #[test]
 fn test_1inch_liquidity_protocol() {
@@ -100,8 +99,8 @@ fn test_1_inch_limit_order_deploy() {
 
     // more than 3.5 million Ethereum gas used
     assert!(result.gas_used > 3_500_000);
-    // less than 9 NEAR Tgas used
-    assert_gas_bound(profile.all_gas(), 9);
+    // less than 10 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 10);
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
@@ -116,8 +115,7 @@ fn deploy_1_inch_limit_order_contract(
 ) -> VMOutcome {
     let artifacts_path = utils::one_inch::download_and_compile_solidity_sources(
         "limit-order-protocol",
-        &DOWNLOAD_ONCE,
-        &COMPILE_ONCE,
+        &DOWNLOAD_COMPILE_ONCE,
     );
     let contract_path = artifacts_path.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
     let constructor =

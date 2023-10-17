@@ -9,56 +9,80 @@ on:
 name: Tests
 jobs:
   test:
-    name: Test suite (mainnet, testnet)
-    runs-on: [self-hosted, heavy]
+    name: Test suite ${{ matrix.profile }}
+    runs-on: github-hosted-heavy-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ mainnet, testnet, mainnet-silo, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
-        run: cache-util restore cargo_git cargo_registry yarn_cache
-      - name: Build contracts
-        run: cargo make build-contracts
-      - name: Test contracts
-        run: cargo make test-contracts
-      - name: Build mainnet test WASM
-        run: cargo make --profile mainnet build-test
-      - name: List mainnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
-      - name: Test mainnet
-        run: cargo make --profile mainnet test-workspace
-      - name: Build testnet test WASM
-        run: cargo make --profile testnet build-test
-      - name: List testnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
-      - name: Test testnet
-        run: cargo make --profile testnet test-workspace
-      - name: Save cache
-        run: cache-util save cargo_git cargo_registry yarn_cache
+        uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.profile }}-cargo-test
+      - name: Setup Node and cache
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: 'yarn'
+          cache-dependency-path: |
+            etc/eth-contracts
+            etc/tests/uniswap
+      - name: Install dependencies
+        run: cargo make -V || cargo install cargo-make
+      - name: Build main contract
+        run: |
+          case ${{ matrix.profile }} in
+            mainnet-silo)
+              cargo make --profile mainnet build-test
+              ;;
+            testnet-silo)
+              cargo make --profile testnet build-test
+              ;;
+            *)
+              ;;
+          esac
+      - name: Tests ${{ matrix.profile }}
+        run: cargo make --profile ${{ matrix.profile }} test-flow
 
   test_modexp:
-    name: Test modexp suite (mainnet, testnet)
-    runs-on: [ self-hosted, heavy ]
+    name: Test modexp suite ${{ matrix.profile }}
+    runs-on: github-hosted-heavy-runner
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
-        run: |
-          cache-util restore cargo_git cargo_registry yarn_cache
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
-      - name: Test mainnet bench-modexp
-        run: cargo make --profile mainnet bench-modexp
-      - name: Test testnet bench-modexp
-        run: cargo make --profile testnet bench-modexp
-      - name: Save cache
-        run: |
-          cache-util save cargo_git cargo_registry yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+        uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.profile }}-cargo-modexp-test
+      - name: Install dependencies
+        run: cargo make -V || cargo install cargo-make
+      - name: Test ${{ matrix.profile }} bench-modexp
+        run: cargo make --profile ${{ matrix.profile }} bench-modexp
 
 env:
   CARGO_TERM_COLOR: always

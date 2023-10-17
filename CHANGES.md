@@ -7,7 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] 2023-10-17
+
+### Changes
+
+- Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
+ additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
+
+- Updated rocksdb up to 0.21.0 by [@aleksuss]. ([#840])
+
+### Additions
+
+- Added a possibility of mirroring deployed ERC-20 contracts in the main Aurora contract in Silo mode by [@aleksuss]. ([#844])
+
+- Allow to initialize hashchain directly with the `new` method by [@birchmd]. ([#846])
+
+- Added a silo logic which allows to set fixed gas costs per transaction by [@aleksuss]. ([#746])
+
+- Added a new type of transaction which allows to add full access key into account of the smart contract by [@aleksuss]. ([#847])
+
+[#746]: https://github.com/aurora-is-near/aurora-engine/pull/746
+[#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
+[#840]: https://github.com/aurora-is-near/aurora-engine/pull/840
+[#844]: https://github.com/aurora-is-near/aurora-engine/pull/844
+[#846]: https://github.com/aurora-is-near/aurora-engine/pull/846
+[#847]: https://github.com/aurora-is-near/aurora-engine/pull/847
+
 ## [3.1.0] 2023-09-25
+
+### Additions
 
 - Added the possibility to use native NEAR instead of wNEAR on Aurora by [@karim-en]. ([#750])
 
@@ -24,15 +52,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- Updated sputnikvm dependency with bugfix in the `returndatacopy` implementation and a performance improvement in accessing EVM memory. [@birchmd] ([#826])
+- Updated [SputnikVM](https://github.com/aurora-is-near/sputnikvm) dependency with bugfix in the `returndatacopy`
+  implementation and a performance improvement in accessing EVM memory by [@birchmd]. ([#826])
 
 ### Changes
 
-- BREAKING: `engine-standalone-storage` no loonger automatically writes to the DB when `consume_message` is called. It is up to downstream users of the library to commit the diff (after doing any validation for correctness). [@birchmd] ([#825])
+- BREAKING: `engine-standalone-storage` no longer automatically writes to the DB when `consume_message` is called. 
+  It is up to downstream users of the library to commit the diff (after doing any validation for correctness) by [@birchmd]. ([#825])
 
 ### Additions
 
-- New crate for the so-called "hashchain" implementation. It will enable verification of Aurora blocks by light clients in the future. [@birchmd] ([#816])
+- New crate for the so-called "hashchain" implementation. It will enable verification of Aurora blocks by light clients 
+  in the future by [@birchmd]. ([#816])
 
 [#816]: https://github.com/aurora-is-near/aurora-engine/pull/816
 [#825]: https://github.com/aurora-is-near/aurora-engine/pull/825
@@ -495,8 +526,10 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.2...develop
-[3.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.2...3.0.0
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...develop
+[3.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.1.0...3.2.0
+[3.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...3.1.0
+[3.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...2.10.2
 [2.10.2]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.1...2.10.2
 [2.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/2.10.0...2.10.1
 [2.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/2.9.3...2.10.0

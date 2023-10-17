@@ -16,6 +16,7 @@ pub enum NewCallArgs {
     V1(LegacyNewCallArgs),
     V2(NewCallArgsV2),
     V3(NewCallArgsV3),
+    V4(NewCallArgsV4),
 }
 
 impl NewCallArgs {
@@ -24,6 +25,14 @@ impl NewCallArgs {
             |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
             Ok,
         )
+    }
+
+    #[must_use]
+    pub const fn initial_hashchain(&self) -> Option<RawH256> {
+        match self {
+            Self::V4(args) => args.initial_hashchain,
+            Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
+        }
     }
 }
 
@@ -64,6 +73,22 @@ pub struct NewCallArgsV3 {
     pub upgrade_delay_blocks: u64,
     /// Relayer keys manager.
     pub key_manager: AccountId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct NewCallArgsV4 {
+    /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    pub chain_id: RawU256,
+    /// Account which can upgrade this contract.
+    /// Use empty to disable updatability.
+    pub owner_id: AccountId,
+    /// How many blocks after staging upgrade can deploy it.
+    pub upgrade_delay_blocks: u64,
+    /// Relayer keys manager.
+    pub key_manager: AccountId,
+    /// Initial value of the hashchain.
+    /// If none is provided then the hashchain will start disabled.
+    pub initial_hashchain: Option<RawH256>,
 }
 
 /// Borsh-encoded parameters for the `set_owner` function.
@@ -149,14 +174,6 @@ impl StorageBalance {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RegisterRelayerCallArgs {
     pub address: Address,
-}
-
-pub type PausedMask = u8;
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct PauseEthConnectorCallArgs {
-    pub paused_mask: PausedMask,
 }
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
@@ -309,6 +326,17 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+pub struct StorageUnregisterArgs {
+    pub force: bool,
+}
+
+pub fn parse_json_args<'de, T: Deserialize<'de>>(
+    bytes: &'de [u8],
+) -> Result<T, errors::ParseArgsError> {
+    serde_json::from_slice(bytes).map_err(Into::into)
+}
+
 /// Parameters for setting relayer keys manager.
 #[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct RelayerKeyManagerArgs {
@@ -321,34 +349,37 @@ pub struct RelayerKeyArgs {
     pub public_key: PublicKey,
 }
 
+pub type FullAccessKeyArgs = RelayerKeyArgs;
+
 pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
 
     pub const ERR_REVERT: &[u8; 10] = b"ERR_REVERT";
+    pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUNDS: &[u8; 16] = b"ERR_OUT_OF_FUNDS";
     pub const ERR_CALL_TOO_DEEP: &[u8; 17] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8; 17] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8; 14] = b"ERR_OUT_OF_GAS";
 
     #[derive(Debug)]
-    pub enum ParseTypeFromJsonError {
+    pub enum ParseArgsError {
         Json(String),
         InvalidAccount(ParseAccountError),
     }
 
-    impl From<serde_json::Error> for ParseTypeFromJsonError {
+    impl From<serde_json::Error> for ParseArgsError {
         fn from(e: serde_json::Error) -> Self {
             Self::Json(e.to_string())
         }
     }
 
-    impl From<ParseAccountError> for ParseTypeFromJsonError {
+    impl From<ParseAccountError> for ParseArgsError {
         fn from(e: ParseAccountError) -> Self {
             Self::InvalidAccount(e)
         }
     }
 
-    impl AsRef<[u8]> for ParseTypeFromJsonError {
+    impl AsRef<[u8]> for ParseArgsError {
         fn as_ref(&self) -> &[u8] {
             match self {
                 Self::Json(e) => e.as_bytes(),

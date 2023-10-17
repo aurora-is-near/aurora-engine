@@ -1,26 +1,37 @@
 use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
-    CallAddRelayerKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
+    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
+    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
     CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallNew, CallNewEthConnector, CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer,
-    CallRemoveRelayerKey, CallResumePrecompiles, CallSetEthConnectorContractData,
-    CallSetKeyManager, CallSetPausedFlags, CallStageUpgrade, CallStateMigration,
-    CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallWithdraw,
-    ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode,
-    ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth,
-    ViewFtMetadata, ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
-    ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
-    ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
-    ViewView,
+    CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
+    CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
+    CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
+    CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGasCost,
+    CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
+    CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
+    CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash,
+    ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress,
+    ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata, ViewFtTotalEthSupplyOnAurora,
+    ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewGetErc20Metadata,
+    ViewGetEthConnectorContractAccount, ViewGetFixedGasCost, ViewGetSiloParams,
+    ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
+    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
+    ViewVersion, ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Proof};
+use aurora_engine_types::parameters::connector::{
+    Erc20Identifier, FungibleTokenMetadata, MirrorErc20TokenArgs, PausedMask, Proof,
+    SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+};
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, PausedMask, RelayerKeyArgs,
+    CallArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs,
     RelayerKeyManagerArgs,
+};
+use aurora_engine_types::parameters::silo::{
+    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
@@ -159,6 +170,19 @@ impl EngineContract {
         ))
     }
 
+    pub fn set_eth_connector_contract_account(
+        &self,
+        account_id: AccountId,
+        withdraw_serialize_type: WithdrawSerializeType,
+    ) -> CallSetEthConnectorContractAccount {
+        CallSetEthConnectorContractAccount::call(&self.contract).args_borsh(
+            SetEthConnectorContractAccountArgs {
+                account: account_id,
+                withdraw_serialize_type,
+            },
+        )
+    }
+
     pub fn factory_update_address_version(
         &self,
         address: Address,
@@ -186,6 +210,10 @@ impl EngineContract {
 
     pub fn deploy_erc20_token(&self, account_id: AccountId) -> CallDeployErc20Token {
         CallDeployErc20Token::call(&self.contract).args_borsh(account_id)
+    }
+
+    pub fn mirror_erc20_token(&self, args: MirrorErc20TokenArgs) -> CallMirrorErc20Token {
+        CallMirrorErc20Token::call(&self.contract).args_borsh(args)
     }
 
     pub fn call(&self, contract: Address, amount: U256, input: Vec<u8>) -> CallCall {
@@ -282,6 +310,56 @@ impl EngineContract {
 
     pub fn remove_relayer_key(&self, key: RelayerKeyArgs) -> CallRemoveRelayerKey {
         CallRemoveRelayerKey::call(&self.contract).args_json(key)
+    }
+
+    pub fn pause_contract(&self) -> CallPauseContract {
+        CallPauseContract::call(&self.contract)
+    }
+
+    pub fn resume_contract(&self) -> CallResumeContract {
+        CallResumeContract::call(&self.contract)
+    }
+
+    pub fn set_fixed_gas_cost(&self, cost: FixedGasCostArgs) -> CallSetFixedGasCost {
+        CallSetFixedGasCost::call(&self.contract).args_borsh(cost)
+    }
+
+    pub fn set_silo_params(&self, params: Option<SiloParamsArgs>) -> CallSetSiloParams {
+        CallSetSiloParams::call(&self.contract).args_borsh(params)
+    }
+
+    pub fn set_whitelist_status(&self, status: WhitelistStatusArgs) -> CallSetWhitelistStatus {
+        CallSetWhitelistStatus::call(&self.contract).args_borsh(status)
+    }
+
+    pub fn add_entry_to_whitelist(&self, entry: WhitelistArgs) -> CallAddEntryToWhitelist {
+        CallAddEntryToWhitelist::call(&self.contract).args_borsh(entry)
+    }
+
+    pub fn add_entry_to_whitelist_batch(
+        &self,
+        batch: Vec<WhitelistArgs>,
+    ) -> CallAddEntryToWhitelistBatch {
+        CallAddEntryToWhitelistBatch::call(&self.contract).args_borsh(batch)
+    }
+
+    pub fn remove_entry_from_whitelist(
+        &self,
+        entry: WhitelistArgs,
+    ) -> CallRemoveEntryFromWhitelist {
+        CallRemoveEntryFromWhitelist::call(&self.contract).args_borsh(entry)
+    }
+
+    pub fn set_erc20_metadata(&self, metadata: SetErc20MetadataArgs) -> CallSetErc20Metadata {
+        CallSetErc20Metadata::call(&self.contract).args_json(metadata)
+    }
+
+    pub fn attach_full_access_key(&self, args: FullAccessKeyArgs) -> CallAttachFullAccessKey {
+        CallAttachFullAccessKey::call(&self.contract).args_json(args)
+    }
+
+    pub fn set_owner(&self, account: &AccountId) -> CallSetOwner {
+        CallSetOwner::call(&self.contract).args_borsh(account)
     }
 }
 
@@ -392,8 +470,28 @@ impl EngineContract {
         ViewAccountsCounter::view(&self.contract)
     }
 
+    pub fn get_eth_connector_contract_account(&self) -> ViewGetEthConnectorContractAccount {
+        ViewGetEthConnectorContractAccount::view(&self.contract)
+    }
+
+    pub fn get_fixed_gas_cost(&self) -> ViewGetFixedGasCost {
+        ViewGetFixedGasCost::view(&self.contract)
+    }
+
+    pub fn get_silo_params(&self) -> ViewGetSiloParams {
+        ViewGetSiloParams::view(&self.contract)
+    }
+
+    pub fn get_whitelist_status(&self, args: WhitelistKindArgs) -> ViewGetWhitelistStatus {
+        ViewGetWhitelistStatus::view(&self.contract).args_borsh(args)
+    }
+
     pub fn factory_get_wnear_address(&self) -> ViewFactoryWnearAddress {
         ViewFactoryWnearAddress::view(&self.contract)
+    }
+
+    pub fn get_erc20_metadata(&self, identifier: Erc20Identifier) -> ViewGetErc20Metadata {
+        ViewGetErc20Metadata::view(&self.contract).args_json(identifier)
     }
 }
 

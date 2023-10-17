@@ -1,5 +1,7 @@
 use crate::utils::workspace::deploy_engine;
-use aurora_engine_types::parameters::engine::{RelayerKeyArgs, RelayerKeyManagerArgs};
+use aurora_engine_types::parameters::engine::{
+    FullAccessKeyArgs, RelayerKeyArgs, RelayerKeyManagerArgs, SetUpgradeDelayBlocksArgs,
+};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::Address;
 use aurora_engine_workspace::parse_near;
@@ -273,6 +275,62 @@ async fn test_call_not_allowed_contract() {
         .err()
         .unwrap();
     assert_error_message(&err, "unable to broadcast the transaction to the network");
+}
+
+#[tokio::test]
+async fn test_attach_full_access_key() {
+    let aurora = deploy_engine().await;
+    let secret_key = SecretKey::from_random(KeyType::ED25519);
+    let public_key = public_key(&secret_key);
+    let admin = aurora.create_account(&aurora.id(), secret_key);
+
+    let err = admin
+        .call(&aurora.id(), "set_upgrade_delay_blocks")
+        .args_borsh(SetUpgradeDelayBlocksArgs {
+            upgrade_delay_blocks: 5,
+        })
+        .max_gas()
+        .transact()
+        .await;
+    assert_error_message(&err, "Failed to query access key");
+
+    let result = aurora
+        .attach_full_access_key(FullAccessKeyArgs { public_key })
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
+
+    let result = admin
+        .call(&aurora.id(), "set_upgrade_delay_blocks")
+        .args_borsh(SetUpgradeDelayBlocksArgs {
+            upgrade_delay_blocks: 5,
+        })
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success()); // because owner_account_id == current_account_id
+
+    // Change the owner
+    let result = aurora
+        .set_owner(&"some_owner.root".parse().unwrap())
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
+
+    let err = admin
+        .call(&aurora.id(), "set_upgrade_delay_blocks")
+        .args_borsh(SetUpgradeDelayBlocksArgs {
+            upgrade_delay_blocks: 5,
+        })
+        .max_gas()
+        .transact()
+        .await;
+    assert_error_message(&err, "ERR_NOT_ALLOWED");
 }
 
 fn public_key(sk: &SecretKey) -> PublicKey {

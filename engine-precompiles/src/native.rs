@@ -1,21 +1,21 @@
 use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::types::EthGas;
+use crate::prelude::{
+    format,
+    parameters::{PromiseArgs, PromiseCreateArgs},
+    sdk::io::{StorageIntermediate, IO},
+    storage::{bytes_to_key, KeyPrefix},
+    str,
+    types::{Address, Yocto},
+    vec, BorshSerialize, Cow, ToString, Vec, U256,
+};
 #[cfg(feature = "error_refund")]
 use crate::prelude::{parameters::RefundCallArgs, types};
-use crate::{
-    prelude::{
-        format,
-        parameters::{PromiseArgs, PromiseCreateArgs, WithdrawCallArgs},
-        sdk::io::{StorageIntermediate, IO},
-        storage::{bytes_to_key, KeyPrefix},
-        str,
-        types::{Address, Yocto},
-        vec, BorshSerialize, Cow, String, ToString, Vec, U256,
-    },
-    xcc::state::get_wnear_address,
-};
-
-use crate::prelude::types::EthGas;
+use crate::xcc::state::get_wnear_address;
 use crate::PrecompileOutput;
+use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+use aurora_engine_types::parameters::WithdrawCallArgs;
+use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::{
     account_id::AccountId,
     parameters::{
@@ -76,7 +76,7 @@ pub mod events {
     ///    uint amount
     /// )
     /// Note: in the ERC-20 exit case `sender` == `erc20_address` because it is
-    /// the ERC-20 contract which calls the exit precompile. However in the case
+    /// the ERC-20 contract which calls the exit precompile. However, in the case
     /// of ETH exit the sender will give the true sender (and the `erc20_address`
     /// will not be meaningful because ETH is not an ERC-20 token).
     pub struct ExitToNear {
@@ -241,6 +241,33 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
+#[cfg(feature = "ext-connector")]
+fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
+    io.read_storage(&construct_contract_key(
+        EthConnectorStorageId::EthConnectorAccount,
+    ))
+    .ok_or(ExitError::Other(Cow::Borrowed("ERR_KEY_NOT_FOUND")))
+    .and_then(|x| {
+        x.to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
+}
+
+fn get_withdraw_serialize_type<I: IO>(io: &I) -> Result<WithdrawSerializeType, ExitError> {
+    io.read_storage(&construct_contract_key(
+        EthConnectorStorageId::WithdrawSerializationType,
+    ))
+    .map_or(Ok(WithdrawSerializeType::Borsh), |value| {
+        value
+            .to_value()
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_DESERIALIZE")))
+    })
+}
+
+fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
+    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
+}
+
 fn validate_amount(amount: U256) -> Result<(), ExitError> {
     if amount > U256::from(u128::MAX) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
@@ -327,18 +354,21 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
         let mut input = parse_input(input)?;
-        let current_account_id = self.current_account_id.clone();
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
 
         let (nep141_address, args, exit_event, method, transfer_near_args) = match flag {
             0x0 => {
                 // ETH transfer
                 //
                 // Input slice format:
-                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
+                // recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
 
                 if let Ok(dest_account) = AccountId::try_from(input) {
                     (
-                        current_account_id,
+                        eth_connector_account_id,
                         // There is no way to inject json, given the encoding of both arguments
                         // as decimal and valid account id respectively.
                         format!(
@@ -362,7 +392,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 }
             }
             0x1 => {
-                // ERC20 transfer
+                // ERC-20 transfer
                 //
                 // This precompile branch is expected to be called from the ERC20 burn function.
                 //
@@ -491,8 +521,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
 }
 
 pub struct ExitToEthereum<I> {
-    current_account_id: AccountId,
     io: I,
+    #[cfg(not(feature = "ext-connector"))]
+    current_account_id: AccountId,
 }
 
 pub mod exit_to_ethereum {
@@ -506,11 +537,17 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
+    #[cfg(not(feature = "ext-connector"))]
     pub const fn new(current_account_id: AccountId, io: I) -> Self {
         Self {
-            current_account_id,
             io,
+            current_account_id,
         }
+    }
+
+    #[cfg(feature = "ext-connector")]
+    pub const fn new(io: I) -> Self {
+        Self { io }
     }
 }
 
@@ -519,6 +556,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         Ok(costs::EXIT_TO_ETHEREUM_GAS)
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(
         &self,
         input: &[u8],
@@ -553,6 +591,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         let mut input = input;
         let flag = input[0];
         input = &input[1..];
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
 
         let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
@@ -563,16 +605,15 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 let recipient_address: Address = input
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
+                let serialize_fn = match get_withdraw_serialize_type(&self.io)? {
+                    WithdrawSerializeType::Json => json_args,
+                    WithdrawSerializeType::Borsh => borsh_args,
+                };
                 (
-                    self.current_account_id.clone(),
+                    eth_connector_account_id,
                     // There is no way to inject json, given the encoding of both arguments
                     // as decimal and hexadecimal respectively.
-                    WithdrawCallArgs {
-                        recipient_address,
-                        amount: NEP141Wei::new(context.apparent_value.as_u128()),
-                    }
-                    .try_to_vec()
-                    .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")))?,
+                    serialize_fn(recipient_address, context.apparent_value)?,
                     events::ExitToEth {
                         sender: Address::new(context.caller),
                         erc20_address: events::ETH_ADDRESS,
@@ -607,7 +648,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
-                    let eth_recipient: String = hex::encode(input);
+                    let eth_recipient = hex::encode(input);
                     // unwrap cannot fail since we checked the length already
                     let recipient_address = Address::try_from_slice(input).map_err(|_| {
                         ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
@@ -668,6 +709,25 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             output: Vec::new(),
         })
     }
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn json_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    Ok(format!(
+        r#"{{"amount": "{}", "recipient": "{}"}}"#,
+        amount.as_u128(),
+        address.encode(),
+    )
+    .into_bytes())
+}
+
+fn borsh_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    WithdrawCallArgs {
+        recipient_address: address,
+        amount: NEP141Wei::new(amount.as_u128()),
+    }
+    .try_to_vec()
+    .map_err(|_| ExitError::Other(Cow::from("ERR_BORSH_SERIALIZE")))
 }
 
 #[cfg(test)]

@@ -1,19 +1,22 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Once;
+use std::sync::{Condvar, Mutex, Once};
 
 pub mod liquidity_protocol;
 
+static READY: Mutex<bool> = Mutex::new(false);
+static CV: Condvar = Condvar::new();
+
 pub fn download_and_compile_solidity_sources(
     repo_name: &str,
-    download_once: &'static Once,
-    compile_once: &'static Once,
+    download_compile_once: &'static Once,
 ) -> PathBuf {
     let sources_dir = Path::new("target").join(repo_name);
-    if !sources_dir.exists() {
-        // Contracts not already present, so download them (but only once, even
-        // if multiple tests running in parallel saw `contracts_dir` does not exist).
-        download_once.call_once(|| {
+
+    // Contracts not already present, so download and compile them (but only once, even
+    // if multiple tests running in parallel saw `contracts_dir` does not exist).
+    download_compile_once.call_once(|| {
+        if !sources_dir.exists() {
             let url = format!("https://github.com/1inch/{repo_name}");
             let repo = git2::Repository::clone(&url, &sources_dir).unwrap();
             if repo_name == "limit-order-protocol" {
@@ -26,10 +29,8 @@ pub fn download_and_compile_solidity_sources(
                 let mut opts = git2::build::CheckoutBuilder::new();
                 repo.checkout_head(Some(opts.force())).unwrap();
             }
-        });
-    }
+        }
 
-    compile_once.call_once(|| {
         // install packages
         let status = Command::new("/usr/bin/env")
             .current_dir(&sources_dir)
@@ -56,7 +57,17 @@ pub fn download_and_compile_solidity_sources(
         // clean and compile
         hardhat("clean");
         hardhat("compile");
+
+        *READY.lock().unwrap() = true;
+        CV.notify_all();
     });
+
+    // Wait for finished compilation.
+    let mut ready = READY.lock().unwrap();
+
+    while !*ready {
+        ready = CV.wait(ready).unwrap();
+    }
 
     sources_dir.join("artifacts/contracts")
 }

@@ -12,6 +12,7 @@ use aurora_engine_types::{account_id::AccountId, fmt, types::Address, Box};
 pub mod admin;
 pub mod connector;
 pub mod evm_transactions;
+pub mod silo;
 pub mod xcc;
 
 pub struct ContractError {

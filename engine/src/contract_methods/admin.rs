@@ -7,7 +7,7 @@
 //! the smart contract and the standalone.
 
 use crate::{
-    connector::EthConnectorContract,
+    contract_methods::connector::EthConnectorContract,
     contract_methods::{
         predecessor_address, require_key_manager_only, require_owner_only, require_paused,
         require_running, ContractError,
@@ -19,7 +19,7 @@ use crate::{
         Authorizer, EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker,
         PausedPrecompilesManager, PrecompileFlags,
     },
-    state,
+    state::{self, EngineState},
 };
 use aurora_engine_hashchain::{bloom::Bloom, hashchain::Hashchain};
 use aurora_engine_modexp::AuroraModExp;
@@ -29,6 +29,7 @@ use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
+use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
 use aurora_engine_types::{
     borsh::BorshDeserialize,
     parameters::{
@@ -48,17 +49,38 @@ const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
 #[named]
-pub fn new<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
-    with_hashchain(io, env, function_name!(), |mut io| {
-        if state::get_state(&io).is_ok() {
-            return Err(b"ERR_ALREADY_INITIALIZED".into());
-        }
+pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
+    if state::get_state(&io).is_ok() {
+        return Err(b"ERR_ALREADY_INITIALIZED".into());
+    }
 
-        let bytes = io.read_input().to_vec();
-        let args = NewCallArgs::deserialize(&bytes).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
-        state::set_state(&mut io, &args.into())?;
-        Ok(())
-    })
+    let input = io.read_input().to_vec();
+    let args = NewCallArgs::deserialize(&input).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
+
+    let initial_hashchain = args.initial_hashchain();
+    let state: EngineState = args.into();
+
+    if let Some(block_hashchain) = initial_hashchain {
+        let block_height = env.block_height();
+        let mut hashchain = Hashchain::new(
+            state.chain_id,
+            env.current_account_id(),
+            block_height,
+            block_hashchain,
+        );
+
+        hashchain.add_block_tx(
+            block_height,
+            function_name!(),
+            &input,
+            &[],
+            &Bloom::default(),
+        )?;
+        crate::hashchain::save_hashchain(&mut io, &hashchain)?;
+    }
+
+    state::set_state(&mut io, &state)?;
+    Ok(())
 }
 
 pub fn get_version<I: IO>(mut io: I) -> Result<(), ContractError> {
@@ -94,9 +116,19 @@ pub fn set_owner<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractErr
     })
 }
 
-pub fn get_bridge_prover<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
-    let connector = EthConnectorContract::init_instance(io)?;
+pub fn get_bridge_prover<I: IO + Copy + PromiseHandler>(mut io: I) -> Result<(), ContractError> {
+    let connector = EthConnectorContract::init(io)?;
+
+    #[cfg(not(feature = "ext-connector"))]
     io.return_output(connector.get_bridge_prover().as_bytes());
+
+    #[cfg(feature = "ext-connector")]
+    {
+        let promise_args = connector.get_bridge_prover();
+        let promise_id = unsafe { io.promise_create_call(&promise_args) };
+        io.promise_return(promise_id);
+    }
+
     Ok(())
 }
 
@@ -391,6 +423,38 @@ pub fn get_latest_hashchain<I: IO>(io: &mut I) -> Result<(), ContractError> {
     let bytes = serde_json::to_vec(&serde_json::json!({ "result": result }))
         .map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&bytes);
+
+    Ok(())
+}
+
+pub fn attach_full_access_key<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+
+    require_running(&state)?;
+    require_owner_only(&state, &env.predecessor_account_id())?;
+
+    let public_key = serde_json::from_slice::<FullAccessKeyArgs>(&io.read_input().to_vec())
+        .map(|args| args.public_key)
+        .map_err(|_| errors::ERR_JSON_DESERIALIZE)?;
+    let current_account_id = env.current_account_id();
+    let action = PromiseAction::AddFullAccessKey {
+        public_key,
+        nonce: 0, // not actually used - depends on block height
+    };
+    let promise = PromiseBatchAction {
+        target_account_id: current_account_id,
+        actions: vec![action],
+    };
+    // SAFETY: This action is dangerous because it adds a new full access key (FAK) to the Engine account.
+    // However, it is safe to do so here because of the `require_owner_only` check above; only the
+    // (trusted) owner account can add a new FAK.
+    let promise_id = unsafe { handler.promise_create_batch(&promise) };
+
+    handler.promise_return(promise_id);
 
     Ok(())
 }
