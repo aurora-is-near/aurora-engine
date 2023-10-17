@@ -212,7 +212,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_tr
     };
 
     assert_eq!(trace.logs().0.len(), expected_trace.len());
-    for (log, step) in trace.logs().0.iter().zip(expected_trace.into_iter()) {
+    for (log, step) in trace.logs().0.iter().zip(expected_trace) {
         assert_eq!(
             log.program_counter.0, step.pc,
             "Program counters should match"

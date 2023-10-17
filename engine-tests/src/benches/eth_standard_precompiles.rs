@@ -59,7 +59,7 @@ pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("standard_precompiles");
 
     // measure wall-clock time
-    for (tx_bytes, id) in transactions.iter().zip(bench_ids.into_iter()) {
+    for (tx_bytes, id) in transactions.iter().zip(bench_ids) {
         group.bench_function(id, |b| {
             b.iter_batched(
                 || (runner.one_shot(), calling_account_id, tx_bytes.clone()),
