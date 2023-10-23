@@ -6,7 +6,7 @@ use aurora_engine_types::parameters::silo::{
     SiloParamsArgs, WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::{Address, EthGas};
 use aurora_engine_types::AsBytes;
 
 #[cfg(feature = "contract")]
@@ -47,17 +47,18 @@ pub fn is_silo_mode_on<I: IO>(io: &I) -> bool {
 }
 
 /// Return gas amount per transaction.
-pub fn get_fixed_gas<I: IO>(io: &I) -> Option<Wei> {
+pub fn get_fixed_gas<I: IO>(io: &I) -> Option<EthGas> {
     let key = fixed_gas_key();
-    io.read_u256(&key).ok().map(Wei::new)
+    io.read_storage(&key)
+        .and_then(|bytes| bytes.to_value().ok())
 }
 
 /// Set gas amount per transaction.
-pub fn set_fixed_gas<I: IO>(io: &mut I, cost: Option<Wei>) {
+pub fn set_fixed_gas<I: IO>(io: &mut I, gas: Option<EthGas>) {
     let key = fixed_gas_key();
 
-    if let Some(cost) = cost {
-        io.write_storage(&key, &cost.to_bytes());
+    if let Some(gas) = gas {
+        io.write_borsh(&key, &gas);
     } else {
         io.remove_storage(&key);
     }
@@ -188,7 +189,7 @@ mod access_test {
 
     #[test]
     fn test_set_fixed_gas() {
-        let cost = Some(Wei::new_u64(1000));
+        let cost = Some(EthGas::new(1000));
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
 

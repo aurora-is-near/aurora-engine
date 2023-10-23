@@ -41,6 +41,7 @@ use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
+use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
 
@@ -458,7 +459,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         sender: &Address,
         transaction: &NormalizedEthTransaction,
         max_gas_price: Option<U256>,
-        fixed_gas: Option<Wei>,
+        fixed_gas: Option<EthGas>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
         if transaction.max_fee_per_gas.is_zero() && fixed_gas.is_none() {
             return Ok(GasPaymentResult::default());
@@ -474,7 +475,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // First we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
         // less than the `gas_limit`. It allows to avoid refund unused gas to the sender later.
         let prepaid_amount = fixed_gas
-            .map_or(transaction.gas_limit, Wei::raw)
+            .map_or(transaction.gas_limit, EthGas::as_u256)
             .checked_mul(effective_gas_price)
             .map(Wei::new)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
@@ -1065,8 +1066,8 @@ pub fn submit_with_alt_modexp<
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check that fixed gas is less than gasLimit from the transaction.
-    if fixed_gas.map_or(false, |gas| gas.raw() > transaction.gas_limit) {
+    // Check that fixed gas is not greater than gasLimit from the transaction.
+    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
@@ -1253,7 +1254,7 @@ pub fn refund_unused_gas<I: IO>(
     gas_used: u64,
     gas_result: &GasPaymentResult,
     relayer: &Address,
-    fixed_gas: Option<Wei>,
+    fixed_gas: Option<EthGas>,
 ) -> Result<(), GasPaymentError> {
     if gas_result.effective_gas_price.is_zero() {
         return Ok(());
@@ -1262,7 +1263,7 @@ pub fn refund_unused_gas<I: IO>(
     let (refund, relayer_reward) = {
         let gas_to_wei = |price: U256| {
             fixed_gas
-                .map_or_else(|| gas_used.into(), Wei::raw)
+                .map_or_else(|| gas_used.into(), EthGas::as_u256)
                 .checked_mul(price)
                 .map(Wei::new)
                 .ok_or(GasPaymentError::EthAmountOverflow)
@@ -1722,7 +1723,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: &Option<Wei>,
+    fixed_gas: &Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
     if fixed_gas.is_some() {
@@ -2420,7 +2421,7 @@ mod tests {
         assert_eq!(expected_result, actual_result);
 
         let actual_result = engine
-            .charge_gas(&origin, &transaction, None, Some(Wei::new_u64(50_000)))
+            .charge_gas(&origin, &transaction, None, Some(EthGas::new(50_000)))
             .unwrap();
 
         let expected_result = GasPaymentResult {
@@ -2637,7 +2638,7 @@ mod tests {
             priority_fee_per_gas: 2.into(),
         };
         let gas_used = 4000;
-        let fixed_gas = Some(Wei::new_u64(7000));
+        let fixed_gas = Some(EthGas::new(7000));
 
         refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer, fixed_gas).unwrap();
 

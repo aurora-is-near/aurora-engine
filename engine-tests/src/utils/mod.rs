@@ -10,7 +10,7 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
-use aurora_engine_types::types::PromiseResult;
+use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_primitives::runtime::config_store::RuntimeConfigStore;
@@ -500,7 +500,7 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
-    pub fn get_fixed_gas(&mut self) -> Option<Wei> {
+    pub fn get_fixed_gas(&mut self) -> Option<EthGas> {
         let outcome = self
             .one_shot()
             .call("get_fixed_gas", "getter", vec![])

@@ -1,6 +1,6 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
-use crate::types::Fee;
+use crate::types::{EthGas, Fee};
 use crate::{format, Add, Display, Mul, Sub, SubAssign, ToString, U256};
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
@@ -192,11 +192,11 @@ impl Sub for Wei {
     }
 }
 
-impl Mul for Wei {
+impl Mul<EthGas> for Wei {
     type Output = Self;
 
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self(self.0 * rhs.0)
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        Self(self.0 * rhs.as_u256())
     }
 }
 

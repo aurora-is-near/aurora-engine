@@ -7,6 +7,7 @@ use aurora_engine_types::parameters::silo::{
     FixedGasArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
     WhitelistKind, WhitelistStatusArgs,
 };
+use aurora_engine_types::types::EthGas;
 use libsecp256k1::SecretKey;
 use rand::{rngs::ThreadRng, Rng, RngCore};
 use std::fmt::Debug;
@@ -20,7 +21,7 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(10u64.pow(18) * 10);
 const ZERO_BALANCE: Wei = Wei::zero();
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(10u64.pow(18) * 4);
-const FIXED_GAS: Wei = Wei::new_u64(10u64.pow(18));
+const FIXED_GAS: EthGas = EthGas::new(10u64.pow(18));
 const ONE_GAS_PRICE: Wei = Wei::new_u64(1);
 const TWO_GAS_PRICE: Wei = Wei::new_u64(2);
 
@@ -115,7 +116,7 @@ fn test_transfer_insufficient_balance() {
 
 #[test]
 fn test_transfer_insufficient_balance_fee() {
-    const HALF_FIXED_GAS: Wei = Wei::new_u64(10u64.pow(18) / 2);
+    const HALF_FIXED_GAS: EthGas = EthGas::new(10u64.pow(18) / 2);
 
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
@@ -708,14 +709,14 @@ fn test_switch_between_fix_gas() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER - Wei::new_u64(result.gas_used),
+        INITIAL_BALANCE - TRANSFER - EthGas::new(result.gas_used) * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
     )
     .unwrap();
     validate_address_balance_and_nonce(&runner, receiver, TRANSFER, 0.into()).unwrap();
 
     // Set fixed gas
-    let fixed_gas = Wei::new_u64(1_000_000);
+    let fixed_gas = EthGas::new(1_000_000);
     set_silo_params(
         &mut runner,
         Some(SiloParamsArgs {
@@ -871,8 +872,8 @@ fn remove_address_from_whitelist(runner: &mut AuroraRunner, address: Address) {
     call_function(runner, "remove_entry_from_whitelist", args);
 }
 
-fn set_fixed_gas(runner: &mut AuroraRunner, cost: Option<Wei>) {
-    let args = FixedGasArgs { fixed_gas: cost };
+fn set_fixed_gas(runner: &mut AuroraRunner, fixed_gas: Option<EthGas>) {
+    let args = FixedGasArgs { fixed_gas };
     call_function(runner, "set_fixed_gas", args);
 }
 
