@@ -37,8 +37,8 @@ use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
+use near_workspaces::types::SecretKey;
 use serde_json::json;
-use workspaces::types::SecretKey;
 
 #[derive(Debug, Clone)]
 pub struct EngineContract {
@@ -60,7 +60,7 @@ impl EngineContract {
     }
 
     pub fn create_account(&self, account_id: &AccountId, secret_key: SecretKey) -> Account {
-        let inner = workspaces::Account::from_secret_key(
+        let inner = near_workspaces::Account::from_secret_key(
             account_id.as_ref().parse().unwrap(),
             secret_key,
             self.node.worker(),
@@ -497,11 +497,11 @@ impl EngineContract {
 
 #[derive(Debug, Clone)]
 pub struct RawContract {
-    inner: workspaces::Contract,
+    inner: near_workspaces::Contract,
 }
 
 impl RawContract {
-    pub fn from_contract(contract: workspaces::Contract) -> Self {
+    pub fn from_contract(contract: near_workspaces::Contract) -> Self {
         Self { inner: contract }
     }
 

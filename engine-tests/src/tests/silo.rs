@@ -1098,6 +1098,7 @@ pub mod workspace {
     }
 
     /// Deploys the EVM, deploys nep141 contract, and calls `set_silo_params`
+    #[allow(clippy::future_not_send)]
     async fn init_silo() -> SiloTestContext {
         // Deploy Aurora Engine
         let aurora = deploy_engine().await;
