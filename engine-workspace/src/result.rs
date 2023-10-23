@@ -2,10 +2,12 @@ use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{H256, U256};
 use near_sdk::{json_types::U128, PromiseOrValue};
+use near_workspaces::result::{
+    ExecutionFinalResult, ExecutionOutcome, ExecutionSuccess, ViewResultDetails,
+};
+use near_workspaces::types::Gas;
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
-use workspaces::result::{ExecutionFinalResult, ExecutionOutcome, ViewResultDetails};
-use workspaces::types::Gas;
 
 #[derive(Debug, Eq, PartialOrd, PartialEq)]
 pub struct ViewResult<T> {
@@ -79,7 +81,7 @@ where
 
 #[derive(Debug)]
 pub struct ExecutionResult<T> {
-    inner: workspaces::result::ExecutionSuccess,
+    inner: ExecutionSuccess,
     value: T,
     success: bool,
 }
@@ -126,7 +128,7 @@ impl ExecutionResult<Address> {
 }
 
 impl<T> ExecutionResult<T> {
-    pub fn new(inner: workspaces::result::ExecutionSuccess, value: T, success: bool) -> Self {
+    pub fn new(inner: ExecutionSuccess, value: T, success: bool) -> Self {
         Self {
             inner,
             value,
