@@ -761,6 +761,7 @@ pub mod workspace {
         );
     }
 
+    #[allow(clippy::future_not_send)]
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
@@ -807,7 +808,7 @@ pub mod workspace {
         })
     }
 
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::future_not_send, clippy::cognitive_complexity)]
     async fn test_exit_to_near_common() -> anyhow::Result<TestExitToNearContext> {
         // 1. deploy Aurora
         let aurora = deploy_engine().await;
