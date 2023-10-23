@@ -159,10 +159,6 @@ impl Wei {
         self.0.checked_add(rhs.0).map(Self)
     }
 
-    pub fn checked_mul(self, rhs: Self) -> Option<Self> {
-        self.0.checked_mul(rhs.0).map(Self)
-    }
-
     /// Try convert U256 to u128 with checking overflow.
     /// NOTICE: Error can contain only overflow
     pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
