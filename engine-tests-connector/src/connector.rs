@@ -10,8 +10,8 @@ use aurora_engine_types::{
 use byte_slice_cast::AsByteSlice;
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde, ONE_YOCTO};
+use near_workspaces::AccountId;
 use std::str::FromStr;
-use workspaces::AccountId;
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
 fn dummy_ft_receiver_bytes() -> Vec<u8> {
