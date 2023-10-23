@@ -7,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] 2023-10-23
+
 ### Changes
 
 - Changed the logic of cost calculation in Silo mode. Specifically, the fixed cost has been replaced with
   a fixed amount of gas per transaction by [@aleksuss]. ([#854]) 
 
+- `near-workspaces-rs` has been updated to 0.8.0 by [@aleksuss]. ([#855])
+
 [#854]: https://github.com/aurora-is-near/aurora-engine/pull/854
+[#855]: https://github.com/aurora-is-near/aurora-engine/pull/855
 
 ## [3.2.0] 2023-10-17
 
@@ -533,7 +538,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.0...develop
+[3.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...3.3.0
 [3.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.1.0...3.2.0
 [3.1.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...3.1.0
 [3.0.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.0.0...2.10.2
