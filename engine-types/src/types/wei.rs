@@ -1,7 +1,7 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
-use crate::types::Fee;
-use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
+use crate::types::{EthGas, Fee};
+use crate::{format, Add, Display, Mul, Sub, SubAssign, ToString, U256};
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
@@ -159,6 +159,10 @@ impl Wei {
         self.0.checked_add(rhs.0).map(Self)
     }
 
+    pub fn checked_mul(self, rhs: Self) -> Option<Self> {
+        self.0.checked_mul(rhs.0).map(Self)
+    }
+
     /// Try convert U256 to u128 with checking overflow.
     /// NOTICE: Error can contain only overflow
     pub fn try_into_u128(self) -> Result<u128, error::BalanceOverflowError> {
@@ -185,6 +189,14 @@ impl Sub for Wei {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self(self.0 - rhs.0)
+    }
+}
+
+impl Mul<EthGas> for Wei {
+    type Output = Self;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        Self(self.0 * rhs.as_u256())
     }
 }
 

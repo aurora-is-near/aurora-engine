@@ -3,9 +3,7 @@ use aurora_engine_types::parameters::connector::{
     Erc20Metadata, FungibleTokenMetadata, WithdrawResult,
 };
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
-use aurora_engine_types::parameters::silo::{
-    FixedGasCostArgs, SiloParamsArgs, WhitelistStatusArgs,
-};
+use aurora_engine_types::parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistStatusArgs};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
@@ -51,7 +49,7 @@ impl_call_return![
     ),
     (CallPauseContract, Call::PauseContract),
     (CallResumeContract, Call::ResumeContract),
-    (CallSetFixedGasCost, Call::SetFixedGasCost),
+    (CallSetFixedGas, Call::SetFixedGas),
     (CallSetSiloParams, Call::SetSiloParams),
     (CallSetWhitelistStatus, Call::SetWhitelistStatus),
     (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
@@ -101,7 +99,7 @@ impl_view_return![
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
     (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
     (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
-    (ViewGetFixedGasCost => FixedGasCostArgs, View::GetFixedGasCost, borsh),
+    (ViewGetFixedGas => FixedGasArgs, View::GetFixedGas, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
     (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),
     (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh),
@@ -147,7 +145,7 @@ pub(crate) enum Call {
     RemoveRelayerKey,
     PauseContract,
     ResumeContract,
-    SetFixedGasCost,
+    SetFixedGas,
     SetSiloParams,
     SetWhitelistStatus,
     AddEntryToWhitelist,
@@ -196,7 +194,7 @@ impl AsRef<str> for Call {
             Call::RemoveRelayerKey => "remove_relayer_key",
             Call::PauseContract => "pause_contract",
             Call::ResumeContract => "resume_contract",
-            Call::SetFixedGasCost => "set_fixed_gas_cost",
+            Call::SetFixedGas => "set_fixed_gas",
             Call::SetSiloParams => "set_silo_params",
             Call::SetWhitelistStatus => "set_whitelist_status",
             Call::AddEntryToWhitelist => "add_entry_to_whitelist",
@@ -235,7 +233,7 @@ pub enum View {
     Nep141FromErc20,
     AccountsCounter,
     GetEthConnectorContractAccount,
-    GetFixedGasCost,
+    GetFixedGas,
     GetSiloParams,
     GetWhitelistStatus,
     FactoryWnearAddress,
@@ -270,7 +268,7 @@ impl AsRef<str> for View {
             View::Nep141FromErc20 => "get_nep141_from_erc20",
             View::AccountsCounter => "get_accounts_counter",
             View::GetEthConnectorContractAccount => "get_eth_connector_contract_account",
-            View::GetFixedGasCost => "get_fixed_gas_cost",
+            View::GetFixedGas => "get_fixed_gas",
             View::GetSiloParams => "get_silo_params",
             View::GetWhitelistStatus => "get_whitelist_status",
             View::FactoryWnearAddress => "factory_get_wnear_address",

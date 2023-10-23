@@ -1,10 +1,12 @@
 use crate::fmt::Formatter;
+use crate::types::Wei;
 use crate::{Add, AddAssign, Display, Div, Mul, Sub};
 #[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
 #[cfg(feature = "borsh-compat")]
 use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use core::num::NonZeroU64;
+use primitive_types::U256;
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -49,7 +51,20 @@ impl NearGas {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    BorshSerialize,
+    BorshDeserialize,
+    Serialize,
+    Deserialize,
+)]
 /// Ethereum gas type which wraps an underlying u64.
 pub struct EthGas(u64);
 
@@ -60,16 +75,22 @@ impl Display for EthGas {
 }
 
 impl EthGas {
-    /// Constructs a new `EthGas` with a given u64 value.
+    /// Constructs a new `EthGas` from a value of type `u64`.
     #[must_use]
     pub const fn new(gas: u64) -> Self {
         Self(gas)
     }
 
-    /// Consumes `EthGas` and returns the underlying type.
+    /// Convert `EthGas` to `u64` type.
     #[must_use]
     pub const fn as_u64(self) -> u64 {
         self.0
+    }
+
+    /// Convert `EthGas` to `U256` type.
+    #[must_use]
+    pub fn as_u256(self) -> U256 {
+        self.as_u64().into()
     }
 
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
@@ -136,5 +157,13 @@ impl Mul<EthGas> for u64 {
 
     fn mul(self, rhs: EthGas) -> Self::Output {
         EthGas(self * rhs.0)
+    }
+}
+
+impl Mul<Wei> for EthGas {
+    type Output = Wei;
+
+    fn mul(self, rhs: Wei) -> Self::Output {
+        Wei::new(self.as_u256() * rhs.raw())
     }
 }
