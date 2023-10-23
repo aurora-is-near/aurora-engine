@@ -86,7 +86,8 @@ fn erc20_mint_out_of_gas() {
         utils::address_from_secret_key(&source_account.secret_key),
         Wei::new_u64(INITIAL_BALANCE - GAS_LIMIT * GAS_PRICE),
         (INITIAL_NONCE + 2).into(),
-    );
+    )
+    .unwrap();
     utils::validate_address_balance_and_nonce(
         &runner,
         sdk::types::near_account_to_evm_address(
@@ -94,7 +95,8 @@ fn erc20_mint_out_of_gas() {
         ),
         Wei::new_u64(GAS_LIMIT * GAS_PRICE),
         U256::zero(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
@@ -239,7 +241,8 @@ fn deploy_erc_20_out_of_gas() {
         utils::address_from_secret_key(&source_account),
         Wei::new_u64(INITIAL_BALANCE),
         (INITIAL_NONCE + 1).into(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
