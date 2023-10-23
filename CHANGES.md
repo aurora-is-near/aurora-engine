@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `near-workspaces-rs` has been updated to 0.8.0 by [@aleksuss]. ([#855])
 
 [#854]: https://github.com/aurora-is-near/aurora-engine/pull/854
-[#854]: https://github.com/aurora-is-near/aurora-engine/pull/855
+[#855]: https://github.com/aurora-is-near/aurora-engine/pull/855
 
 ## [3.2.0] 2023-10-17
 
