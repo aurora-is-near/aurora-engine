@@ -8,20 +8,31 @@ use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 /// Type indicator (per EIP-1559)
 pub const TYPE_BYTE: u8 = 0x02;
 
-/// A EIP-1559 transaction kind from the London hard fork.
+/// EIP-1559 transaction kind from the London hard fork.
 ///
 /// See [EIP-1559](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1559.md)
 /// for more details.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Transaction1559 {
+    /// ID of chain which the transaction belongs.
     pub chain_id: u64,
+    /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
+    /// Determined by the sender and is optional. Priority Fee is also known as Miner Tip as it is
+    /// paid directly to block producers.
     pub max_priority_fee_per_gas: U256,
+    /// Maximum amount the sender is willing to pay to get their transaction included in a block.
     pub max_fee_per_gas: U256,
+    /// The maximum amount of gas the sender is willing to consume on a transaction.
     pub gas_limit: U256,
+    /// The receiving address (`None` for the zero address).
     pub to: Option<Address>,
+    /// The amount of ETH to transfer.
     pub value: Wei,
+    /// Arbitrary binary data for a contract call invocation.
     pub data: Vec<u8>,
+    /// A list of addresses and storage keys that the transaction plans to access.
+    /// Accesses outside the list are possible, but become more expensive.
     pub access_list: Vec<AccessTuple>,
 }
 

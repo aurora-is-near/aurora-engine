@@ -9,7 +9,7 @@ use aurora_engine_types::parameters::connector::{
     SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
-use aurora_engine_types::parameters::silo::FixedGasCostArgs;
+use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::PromiseResult;
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
@@ -500,13 +500,13 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
-    pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
+    pub fn get_fixed_gas(&mut self) -> Option<Wei> {
         let outcome = self
             .one_shot()
-            .call("get_fixed_gas_cost", "getter", vec![])
+            .call("get_fixed_gas", "getter", vec![])
             .unwrap();
         let val = outcome.return_data.as_value()?;
-        FixedGasCostArgs::try_from_slice(&val).unwrap().cost
+        FixedGasArgs::try_from_slice(&val).unwrap().fixed_gas
     }
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
@@ -749,9 +749,18 @@ pub fn init_hashchain(
 }
 
 pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
+    transfer_with_price(to, amount, nonce, U256::zero())
+}
+
+pub fn transfer_with_price(
+    to: Address,
+    amount: Wei,
+    nonce: U256,
+    gas_price: U256,
+) -> TransactionLegacy {
     TransactionLegacy {
         nonce,
-        gas_price: U256::default(),
+        gas_price,
         gas_limit: u64::MAX.into(),
         to: Some(to),
         value: amount,
@@ -760,6 +769,14 @@ pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
 }
 
 pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
+    create_deploy_transaction_with_price(contract_bytes, nonce, U256::zero())
+}
+
+pub fn create_deploy_transaction_with_price(
+    contract_bytes: Vec<u8>,
+    nonce: U256,
+    gas_price: U256,
+) -> TransactionLegacy {
     let len = u16::try_from(contract_bytes.len())
         .unwrap_or_else(|_| panic!("Cannot deploy a contract with that many bytes!"));
     // This bit of EVM byte code essentially says:
@@ -778,7 +795,7 @@ pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> Transa
 
     TransactionLegacy {
         nonce,
-        gas_price: U256::default(),
+        gas_price,
         gas_limit: u64::MAX.into(),
         to: None,
         value: Wei::zero(),
@@ -903,9 +920,22 @@ pub fn validate_address_balance_and_nonce(
     address: Address,
     expected_balance: Wei,
     expected_nonce: U256,
-) {
-    assert_eq!(runner.get_balance(address), expected_balance, "balance");
-    assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
+) -> anyhow::Result<()> {
+    let actual_balance = runner.get_balance(address);
+
+    if actual_balance != expected_balance {
+        anyhow::bail!(
+            "Expected and actual balance mismatch: {expected_balance} vs {actual_balance}"
+        );
+    }
+
+    let actual_nonce = runner.get_nonce(address);
+
+    if actual_nonce != expected_nonce {
+        anyhow::bail!("Expected and actual nonce mismatch: {expected_nonce} vs {actual_nonce}");
+    }
+
+    Ok(())
 }
 
 pub fn address_from_hex(address: &str) -> Address {
@@ -984,6 +1014,7 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
                 "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
+                "ERR_FIXED_GAS_OVERFLOW" => EngineErrorKind::FixedGasOverflow,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }

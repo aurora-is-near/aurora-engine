@@ -225,9 +225,9 @@ pub fn parse_transaction_kind(
                 })?;
             TransactionKind::SetErc20Metadata(args)
         }
-        TransactionKindTag::SetFixedGasCost => {
-            let args = silo_params::FixedGasCostArgs::try_from_slice(&bytes).map_err(f)?;
-            TransactionKind::SetFixedGasCost(args)
+        TransactionKindTag::SetFixedGas => {
+            let args = silo_params::FixedGasArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetFixedGas(args)
         }
         TransactionKindTag::SetSiloParams => {
             let args: Option<silo_params::SiloParamsArgs> =
@@ -691,8 +691,8 @@ fn non_submit_execute<I: IO + Copy>(
 
             None
         }
-        TransactionKind::SetFixedGasCost(args) => {
-            silo::set_fixed_gas_cost(&mut io, args.cost);
+        TransactionKind::SetFixedGas(args) => {
+            silo::set_fixed_gas(&mut io, args.fixed_gas);
             None
         }
         TransactionKind::SetSiloParams(args) => {

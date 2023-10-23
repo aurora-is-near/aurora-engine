@@ -11,7 +11,7 @@ pub struct TransactionLegacy {
     pub nonce: U256,
     /// The fee the sender pays per unit of gas
     pub gas_price: U256,
-    /// The maximum amount of gas units consumed by the transaction
+    /// The maximum amount of gas the sender is willing to consume on a transaction
     pub gas_limit: U256,
     /// The receiving address (`None` for the zero address)
     pub to: Option<Address>,

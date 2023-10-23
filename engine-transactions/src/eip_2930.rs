@@ -32,13 +32,22 @@ impl Decodable for AccessTuple {
 /// See `https://eips.ethereum.org/EIPS/eip-2930`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Transaction2930 {
+    /// ID of chain which the transaction belongs.
     pub chain_id: u64,
+    /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
+    /// The fee the sender pays per unit of gas.
     pub gas_price: U256,
+    /// The maximum amount of gas the sender is willing to consume on a transaction.
     pub gas_limit: U256,
+    /// The receiving address (`None` for the zero address)
     pub to: Option<Address>,
+    /// The amount of ETH to transfer.
     pub value: Wei,
+    /// Arbitrary binary data for a contract call invocation
     pub data: Vec<u8>,
+    /// A list of addresses and storage keys that the transaction plans to access.
+    /// Accesses outside the list are possible, but become more expensive.
     pub access_list: Vec<AccessTuple>,
 }
 

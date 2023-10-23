@@ -3,13 +3,18 @@ use crate::borsh::{self, BorshDeserialize, BorshSerialize};
 use crate::types::{Address, Wei};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct FixedGasCostArgs {
-    pub cost: Option<Wei>,
+pub struct FixedGasArgs {
+    pub fixed_gas: Option<Wei>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SiloParamsArgs {
-    pub fixed_gas_cost: Wei,
+    /// Fixed amount of gas per transaction.
+    pub fixed_gas: Wei,
+    /// EVM address, which is used for withdrawing ERC-20 base tokens in case
+    /// a recipient of the tokens is not in the silo white list.
+    /// Note: the logic described above works only if the fallback address
+    /// is set by `set_silo_params` function. In other words, in Silo mode.
     pub erc20_fallback_address: Address,
 }
 

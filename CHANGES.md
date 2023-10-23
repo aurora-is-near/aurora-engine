@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+
+- Changed the logic of cost calculation in Silo mode. Specifically, the fixed cost has been replaced with
+  a fixed amount of gas per transaction by [@aleksuss]. ([#854]) 
+
+[#854]: https://github.com/aurora-is-near/aurora-engine/pull/854
+
 ## [3.2.0] 2023-10-17
 
 ### Changes
@@ -18,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Additions
 
-- Added a possibility of mirroring deployed ERC-20 contracts in the main Aurora contract in Silo mode by [@aleksuss]. ([#844])
+- Added a possibility of mirroring deployed ERC-20 contracts in the main Aurora contract in Silo mode by [@aleksuss]. ([#845])
 
 - Allow to initialize hashchain directly with the `new` method by [@birchmd]. ([#846])
 
@@ -29,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#746]: https://github.com/aurora-is-near/aurora-engine/pull/746
 [#834]: https://github.com/aurora-is-near/aurora-engine/pull/834
 [#840]: https://github.com/aurora-is-near/aurora-engine/pull/840
-[#844]: https://github.com/aurora-is-near/aurora-engine/pull/844
+[#845]: https://github.com/aurora-is-near/aurora-engine/pull/845
 [#846]: https://github.com/aurora-is-near/aurora-engine/pull/846
 [#847]: https://github.com/aurora-is-near/aurora-engine/pull/847
 

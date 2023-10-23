@@ -707,8 +707,10 @@ fn test_eth_transfer_success() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // perform transfer
     runner
@@ -723,8 +725,10 @@ fn test_eth_transfer_success() {
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT,
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into())
+        .unwrap();
 }
 
 /// Tests the case where the transfer amount is larger than the address balance
@@ -739,8 +743,10 @@ fn test_eth_transfer_insufficient_balance() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let result = runner
@@ -758,8 +764,10 @@ fn test_eth_transfer_insufficient_balance() {
         INITIAL_BALANCE,
         // the nonce is still incremented even though the transfer failed
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 /// Tests the case where the nonce on the transaction does not match the address
@@ -774,8 +782,10 @@ fn test_eth_transfer_incorrect_nonce() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -792,8 +802,10 @@ fn test_eth_transfer_incorrect_nonce() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 #[test]
@@ -837,8 +849,10 @@ fn test_eth_transfer_not_enough_gas() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -852,8 +866,10 @@ fn test_eth_transfer_not_enough_gas() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 #[test]
@@ -873,8 +889,10 @@ fn test_transfer_charging_gas_success() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // do transfer
     let result = runner
@@ -894,19 +912,22 @@ fn test_transfer_charging_gas_success() {
         source_address,
         expected_source_balance,
         (INITIAL_NONCE + 1).into(),
-    );
+    )
+    .unwrap();
     utils::validate_address_balance_and_nonce(
         &runner,
         dest_address,
         expected_dest_balance,
         0.into(),
-    );
+    )
+    .unwrap();
     utils::validate_address_balance_and_nonce(
         &runner,
         relayer_address,
         expected_relayer_balance,
         0.into(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
@@ -928,8 +949,10 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -951,9 +974,11 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         INITIAL_BALANCE,
         // nonce is still not incremented since the transaction was invalid
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
-    utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into()).unwrap();
 }
 
 pub fn initialize_transfer() -> (utils::AuroraRunner, utils::Signer, Address) {
@@ -1071,8 +1096,10 @@ fn test_eth_transfer_with_max_gas_price() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // perform transfer
     let max_gas_price = 5;
@@ -1091,8 +1118,10 @@ fn test_eth_transfer_with_max_gas_price() {
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into())
+        .unwrap();
 }
 
 #[test]

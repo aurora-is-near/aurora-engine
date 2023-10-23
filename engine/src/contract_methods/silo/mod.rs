@@ -22,11 +22,11 @@ const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
 
 /// Return SILO parameters.
 pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
-    let params = get_fixed_gas_cost(io)
+    let params = get_fixed_gas(io)
         .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
 
     params.map(|(cost, address)| SiloParamsArgs {
-        fixed_gas_cost: cost,
+        fixed_gas: cost,
         erc20_fallback_address: address,
     })
 }
@@ -34,30 +34,27 @@ pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
 /// Set SILO parameters.
 pub fn set_silo_params<I: IO>(io: &mut I, args: Option<SiloParamsArgs>) {
     let (cost, address) = args.map_or((None, None), |params| {
-        (
-            Some(params.fixed_gas_cost),
-            Some(params.erc20_fallback_address),
-        )
+        (Some(params.fixed_gas), Some(params.erc20_fallback_address))
     });
 
-    set_fixed_gas_cost(io, cost);
+    set_fixed_gas(io, cost);
     set_erc20_fallback_address(io, address);
 }
 
-/// Return true if the Silo mode is on (`fixed_gas_cost` is set).
+/// Return true if the Silo mode is on (`fixed_gas` is set).
 pub fn is_silo_mode_on<I: IO>(io: &I) -> bool {
-    get_fixed_gas_cost(io).is_some()
+    get_fixed_gas(io).is_some()
 }
 
-/// Return fixed gas cost.
-pub fn get_fixed_gas_cost<I: IO>(io: &I) -> Option<Wei> {
-    let key = fixed_gas_cost_key();
+/// Return gas amount per transaction.
+pub fn get_fixed_gas<I: IO>(io: &I) -> Option<Wei> {
+    let key = fixed_gas_key();
     io.read_u256(&key).ok().map(Wei::new)
 }
 
-/// Set fixed gas cost.
-pub fn set_fixed_gas_cost<I: IO>(io: &mut I, cost: Option<Wei>) {
-    let key = fixed_gas_cost_key();
+/// Set gas amount per transaction.
+pub fn set_fixed_gas<I: IO>(io: &mut I, cost: Option<Wei>) {
+    let key = fixed_gas_key();
 
     if let Some(cost) = cost {
         io.write_storage(&key, &cost.to_bytes());
@@ -168,7 +165,7 @@ fn is_account_allowed<I: IO + Copy>(io: &I, account: &AccountId) -> bool {
     !list.is_enabled() || list.is_exist(account)
 }
 
-fn fixed_gas_cost_key() -> Vec<u8> {
+fn fixed_gas_key() -> Vec<u8> {
     bytes_to_key(KeyPrefix::Silo, GAS_COST_KEY)
 }
 
@@ -190,14 +187,14 @@ mod access_test {
     use std::cell::RefCell;
 
     #[test]
-    fn test_set_fixed_gas_cost() {
+    fn test_set_fixed_gas() {
         let cost = Some(Wei::new_u64(1000));
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
 
-        assert_eq!(get_fixed_gas_cost(&io), None);
-        set_fixed_gas_cost(&mut io, cost);
-        assert_eq!(get_fixed_gas_cost(&io), cost);
+        assert_eq!(get_fixed_gas(&io), None);
+        set_fixed_gas(&mut io, cost);
+        assert_eq!(get_fixed_gas(&io), cost);
     }
 
     #[test]

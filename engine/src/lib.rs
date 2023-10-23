@@ -91,7 +91,7 @@ mod contract {
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::borsh::BorshSerialize;
     use aurora_engine_types::parameters::silo::{
-        FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
@@ -957,25 +957,25 @@ mod contract {
     /// Silo
     ///
     #[no_mangle]
-    pub extern "C" fn get_fixed_gas_cost() {
+    pub extern "C" fn get_fixed_gas() {
         let mut io = Runtime;
-        let cost = FixedGasCostArgs {
-            cost: silo::get_fixed_gas_cost(&io),
+        let cost = FixedGasArgs {
+            fixed_gas: silo::get_fixed_gas(&io),
         };
 
         io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
     }
 
     #[no_mangle]
-    pub extern "C" fn set_fixed_gas_cost() {
+    pub extern "C" fn set_fixed_gas() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
 
-        let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
-        args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
+        let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
+        args.fixed_gas.sdk_expect("FIXED_GAS_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
         silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
-        silo::set_fixed_gas_cost(&mut io, args.cost);
+        silo::set_fixed_gas(&mut io, args.fixed_gas);
     }
 
     #[no_mangle]
