@@ -152,7 +152,7 @@ pub enum TransactionKind {
     /// Set metadata of ERC-20 contract.
     SetErc20Metadata(parameters::SetErc20MetadataArgs),
     /// Silo operations
-    SetFixedGasCost(silo::FixedGasCostArgs),
+    SetFixedGas(silo::FixedGasArgs),
     SetSiloParams(Option<silo::SiloParamsArgs>),
     AddEntryToWhitelist(silo::WhitelistArgs),
     AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
@@ -401,7 +401,7 @@ impl TransactionKind {
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
             Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
             Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
-            Self::SetFixedGasCost(_) => Self::no_evm_execution("set_fixed_gas_cost"),
+            Self::SetFixedGas(_) => Self::no_evm_execution("set_fixed_gas"),
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
             Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
             Self::AddEntryToWhitelistBatch(_) => {
@@ -528,8 +528,8 @@ pub enum TransactionKindTag {
     SetErc20Metadata,
     #[strum(serialize = "set_eth_connector_contract_account")]
     SetEthConnectorContractAccount,
-    #[strum(serialize = "set_fixed_gas_cost")]
-    SetFixedGasCost,
+    #[strum(serialize = "set_fixed_gas")]
+    SetFixedGas,
     #[strum(serialize = "set_silo_params")]
     SetSiloParams,
     #[strum(serialize = "set_whitelist_status")]
@@ -591,7 +591,7 @@ impl TransactionKind {
             }
             Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
             Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::SetFixedGasCost(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetFixedGas(args) => args.try_to_vec().unwrap_or_default(),
             Self::SetSiloParams(args) => args.try_to_vec().unwrap_or_default(),
             Self::AddEntryToWhitelist(args) | Self::RemoveEntryFromWhitelist(args) => {
                 args.try_to_vec().unwrap_or_default()
@@ -647,7 +647,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::SetEthConnectorContractAccount(_) => {
                 Self::SetEthConnectorContractAccount
             }
-            TransactionKind::SetFixedGasCost(_) => Self::SetFixedGasCost,
+            TransactionKind::SetFixedGas(_) => Self::SetFixedGas,
             TransactionKind::SetSiloParams(_) => Self::SetSiloParams,
             TransactionKind::AddEntryToWhitelist(_) => Self::AddEntryToWhitelist,
             TransactionKind::AddEntryToWhitelistBatch(_) => Self::AddEntryToWhitelistBatch,
@@ -838,7 +838,7 @@ enum BorshableTransactionKind<'a> {
     RemoveRelayerKey(Cow<'a, parameters::RelayerKeyArgs>),
     StartHashchain(Cow<'a, parameters::StartHashchainArgs>),
     SetErc20Metadata(Cow<'a, parameters::SetErc20MetadataArgs>),
-    SetFixedGasCost(Cow<'a, silo::FixedGasCostArgs>),
+    SetFixedGas(Cow<'a, silo::FixedGasArgs>),
     SetSiloParams(Cow<'a, Option<silo::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
     AddEntryToWhitelistBatch(Cow<'a, Vec<silo::WhitelistArgs>>),
@@ -902,7 +902,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
             TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
             TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
-            TransactionKind::SetFixedGasCost(x) => Self::SetFixedGasCost(Cow::Borrowed(x)),
+            TransactionKind::SetFixedGas(x) => Self::SetFixedGas(Cow::Borrowed(x)),
             TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelistBatch(x) => {
@@ -994,9 +994,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetErc20Metadata(x) => {
                 Ok(Self::SetErc20Metadata(x.into_owned()))
             }
-            BorshableTransactionKind::SetFixedGasCost(x) => {
-                Ok(Self::SetFixedGasCost(x.into_owned()))
-            }
+            BorshableTransactionKind::SetFixedGas(x) => Ok(Self::SetFixedGas(x.into_owned())),
             BorshableTransactionKind::SetSiloParams(x) => Ok(Self::SetSiloParams(x.into_owned())),
             BorshableTransactionKind::AddEntryToWhitelist(x) => {
                 Ok(Self::AddEntryToWhitelist(x.into_owned()))

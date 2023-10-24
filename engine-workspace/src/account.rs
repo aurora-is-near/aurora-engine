@@ -8,23 +8,23 @@ pub use near_units::parse_near;
 
 #[derive(Debug, Clone)]
 pub struct Account {
-    inner: workspaces::Account,
+    inner: near_workspaces::Account,
 }
 
 impl Account {
-    pub(crate) fn from_inner(inner: workspaces::Account) -> Self {
+    pub(crate) fn from_inner(inner: near_workspaces::Account) -> Self {
         Self { inner }
     }
 
     pub fn call<F: AsRef<str>>(&self, contract_id: &AccountId, function: F) -> CallTransaction {
-        let contract_id = workspaces::AccountId::from_str(contract_id.as_ref()).unwrap();
+        let contract_id = near_workspaces::AccountId::from_str(contract_id.as_ref()).unwrap();
         let transaction = self.inner.call(&contract_id, function.as_ref());
 
         CallTransaction::new(transaction)
     }
 
     pub fn view<F: AsRef<str>>(&self, contract_id: &AccountId, function: F) -> ViewTransaction {
-        let contract_id = workspaces::AccountId::from_str(contract_id.as_ref()).unwrap();
+        let contract_id = near_workspaces::AccountId::from_str(contract_id.as_ref()).unwrap();
         let transaction = self.inner.view(&contract_id, function.as_ref());
 
         ViewTransaction::new(transaction)

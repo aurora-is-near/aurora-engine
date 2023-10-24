@@ -4,9 +4,10 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::parameters::silo::{
-    FixedGasCostArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
+    FixedGasArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
     WhitelistKind, WhitelistStatusArgs,
 };
+use aurora_engine_types::types::EthGas;
 use libsecp256k1::SecretKey;
 use rand::{rngs::ThreadRng, Rng, RngCore};
 use std::fmt::Debug;
@@ -20,10 +21,13 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(10u64.pow(18) * 10);
 const ZERO_BALANCE: Wei = Wei::zero();
 const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(10u64.pow(18) * 4);
-const FEE: Wei = Wei::new_u64(10u64.pow(18));
+const FIXED_GAS: EthGas = EthGas::new(10u64.pow(18));
+const ONE_GAS_PRICE: Wei = Wei::new_u64(1);
+const TWO_GAS_PRICE: Wei = Wei::new_u64(2);
+
 const ERC20_FALLBACK_ADDRESS: Address = Address::zero();
 const SILO_PARAMS_ARGS: SiloParamsArgs = SiloParamsArgs {
-    fixed_gas_cost: FEE,
+    fixed_gas: FIXED_GAS,
     erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
 };
 // https://github.com/aurora-is-near/aurora-engine/blob/master/engine-tests/src/test_utils/mod.rs#L393
@@ -43,13 +47,15 @@ fn test_address_transfer_success() {
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // perform transfer
     runner
         .submit_with_signer(&mut source_account, |nonce| {
-            utils::transfer(receiver, TRANSFER_AMOUNT, nonce)
+            utils::transfer_with_price(receiver, TRANSFER_AMOUNT, nonce, TWO_GAS_PRICE.raw())
         })
         .unwrap();
 
@@ -57,10 +63,12 @@ fn test_address_transfer_success() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - FEE - TRANSFER_AMOUNT,
+        INITIAL_BALANCE - FIXED_GAS * TWO_GAS_PRICE - TRANSFER_AMOUNT,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
@@ -74,14 +82,21 @@ fn test_transfer_insufficient_balance() {
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // attempt transfer
     let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
-            utils::transfer(receiver, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
+            utils::transfer_with_price(
+                receiver,
+                INITIAL_BALANCE + INITIAL_BALANCE,
+                nonce,
+                ONE_GAS_PRICE.raw(),
+            )
         })
         .unwrap();
     assert_eq!(result.status, TransactionStatus::OutOfFund);
@@ -90,16 +105,18 @@ fn test_transfer_insufficient_balance() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - FEE,
+        INITIAL_BALANCE - FIXED_GAS * ONE_GAS_PRICE,
         // the nonce is still incremented even though the transfer failed
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
 fn test_transfer_insufficient_balance_fee() {
-    const HALF_FEE: Wei = Wei::new_u64(10u64.pow(18) / 2);
+    const HALF_FIXED_GAS: EthGas = EthGas::new(10u64.pow(18) / 2);
 
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
@@ -110,19 +127,21 @@ fn test_transfer_insufficient_balance_fee() {
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
+    // We want to leave TRANSFER_AMOUNT + HALF_FIXED_GAS on the balance.
+    let amount = INITIAL_BALANCE
+        - FIXED_GAS * ONE_GAS_PRICE
+        - TRANSFER_AMOUNT
+        - HALF_FIXED_GAS * ONE_GAS_PRICE;
     // attempt transfer
     let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
-            utils::transfer(
-                receiver,
-                // We want to leave TRANSFER_AMOUNT + HALF_FEE on the balance.
-                INITIAL_BALANCE - TRANSFER_AMOUNT - FEE - HALF_FEE,
-                nonce,
-            )
+            utils::transfer_with_price(receiver, amount, nonce, ONE_GAS_PRICE.raw())
         })
         .unwrap();
     assert!(matches!(result.status, TransactionStatus::Succeed(_)));
@@ -131,22 +150,18 @@ fn test_transfer_insufficient_balance_fee() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        TRANSFER_AMOUNT + HALF_FEE,
+        TRANSFER_AMOUNT + HALF_FIXED_GAS * ONE_GAS_PRICE,
         // the nonce is still incremented even though the transfer failed
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(
-        &runner,
-        receiver,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE - HALF_FEE,
-        INITIAL_NONCE.into(),
-    );
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, amount, INITIAL_NONCE.into()).unwrap();
 
     // attempt transfer
     let result = runner
         .submit_with_signer(&mut source_account, |nonce| {
             // try to transfer more than we have
-            utils::transfer(receiver, TRANSFER_AMOUNT, nonce)
+            utils::transfer_with_price(receiver, TRANSFER_AMOUNT, nonce, ONE_GAS_PRICE.raw())
         })
         .unwrap();
     assert!(matches!(result.status, TransactionStatus::OutOfFund));
@@ -163,8 +178,10 @@ fn test_eth_transfer_incorrect_nonce() {
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // attempt transfer
     let err = runner
@@ -176,8 +193,10 @@ fn test_eth_transfer_incorrect_nonce() {
     assert_eq!(err.kind, EngineErrorKind::IncorrectNonce);
 
     // validate post-state (which is the same as pre-state in this case)
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
@@ -192,26 +211,28 @@ fn test_transfer_with_low_gas_limit() {
 
     let transaction = |nonce| {
         let mut tx = utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
-        // it's not enough gas for common tx, but it doesn't matter if fixed cost is set
         tx.gas_limit = 10_000.into();
+        tx.gas_price = ONE_GAS_PRICE.raw();
         tx
     };
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
-    // make transfer
-    let result = runner.submit_with_signer(&mut signer, transaction).unwrap();
-    assert!(matches!(result.status, TransactionStatus::Succeed(_)));
+    // make transfer. should be error FixedGasOverflow because too low gas_limit.
+    let error = runner
+        .submit_with_signer(&mut signer, transaction)
+        .err()
+        .unwrap();
+    assert!(matches!(error.kind, EngineErrorKind::FixedGasOverflow));
 
-    validate_address_balance_and_nonce(
-        &runner,
-        sender,
-        INITIAL_BALANCE - FEE - TRANSFER_AMOUNT,
-        (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
@@ -219,15 +240,18 @@ fn test_relayer_balance_after_transfer() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let transaction = |nonce| utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
+    let transaction =
+        |nonce| utils::transfer_with_price(receiver, TRANSFER_AMOUNT, nonce, ONE_GAS_PRICE.raw());
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     add_account_to_whitelist(&mut runner, caller);
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // do transfer
     runner
@@ -242,11 +266,19 @@ fn test_relayer_balance_after_transfer() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, relayer, FEE, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(
+        &runner,
+        relayer,
+        FIXED_GAS * ONE_GAS_PRICE,
+        INITIAL_NONCE.into(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -293,12 +325,19 @@ fn test_submit_access_right() {
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let transaction = utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    let transaction = utils::transfer_with_price(
+        receiver,
+        TRANSFER_AMOUNT,
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Allow to submit transactions.
 
@@ -309,8 +348,10 @@ fn test_submit_access_right() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Add caller and signer to whitelists.
     add_account_to_whitelist(&mut runner, caller);
@@ -326,10 +367,12 @@ fn test_submit_access_right() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
@@ -337,12 +380,19 @@ fn test_submit_access_right_via_batch() {
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let transaction = utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    let transaction = utils::transfer_with_price(
+        receiver,
+        TRANSFER_AMOUNT,
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Allow to submit transactions.
 
@@ -353,8 +403,10 @@ fn test_submit_access_right_via_batch() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Add caller and signer to whitelists via batch.
     let args = vec![
@@ -380,22 +432,31 @@ fn test_submit_access_right_via_batch() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
 fn test_submit_with_disabled_whitelist() {
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
-    let transaction = utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    let transaction = utils::transfer_with_price(
+        receiver,
+        TRANSFER_AMOUNT,
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Allow to submit transactions.
 
@@ -406,8 +467,10 @@ fn test_submit_with_disabled_whitelist() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // validate post-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Disable whitelists.
     disable_whitelist(&mut runner, WhitelistKind::Account);
@@ -423,10 +486,12 @@ fn test_submit_with_disabled_whitelist() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 
     // Enable whitelist.
     enable_whitelist(&mut runner, WhitelistKind::Account);
@@ -443,7 +508,12 @@ fn test_submit_with_removing_entries() {
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let transaction = utils::transfer(receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    let transaction = utils::transfer_with_price(
+        receiver,
+        TRANSFER_AMOUNT,
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
 
@@ -451,8 +521,10 @@ fn test_submit_with_removing_entries() {
     add_account_to_whitelist(&mut runner, caller.clone());
     add_address_to_whitelist(&mut runner, sender);
 
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // perform transfer
     let result = runner
@@ -464,10 +536,12 @@ fn test_submit_with_removing_entries() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 
     // Remove account id and address from white lists.
     remove_account_from_whitelist(&mut runner, caller);
@@ -483,10 +557,12 @@ fn test_submit_with_removing_entries() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER_AMOUNT - FEE,
+        INITIAL_BALANCE - TRANSFER_AMOUNT - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
@@ -501,7 +577,11 @@ fn test_deploy_access_rights() {
         buf
     };
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-    let deploy_tx = utils::create_deploy_transaction(code.clone(), INITIAL_NONCE.into());
+    let deploy_tx = utils::create_deploy_transaction_with_price(
+        code.clone(),
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
     // Check that caller's balance is enough.
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
@@ -515,7 +595,8 @@ fn test_deploy_access_rights() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // Check that the balance and the nonce haven't been changed.
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Add caller's account id and sender address to admins list to allow deploying a code.
     add_admin(&mut runner, caller);
@@ -535,9 +616,10 @@ fn test_deploy_access_rights() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - FEE,
+        INITIAL_BALANCE - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
@@ -551,7 +633,11 @@ fn test_deploy_with_disabled_whitelist() {
         rng.fill_bytes(&mut buf);
         buf
     };
-    let deploy_tx = utils::create_deploy_transaction(code.clone(), INITIAL_NONCE.into());
+    let deploy_tx = utils::create_deploy_transaction_with_price(
+        code.clone(),
+        INITIAL_NONCE.into(),
+        ONE_GAS_PRICE.raw(),
+    );
     // Check that caller's balance is enough.
     let balance = runner.get_balance(sender);
     assert_eq!(balance, INITIAL_BALANCE);
@@ -565,7 +651,8 @@ fn test_deploy_with_disabled_whitelist() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
     // Check that the balance and the nonce haven't been changed.
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Disable whitelists.
     disable_whitelist(&mut runner, WhitelistKind::Admin);
@@ -585,13 +672,14 @@ fn test_deploy_with_disabled_whitelist() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - FEE,
+        INITIAL_BALANCE - FIXED_GAS * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
-fn test_switch_between_fix_gas_cost() {
+fn test_switch_between_fix_gas() {
     const TRANSFER: Wei = Wei::new_u64(10_000_000);
     let (mut runner, mut signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
@@ -601,8 +689,10 @@ fn test_switch_between_fix_gas_cost() {
     add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
-    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into());
-    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
+        .unwrap();
 
     // Defining gas cost in transaction
     // do transfer
@@ -619,41 +709,44 @@ fn test_switch_between_fix_gas_cost() {
     validate_address_balance_and_nonce(
         &runner,
         sender,
-        INITIAL_BALANCE - TRANSFER - Wei::new_u64(result.gas_used),
+        INITIAL_BALANCE - TRANSFER - EthGas::new(result.gas_used) * ONE_GAS_PRICE,
         (INITIAL_NONCE + 1).into(),
-    );
-    validate_address_balance_and_nonce(&runner, receiver, TRANSFER, 0.into());
+    )
+    .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, TRANSFER, 0.into()).unwrap();
 
-    // Set fixed gas cost
-    let fixed_gas_cost = Wei::new_u64(1_000_000);
+    // Set fixed gas
+    let fixed_gas = EthGas::new(1_000_000);
     set_silo_params(
         &mut runner,
         Some(SiloParamsArgs {
-            fixed_gas_cost,
+            fixed_gas,
             erc20_fallback_address: ERC20_FALLBACK_ADDRESS,
         }),
     );
     // Check that fixed gas cost has been set successfully.
-    assert_eq!(runner.get_fixed_gas_cost(), Some(fixed_gas_cost));
+    assert_eq!(runner.get_fixed_gas(), Some(fixed_gas));
 
     let balance_before_transfer = runner.get_balance(sender);
     let result = runner
         .submit_with_signer(&mut signer, |nonce| {
-            utils::transfer(receiver, TRANSFER, nonce)
+            utils::transfer_with_price(receiver, TRANSFER, nonce, TWO_GAS_PRICE.raw())
         })
         .unwrap();
     assert!(matches!(result.status, TransactionStatus::Succeed(_)));
 
-    let sender_balance = balance_before_transfer - TRANSFER - fixed_gas_cost;
+    let sender_balance = balance_before_transfer - TRANSFER - fixed_gas * TWO_GAS_PRICE;
     let receiver_balance = TRANSFER + TRANSFER;
 
     // validate post-state
-    validate_address_balance_and_nonce(&runner, sender, sender_balance, (INITIAL_NONCE + 2).into());
-    validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, sender_balance, (INITIAL_NONCE + 2).into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into())
+        .unwrap();
 
     // Unset fixed gas cost. Should be used usual gas charge mechanism.
     set_silo_params(&mut runner, None);
-    assert_eq!(runner.get_fixed_gas_cost(), None);
+    assert_eq!(runner.get_fixed_gas(), None);
     let balance_before_transfer = runner.get_balance(sender);
 
     // do transfer
@@ -670,29 +763,31 @@ fn test_switch_between_fix_gas_cost() {
     let receiver_balance = TRANSFER + TRANSFER + TRANSFER;
 
     // validate post-state
-    validate_address_balance_and_nonce(&runner, sender, sender_balance, (INITIAL_NONCE + 3).into());
-    validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into());
+    validate_address_balance_and_nonce(&runner, sender, sender_balance, (INITIAL_NONCE + 3).into())
+        .unwrap();
+    validate_address_balance_and_nonce(&runner, receiver, receiver_balance, INITIAL_NONCE.into())
+        .unwrap();
 }
 
 #[test]
 #[should_panic(expected = "SILO_MODE_IS_OFF")]
-fn test_set_fixed_gas_cost_in_disabled_silo_mode() {
+fn test_set_fixed_gas_in_disabled_silo_mode() {
     let mut runner = utils::deploy_runner();
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_fixed_gas(&mut runner, Some(FIXED_GAS));
 }
 
 #[test]
-#[should_panic(expected = "FIXED_GAS_COST_IS_NONE")]
-fn test_set_none_fixed_gas_cost() {
+#[should_panic(expected = "FIXED_GAS_IS_NONE")]
+fn test_set_none_fixed_gas() {
     let mut runner = utils::deploy_runner();
-    set_fixed_gas_cost(&mut runner, None);
+    set_fixed_gas(&mut runner, None);
 }
 
 #[test]
-fn test_set_fixed_gas_cost() {
+fn test_set_fixed_gas() {
     let mut runner = utils::deploy_runner();
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    set_fixed_gas_cost(&mut runner, Some(FEE));
+    set_fixed_gas(&mut runner, Some(FIXED_GAS));
 }
 
 fn initialize_transfer() -> (AuroraRunner, utils::Signer, Address) {
@@ -777,9 +872,9 @@ fn remove_address_from_whitelist(runner: &mut AuroraRunner, address: Address) {
     call_function(runner, "remove_entry_from_whitelist", args);
 }
 
-fn set_fixed_gas_cost(runner: &mut AuroraRunner, cost: Option<Wei>) {
-    let args = FixedGasCostArgs { cost };
-    call_function(runner, "set_fixed_gas_cost", args);
+fn set_fixed_gas(runner: &mut AuroraRunner, fixed_gas: Option<EthGas>) {
+    let args = FixedGasArgs { fixed_gas };
+    call_function(runner, "set_fixed_gas", args);
 }
 
 fn set_silo_params(runner: &mut AuroraRunner, silo_params: Option<SiloParamsArgs>) {
@@ -799,7 +894,7 @@ fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &st
 }
 
 pub mod workspace {
-    use super::FEE;
+    use super::FIXED_GAS;
     use crate::tests::erc20_connector::workspace::{erc20_balance, exit_to_near};
     use crate::utils::solidity::erc20::ERC20;
     use crate::utils::workspace::{
@@ -1004,6 +1099,7 @@ pub mod workspace {
     }
 
     /// Deploys the EVM, deploys nep141 contract, and calls `set_silo_params`
+    #[allow(clippy::future_not_send)]
     async fn init_silo() -> SiloTestContext {
         // Deploy Aurora Engine
         let aurora = deploy_engine().await;
@@ -1018,7 +1114,7 @@ pub mod workspace {
 
         // Set silo mode
         let params = Some(SiloParamsArgs {
-            fixed_gas_cost: FEE,
+            fixed_gas: FIXED_GAS,
             erc20_fallback_address: fallback_address,
         });
 

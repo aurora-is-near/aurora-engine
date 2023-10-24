@@ -605,7 +605,7 @@ pub mod workspace {
         check_fib_result(&output, usize::try_from(n).unwrap());
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::future_not_send)]
     async fn test_xcc_precompile_common(is_scheduled: bool) {
         let XccTestContext {
             aurora,
@@ -753,6 +753,7 @@ pub mod workspace {
 
     /// Deploys the EVM, sets xcc router code, deploys wnear contract, bridges wnear into EVM,
     /// and calls `factory_set_wnear_address`
+    #[allow(clippy::future_not_send)]
     async fn init_xcc() -> anyhow::Result<XccTestContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();

@@ -1,8 +1,8 @@
 use aurora_engine_types::borsh::BorshSerialize;
+use near_workspaces::result::ExecutionFinalResult;
+use near_workspaces::rpc::query::{Query, ViewFunction};
+use near_workspaces::rpc::BoxFuture;
 use std::future::IntoFuture;
-use workspaces::result::ExecutionFinalResult;
-use workspaces::rpc::query::{Query, ViewFunction};
-use workspaces::rpc::BoxFuture;
 
 pub struct ViewTransaction<'a> {
     pub(crate) inner: Query<'a, ViewFunction>,
@@ -30,7 +30,7 @@ impl<'a> ViewTransaction<'a> {
 }
 
 impl<'a> IntoFuture for ViewTransaction<'a> {
-    type Output = anyhow::Result<workspaces::result::ViewResultDetails>;
+    type Output = anyhow::Result<near_workspaces::result::ViewResultDetails>;
     type IntoFuture = BoxFuture<'a, Self::Output>;
 
     fn into_future(self) -> Self::IntoFuture {
@@ -38,12 +38,12 @@ impl<'a> IntoFuture for ViewTransaction<'a> {
     }
 }
 
-pub struct CallTransaction<'a> {
-    inner: workspaces::operations::CallTransaction<'a>,
+pub struct CallTransaction {
+    inner: near_workspaces::operations::CallTransaction,
 }
 
-impl<'a> CallTransaction<'a> {
-    pub(crate) fn new(call_tx: workspaces::operations::CallTransaction<'a>) -> Self {
+impl CallTransaction {
+    pub(crate) fn new(call_tx: near_workspaces::operations::CallTransaction) -> Self {
         Self { inner: call_tx }
     }
 
@@ -63,7 +63,7 @@ impl<'a> CallTransaction<'a> {
     }
 
     pub fn gas(mut self, gas: u64) -> Self {
-        self.inner = self.inner.gas(gas);
+        self.inner = self.inner.gas(near_gas::NearGas::from_gas(gas));
         self
     }
 
