@@ -399,7 +399,7 @@ pub fn get_erc20_metadata<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<()
     let current_account_id = env.current_account_id();
     let engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
         state,
-        predecessor_address(&current_account_id),
+        predecessor_address(&env.predecessor_account_id()),
         current_account_id,
         io,
         env,

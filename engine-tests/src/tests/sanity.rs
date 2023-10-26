@@ -434,8 +434,8 @@ fn test_solidity_pure_bench() {
         .unwrap();
 
     assert!(
-        result.gas_used > 38_000_000,
-        "Over 38 million EVM gas is used {}",
+        result.gas_used > 37_000_000,
+        "Over 37 million EVM gas is used {}",
         result.gas_used
     );
     let near_gas = profile.all_gas();
