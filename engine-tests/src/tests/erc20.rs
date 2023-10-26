@@ -309,7 +309,7 @@ fn test_erc20_get_and_set_metadata_by_owner() {
     // Change the owner of the aurora contract
     let new_owner = "new_owner";
     let set_owner_args = SetOwnerArgs {
-        new_owner: str_to_account_id(&new_owner),
+        new_owner: str_to_account_id(new_owner),
     };
 
     let result = runner.call("set_owner", &caller, set_owner_args.try_to_vec().unwrap());
