@@ -41,7 +41,7 @@ pub trait Authorizer {
 
 /// Can check if a subset of precompiles is currently paused or not.
 pub trait PausedPrecompilesChecker {
-    /// Checks if all of the `precompiles` are paused.
+    /// Checks if all the `precompiles` are paused.
     ///
     /// The `precompiles` mask can be a subset and every 1 bit is meant to be checked and every 0 bit is ignored.
     fn is_paused(&self, precompiles: PrecompileFlags) -> bool;
