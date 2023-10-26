@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+
+- The smart contract owner whose account id is not the same as the contract account id can set ERC-20 metadata
+  by [@aleksuss] ([#858]). 
+
+[#858]: https://github.com/aurora-is-near/aurora-engine/pull/858
+
 ## [3.3.0] 2023-10-23
 
 ### Changes

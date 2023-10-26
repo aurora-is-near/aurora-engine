@@ -381,7 +381,7 @@ pub fn set_erc20_metadata<I: IO + Copy, E: Env, H: PromiseHandler>(
         let current_account_id = env.current_account_id();
         let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
             state,
-            predecessor_address(&env.predecessor_account_id()),
+            predecessor_address(&current_account_id),
             current_account_id,
             io,
             env,
