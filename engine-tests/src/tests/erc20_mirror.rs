@@ -169,7 +169,6 @@ async fn test_mirroring_erc20_token() {
     assert_eq!(nep_141_balance_of(&nep141, &ft_owner.id()).await, 1_000_000);
 }
 
-#[allow(clippy::future_not_send)]
 async fn deploy_main_contract() -> EngineContract {
     let code = get_main_contract_code().await.unwrap();
     deploy_engine_with_code(code).await

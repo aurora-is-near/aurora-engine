@@ -53,7 +53,7 @@ near-vm-errors = "0.17"
 near-vm-logic = "0.17"
 near-vm-runner = { version = "0.17", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
 near-units = "0.2"
-near-workspaces = "0.8"
+near-workspaces = "0.9"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }

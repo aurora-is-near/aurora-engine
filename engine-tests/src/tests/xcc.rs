@@ -753,7 +753,6 @@ pub mod workspace {
 
     /// Deploys the EVM, sets xcc router code, deploys wnear contract, bridges wnear into EVM,
     /// and calls `factory_set_wnear_address`
-    #[allow(clippy::future_not_send)]
     async fn init_xcc() -> anyhow::Result<XccTestContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();

@@ -19,7 +19,6 @@ const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
 /// Deploy Aurora smart contract WITHOUT init external eth-connector.
-#[allow(clippy::future_not_send)]
 pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
     let chain_id = AuroraRunner::get_default_chain_id();
     aurora_engine_workspace::EngineContractBuilder::new()
@@ -35,7 +34,7 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .unwrap()
 }
 
-#[allow(clippy::let_and_return, clippy::future_not_send)]
+#[allow(clippy::let_and_return)]
 pub async fn deploy_engine() -> EngineContract {
     let code = AuroraRunner::get_engine_code();
     let contract = deploy_engine_with_code(code).await;

@@ -1,6 +1,6 @@
 use aurora_engine_types::account_id::AccountId;
 use near_workspaces::network::{NetworkClient, Sandbox};
-use near_workspaces::types::{KeyType, SecretKey};
+use near_workspaces::types::{KeyType, NearToken, SecretKey};
 use near_workspaces::Worker;
 use std::str::FromStr;
 use std::time::Duration;
@@ -36,7 +36,7 @@ impl Node {
         self.worker
             .view_account(&account_id)
             .await
-            .map(|d| d.balance)
+            .map(|d| d.balance.as_yoctonear())
             .map_err(Into::into)
     }
 
@@ -76,7 +76,7 @@ impl Node {
             .batch(&root)
             .create_account()
             .add_key(sk.public_key(), AccessKey::full_access())
-            .transfer(balance)
+            .transfer(NearToken::from_yoctonear(balance))
             .transact()
             .await?
             .into_result()?;

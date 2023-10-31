@@ -532,7 +532,11 @@ pub mod workspace {
             &aurora,
         )
         .await;
-        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+        let total_tokens_burnt: u128 = result
+            .outcomes()
+            .iter()
+            .map(|o| o.tokens_burnt.as_yoctonear())
+            .sum();
 
         // Check that the wnear tokens are properly unwrapped and transferred to `ft_owner`
         assert_eq!(
@@ -578,7 +582,11 @@ pub mod workspace {
             &aurora,
         )
         .await;
-        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+        let total_tokens_burnt: u128 = result
+            .outcomes()
+            .iter()
+            .map(|o| o.tokens_burnt.as_yoctonear())
+            .sum();
 
         // Check that there were no near tokens transferred to `ft_owner`
         assert_eq!(
@@ -761,7 +769,6 @@ pub mod workspace {
         );
     }
 
-    #[allow(clippy::future_not_send)]
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
@@ -808,7 +815,7 @@ pub mod workspace {
         })
     }
 
-    #[allow(clippy::future_not_send, clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     async fn test_exit_to_near_common() -> anyhow::Result<TestExitToNearContext> {
         // 1. deploy Aurora
         let aurora = deploy_engine().await;
