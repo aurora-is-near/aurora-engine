@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::contract::RawContract;
 use aurora_engine_types::public_key::PublicKey;
-pub use near_units::parse_near;
+use near_workspaces::types::NearToken;
 
 #[derive(Debug, Clone)]
 pub struct Account {
@@ -39,7 +39,11 @@ impl Account {
         self.inner.id().as_str().parse().unwrap()
     }
 
-    pub async fn create_subaccount(&self, name: &str, balance: u128) -> anyhow::Result<Account> {
+    pub async fn create_subaccount(
+        &self,
+        name: &str,
+        balance: NearToken,
+    ) -> anyhow::Result<Account> {
         self.inner
             .create_subaccount(name)
             .initial_balance(balance)

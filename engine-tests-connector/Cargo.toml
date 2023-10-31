@@ -18,7 +18,6 @@ anyhow.workspace = true
 byte-slice-cast.workspace = true
 near-gas.workspace = true
 near-sdk.workspace = true
-near-units.workspace = true
 near-workspaces.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 hex.workspace = true

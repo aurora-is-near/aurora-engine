@@ -1297,7 +1297,6 @@ mod workspace {
         );
     }
 
-    #[allow(clippy::future_not_send)]
     async fn initialize_engine() -> (EngineContract, utils::Signer, Address) {
         let engine = utils::workspace::deploy_engine().await;
         let signer = utils::Signer::random();

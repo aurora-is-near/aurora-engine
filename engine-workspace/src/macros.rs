@@ -48,7 +48,7 @@ macro_rules! impl_call_return  {
                 self.0 = self.0.max_gas();
                 self
             }
-            pub fn deposit(mut self, deposit: u128) -> Self {
+            pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }
@@ -83,7 +83,7 @@ macro_rules! impl_call_return  {
                 self.0 = self.0.max_gas();
                 self
             }
-            pub fn deposit(mut self, deposit: u128) -> Self {
+            pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }
