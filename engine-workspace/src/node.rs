@@ -15,7 +15,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub async fn new(root: &str, root_balance: u128) -> anyhow::Result<Self> {
+    pub async fn new(root: &str, root_balance: NearToken) -> anyhow::Result<Self> {
         let worker = near_workspaces::sandbox().await?;
         let root = Self::create_root_account(&worker, root, root_balance).await?;
 
@@ -43,7 +43,7 @@ impl Node {
     async fn create_root_account(
         worker: &Worker<Sandbox>,
         root_acc_name: &str,
-        balance: u128,
+        balance: NearToken,
     ) -> anyhow::Result<near_workspaces::Account> {
         use near_workspaces::AccessKey;
 
@@ -76,7 +76,7 @@ impl Node {
             .batch(&root)
             .create_account()
             .add_key(sk.public_key(), AccessKey::full_access())
-            .transfer(NearToken::from_yoctonear(balance))
+            .transfer(balance)
             .transact()
             .await?
             .into_result()?;

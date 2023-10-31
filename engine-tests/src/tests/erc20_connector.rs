@@ -398,9 +398,10 @@ pub mod workspace {
     use aurora_engine::proof::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
-    use aurora_engine_workspace::types::ExecutionFinalResult;
-    use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+    use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
+    use aurora_engine_workspace::{EngineContract, RawContract};
 
+    const BALANCE: NearToken = NearToken::from_near(50);
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
     const FT_TRANSFER_AMOUNT: u128 = 300_000;
     const FT_EXIT_AMOUNT: u128 = 100_000;
@@ -725,7 +726,7 @@ pub mod workspace {
                 None,
             )
             .max_gas()
-            .deposit(1)
+            .deposit(NearToken::from_yoctonear(1))
             .transact()
             .await
             .unwrap();
@@ -821,7 +822,7 @@ pub mod workspace {
         let aurora = deploy_engine().await;
 
         // 2. Create account
-        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", parse_near!("50 N")).await?;
+        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", BALANCE).await?;
         let ft_owner_address =
             aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
         let result = aurora
@@ -873,8 +874,7 @@ pub mod workspace {
         );
 
         // 5. Deploy NEP-141
-        let nep_141_account =
-            create_sub_account(&aurora.root(), FT_ACCOUNT, parse_near!("50 N")).await?;
+        let nep_141_account = create_sub_account(&aurora.root(), FT_ACCOUNT, BALANCE).await?;
 
         let nep_141 = deploy_nep_141(&nep_141_account, &ft_owner, FT_TOTAL_SUPPLY, &aurora)
             .await

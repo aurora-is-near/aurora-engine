@@ -16,7 +16,6 @@ aurora-engine-types = { workspace = true, features = ["impl-serde", "std"] }
 anyhow.workspace = true
 near-gas.workspace = true
 near-sdk.workspace = true
-near-units.workspace = true
 near-workspaces.workspace = true
 serde.workspace = true
 serde_json.workspace = true

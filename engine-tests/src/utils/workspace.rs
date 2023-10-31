@@ -10,11 +10,11 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Withdraw
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
 use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
-const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
+const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
 #[cfg(feature = "ext-connector")]
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
@@ -27,8 +27,8 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .with_code(code)
         .with_custodian_address("d045f7e19B2488924B97F9c145b5E51D0D895A65")
         .unwrap()
-        .with_root_balance(parse_near!("10000 N"))
-        .with_contract_balance(parse_near!("1000 N"))
+        .with_root_balance(NearToken::from_near(10000))
+        .with_contract_balance(NearToken::from_near(1000))
         .deploy_and_init()
         .await
         .unwrap()
@@ -51,7 +51,10 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     let contract_bytes = get_aurora_eth_connector_contract();
     let contract_account = aurora
         .root()
-        .create_subaccount(AURORA_ETH_CONNECTOR, 15 * STORAGE_AMOUNT)
+        .create_subaccount(
+            AURORA_ETH_CONNECTOR,
+            STORAGE_AMOUNT.checked_mul(15).unwrap(),
+        )
         .await
         .unwrap();
     let contract = contract_account.deploy(&contract_bytes).await.unwrap();
@@ -84,7 +87,7 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
 pub async fn create_sub_account(
     master_account: &Account,
     account: &str,
-    balance: u128,
+    balance: NearToken,
 ) -> anyhow::Result<Account> {
     master_account.create_subaccount(account, balance).await
 }
@@ -121,7 +124,7 @@ pub async fn transfer_nep_141_to_erc_20(
             "amount": amount.to_string(),
             "memo": "null",
         }))
-        .deposit(1)
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?;
     assert!(result.is_success(), "{result:?}");
@@ -207,7 +210,7 @@ pub async fn transfer_nep_141(
             "amount": amount.to_string(),
             "memo": "null",
         }))
-        .deposit(1)
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?;
     assert!(result.is_success());

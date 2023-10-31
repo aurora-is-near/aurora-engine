@@ -73,8 +73,8 @@ impl CallTransaction {
         self
     }
 
-    pub fn deposit(mut self, deposit: u128) -> Self {
-        self.inner = self.inner.deposit(NearToken::from_yoctonear(deposit));
+    pub fn deposit(mut self, deposit: NearToken) -> Self {
+        self.inner = self.inner.deposit(deposit);
         self
     }
 
