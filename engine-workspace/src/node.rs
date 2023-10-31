@@ -1,6 +1,6 @@
 use aurora_engine_types::account_id::AccountId;
 use near_workspaces::network::{NetworkClient, Sandbox};
-use near_workspaces::types::{KeyType, SecretKey};
+use near_workspaces::types::{KeyType, NearToken, SecretKey};
 use near_workspaces::Worker;
 use std::str::FromStr;
 use std::time::Duration;
@@ -15,7 +15,7 @@ pub struct Node {
 }
 
 impl Node {
-    pub async fn new(root: &str, root_balance: u128) -> anyhow::Result<Self> {
+    pub async fn new(root: &str, root_balance: NearToken) -> anyhow::Result<Self> {
         let worker = near_workspaces::sandbox().await?;
         let root = Self::create_root_account(&worker, root, root_balance).await?;
 
@@ -36,14 +36,14 @@ impl Node {
         self.worker
             .view_account(&account_id)
             .await
-            .map(|d| d.balance)
+            .map(|d| d.balance.as_yoctonear())
             .map_err(Into::into)
     }
 
     async fn create_root_account(
         worker: &Worker<Sandbox>,
         root_acc_name: &str,
-        balance: u128,
+        balance: NearToken,
     ) -> anyhow::Result<near_workspaces::Account> {
         use near_workspaces::AccessKey;
 

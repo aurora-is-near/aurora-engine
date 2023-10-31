@@ -2,6 +2,7 @@ use aurora_engine_types::borsh::BorshSerialize;
 use near_workspaces::result::ExecutionFinalResult;
 use near_workspaces::rpc::query::{Query, ViewFunction};
 use near_workspaces::rpc::BoxFuture;
+use near_workspaces::types::NearToken;
 use std::future::IntoFuture;
 
 pub struct ViewTransaction<'a> {
@@ -72,7 +73,7 @@ impl CallTransaction {
         self
     }
 
-    pub fn deposit(mut self, deposit: u128) -> Self {
+    pub fn deposit(mut self, deposit: NearToken) -> Self {
         self.inner = self.inner.deposit(deposit);
         self
     }

@@ -4,10 +4,12 @@ use aurora_engine_types::parameters::engine::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::Address;
-use aurora_engine_workspace::parse_near;
-use aurora_engine_workspace::types::{KeyType, SecretKey};
+use aurora_engine_workspace::types::{KeyType, NearToken, SecretKey};
 use std::fmt::Debug;
 use std::str::FromStr;
+
+const BALANCE: NearToken = NearToken::from_near(10);
+const DEPOSIT: NearToken = NearToken::from_millinear(500);
 
 #[tokio::test]
 async fn test_add_key_manager() {
@@ -16,14 +18,14 @@ async fn test_add_key_manager() {
     let relayer_key_args = RelayerKeyArgs { public_key: pk };
     let manager = aurora
         .root()
-        .create_subaccount("key_manager", parse_near!("10 N"))
+        .create_subaccount("key_manager", BALANCE)
         .await
         .unwrap();
 
     let result = manager
         .call(&aurora.id(), "add_relayer_key")
         .args_json(relayer_key_args.clone())
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .max_gas()
         .transact()
         .await
@@ -46,7 +48,7 @@ async fn test_add_key_manager() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(relayer_key_args.clone())
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();
@@ -64,7 +66,7 @@ async fn test_add_key_manager() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(relayer_key_args)
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();
@@ -82,7 +84,7 @@ async fn test_submit_by_relayer() {
 
     let manager = aurora
         .root()
-        .create_subaccount("key_manager", parse_near!("10 N"))
+        .create_subaccount("key_manager", BALANCE)
         .await
         .unwrap();
     let result = aurora
@@ -108,7 +110,7 @@ async fn test_submit_by_relayer() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(RelayerKeyArgs { public_key })
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();
@@ -131,7 +133,7 @@ async fn test_delete_relayer_key() {
 
     let manager = aurora
         .root()
-        .create_subaccount("key_manager", parse_near!("10 N"))
+        .create_subaccount("key_manager", BALANCE)
         .await
         .unwrap();
     let result = aurora
@@ -148,7 +150,7 @@ async fn test_delete_relayer_key() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(RelayerKeyArgs { public_key })
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();
@@ -199,7 +201,7 @@ async fn test_call_not_allowed_method() {
 
     let manager = aurora
         .root()
-        .create_subaccount("key_manager", parse_near!("10 N"))
+        .create_subaccount("key_manager", BALANCE)
         .await
         .unwrap();
     let result = aurora
@@ -216,7 +218,7 @@ async fn test_call_not_allowed_method() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(RelayerKeyArgs { public_key })
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();
@@ -243,7 +245,7 @@ async fn test_call_not_allowed_contract() {
 
     let manager = aurora
         .root()
-        .create_subaccount("key_manager", parse_near!("10 N"))
+        .create_subaccount("key_manager", BALANCE)
         .await
         .unwrap();
     let result = aurora
@@ -260,7 +262,7 @@ async fn test_call_not_allowed_contract() {
         .call(&aurora.id(), "add_relayer_key")
         .args_json(RelayerKeyArgs { public_key })
         .max_gas()
-        .deposit(parse_near!("0.5 N"))
+        .deposit(DEPOSIT)
         .transact()
         .await
         .unwrap();

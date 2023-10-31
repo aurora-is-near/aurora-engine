@@ -904,7 +904,8 @@ pub mod workspace {
         SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
     };
     use aurora_engine_types::types::Address;
-    use aurora_engine_workspace::{account::Account, parse_near, EngineContract, RawContract};
+    use aurora_engine_workspace::types::NearToken;
+    use aurora_engine_workspace::{account::Account, EngineContract, RawContract};
 
     const FT_ACCOUNT: &str = "test_token";
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
@@ -1090,7 +1091,7 @@ pub mod workspace {
         let result = source
             .call(&nep_141.id(), "ft_transfer_call")
             .args_json(transfer_args)
-            .deposit(1)
+            .deposit(NearToken::from_yoctonear(1))
             .max_gas()
             .transact()
             .await
@@ -1099,14 +1100,13 @@ pub mod workspace {
     }
 
     /// Deploys the EVM, deploys nep141 contract, and calls `set_silo_params`
-    #[allow(clippy::future_not_send)]
     async fn init_silo() -> SiloTestContext {
         // Deploy Aurora Engine
         let aurora = deploy_engine().await;
         // Create fallback account and evm address
         let fallback_account = aurora
             .root()
-            .create_subaccount("fallback", parse_near!("10 N"))
+            .create_subaccount("fallback", NearToken::from_near(10))
             .await
             .unwrap();
         let fallback_address =
@@ -1124,7 +1124,7 @@ pub mod workspace {
         // Create `ft_owner` account and evm address
         let ft_owner = aurora
             .root()
-            .create_subaccount("ft_owner", parse_near!("10 N"))
+            .create_subaccount("ft_owner", NearToken::from_near(10))
             .await
             .unwrap();
         let ft_owner_address =
@@ -1132,7 +1132,7 @@ pub mod workspace {
 
         let nep_141_account = aurora
             .root()
-            .create_subaccount(FT_ACCOUNT, parse_near!("10 N"))
+            .create_subaccount(FT_ACCOUNT, NearToken::from_near(10))
             .await
             .unwrap();
 
@@ -1149,7 +1149,7 @@ pub mod workspace {
                 "account_id": fallback_account.id(),
                 "registration_only": None::<bool>
             }))
-            .deposit(parse_near!("50 N"))
+            .deposit(NearToken::from_near(50))
             .transact()
             .await
             .unwrap();

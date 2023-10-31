@@ -5,7 +5,6 @@ use crate::utils::workspace::{
     transfer_nep_141_to_erc_20,
 };
 use crate::utils::AuroraRunner;
-use aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
     WithdrawSerializeType,
@@ -13,7 +12,8 @@ use aurora_engine_types::parameters::connector::{
 use aurora_engine_types::parameters::silo::SiloParamsArgs;
 use aurora_engine_types::types::RawU256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+use aurora_engine_workspace::types::NearToken;
+use aurora_engine_workspace::{EngineContract, RawContract};
 
 const AURORA_VERSION: &str = include_str!("../../../VERSION");
 const TRANSFER_AMOUNT: u128 = 1000;
@@ -95,7 +95,7 @@ async fn test_mirroring_erc20_token() {
         .args_json(serde_json::json!({
             "account_id": silo_contract.id(),
         }))
-        .deposit(STORAGE_AMOUNT.as_u128())
+        .deposit(NearToken::from_near(2))
         .transact()
         .await
         .unwrap();
@@ -169,7 +169,6 @@ async fn test_mirroring_erc20_token() {
     assert_eq!(nep_141_balance_of(&nep141, &ft_owner.id()).await, 1_000_000);
 }
 
-#[allow(clippy::future_not_send)]
 async fn deploy_main_contract() -> EngineContract {
     let code = get_main_contract_code().await.unwrap();
     deploy_engine_with_code(code).await
@@ -178,7 +177,7 @@ async fn deploy_main_contract() -> EngineContract {
 async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract {
     let silo_account = main_contract
         .root()
-        .create_subaccount("silo", parse_near!("50 N"))
+        .create_subaccount("silo", NearToken::from_near(50))
         .await
         .unwrap();
     let silo_bytes = AuroraRunner::get_engine_code();
@@ -211,12 +210,12 @@ async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract 
 async fn deploy_nep141(main_contract: &EngineContract) -> (RawContract, Account) {
     let ft_owner = main_contract
         .root()
-        .create_subaccount("ft_owner", parse_near!("10 N"))
+        .create_subaccount("ft_owner", NearToken::from_near(10))
         .await
         .unwrap();
     let nep_141_account = main_contract
         .root()
-        .create_subaccount("test_token", parse_near!("10 N"))
+        .create_subaccount("test_token", NearToken::from_near(10))
         .await
         .unwrap();
 

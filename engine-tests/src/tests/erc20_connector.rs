@@ -398,9 +398,10 @@ pub mod workspace {
     use aurora_engine::proof::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
-    use aurora_engine_workspace::types::ExecutionFinalResult;
-    use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+    use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
+    use aurora_engine_workspace::{EngineContract, RawContract};
 
+    const BALANCE: NearToken = NearToken::from_near(50);
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;
     const FT_TRANSFER_AMOUNT: u128 = 300_000;
     const FT_EXIT_AMOUNT: u128 = 100_000;
@@ -532,7 +533,11 @@ pub mod workspace {
             &aurora,
         )
         .await;
-        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+        let total_tokens_burnt: u128 = result
+            .outcomes()
+            .iter()
+            .map(|o| o.tokens_burnt.as_yoctonear())
+            .sum();
 
         // Check that the wnear tokens are properly unwrapped and transferred to `ft_owner`
         assert_eq!(
@@ -578,7 +583,11 @@ pub mod workspace {
             &aurora,
         )
         .await;
-        let total_tokens_burnt: u128 = result.outcomes().iter().map(|o| o.tokens_burnt).sum();
+        let total_tokens_burnt: u128 = result
+            .outcomes()
+            .iter()
+            .map(|o| o.tokens_burnt.as_yoctonear())
+            .sum();
 
         // Check that there were no near tokens transferred to `ft_owner`
         assert_eq!(
@@ -717,7 +726,7 @@ pub mod workspace {
                 None,
             )
             .max_gas()
-            .deposit(1)
+            .deposit(NearToken::from_yoctonear(1))
             .transact()
             .await
             .unwrap();
@@ -761,7 +770,6 @@ pub mod workspace {
         );
     }
 
-    #[allow(clippy::future_not_send)]
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
@@ -808,13 +816,13 @@ pub mod workspace {
         })
     }
 
-    #[allow(clippy::future_not_send, clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     async fn test_exit_to_near_common() -> anyhow::Result<TestExitToNearContext> {
         // 1. deploy Aurora
         let aurora = deploy_engine().await;
 
         // 2. Create account
-        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", parse_near!("50 N")).await?;
+        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", BALANCE).await?;
         let ft_owner_address =
             aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
         let result = aurora
@@ -866,8 +874,7 @@ pub mod workspace {
         );
 
         // 5. Deploy NEP-141
-        let nep_141_account =
-            create_sub_account(&aurora.root(), FT_ACCOUNT, parse_near!("50 N")).await?;
+        let nep_141_account = create_sub_account(&aurora.root(), FT_ACCOUNT, BALANCE).await?;
 
         let nep_141 = deploy_nep_141(&nep_141_account, &ft_owner, FT_TOTAL_SUPPLY, &aurora)
             .await
