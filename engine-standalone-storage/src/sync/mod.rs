@@ -384,6 +384,10 @@ where
     let predecessor_account_id = transaction_message.caller.clone();
     let near_receipt_id = transaction_message.near_receipt_id;
     let current_account_id = engine_account_id;
+    let random_seed = compute_random_seed(
+        &transaction_message.action_hash,
+        &block_metadata.random_seed,
+    );
     let env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -391,7 +395,7 @@ where
         block_height,
         block_timestamp: block_metadata.timestamp,
         attached_deposit: transaction_message.attached_near,
-        random_seed: block_metadata.random_seed,
+        random_seed,
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
@@ -433,6 +437,16 @@ where
     let diff = get_diff(&io);
 
     (tx_hash, diff, result)
+}
+
+/// Based on nearcore implementation:
+/// <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295>
+fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
+    const BYTES_LEN: usize = 32 + 32;
+    let mut bytes: Vec<u8> = Vec::with_capacity(BYTES_LEN);
+    bytes.extend_from_slice(action_hash.as_bytes());
+    bytes.extend_from_slice(block_random_value.as_bytes());
+    aurora_engine_sdk::sha256(&bytes)
 }
 
 /// Handles all transaction kinds other than `submit`.

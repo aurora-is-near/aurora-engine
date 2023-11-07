@@ -198,6 +198,7 @@ impl StandaloneRunner {
         method_name: &str,
         ctx: &near_vm_logic::VMContext,
         promise_results: &[PromiseResult],
+        block_random_value: Option<H256>,
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
@@ -207,8 +208,8 @@ impl StandaloneRunner {
         env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
-        if ctx.random_seed.len() == 32 {
-            env.random_seed = H256::from_slice(&ctx.random_seed);
+        if let Some(value) = block_random_value {
+            env.random_seed = value;
         }
 
         let promise_data: Vec<_> = promise_results
@@ -238,6 +239,19 @@ impl StandaloneRunner {
             ctx.input.clone(),
         );
         tx_msg.transaction = transaction_kind;
+
+        if ctx.random_seed.len() == 32 {
+            let runtime_random_value = {
+                use near_primitives_core::hash::CryptoHash;
+                let action_hash = CryptoHash(tx_msg.action_hash.0);
+                let random_seed = CryptoHash(env.random_seed.0);
+                near_primitives::utils::create_random_seed(u32::MAX, action_hash, random_seed)
+            };
+            assert_eq!(
+                ctx.random_seed, runtime_random_value,
+                "Runtime random value should match computed value when it is specified"
+            );
+        }
 
         let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
@@ -314,6 +328,13 @@ impl StandaloneRunner {
                 PromiseResult::Successful(bytes) => Some(bytes.clone()),
             })
             .collect();
+        let action_hash = {
+            let mut bytes = Vec::with_capacity(32 + 32 + 8);
+            bytes.extend_from_slice(transaction_hash.as_bytes());
+            bytes.extend_from_slice(block_hash.as_bytes());
+            bytes.extend_from_slice(&(u64::MAX - u64::from(transaction_position)).to_le_bytes());
+            aurora_engine_sdk::sha256(&bytes)
+        };
         TransactionMessage {
             block_hash,
             near_receipt_id: transaction_hash,
@@ -325,6 +346,7 @@ impl StandaloneRunner {
             transaction: TransactionKind::Unknown,
             promise_data,
             raw_input,
+            action_hash,
         }
     }
 

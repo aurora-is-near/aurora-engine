@@ -64,6 +64,7 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -102,6 +103,7 @@ fn test_consume_deposit_message() {
         // (which is `true` because the proof is valid in this case).
         promise_data: vec![Some(true.try_to_vec().unwrap())],
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -136,6 +138,7 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -170,6 +173,7 @@ fn test_consume_deploy_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -226,6 +230,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
@@ -268,6 +273,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
@@ -334,6 +340,7 @@ fn test_consume_ft_on_transfer_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -382,6 +389,7 @@ fn test_consume_call_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -436,6 +444,7 @@ fn test_consume_submit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(

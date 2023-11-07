@@ -171,7 +171,7 @@ fn repro_common(context: &ReproContext) {
     let mut standalone = standalone::StandaloneRunner::default();
     json_snapshot::initialize_engine_state(&standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
-        .submit_raw("submit", &runner.context, &[])
+        .submit_raw("submit", &runner.context, &[], None)
         .unwrap();
     assert_eq!(
         submit_result.try_to_vec().unwrap(),
