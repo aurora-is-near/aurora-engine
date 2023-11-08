@@ -1,11 +1,14 @@
+use crate::engine::{Engine, EngineResult};
 use crate::errors::ERR_SERIALIZE;
-use crate::parameters::{CallArgs, FunctionCallArgsV2};
-use aurora_engine_precompiles::xcc::state::{self, ERR_MISSING_WNEAR_ADDRESS};
+use crate::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
+use aurora_engine_modexp::ModExpAlgorithm;
+use aurora_engine_precompiles::xcc::state::ERR_MISSING_WNEAR_ADDRESS;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::PromiseHandler;
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshSerialize;
+use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
@@ -248,15 +251,13 @@ pub fn handle_precompile_promise<I, P>(
     let withdraw_id = if required_near == ZERO_YOCTO {
         setup_id
     } else {
-        let wnear_address = state::get_wnear_address(io);
-        let withdraw_call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: wnear_address,
-            value: [0u8; 32],
-            input: withdraw_to_near_args(&promise.target_account_id, required_near),
-        });
+        let withdraw_call_args = WithdrawWnearToRouterArgs {
+            target: sender,
+            amount: required_near,
+        };
         let withdraw_call = PromiseCreateArgs {
             target_account_id: current_account_id.clone(),
-            method: "call".into(),
+            method: "withdraw_wnear_to_router".into(),
             args: withdraw_call_args.try_to_vec().unwrap(),
             attached_balance: ZERO_YOCTO,
             attached_gas: WITHDRAW_GAS,
@@ -336,6 +337,23 @@ pub fn set_code_version_of_address<I: IO>(io: &mut I, address: &Address, version
     io.write_storage(&key, &value_bytes);
 }
 
+pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, M: ModExpAlgorithm, H: PromiseHandler>(
+    recipient: &AccountId,
+    amount: Yocto,
+    wnear_address: Address,
+    engine: &mut Engine<I, E, M>,
+    handler: &mut H,
+) -> EngineResult<(SubmitResult, Vec<PromiseId>)> {
+    let mut interceptor = PromiseInterceptor::new(handler);
+    let withdraw_call_args = CallArgs::V2(FunctionCallArgsV2 {
+        contract: wnear_address,
+        value: [0u8; 32],
+        input: withdraw_to_near_args(recipient, amount),
+    });
+    let result = engine.call_with_args(withdraw_call_args, &mut interceptor)?;
+    Ok((result, interceptor.promises))
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum FundXccError {
     InsufficientBalance,
@@ -395,6 +413,72 @@ fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
         ethabi::Token::Uint(U256::from(amount.as_u128())),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
+}
+
+/// A `PromiseHandler` that remembers all the `PromiseIds` it creates.
+/// This is used to make a promise the return value of a function even
+/// if the promise was not captured in the code where the handler is used.
+/// For example, this can capture the promises created by the exit precompiles.
+struct PromiseInterceptor<'a, H> {
+    inner: &'a mut H,
+    promises: Vec<PromiseId>,
+}
+
+impl<'a, H> PromiseInterceptor<'a, H> {
+    fn new(inner: &'a mut H) -> Self {
+        Self {
+            inner,
+            promises: Vec::new(),
+        }
+    }
+}
+
+impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
+    type ReadOnly = H::ReadOnly;
+
+    fn promise_results_count(&self) -> u64 {
+        self.inner.promise_results_count()
+    }
+
+    fn promise_result(&self, index: u64) -> Option<aurora_engine_types::types::PromiseResult> {
+        self.inner.promise_result(index)
+    }
+
+    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+        let id = self.inner.promise_create_call(args);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+        let id = self.inner.promise_create_and_combine(args);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_attach_callback(
+        &mut self,
+        base: PromiseId,
+        callback: &PromiseCreateArgs,
+    ) -> PromiseId {
+        let id = self.inner.promise_attach_callback(base, callback);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+        let id = self.inner.promise_create_batch(args);
+        self.promises.push(id);
+        id
+    }
+
+    fn promise_return(&mut self, promise: PromiseId) {
+        self.inner.promise_return(promise);
+    }
+
+    fn read_only(&self) -> Self::ReadOnly {
+        self.inner.read_only()
+    }
 }
 
 #[cfg(test)]
