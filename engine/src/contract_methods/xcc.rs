@@ -2,7 +2,7 @@ use crate::{
     contract_methods::{predecessor_address, require_owner_only, require_running, ContractError},
     engine::Engine,
     errors,
-    hashchain::with_hashchain,
+    hashchain::{with_hashchain, with_logs_hashchain},
     state, xcc,
 };
 use aurora_engine_modexp::AuroraModExp;
@@ -12,8 +12,11 @@ use aurora_engine_sdk::{
     promise::PromiseHandler,
 };
 use aurora_engine_types::{
-    account_id::AccountId, borsh::BorshSerialize, format,
-    parameters::xcc::WithdrawWnearToRouterArgs, types::Address,
+    account_id::AccountId,
+    borsh::BorshSerialize,
+    format,
+    parameters::{engine::SubmitResult, xcc::WithdrawWnearToRouterArgs},
+    types::Address,
 };
 use function_name::named;
 
@@ -22,8 +25,8 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
-    with_hashchain(io, env, function_name!(), |io| {
+) -> Result<SubmitResult, ContractError> {
+    with_logs_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
         env.assert_private_call()?;
@@ -59,7 +62,7 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
         }
         let id = ids.last().ok_or(b"ERR_NO_PROMISE_CREATED")?;
         handler.promise_return(*id);
-        Ok(())
+        Ok(result)
     })
 }
 

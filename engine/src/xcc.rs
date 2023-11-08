@@ -345,13 +345,22 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, M: ModExpAlgorithm, H: Pro
     handler: &mut H,
 ) -> EngineResult<(SubmitResult, Vec<PromiseId>)> {
     let mut interceptor = PromiseInterceptor::new(handler);
-    let withdraw_call_args = CallArgs::V2(FunctionCallArgsV2 {
+    let withdraw_call_args = withdraw_wnear_call_args(recipient, amount, wnear_address);
+    let result = engine.call_with_args(withdraw_call_args, &mut interceptor)?;
+    Ok((result, interceptor.promises))
+}
+
+#[must_use]
+pub fn withdraw_wnear_call_args(
+    recipient: &AccountId,
+    amount: Yocto,
+    wnear_address: Address,
+) -> CallArgs {
+    CallArgs::V2(FunctionCallArgsV2 {
         contract: wnear_address,
         value: [0u8; 32],
         input: withdraw_to_near_args(recipient, amount),
-    });
-    let result = engine.call_with_args(withdraw_call_args, &mut interceptor)?;
-    Ok((result, interceptor.promises))
+    })
 }
 
 #[derive(Debug, Clone, Copy)]

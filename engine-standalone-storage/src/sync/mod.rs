@@ -189,6 +189,10 @@ pub fn parse_transaction_kind(
             })?;
             TransactionKind::FactorySetWNearAddress(address)
         }
+        TransactionKindTag::WithdrawWnearToRouter => {
+            let args = xcc::WithdrawWnearToRouterArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::WithdrawWnearToRouter(args)
+        }
         TransactionKindTag::SetUpgradeDelayBlocks => {
             let args = parameters::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetUpgradeDelayBlocks(args)
@@ -643,6 +647,12 @@ fn non_submit_execute<I: IO + Copy>(
             contract_methods::xcc::fund_xcc_sub_account(io, env, &mut handler)?;
 
             None
+        }
+        TransactionKind::WithdrawWnearToRouter(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
+
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function

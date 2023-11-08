@@ -5,6 +5,7 @@ use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo;
+use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -146,6 +147,8 @@ pub enum TransactionKind {
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
     FundXccSubAccount(FundXccArgs),
+    /// Self-call used during XCC flow to move wNEAR tokens to user's XCC account
+    WithdrawWnearToRouter(WithdrawWnearToRouterArgs),
     /// Pause the contract
     PauseContract,
     /// Resume the contract
@@ -374,6 +377,31 @@ impl TransactionKind {
                     },
                 )
             }
+            Self::WithdrawWnearToRouter(args) => {
+                let recipient = AccountId::new(&format!(
+                    "{}.{}",
+                    args.target.encode(),
+                    engine_account.as_ref()
+                ))
+                .unwrap_or_else(|_| engine_account.clone());
+                let wnear_address = storage
+                    .with_engine_access(block_height, transaction_position, &[], |io| {
+                        aurora_engine_precompiles::xcc::state::get_wnear_address(&io)
+                    })
+                    .result;
+                let call_args = aurora_engine::xcc::withdraw_wnear_call_args(
+                    &recipient,
+                    args.amount,
+                    wnear_address,
+                );
+                Self::Call(call_args).eth_repr(
+                    engine_account,
+                    caller,
+                    block_height,
+                    transaction_position,
+                    storage,
+                )
+            }
             Self::Deposit(_) => Self::no_evm_execution("deposit"),
             Self::FtTransferCall(_) => Self::no_evm_execution("ft_transfer_call"),
             Self::FinishDeposit(_) => Self::no_evm_execution("finish_deposit"),
@@ -550,6 +578,8 @@ pub enum TransactionKindTag {
     RemoveEntryFromWhitelist,
     #[strum(serialize = "mirror_erc20_token_callback")]
     MirrorErc20TokenCallback,
+    #[strum(serialize = "withdraw_wnear_to_router")]
+    WithdrawWnearToRouter,
     Unknown,
 }
 
@@ -592,6 +622,7 @@ impl TransactionKind {
             Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
             Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
             Self::FundXccSubAccount(args) => args.try_to_vec().unwrap_or_default(),
+            Self::WithdrawWnearToRouter(args) => args.try_to_vec().unwrap_or_default(),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
             Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
             Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
@@ -641,6 +672,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::FactoryUpdate(_) => Self::FactoryUpdate,
             TransactionKind::FactoryUpdateAddressVersion(_) => Self::FactoryUpdateAddressVersion,
             TransactionKind::FactorySetWNearAddress(_) => Self::FactorySetWNearAddress,
+            TransactionKind::WithdrawWnearToRouter(_) => Self::WithdrawWnearToRouter,
             TransactionKind::SetOwner(_) => Self::SetOwner,
             TransactionKind::SubmitWithArgs(_) => Self::SubmitWithArgs,
             TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
@@ -886,6 +918,7 @@ enum BorshableTransactionKind<'a> {
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
     MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
+    WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -923,6 +956,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             }
             TransactionKind::FactorySetWNearAddress(address) => {
                 Self::FactorySetWNearAddress(*address)
+            }
+            TransactionKind::WithdrawWnearToRouter(x) => {
+                Self::WithdrawWnearToRouter(Cow::Borrowed(x))
             }
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
@@ -1050,6 +1086,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::MirrorErc20TokenCallback(x) => {
                 Ok(Self::MirrorErc20TokenCallback(x.into_owned()))
+            }
+            BorshableTransactionKind::WithdrawWnearToRouter(x) => {
+                Ok(Self::WithdrawWnearToRouter(x.into_owned()))
             }
         }
     }
