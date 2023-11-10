@@ -1,16 +1,68 @@
 use crate::{
-    contract_methods::{require_owner_only, require_running, ContractError},
+    contract_methods::{predecessor_address, require_owner_only, require_running, ContractError},
+    engine::Engine,
     errors,
-    hashchain::with_hashchain,
+    hashchain::{with_hashchain, with_logs_hashchain},
     state, xcc,
 };
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::{
     env::Env,
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
-use aurora_engine_types::{borsh::BorshSerialize, types::Address};
+use aurora_engine_types::{
+    account_id::AccountId,
+    borsh::BorshSerialize,
+    format,
+    parameters::{engine::SubmitResult, xcc::WithdrawWnearToRouterArgs},
+    types::Address,
+};
 use function_name::named;
+
+#[named]
+pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<SubmitResult, ContractError> {
+    with_logs_hashchain(io, env, function_name!(), |io| {
+        let state = state::get_state(&io)?;
+        require_running(&state)?;
+        env.assert_private_call()?;
+        if matches!(handler.promise_result_check(), Some(false)) {
+            return Err(b"ERR_CALLBACK_OF_FAILED_PROMISE".into());
+        }
+        let args: WithdrawWnearToRouterArgs = io.read_input_borsh()?;
+        let current_account_id = env.current_account_id();
+        let recipient = AccountId::new(&format!(
+            "{}.{}",
+            args.target.encode(),
+            current_account_id.as_ref()
+        ))?;
+        let wnear_address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
+        let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
+            state,
+            predecessor_address(&current_account_id),
+            current_account_id,
+            io,
+            env,
+        );
+        let (result, ids) = xcc::withdraw_wnear_to_router(
+            &recipient,
+            args.amount,
+            wnear_address,
+            &mut engine,
+            handler,
+        )?;
+        if !result.status.is_ok() {
+            return Err(b"ERR_WITHDRAW_FAILED".into());
+        }
+        let id = ids.last().ok_or(b"ERR_NO_PROMISE_CREATED")?;
+        handler.promise_return(*id);
+        Ok(result)
+    })
+}
 
 #[named]
 pub fn factory_update<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {

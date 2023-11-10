@@ -52,6 +52,7 @@ mod consts {
     pub(super) const ERR_SERIALIZE: &str = "ERR_XCC_CALL_SERIALIZE";
     pub(super) const ERR_STATIC: &str = "ERR_INVALID_IN_STATIC";
     pub(super) const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
+    pub(super) const ERR_XCC_ACCOUNT_ID: &str = "ERR_FAILED_TO_CREATE_XCC_ACCOUNT_ID";
     pub(super) const ROUTER_EXEC_NAME: &str = "execute";
     pub(super) const ROUTER_SCHEDULE_NAME: &str = "schedule";
     /// Solidity selector for the ERC-20 transferFrom function
@@ -130,7 +131,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         }
 
         let sender = context.caller;
-        let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref());
+        let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref())?;
         let args = CrossContractCallArgs::try_from_slice(input)
             .map_err(|_| ExitError::Other(Cow::from(consts::ERR_INVALID_INPUT)))?;
         let (promise, attached_near) = match args {
@@ -295,10 +296,13 @@ fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
     [&consts::TRANSFER_FROM_SELECTOR, args.as_slice()].concat()
 }
 
-fn create_target_account_id(sender: H160, engine_account_id: &str) -> AccountId {
+fn create_target_account_id(
+    sender: H160,
+    engine_account_id: &str,
+) -> Result<AccountId, PrecompileFailure> {
     format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
         .parse()
-        .unwrap_or_default()
+        .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {
