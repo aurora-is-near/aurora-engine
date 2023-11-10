@@ -389,6 +389,19 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// A private function (only callable by the contract itself) used as part of the XCC flow.
+    /// This function uses the exit to Near precompile to move wNear from Aurora to a user's
+    /// XCC account.
+    #[no_mangle]
+    pub extern "C" fn withdraw_wnear_to_router() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::xcc::withdraw_wnear_to_router(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Mirror existing ERC-20 token on the main Aurora contract.
     /// Notice: It works if the SILO mode is on.
     #[no_mangle]
