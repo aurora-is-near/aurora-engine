@@ -520,6 +520,16 @@ impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
         id
     }
 
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        base: PromiseId,
+        args: &PromiseBatchAction,
+    ) -> PromiseId {
+        let id = self.inner.promise_attach_batch_callback(base, args);
+        self.promises.push(id);
+        id
+    }
+
     fn promise_return(&mut self, promise: PromiseId) {
         self.inner.promise_return(promise);
     }

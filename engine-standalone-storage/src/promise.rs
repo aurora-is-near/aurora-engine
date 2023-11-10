@@ -53,6 +53,14 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
         PromiseId::new(0)
     }
 
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        _base: PromiseId,
+        _args: &PromiseBatchAction,
+    ) -> PromiseId {
+        PromiseId::new(0)
+    }
+
     fn promise_return(&mut self, _promise: PromiseId) {}
 
     fn read_only(&self) -> Self::ReadOnly {
