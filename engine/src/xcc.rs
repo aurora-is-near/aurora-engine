@@ -179,10 +179,12 @@ where
 pub fn handle_precompile_promise<I, P>(
     io: &I,
     handler: &mut P,
+    base_id: Option<PromiseId>,
     promise: &PromiseCreateArgs,
     required_near: Yocto,
     current_account_id: &AccountId,
-) where
+) -> PromiseId
+where
     P: PromiseHandler,
     I: IO + Copy,
 {
@@ -256,7 +258,12 @@ pub fn handle_precompile_promise<I, P>(
             // (not the main engine account), and the actions performed are only (1) create it
             // for the first time and/or (2) deploy the code from our storage (i.e. the deployed
             // code is controlled by us, not the user).
-            let promise_id = unsafe { handler.promise_create_batch(&batch) };
+            let promise_id = unsafe {
+                match base_id {
+                    Some(id) => handler.promise_attach_batch_callback(id, &batch),
+                    None => handler.promise_create_batch(&batch),
+                }
+            };
             // Add a callback here to update the version of the account
             let args = AddressVersionUpdateArgs {
                 address: sender,
@@ -275,7 +282,7 @@ pub fn handle_precompile_promise<I, P>(
             // metadata that has just been deployed above.
             unsafe { Some(handler.promise_attach_callback(promise_id, &callback)) }
         }
-        AddressVersionStatus::UpToDate => None,
+        AddressVersionStatus::UpToDate => base_id,
     };
     // 2. If some NEAR is required for this call (from storage staking for a new account
     //    and/or attached NEAR to the call the user wants to make), then we need to have the
@@ -333,12 +340,12 @@ pub fn handle_precompile_promise<I, P>(
     // user directly. The XCC precompile will only construct promises that target the `execute`
     // and `schedule` methods of the user's router contract. Therefore, the user cannot have
     // the engine make arbitrary calls.
-    let _promise_id = unsafe {
+    unsafe {
         match withdraw_id {
             None => handler.promise_create_call(promise),
             Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
         }
-    };
+    }
 }
 
 /// Read the current wasm bytecode for the router contracts
