@@ -30,11 +30,9 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
         let state = state::get_state(&io)?;
         require_running(&state)?;
         env.assert_private_call()?;
-        let check_promise: Result<(), &[u8]> = match handler.promise_result_check() {
-            Some(true) | None => Ok(()),
-            Some(false) => Err(b"ERR_CALLBACK_OF_FAILED_PROMISE"),
-        };
-        check_promise?;
+        if matches!(handler.promise_result_check(), Some(false)) {
+            return Err(b"ERR_CALLBACK_OF_FAILED_PROMISE".into());
+        }
         let args: WithdrawWnearToRouterArgs = io.read_input_borsh()?;
         let current_account_id = env.current_account_id();
         let recipient = AccountId::new(&format!(
