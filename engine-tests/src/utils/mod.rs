@@ -612,7 +612,11 @@ impl AuroraRunner {
     }
 
     pub fn get_engine_v331_code() -> Vec<u8> {
-        let path = "src/tests/res/aurora_v3.3.1.wasm";
+        let path = if cfg!(feature = "ext-connector") {
+            "src/tests/res/aurora_silo_v3.3.1.wasm"
+        } else {
+            "src/tests/res/aurora_v3.3.1.wasm"
+        };
         std::fs::read(path).unwrap()
     }
 
