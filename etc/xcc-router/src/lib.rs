@@ -4,7 +4,7 @@ use aurora_engine_types::parameters::{
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LazyOption, LookupMap};
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::U64;
 use near_sdk::BorshStorageKey;
 use near_sdk::{
     env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
@@ -27,15 +27,9 @@ const CURRENT_VERSION: u32 = std::include!("VERSION");
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
 const INITIALIZE_GAS: Gas = Gas(15_000_000_000_000);
-/// Gas cost estimated from mainnet data. Cost seems to consistently be 3 Tgas, but we add a
-/// little more to be safe. Example:
-/// https://explorer.mainnet.near.org/transactions/3U9SKbGKM3MchLa2hLTNuYLdErcEDneJGbGv1cHZXuvE#HsHabUdJ7DRJcseNa4GQTYwm8KtbB4mqsq2AUssJWWv6
-const WNEAR_WITHDRAW_GAS: Gas = Gas(5_000_000_000_000);
 /// Gas cost estimated from mainnet data. Example:
 /// https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM
 const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
-/// Gas cost estimated from simulation tests.
-const REFUND_GAS: Gas = Gas(5_000_000_000_000);
 /// Registration amount computed from FT token source code, see
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
@@ -160,37 +154,6 @@ impl Router {
         env::promise_return(promise_id)
     }
 
-    /// The router will receive wNEAR deposits from its user. This function is to
-    /// unwrap that wNEAR into NEAR. Additionally, this function will transfer some
-    /// NEAR back to its parent, if needed. This transfer is done because the parent
-    /// must cover the storage staking cost with the router account is first created,
-    /// but the user ultimately is responsible to pay for it.
-    pub fn unwrap_and_refund_storage(&self, amount: U128, refund_needed: bool) {
-        self.require_parent_caller();
-
-        let args = format!(r#"{{"amount": "{}"}}"#, amount.0);
-        let id = env::promise_create(
-            self.wnear_account.clone(),
-            "near_withdraw",
-            args.as_bytes(),
-            1,
-            WNEAR_WITHDRAW_GAS,
-        );
-        let final_id = if refund_needed {
-            env::promise_then(
-                id,
-                env::current_account_id(),
-                "send_refund",
-                &[],
-                0,
-                REFUND_GAS,
-            )
-        } else {
-            id
-        };
-        env::promise_return(final_id);
-    }
-
     /// Allows the parent contract to trigger an update to the logic of this contract
     /// (by deploying a new contract to this account);
     #[payable]
@@ -209,19 +172,14 @@ impl Router {
         env::promise_return(promise_id);
     }
 
-    #[private]
     pub fn send_refund(&self) -> Promise {
-        let parent = self
-            .parent
-            .get()
-            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
-
+        let parent = self.require_parent_caller();
         Promise::new(parent).transfer(REFUND_AMOUNT)
     }
 }
 
 impl Router {
-    fn require_parent_caller(&self) {
+    fn require_parent_caller(&self) -> AccountId {
         let caller = env::predecessor_account_id();
         let parent = self
             .parent
@@ -238,6 +196,8 @@ impl Router {
                 env::panic_str("ERR_CALLBACK_OF_FAILED_PROMISE");
             }
         }
+
+        parent
     }
 
     fn promise_create(promise: PromiseArgs) -> PromiseIndex {
