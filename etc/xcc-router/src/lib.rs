@@ -123,7 +123,7 @@ impl Router {
     /// contract calls is used by the address associated with the sub-account this router contract
     /// is deployed at.
     pub fn execute(&self, #[serializer(borsh)] promise: PromiseArgs) {
-        self.require_parent_caller();
+        self.assert_preconditions();
 
         let promise_id = Router::promise_create(promise);
         env::promise_return(promise_id)
@@ -131,7 +131,7 @@ impl Router {
 
     /// Similar security considerations here as for `execute`.
     pub fn schedule(&mut self, #[serializer(borsh)] promise: PromiseArgs) {
-        self.require_parent_caller();
+        self.assert_preconditions();
 
         let nonce = self.nonce.get().unwrap_or_default();
         self.scheduled_promises.insert(&nonce, &promise);
@@ -158,7 +158,7 @@ impl Router {
     /// (by deploying a new contract to this account);
     #[payable]
     pub fn deploy_upgrade(&mut self, #[serializer(borsh)] args: DeployUpgradeParams) {
-        self.require_parent_caller();
+        self.assert_preconditions();
 
         let promise_id = env::promise_batch_create(&env::current_account_id());
         env::promise_batch_action_deploy_contract(promise_id, &args.code);
@@ -173,31 +173,37 @@ impl Router {
     }
 
     pub fn send_refund(&self) -> Promise {
-        let parent = self.require_parent_caller();
+        let parent = self.get_parent().unwrap_or_else(env_panic);
+
+        require_caller(&parent)
+            .and_then(|_| require_no_failed_promises())
+            .unwrap_or_else(env_panic);
+
         Promise::new(parent).transfer(REFUND_AMOUNT)
     }
 }
 
 impl Router {
-    fn require_parent_caller(&self) -> AccountId {
-        let caller = env::predecessor_account_id();
-        let parent = self
-            .parent
-            .get()
-            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
-        if caller != parent {
-            env::panic_str(ERR_ILLEGAL_CALLER);
-        }
-        // Any method that can only be called by the parent should also only be executed if
-        // the parent's execution was successful.
-        let num_promises = env::promise_results_count();
-        for index in 0..num_promises {
-            if let PromiseResult::Failed | PromiseResult::NotReady = env::promise_result(index) {
-                env::panic_str("ERR_CALLBACK_OF_FAILED_PROMISE");
-            }
-        }
+    fn get_parent(&self) -> Result<AccountId, Error> {
+        self.parent.get().ok_or(Error::ContractNotInitialized)
+    }
 
-        parent
+    /// Checks the following preconditions:
+    ///   1. Contract is initialized
+    ///   2. predecessor_account_id == self.parent
+    ///   3. There are no failed promise results
+    /// These preconditions must be checked on methods where are important for
+    /// the security of the contract (e.g. `execute`).
+    fn require_preconditions(&self) -> Result<(), Error> {
+        let parent = self.get_parent()?;
+        require_caller(&parent)?;
+        require_no_failed_promises()?;
+        Ok(())
+    }
+
+    /// Panics if any of the preconditions checked in `require_preconditions` are not met.
+    fn assert_preconditions(&self) {
+        self.require_preconditions().unwrap_or_else(env_panic);
     }
 
     fn promise_create(promise: PromiseArgs) -> PromiseIndex {
@@ -358,4 +364,42 @@ fn to_sdk_pk(key: &aurora_engine_types::parameters::NearPublicKey) -> near_sdk::
 
     // Unwrap should be safe because we only encode valid public keys
     data.try_into().unwrap()
+}
+
+fn require_caller(caller: &AccountId) -> Result<(), Error> {
+    if caller != &env::predecessor_account_id() {
+        return Err(Error::IllegalCaller);
+    }
+    Ok(())
+}
+
+fn require_no_failed_promises() -> Result<(), Error> {
+    let num_promises = env::promise_results_count();
+    for index in 0..num_promises {
+        if let PromiseResult::Failed | PromiseResult::NotReady = env::promise_result(index) {
+            return Err(Error::CallbackOfFailedPromise);
+        }
+    }
+    Ok(())
+}
+
+fn env_panic<T>(e: Error) -> T {
+    env::panic_str(e.as_ref())
+}
+
+#[derive(Debug)]
+enum Error {
+    ContractNotInitialized,
+    IllegalCaller,
+    CallbackOfFailedPromise,
+}
+
+impl AsRef<str> for Error {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::ContractNotInitialized => "ERR_CONTRACT_NOT_INITIALIZED",
+            Self::IllegalCaller => ERR_ILLEGAL_CALLER,
+            Self::CallbackOfFailedPromise => "ERR_CALLBACK_OF_FAILED_PROMISE",
+        }
+    }
 }
