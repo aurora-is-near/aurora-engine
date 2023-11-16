@@ -22,9 +22,11 @@ enum StorageKey {
     Map,
 }
 
-const CURRENT_VERSION: u32 = 1;
+const INITIALIZE: &str = "initialize";
+const CURRENT_VERSION: u32 = std::include!("VERSION");
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
+const INITIALIZE_GAS: Gas = Gas(15_000_000_000_000);
 /// Gas cost estimated from mainnet data. Cost seems to consistently be 3 Tgas, but we add a
 /// little more to be safe. Example:
 /// https://explorer.mainnet.near.org/transactions/3U9SKbGKM3MchLa2hLTNuYLdErcEDneJGbGv1cHZXuvE#HsHabUdJ7DRJcseNa4GQTYwm8KtbB4mqsq2AUssJWWv6
@@ -40,6 +42,12 @@ const REFUND_GAS: Gas = Gas(5_000_000_000_000);
 const WNEAR_REGISTER_AMOUNT: u128 = 1_250_000_000_000_000_000_000;
 /// Must match arora_engine_precompiles::xcc::state::STORAGE_AMOUNT
 const REFUND_AMOUNT: u128 = 2_000_000_000_000_000_000_000_000;
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct DeployUpgradeParams {
+    pub code: Vec<u8>,
+    pub initialize_args: Vec<u8>,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -75,7 +83,9 @@ impl Router {
                 parent.set(&caller);
             }
             Some(parent) => {
-                if caller != parent {
+                // Allow self-calls to `initialize` also.
+                // This happens during the upgrade flow.
+                if (caller != parent) && (caller != env::current_account_id()) {
                     env::panic_str(ERR_ILLEGAL_CALLER);
                 }
             }
@@ -107,6 +117,10 @@ impl Router {
             scheduled_promises,
             wnear_account,
         }
+    }
+
+    pub fn get_version(&self) -> u32 {
+        self.version.get().unwrap_or_default()
     }
 
     /// This function can only be called by the parent account (i.e. Aurora engine) to ensure that
@@ -175,6 +189,24 @@ impl Router {
             id
         };
         env::promise_return(final_id);
+    }
+
+    /// Allows the parent contract to trigger an update to the logic of this contract
+    /// (by deploying a new contract to this account);
+    #[payable]
+    pub fn deploy_upgrade(&mut self, #[serializer(borsh)] args: DeployUpgradeParams) {
+        self.require_parent_caller();
+
+        let promise_id = env::promise_batch_create(&env::current_account_id());
+        env::promise_batch_action_deploy_contract(promise_id, &args.code);
+        env::promise_batch_action_function_call(
+            promise_id,
+            INITIALIZE,
+            &args.initialize_args,
+            0,
+            INITIALIZE_GAS,
+        );
+        env::promise_return(promise_id);
     }
 
     #[private]

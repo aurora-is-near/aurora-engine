@@ -7,7 +7,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::BorshSerialize;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
@@ -19,10 +19,12 @@ pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXcc
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
 pub const ERR_ATTACHED_NEAR: &str = "ERR_ATTACHED_XCC_NEAR";
+pub const ERR_UPGRADE_ARG_SERIALIZATION: &str = "ERR_UPGRADE_ARG_SERIALIZATION";
 pub const CODE_KEY: &[u8] = b"router_code";
 /// Gas costs estimated from simulation tests.
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(15_000_000_000_000);
+pub const UPGRADE_GAS: NearGas = NearGas::new(20_000_000_000_000);
 pub const UNWRAP_AND_REFUND_GAS: NearGas = NearGas::new(25_000_000_000_000);
 pub const WITHDRAW_GAS: NearGas = NearGas::new(40_000_000_000_000);
 /// Solidity selector for the `withdrawToNear` function
@@ -49,6 +51,13 @@ impl<'a> RouterCode<'a> {
     pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(Cow::Borrowed(bytes))
     }
+}
+
+/// Same as the corresponding struct in the xcc-router
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct DeployUpgradeParams {
+    pub code: Vec<u8>,
+    pub initialize_args: Vec<u8>,
 }
 
 pub fn fund_xcc_sub_account<I, P, E>(
@@ -79,20 +88,9 @@ where
 
     // If account needs to be created and/or updated then include those actions.
     if let AddressVersionStatus::DeployNeeded { create_needed } = deploy_needed {
-        if create_needed {
-            if fund_amount < STORAGE_AMOUNT {
-                return Err(FundXccError::InsufficientBalance);
-            }
-
-            promise_actions.push(PromiseAction::CreateAccount);
-        }
-        promise_actions.push(PromiseAction::Transfer {
-            amount: fund_amount,
-        });
-        promise_actions.push(PromiseAction::DeployContract {
-            code: get_router_code(io).0.into_owned(),
-        });
-        // Either we need to assume it is set in the Engine or we need to accept it as input.
+        let code = get_router_code(io).0.into_owned();
+        // wnear_account is needed for initialization so we must assume it is set
+        // in the Engine or we need to accept it as input.
         let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
             wnear_account
         } else {
@@ -109,12 +107,36 @@ where
             wnear_account.as_ref(),
             create_needed,
         );
-        promise_actions.push(PromiseAction::FunctionCall {
-            name: "initialize".into(),
-            args: init_args.into_bytes(),
-            attached_yocto: ZERO_YOCTO,
-            gas: INITIALIZE_GAS,
-        });
+        if create_needed {
+            if fund_amount < STORAGE_AMOUNT {
+                return Err(FundXccError::InsufficientBalance);
+            }
+
+            promise_actions.push(PromiseAction::CreateAccount);
+            promise_actions.push(PromiseAction::Transfer {
+                amount: fund_amount,
+            });
+            promise_actions.push(PromiseAction::DeployContract { code });
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: "initialize".into(),
+                args: init_args.into_bytes(),
+                attached_yocto: ZERO_YOCTO,
+                gas: INITIALIZE_GAS,
+            });
+        } else {
+            let deploy_args = DeployUpgradeParams {
+                code,
+                initialize_args: init_args.into_bytes(),
+            };
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: "deploy_upgrade".into(),
+                args: deploy_args
+                    .try_to_vec()
+                    .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                attached_yocto: fund_amount,
+                gas: UPGRADE_GAS + INITIALIZE_GAS,
+            });
+        }
     } else {
         // No matter what include the transfer of the funding amount
         promise_actions.push(PromiseAction::Transfer {
@@ -188,16 +210,8 @@ pub fn handle_precompile_promise<I, P>(
     let setup_id = match &deploy_needed {
         AddressVersionStatus::DeployNeeded { create_needed } => {
             let mut promise_actions = Vec::with_capacity(4);
-            if *create_needed {
-                promise_actions.push(PromiseAction::CreateAccount);
-                promise_actions.push(PromiseAction::Transfer {
-                    amount: STORAGE_AMOUNT,
-                });
-            }
-            promise_actions.push(PromiseAction::DeployContract {
-                code: get_router_code(io).0.into_owned(),
-            });
-            // After the deployment we call the contract's initialize function
+            let code = get_router_code(io).0.into_owned();
+            // After the deployment we will call the contract's initialize function
             let wnear_address = get_wnear_address(io);
             let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
@@ -207,12 +221,33 @@ pub fn handle_precompile_promise<I, P>(
                 wnear_account.0.as_ref(),
                 create_needed,
             );
-            promise_actions.push(PromiseAction::FunctionCall {
-                name: "initialize".into(),
-                args: init_args.into_bytes(),
-                attached_yocto: ZERO_YOCTO,
-                gas: INITIALIZE_GAS,
-            });
+            if *create_needed {
+                promise_actions.push(PromiseAction::CreateAccount);
+                promise_actions.push(PromiseAction::Transfer {
+                    amount: STORAGE_AMOUNT,
+                });
+                promise_actions.push(PromiseAction::DeployContract { code });
+                promise_actions.push(PromiseAction::FunctionCall {
+                    name: "initialize".into(),
+                    args: init_args.into_bytes(),
+                    attached_yocto: ZERO_YOCTO,
+                    gas: INITIALIZE_GAS,
+                });
+            } else {
+                let deploy_args = DeployUpgradeParams {
+                    code,
+                    initialize_args: init_args.into_bytes(),
+                };
+                promise_actions.push(PromiseAction::FunctionCall {
+                    name: "deploy_upgrade".into(),
+                    args: deploy_args
+                        .try_to_vec()
+                        .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                    attached_yocto: ZERO_YOCTO,
+                    gas: UPGRADE_GAS + INITIALIZE_GAS,
+                });
+            }
+
             let batch = PromiseBatchAction {
                 target_account_id: promise.target_account_id.clone(),
                 actions: promise_actions,
@@ -408,6 +443,11 @@ impl AddressVersionStatus {
             None => Self::DeployNeeded {
                 create_needed: true,
             },
+            Some(version) if version == CodeVersion::ONE => {
+                // It is impossible to upgrade the initial XCC routers because
+                // they lack the upgrade method.
+                Self::UpToDate
+            }
             Some(version) if version < latest_code_version => Self::DeployNeeded {
                 create_needed: false,
             },

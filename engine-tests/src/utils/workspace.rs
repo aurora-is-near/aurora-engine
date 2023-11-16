@@ -34,9 +34,16 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .unwrap()
 }
 
-#[allow(clippy::let_and_return)]
 pub async fn deploy_engine() -> EngineContract {
-    let code = AuroraRunner::get_engine_code();
+    inner_deploy_engine(AuroraRunner::get_engine_code()).await
+}
+
+pub async fn deploy_engine_v331() -> EngineContract {
+    inner_deploy_engine(AuroraRunner::get_engine_v331_code()).await
+}
+
+#[allow(clippy::let_and_return)]
+async fn inner_deploy_engine(code: Vec<u8>) -> EngineContract {
     let contract = deploy_engine_with_code(code).await;
 
     #[cfg(feature = "ext-connector")]
@@ -82,6 +89,16 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     assert!(result.is_success());
 
     Ok(())
+}
+
+pub async fn get_xcc_router_version(aurora: &EngineContract, xcc_account: &AccountId) -> u32 {
+    aurora
+        .root()
+        .view(xcc_account, "get_version")
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap()
 }
 
 pub async fn create_sub_account(
