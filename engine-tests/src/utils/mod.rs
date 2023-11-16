@@ -611,6 +611,15 @@ impl AuroraRunner {
         std::fs::read(path).unwrap()
     }
 
+    pub fn get_engine_v331_code() -> Vec<u8> {
+        let path = if cfg!(feature = "ext-connector") {
+            "src/tests/res/aurora_silo_v3.3.1.wasm"
+        } else {
+            "src/tests/res/aurora_v3.3.1.wasm"
+        };
+        std::fs::read(path).unwrap()
+    }
+
     pub const fn get_default_chain_id() -> u64 {
         DEFAULT_CHAIN_ID
     }
