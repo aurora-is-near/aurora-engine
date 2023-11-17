@@ -25,7 +25,7 @@ pub const CODE_KEY: &[u8] = b"router_code";
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(15_000_000_000_000);
 pub const UPGRADE_GAS: NearGas = NearGas::new(20_000_000_000_000);
-pub const UNWRAP_AND_REFUND_GAS: NearGas = NearGas::new(25_000_000_000_000);
+pub const REFUND_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const WITHDRAW_GAS: NearGas = NearGas::new(40_000_000_000_000);
 /// Solidity selector for the `withdrawToNear` function
 /// `https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848`
@@ -312,22 +312,20 @@ pub fn handle_precompile_promise<I, P>(
             AddressVersionStatus::DeployNeeded { create_needed } => create_needed,
             AddressVersionStatus::UpToDate => false,
         };
-        let args = format!(
-            r#"{{"amount": "{}", "refund_needed": {}}}"#,
-            required_near.as_u128(),
-            refund_needed,
-        );
-        let unwrap_call = PromiseCreateArgs {
-            target_account_id: promise.target_account_id.clone(),
-            method: "unwrap_and_refund_storage".into(),
-            args: args.into_bytes(),
-            attached_balance: ZERO_YOCTO,
-            attached_gas: UNWRAP_AND_REFUND_GAS,
-        };
-        // Safety: This call is safe because the router's `unwrap_and_refund_storage` method
-        // does not violate any security invariants. It only interacts with the wrap.near contract
-        // to obtain NEAR from WNEAR.
-        unsafe { Some(handler.promise_attach_callback(id, &unwrap_call)) }
+        if refund_needed {
+            let refund_call = PromiseCreateArgs {
+                target_account_id: promise.target_account_id.clone(),
+                method: "send_refund".into(),
+                args: Vec::new(),
+                attached_balance: ZERO_YOCTO,
+                attached_gas: REFUND_GAS,
+            };
+            // Safety: This call is safe because the router's `send_refund` method
+            // does not violate any security invariants. It only sends NEAR back to this contract.
+            unsafe { Some(handler.promise_attach_callback(id, &refund_call)) }
+        } else {
+            Some(id)
+        }
     };
     // 3. Finally we can do the call the user wanted to do.
 
@@ -457,8 +455,9 @@ impl AddressVersionStatus {
 }
 
 fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
+    let recipient_with_msg = format!("{recipient}:unwrap");
     let args = ethabi::encode(&[
-        ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+        ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
         ethabi::Token::Uint(U256::from(amount.as_u128())),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
@@ -537,6 +536,7 @@ mod tests {
     #[test]
     fn test_withdraw_to_near_encoding() {
         let recipient: AccountId = "some_account.near".parse().unwrap();
+        let recipient_with_msg = format!("{recipient}:unwrap");
         let amount = Yocto::new(1332654);
         #[allow(deprecated)]
         let withdraw_function = ethabi::Function {
@@ -559,7 +559,7 @@ mod tests {
         };
         let expected_tx_data = withdraw_function
             .encode_input(&[
-                ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+                ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
                 ethabi::Token::Uint(U256::from(amount.as_u128())),
             ])
             .unwrap();
