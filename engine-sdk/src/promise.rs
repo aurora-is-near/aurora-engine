@@ -51,6 +51,16 @@ pub trait PromiseHandler {
     /// code or adding/removing access keys.
     unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId;
 
+    /// # Safety
+    /// See note on `promise_create_call`. Promise batches in particular must be used very
+    /// carefully because they can take destructive actions such as deploying new contract
+    /// code or adding/removing access keys.
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        base: PromiseId,
+        args: &PromiseBatchAction,
+    ) -> PromiseId;
+
     fn promise_return(&mut self, promise: PromiseId);
 
     /// # Safety
@@ -129,6 +139,14 @@ impl PromiseHandler for Noop {
     }
 
     unsafe fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+        PromiseId::new(0)
+    }
+
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        _base: PromiseId,
+        _args: &PromiseBatchAction,
+    ) -> PromiseId {
         PromiseId::new(0)
     }
 

@@ -33,6 +33,22 @@ impl PromiseTracker {
         self.internal_index += 1;
         id
     }
+
+    fn remove_as_near_promise(&mut self, id: u64) -> Option<NearPromise> {
+        let result = match self.scheduled_promises.remove(&id)? {
+            PromiseArgs::Batch(x) => NearPromise::Simple(SimpleNearPromise::Batch(x)),
+            PromiseArgs::Create(x) => NearPromise::Simple(SimpleNearPromise::Create(x)),
+            PromiseArgs::Recursive(x) => x,
+            PromiseArgs::Callback { base, callback } => {
+                let base_promise = self.remove_as_near_promise(base.raw())?;
+                NearPromise::Then {
+                    base: Box::new(base_promise),
+                    callback: SimpleNearPromise::Create(callback),
+                }
+            }
+        };
+        Some(result)
+    }
 }
 
 impl PromiseHandler for PromiseTracker {
@@ -88,6 +104,23 @@ impl PromiseHandler for PromiseTracker {
         let id = self.take_id();
         self.scheduled_promises
             .insert(id, PromiseArgs::Batch(args.clone()));
+        PromiseId::new(id)
+    }
+
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        base: PromiseId,
+        args: &PromiseBatchAction,
+    ) -> PromiseId {
+        let id = self.take_id();
+        let base_promise = self
+            .remove_as_near_promise(base.raw())
+            .expect("Base promise id must be known");
+        let new_promise = PromiseArgs::Recursive(NearPromise::Then {
+            base: Box::new(base_promise),
+            callback: SimpleNearPromise::Batch(args.clone()),
+        });
+        self.scheduled_promises.insert(id, new_promise);
         PromiseId::new(id)
     }
 
