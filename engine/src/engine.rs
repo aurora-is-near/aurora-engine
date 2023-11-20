@@ -1621,6 +1621,7 @@ where
     P: PromiseHandler,
     I: IO + Copy,
 {
+    let mut previous_promise: Option<PromiseId> = None;
     logs.into_iter()
         .filter_map(|log| {
             if log.address == exit_to_near::ADDRESS.raw()
@@ -1633,15 +1634,33 @@ where
                                 // Safety: this promise creation is safe because it does not come from
                                 // users directly. The exit precompiles only create promises which we
                                 // are able to execute without violating any security invariants.
-                                unsafe { schedule_promise(handler, &promise) }
+                                let id = unsafe {
+                                    match previous_promise {
+                                        Some(base_id) => {
+                                            schedule_promise_callback(handler, base_id, &promise)
+                                        }
+                                        None => schedule_promise(handler, &promise),
+                                    }
+                                };
+                                previous_promise = Some(id);
                             }
                             PromiseArgs::Callback(promise) => {
                                 // Safety: This is safe because the promise data comes from our own
                                 // exit precompiles. See note above.
-                                unsafe {
-                                    let base_id = schedule_promise(handler, &promise.base);
+                                let base_id = unsafe {
+                                    match previous_promise {
+                                        Some(base_id) => schedule_promise_callback(
+                                            handler,
+                                            base_id,
+                                            &promise.base,
+                                        ),
+                                        None => schedule_promise(handler, &promise.base),
+                                    }
+                                };
+                                let id = unsafe {
                                     schedule_promise_callback(handler, base_id, &promise.callback)
-                                }
+                                };
+                                previous_promise = Some(id);
                             }
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
@@ -1664,13 +1683,15 @@ where
                     let required_near =
                         Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
                     if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                        crate::xcc::handle_precompile_promise(
+                        let id = crate::xcc::handle_precompile_promise(
                             io,
                             handler,
+                            previous_promise,
                             &promise,
                             required_near,
                             current_account_id,
                         );
+                        previous_promise = Some(id);
                     }
                 }
                 // do not pass on these "internal logs" to caller
