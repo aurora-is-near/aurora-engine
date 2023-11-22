@@ -493,9 +493,9 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::FtOnTransfer(_) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
+            let maybe_output = contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
 
-            None
+            maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::FtTransferCall(_) => {
             #[cfg(feature = "ext-connector")]

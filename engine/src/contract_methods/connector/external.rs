@@ -23,6 +23,7 @@ use aurora_engine_types::parameters::connector::{
     TransferCallCallArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
+use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::parameters::{PromiseWithCallbackArgs, WithdrawCallArgs};
 use aurora_engine_types::types::ZERO_WEI;
 use function_name::named;
@@ -151,7 +152,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     let current_account_id = env.current_account_id();
     let predecessor_account_id = env.predecessor_account_id();
     let mut engine: Engine<_, _> = Engine::new(
@@ -164,13 +165,20 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     let args: NEP141FtOnTransferArgs = read_json_args(&io).map_err(Into::<ParseArgsError>::into)?;
     let mut eth_connector = EthConnectorContract::init(io)?;
 
-    if predecessor_account_id == eth_connector.get_eth_connector_contract_account() {
+    let output = if predecessor_account_id == eth_connector.get_eth_connector_contract_account() {
         eth_connector.ft_on_transfer(&engine, &args)?;
+        None
     } else {
-        engine.receive_erc20_tokens(&predecessor_account_id, &args, &current_account_id, handler);
-    }
+        let result = engine.receive_erc20_tokens(
+            &predecessor_account_id,
+            &args,
+            &current_account_id,
+            handler,
+        );
+        result.ok()
+    };
 
-    Ok(())
+    Ok(output)
 }
 
 #[allow(clippy::missing_const_for_fn)]

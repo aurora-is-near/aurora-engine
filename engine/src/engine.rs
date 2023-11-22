@@ -30,7 +30,7 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
+    BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
     ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
     ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
@@ -60,29 +60,6 @@ pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;
 #[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {
     aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
-}
-
-macro_rules! unwrap_res_or_finish {
-    ($e:expr, $output:expr, $io:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(_e) => {
-                #[cfg(feature = "log")]
-                sdk::log(crate::prelude::format!("{:?}", _e).as_str());
-                $io.return_output($output);
-                return;
-            }
-        }
-    };
-}
-
-macro_rules! assert_or_finish {
-    ($e:expr, $output:expr, $io:expr) => {
-        if !$e {
-            $io.return_output($output);
-            return;
-        }
-    };
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -751,24 +728,34 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         args: &NEP141FtOnTransferArgs,
         current_account_id: &AccountId,
         handler: &mut P,
-    ) {
+    ) -> Result<SubmitResult, EngineError> {
+        const INVALID_MESSAGE: &str = "receive_erc20_tokens invalid message";
+        const UNKNOWN_NEP_141: &str = "receive_erc20_tokens unknown NEP-141";
+
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
+        let mut local_io = self.io;
+        let mut engine_err = |msg: &'static str| {
+            sdk::log!("{}", msg);
+            local_io.return_output(output_on_fail);
+            EngineError {
+                kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(msg))),
+                gas_used: 0,
+            }
+        };
 
         // Parse message to determine recipient
         let mut recipient = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
-            assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
-
-            Address::new(H160(unwrap_res_or_finish!(
-                unwrap_res_or_finish!(hex::decode(&message[..40]), output_on_fail, self.io)
-                    .as_slice()
-                    .try_into(),
-                output_on_fail,
-                self.io
-            )))
+            if message.len() < 40 {
+                return Err(engine_err(INVALID_MESSAGE));
+            }
+            let mut address_bytes = [0; 20];
+            hex::decode_to_slice(&message[..40], &mut address_bytes)
+                .map_err(|_| engine_err(INVALID_MESSAGE))?;
+            Address::from_array(address_bytes)
         };
 
         if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
@@ -777,21 +764,17 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             }
         };
 
-        let erc20_token = Address::from_array(unwrap_res_or_finish!(
-            unwrap_res_or_finish!(
-                get_erc20_from_nep141(&self.io, token),
-                output_on_fail,
-                self.io
-            )
-            .as_slice()
-            .try_into(),
-            output_on_fail,
-            self.io
-        ));
+        let erc20_token = {
+            let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
+                .ok()
+                .and_then(|bytes| bytes.as_slice().try_into().ok())
+                .ok_or_else(|| engine_err(UNKNOWN_NEP_141))?;
+            Address::from_array(address_bytes)
+        };
 
         let erc20_admin_address = current_address(current_account_id);
-        unwrap_res_or_finish!(
-            self.call(
+        let result = self
+            .call(
                 &erc20_admin_address,
                 &erc20_token,
                 Wei::zero(),
@@ -800,46 +783,49 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
-            .and_then(|submit_result| {
-                match submit_result.status {
-                    TransactionStatus::Succeed(_) => Ok(()),
-                    TransactionStatus::Revert(bytes) => {
-                        let error_message = crate::prelude::format!(
-                            "Reverted with message: {}",
-                            crate::prelude::String::from_utf8_lossy(&bytes)
-                        );
-                        Err(EngineError {
-                            kind: EngineErrorKind::EvmError(ExitError::Other(
-                                crate::prelude::Cow::from(error_message),
-                            )),
-                            gas_used: submit_result.gas_used,
-                        })
-                    }
-                    TransactionStatus::OutOfFund => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+            .and_then(|submit_result| match submit_result.status {
+                TransactionStatus::Succeed(_) => Ok(submit_result),
+                TransactionStatus::Revert(bytes) => {
+                    let error_message = crate::prelude::format!(
+                        "Reverted with message: {}",
+                        crate::prelude::String::from_utf8_lossy(&bytes)
+                    );
+                    Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::Other(
+                            crate::prelude::Cow::from(error_message),
+                        )),
                         gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::OutOfOffset => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
-                        gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::OutOfGas => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
-                        gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::CallTooDeep => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
-                        gas_used: submit_result.gas_used,
-                    }),
+                    })
                 }
-            }),
-            output_on_fail,
-            self.io
-        );
+                TransactionStatus::OutOfFund => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfOffset => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfGas => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::CallTooDeep => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
+                    gas_used: submit_result.gas_used,
+                }),
+            })
+            .map_err(|e| {
+                sdk::log!("{:?}", e);
+                self.io.return_output(output_on_fail);
+                e
+            })?;
 
-        // TODO(marX)
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
+
+        // Return SubmitResult so that it can be accessed in standalone engine.
+        // This is used to help with the indexing of bridge transactions.
+        Ok(result)
     }
 
     /// Read metadata of ERC-20 contract.
@@ -2310,7 +2296,9 @@ mod tests {
         engine
             .register_token(erc20_token, nep141_token.clone())
             .unwrap();
-        engine.receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler);
+        engine
+            .receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler)
+            .unwrap();
 
         let storage = storage.borrow();
         let actual_output = storage.output.as_slice();
