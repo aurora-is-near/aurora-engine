@@ -735,14 +735,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
         let mut local_io = self.io;
-        let engine_err = |msg: &'static str| {
-            move || {
-                sdk::log!("{}", msg);
-                local_io.return_output(output_on_fail);
-                EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(msg))),
-                    gas_used: 0,
-                }
+        let mut engine_err = |msg: &'static str| {
+            sdk::log!("{}", msg);
+            local_io.return_output(output_on_fail);
+            EngineError {
+                kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(msg))),
+                gas_used: 0,
             }
         };
 
@@ -752,20 +750,11 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             //      Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
             if message.len() < 40 {
-                sdk::log!("{}", INVALID_MESSAGE);
-                self.io.return_output(output_on_fail);
-                return Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(
-                        INVALID_MESSAGE,
-                    ))),
-                    gas_used: 0,
-                });
+                return Err(engine_err(INVALID_MESSAGE));
             }
-            let address_bytes: [u8; 20] = hex::decode(&message[..40])
-                .ok()
-                .and_then(|bytes| bytes.as_slice().try_into().ok())
-                .ok_or_else(engine_err(INVALID_MESSAGE))?;
-
+            let mut address_bytes = [0; 20];
+            hex::decode_to_slice(&message[..40], &mut address_bytes)
+                .map_err(|_| engine_err(INVALID_MESSAGE))?;
             Address::from_array(address_bytes)
         };
 
@@ -779,7 +768,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
                 .ok()
                 .and_then(|bytes| bytes.as_slice().try_into().ok())
-                .ok_or_else(engine_err(UNKNOWN_NEP_141))?;
+                .ok_or_else(|| engine_err(UNKNOWN_NEP_141))?;
             Address::from_array(address_bytes)
         };
 
