@@ -103,13 +103,13 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     #[cfg(not(feature = "ext-connector"))]
-    internal::ft_on_transfer(io, env, handler)?;
+    let result = internal::ft_on_transfer(io, env, handler)?;
     #[cfg(feature = "ext-connector")]
-    external::ft_on_transfer(io, env, handler)?;
+    let result = external::ft_on_transfer(io, env, handler)?;
 
-    Ok(())
+    Ok(result)
 }
 
 #[named]
