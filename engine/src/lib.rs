@@ -76,8 +76,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::{self, Engine};
-    #[cfg(feature = "evm_bully")]
-    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
@@ -553,45 +551,6 @@ mod contract {
         contract_methods::connector::get_erc20_metadata(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
-    }
-
-    ///
-    /// BENCHMARKING METHODS
-    ///
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_chain() {
-        use crate::prelude::U256;
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
-        state.chain_id = args.chain_id;
-        state::set_state(&mut io, &state).sdk_unwrap();
-        // set genesis block balances
-        for account_balance in args.genesis_alloc {
-            engine::set_balance(
-                &mut io,
-                &account_balance.address,
-                &crate::prelude::Wei::new(U256::from(account_balance.balance)),
-            );
-        }
-        // return new chain ID
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
-    }
-
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_block() {
-        let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
     ///
