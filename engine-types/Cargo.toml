@@ -33,4 +33,3 @@ std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "
 # in other Rust contracts.
 contracts-std = ["borsh/std", "hex/std"]
 impl-serde = ["primitive-types/impl-serde"]
-evm_bully = []
