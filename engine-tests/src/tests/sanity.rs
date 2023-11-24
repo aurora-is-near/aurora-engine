@@ -689,7 +689,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let expected_number = 1550;
+    let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
 
     assert!(
