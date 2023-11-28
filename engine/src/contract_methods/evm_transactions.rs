@@ -56,17 +56,6 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
         let current_account_id = env.current_account_id();
         let predecessor_account_id = env.predecessor_account_id();
 
-        // During the XCC flow the Engine will call itself to move wNEAR
-        // to the user's sub-account. We do not want this move to happen
-        // if prior promises in the flow have failed.
-        if current_account_id == predecessor_account_id {
-            let check_promise: Result<(), &[u8]> = match handler.promise_result_check() {
-                Some(true) | None => Ok(()),
-                Some(false) => Err(b"ERR_CALLBACK_OF_FAILED_PROMISE"),
-            };
-            check_promise?;
-        }
-
         let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
             state,
             predecessor_address(&predecessor_account_id),

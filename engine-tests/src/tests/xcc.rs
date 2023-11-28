@@ -10,13 +10,17 @@ use aurora_engine_types::parameters::{
 };
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
+use aurora_engine_workspace::types::NearToken;
 use near_primitives::transaction::Action;
 use near_primitives_core::contract::ContractCode;
 use std::fs;
 use std::path::Path;
 
-const WNEAR_AMOUNT: u128 = 10 * 50_000_000_000_000_000_000_000_000;
-const STORAGE_AMOUNT: i128 = 50_000_000_000_000_000_000_000_000;
+const WNEAR_AMOUNT: NearToken = NearToken::from_near(500);
+const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
+
+const XCC_ROUTER_BASE_PATH: &str = "../etc/xcc-router";
+const XCC_ROUTER_VERSION_RELATIVE_PATH: &str = "src/VERSION";
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -63,7 +67,7 @@ fn test_xcc_eth_gas_cost() {
             wnear_erc20.transfer_from(
                 utils::address_from_secret_key(&signer.secret_key),
                 Address::from_array([1u8; 20]),
-                U256::from(STORAGE_AMOUNT),
+                U256::from(STORAGE_AMOUNT.as_yoctonear()),
                 nonce,
             )
         })
@@ -327,7 +331,11 @@ fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
         aurora_engine::parameters::CallArgs::V1(aurora_engine::parameters::FunctionCallArgsV1 {
             contract: address,
             input: contract
-                .mint(dest_address, WNEAR_AMOUNT.into(), U256::zero())
+                .mint(
+                    dest_address,
+                    WNEAR_AMOUNT.as_yoctonear().into(),
+                    U256::zero(),
+                )
                 .data,
         });
     let result = runner.call("call", &engine_account, call_args.try_to_vec().unwrap());
@@ -344,17 +352,30 @@ fn approve_erc20(
 ) {
     let approve_result = runner
         .submit_with_signer(signer, |nonce| {
-            token.approve(spender, WNEAR_AMOUNT.into(), nonce)
+            token.approve(spender, WNEAR_AMOUNT.as_yoctonear().into(), nonce)
         })
         .unwrap();
     assert!(approve_result.status.is_ok());
 }
 
 pub fn contract_bytes() -> Vec<u8> {
-    let base_path = Path::new("../etc").join("xcc-router");
+    let base_path = Path::new(XCC_ROUTER_BASE_PATH);
     let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
     utils::rust::compile(base_path);
     fs::read(output_path).unwrap()
+}
+
+pub fn router_version() -> u32 {
+    let base_path = Path::new(XCC_ROUTER_BASE_PATH);
+    let file_path = base_path.join(XCC_ROUTER_VERSION_RELATIVE_PATH);
+    let version = fs::read_to_string(file_path).unwrap();
+    version.trim().parse().unwrap()
+}
+
+pub fn change_router_version(version: u32) {
+    let base_path = Path::new(XCC_ROUTER_BASE_PATH);
+    let file_path = base_path.join(XCC_ROUTER_VERSION_RELATIVE_PATH);
+    fs::write(file_path, format!("{version}\n")).unwrap();
 }
 
 fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
@@ -385,9 +406,10 @@ fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
 pub mod workspace {
     use crate::tests::xcc::{check_fib_result, WNEAR_AMOUNT};
     use crate::utils;
+    use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
     use crate::utils::workspace::{
-        create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        nep_141_balance_of, transfer_nep_141_to_erc_20,
+        create_sub_account, deploy_engine, deploy_engine_v331, deploy_erc20_from_nep_141,
+        deploy_nep_141, get_xcc_router_version, nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
@@ -400,12 +422,13 @@ pub mod workspace {
     };
     use aurora_engine_types::types::{Address, NearGas, Wei, Yocto};
     use aurora_engine_types::U256;
-    use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+    use aurora_engine_workspace::types::NearToken;
+    use aurora_engine_workspace::{EngineContract, RawContract};
     use serde_json::json;
     use std::path::Path;
 
-    const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
-    const ONE_NEAR: u128 = 10u128.pow(24);
+    const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
+    const ONE_NEAR: u128 = NearToken::from_near(1).as_yoctonear();
 
     #[tokio::test]
     async fn test_xcc_external_fund() {
@@ -431,7 +454,7 @@ pub mod workspace {
         let wnear_account = deploy_wnear(&aurora).await.unwrap();
 
         // Fund XCC sub-account
-        let fund_amount = parse_near!("5 N");
+        let fund_amount = NearToken::from_near(5);
         let result = aurora
             .fund_xcc_sub_account(
                 signer_address,
@@ -450,7 +473,10 @@ pub mod workspace {
             .get_balance(&sub_account_id.parse().unwrap())
             .await
             .unwrap();
-        assert_eq!((fund_amount - sub_account_balance) / ONE_NEAR, 0);
+        assert_eq!(
+            (fund_amount.as_yoctonear() - sub_account_balance) / ONE_NEAR,
+            0
+        );
 
         // Do an XCC call. This XCC call is to the Aurora Engine itself to deploy an EVM contract,
         // but that is just for this test. The call could be to any contract to do any action.
@@ -605,6 +631,152 @@ pub mod workspace {
         check_fib_result(&output, usize::try_from(n).unwrap());
     }
 
+    #[allow(clippy::too_many_lines)]
+    #[tokio::test]
+    async fn test_xcc_upgrade() {
+        const DEPOSIT_AMOUNT: u128 = 1;
+
+        // Deploy v3.3.1 Engine with the XCC router contract it had at the time.
+        let v1_bytes = std::fs::read("src/tests/res/xcc_router_v1.wasm").unwrap();
+        let XccTestContext {
+            aurora,
+            mut signer,
+            signer_address,
+            chain_id,
+            wnear_account,
+        } = inner_init_xcc(v1_bytes, true).await.unwrap();
+
+        let router_account_id = create_router_account_id(&signer_address, &aurora);
+
+        // Do XCC interaction to create router account
+        let promise = PromiseCreateArgs {
+            target_account_id: wnear_account.id(),
+            method: "near_deposit".into(),
+            args: b"{}".to_vec(),
+            attached_balance: Yocto::new(1),
+            attached_gas: NearGas::new(5_000_000_000_000),
+        };
+        let promise_args = PromiseArgs::Create(promise);
+        let xcc_args = CrossContractCallArgs::Eager(promise_args);
+        submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            nep_141_balance_of(&wnear_account, &router_account_id).await,
+            DEPOSIT_AMOUNT,
+        );
+
+        // Upgrade to latest engine code
+        aurora
+            .stage_upgrade(utils::AuroraRunner::get_engine_code())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        aurora.deploy_upgrade().max_gas().transact().await.unwrap();
+
+        // Upgrade to Engine to have latest XCC
+        let current_xcc_version = super::router_version();
+        aurora
+            .factory_update(super::contract_bytes())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        // Confirm that XCC v1 router account still works
+        submit_xcc_transaction(&xcc_args, &aurora, &mut signer, chain_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            nep_141_balance_of(&wnear_account, &router_account_id).await,
+            2 * DEPOSIT_AMOUNT,
+        );
+
+        // Create new account on Aurora
+        let mut v2_signer = utils::Signer::random();
+        let v2_signer_address = utils::address_from_secret_key(&v2_signer.secret_key);
+        let wnear_address = aurora.factory_get_wnear_address().await.unwrap().result;
+        let wnear_erc20 = {
+            let constructor = ERC20Constructor::load();
+            let contract = constructor.0.deployed_at(wnear_address);
+            ERC20(contract)
+        };
+        transfer_nep_141_to_erc_20(
+            &wnear_account,
+            &wnear_erc20,
+            &aurora.root(),
+            v2_signer_address,
+            WNEAR_AMOUNT.as_yoctonear(),
+            &aurora,
+        )
+        .await
+        .unwrap();
+        approve_xcc_precompile(&wnear_erc20, &aurora, chain_id, &mut v2_signer)
+            .await
+            .unwrap();
+
+        // Use XCC to create account with v2 router contract
+        let v2_router_account_id = create_router_account_id(&v2_signer_address, &aurora);
+        submit_xcc_transaction(&xcc_args, &aurora, &mut v2_signer, chain_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            nep_141_balance_of(&wnear_account, &v2_router_account_id).await,
+            DEPOSIT_AMOUNT,
+        );
+        assert_eq!(
+            get_xcc_router_version(&aurora, &v2_router_account_id).await,
+            current_xcc_version,
+        );
+
+        // Upgrade to Engine to have fake XCC v3
+        super::change_router_version(current_xcc_version + 1);
+        aurora
+            .factory_update(super::contract_bytes())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        // Use v2 XCC router account and confirm it is upgraded to v3
+        submit_xcc_transaction(&xcc_args, &aurora, &mut v2_signer, chain_id)
+            .await
+            .unwrap();
+        assert_eq!(
+            nep_141_balance_of(&wnear_account, &v2_router_account_id).await,
+            2 * DEPOSIT_AMOUNT,
+        );
+        assert_eq!(
+            get_xcc_router_version(&aurora, &v2_router_account_id).await,
+            current_xcc_version + 1,
+        );
+
+        // Upgrade Engine to have fake XCC v4
+        super::change_router_version(current_xcc_version + 2);
+        aurora
+            .factory_update(super::contract_bytes())
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        // Use XCC direct funding and confirm upgrade still happens
+        aurora
+            .fund_xcc_sub_account(v2_signer_address, Some(wnear_account.id()))
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+        assert_eq!(
+            get_xcc_router_version(&aurora, &v2_router_account_id).await,
+            current_xcc_version + 2,
+        );
+
+        // Restore XCC router version to not leave the git repo dirty
+        super::change_router_version(current_xcc_version);
+    }
+
     #[allow(clippy::too_many_lines, clippy::future_not_send)]
     async fn test_xcc_precompile_common(is_scheduled: bool) {
         let XccTestContext {
@@ -655,7 +827,7 @@ pub mod workspace {
                 "receiver_id": router_account,
                 "amount": format!("{transfer_amount}"),
             }))
-            .deposit(1)
+            .deposit(NearToken::from_yoctonear(1))
             .transact()
             .await
             .unwrap();
@@ -751,13 +923,23 @@ pub mod workspace {
         );
     }
 
+    /// Default XCC initialization (latest Aurora Engine code + latest XCC router code).
+    async fn init_xcc() -> anyhow::Result<XccTestContext> {
+        inner_init_xcc(super::contract_bytes(), false).await
+    }
+
     /// Deploys the EVM, sets xcc router code, deploys wnear contract, bridges wnear into EVM,
     /// and calls `factory_set_wnear_address`
-    #[allow(clippy::future_not_send)]
-    async fn init_xcc() -> anyhow::Result<XccTestContext> {
-        let aurora = deploy_engine().await;
+    async fn inner_init_xcc(
+        xcc_wasm_bytes: Vec<u8>,
+        use_v331: bool,
+    ) -> anyhow::Result<XccTestContext> {
+        let aurora = if use_v331 {
+            deploy_engine_v331().await
+        } else {
+            deploy_engine().await
+        };
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
-        let xcc_wasm_bytes = super::contract_bytes();
         let result = aurora.factory_update(xcc_wasm_bytes).transact().await?;
         assert!(result.is_success());
 
@@ -773,7 +955,7 @@ pub mod workspace {
             &wnear_erc20,
             &aurora.root(),
             signer_address,
-            WNEAR_AMOUNT,
+            WNEAR_AMOUNT.as_yoctonear(),
             &aurora,
         )
         .await
@@ -787,18 +969,7 @@ pub mod workspace {
         let wnear_address = aurora.factory_get_wnear_address().await.unwrap().result;
         assert_eq!(wnear_address, wnear_erc20.0.address);
 
-        let approve_tx = wnear_erc20.approve(
-            cross_contract_call::ADDRESS,
-            WNEAR_AMOUNT.into(),
-            signer.use_nonce().into(),
-        );
-        let signed_transaction =
-            utils::sign_transaction(approve_tx, Some(chain_id), &signer.secret_key);
-        let result = aurora
-            .submit(rlp::encode(&signed_transaction).to_vec())
-            .transact()
-            .await?;
-        assert!(result.is_success());
+        approve_xcc_precompile(&wnear_erc20, &aurora, chain_id, &mut signer).await?;
 
         Ok(XccTestContext {
             aurora,
@@ -815,6 +986,39 @@ pub mod workspace {
         pub signer_address: Address,
         pub chain_id: u64,
         pub wnear_account: RawContract,
+    }
+
+    fn create_router_account_id(signer_address: &Address, aurora: &EngineContract) -> AccountId {
+        let router_account = format!(
+            "{}.{}",
+            hex::encode(signer_address.as_bytes()),
+            aurora.id().as_ref()
+        );
+        router_account.parse().unwrap()
+    }
+
+    /// The signer approves the XCC precompile to spend its wrapped NEAR
+    async fn approve_xcc_precompile(
+        wnear_erc20: &ERC20,
+        aurora: &EngineContract,
+        chain_id: u64,
+        signer: &mut utils::Signer,
+    ) -> anyhow::Result<()> {
+        let approve_tx = wnear_erc20.approve(
+            cross_contract_call::ADDRESS,
+            WNEAR_AMOUNT.as_yoctonear().into(),
+            signer.use_nonce().into(),
+        );
+        let signed_transaction =
+            utils::sign_transaction(approve_tx, Some(chain_id), &signer.secret_key);
+        let result = aurora
+            .submit(rlp::encode(&signed_transaction).to_vec())
+            .transact()
+            .await?;
+        if !result.is_success() {
+            return Err(anyhow::Error::msg("Failed Approve transaction"));
+        };
+        Ok(())
     }
 
     async fn submit_xcc_transaction(
@@ -890,7 +1094,7 @@ pub mod workspace {
         let result = aurora
             .root()
             .call(&wrap_account.id(), "near_deposit")
-            .deposit(WNEAR_AMOUNT)
+            .deposit(WNEAR_AMOUNT.saturating_mul(3))
             .transact()
             .await?;
         assert!(result.is_success(), "{result:?}");
@@ -906,7 +1110,8 @@ pub mod workspace {
             utils::rust::compile(base_path);
             std::fs::read(output_path)?
         };
-        let fib_account = create_sub_account(&aurora.root(), "fib", parse_near!("50 N")).await?;
+        let fib_account =
+            create_sub_account(&aurora.root(), "fib", NearToken::from_near(50)).await?;
         fib_account
             .deploy(&fib_contract_bytes)
             .await

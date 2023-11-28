@@ -20,13 +20,18 @@ pub enum NewCallArgs {
 }
 
 impl NewCallArgs {
+    /// Creates a `NewCallArs` from the provided bytes which could be represented
+    /// in JSON or Borsh format. Supporting arguments in JSON format starting from V4.
     pub fn deserialize(bytes: &[u8]) -> Result<Self, borsh::maybestd::io::Error> {
-        Self::try_from_slice(bytes).map_or_else(
-            |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
-            Ok,
-        )
+        Self::try_from_json(bytes).or_else(|_| {
+            Self::try_from_slice(bytes).map_or_else(
+                |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
+                Ok,
+            )
+        })
     }
 
+    /// Returns a genesis hash of the Hashchain if present.
     #[must_use]
     pub const fn initial_hashchain(&self) -> Option<RawH256> {
         match self {
@@ -34,6 +39,25 @@ impl NewCallArgs {
             Self::V1(_) | Self::V2(_) | Self::V3(_) => None,
         }
     }
+
+    fn try_from_json(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice::<NewCallJsonArgs>(bytes).map(Into::into)
+    }
+}
+
+impl From<NewCallJsonArgs> for NewCallArgs {
+    fn from(value: NewCallJsonArgs) -> Self {
+        match value {
+            NewCallJsonArgs::V1(args) => Self::V4(args),
+        }
+    }
+}
+
+/// JSON encoded new parameters.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NewCallJsonArgs {
+    V1(NewCallArgsV4),
 }
 
 /// Old Borsh-encoded parameters for the `new` function.
@@ -75,9 +99,10 @@ pub struct NewCallArgsV3 {
     pub key_manager: AccountId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 pub struct NewCallArgsV4 {
     /// Chain id, according to the EIP-115 / ethereum-lists spec.
+    #[serde(with = "chain_id_deserialize")]
     pub chain_id: RawU256,
     /// Account which can upgrade this contract.
     /// Use empty to disable updatability.
@@ -93,24 +118,16 @@ pub struct NewCallArgsV4 {
 
 /// Borsh-encoded parameters for the `set_owner` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub struct SetOwnerArgs {
     pub new_owner: AccountId,
 }
 
 /// Borsh-encoded parameters for the `set_upgrade_delay_blocks` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub struct SetUpgradeDelayBlocksArgs {
     pub upgrade_delay_blocks: u64,
-}
-
-/// Borsh-encoded (genesis) account balance used by the `begin_chain` function.
-#[cfg(feature = "evm_bully")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct AccountBalance {
-    pub address: Address,
-    pub balance: RawU256,
 }
 
 /// Borsh-encoded submit arguments used by the `submit_with_args` function.
@@ -125,40 +142,14 @@ pub struct SubmitArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub struct StartHashchainArgs {
     pub block_height: u64,
     pub block_hashchain: RawH256,
 }
 
-/// Borsh-encoded parameters for the `begin_chain` function.
-#[cfg(feature = "evm_bully")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct BeginChainArgs {
-    pub chain_id: RawU256,
-    pub genesis_alloc: Vec<AccountBalance>,
-}
-
-/// Borsh-encoded parameters for the `begin_block` function.
-#[cfg(feature = "evm_bully")]
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct BeginBlockArgs {
-    /// The current block's hash (for replayer use).
-    pub hash: RawU256,
-    /// The current block's beneficiary address.
-    pub coinbase: Address,
-    /// The current block's timestamp (in seconds since the Unix epoch).
-    pub timestamp: RawU256,
-    /// The current block's number (the genesis block is number zero).
-    pub number: RawU256,
-    /// The current block's difficulty.
-    pub difficulty: RawU256,
-    /// The current block's gas limit.
-    pub gaslimit: RawU256,
-}
-
 /// Fungible token storage balance
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct StorageBalance {
     pub total: Yocto,
     pub available: Yocto,
@@ -182,7 +173,7 @@ pub struct PausePrecompilesCallArgs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub struct ResultLog {
     pub address: Address,
     pub topics: Vec<RawU256>,
@@ -191,7 +182,7 @@ pub struct ResultLog {
 
 /// The status of a transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
@@ -237,7 +228,7 @@ impl AsRef<[u8]> for TransactionStatus {
 /// Borsh-encoded parameters for the `call`, `call_with_args`, `deploy_code`,
 /// and `deploy_with_input` methods.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub struct SubmitResult {
     version: u8,
     pub status: TransactionStatus,
@@ -350,6 +341,27 @@ pub struct RelayerKeyArgs {
 }
 
 pub type FullAccessKeyArgs = RelayerKeyArgs;
+
+mod chain_id_deserialize {
+    use crate::types::{u256_to_arr, RawU256};
+    use primitive_types::U256;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<RawU256, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        u64::deserialize(deserializer).map(|v| u256_to_arr(&(v.into())))
+    }
+
+    pub fn serialize<S>(value: &RawU256, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let chain_id = U256::from_big_endian(value.as_slice()).low_u64();
+        serializer.serialize_u64(chain_id)
+    }
+}
 
 pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
@@ -464,5 +476,31 @@ mod tests {
         let args = serde_json::from_str::<RelayerKeyArgs>(json).unwrap();
 
         assert_eq!(args.public_key, public_key);
+    }
+
+    #[test]
+    fn test_deserialize_new_call_args_json() {
+        let chain_id = 1_313_161_559;
+        let json = serde_json::json!({
+            "chain_id": chain_id,
+            "owner_id": "aurora",
+            "upgrade_delay_blocks": 10,
+            "key_manager": "manager.near",
+            "initial_hashchain": null
+        });
+        let arguments = NewCallArgs::deserialize(&serde_json::to_vec(&json).unwrap());
+        let Ok(NewCallArgs::V4(arguments)) = arguments else {
+            panic!("Wrong type of arguments");
+        };
+        let value = serde_json::to_value(arguments).unwrap();
+        assert_eq!(value.get("chain_id").unwrap().as_u64(), Some(chain_id));
+
+        let outdated = serde_json::json!({
+            "chain_id": chain_id,
+            "owner_id": "aurora",
+            "upgrade_delay_blocks": 19
+        });
+        let arguments = NewCallArgs::deserialize(&serde_json::to_vec(&outdated).unwrap());
+        assert!(matches!(arguments, Err(_)));
     }
 }

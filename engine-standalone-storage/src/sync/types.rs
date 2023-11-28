@@ -5,6 +5,7 @@ use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo;
+use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{
     borsh::{self, BorshDeserialize, BorshSerialize},
@@ -53,6 +54,14 @@ pub struct TransactionMessage {
     pub promise_data: Vec<Option<Vec<u8>>>,
     /// Raw bytes passed as input when executed in the Near Runtime.
     pub raw_input: Vec<u8>,
+    /// A Near protocol quantity equal to
+    /// `sha256(receipt_id || block_hash || le_bytes(u64 - action_index))`.
+    /// This quantity is used together with the block random seed
+    /// to generate the random value available to the transaction.
+    /// nearcore references:
+    /// - https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L261
+    /// - https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295
+    pub action_hash: H256,
 }
 
 impl TransactionMessage {
@@ -138,6 +147,8 @@ pub enum TransactionKind {
     FactoryUpdateAddressVersion(AddressVersionUpdateArgs),
     FactorySetWNearAddress(Address),
     FundXccSubAccount(FundXccArgs),
+    /// Self-call used during XCC flow to move wNEAR tokens to user's XCC account
+    WithdrawWnearToRouter(WithdrawWnearToRouterArgs),
     /// Pause the contract
     PauseContract,
     /// Resume the contract
@@ -366,6 +377,31 @@ impl TransactionKind {
                     },
                 )
             }
+            Self::WithdrawWnearToRouter(args) => {
+                let recipient = AccountId::new(&format!(
+                    "{}.{}",
+                    args.target.encode(),
+                    engine_account.as_ref()
+                ))
+                .unwrap_or_else(|_| engine_account.clone());
+                let wnear_address = storage
+                    .with_engine_access(block_height, transaction_position, &[], |io| {
+                        aurora_engine_precompiles::xcc::state::get_wnear_address(&io)
+                    })
+                    .result;
+                let call_args = aurora_engine::xcc::withdraw_wnear_call_args(
+                    &recipient,
+                    args.amount,
+                    wnear_address,
+                );
+                Self::Call(call_args).eth_repr(
+                    engine_account,
+                    caller,
+                    block_height,
+                    transaction_position,
+                    storage,
+                )
+            }
             Self::Deposit(_) => Self::no_evm_execution("deposit"),
             Self::FtTransferCall(_) => Self::no_evm_execution("ft_transfer_call"),
             Self::FinishDeposit(_) => Self::no_evm_execution("finish_deposit"),
@@ -542,6 +578,8 @@ pub enum TransactionKindTag {
     RemoveEntryFromWhitelist,
     #[strum(serialize = "mirror_erc20_token_callback")]
     MirrorErc20TokenCallback,
+    #[strum(serialize = "withdraw_wnear_to_router")]
+    WithdrawWnearToRouter,
     Unknown,
 }
 
@@ -584,6 +622,7 @@ impl TransactionKind {
             Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
             Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
             Self::FundXccSubAccount(args) => args.try_to_vec().unwrap_or_default(),
+            Self::WithdrawWnearToRouter(args) => args.try_to_vec().unwrap_or_default(),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
             Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
             Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
@@ -633,6 +672,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::FactoryUpdate(_) => Self::FactoryUpdate,
             TransactionKind::FactoryUpdateAddressVersion(_) => Self::FactoryUpdateAddressVersion,
             TransactionKind::FactorySetWNearAddress(_) => Self::FactorySetWNearAddress,
+            TransactionKind::WithdrawWnearToRouter(_) => Self::WithdrawWnearToRouter,
             TransactionKind::SetOwner(_) => Self::SetOwner,
             TransactionKind::SubmitWithArgs(_) => Self::SubmitWithArgs,
             TransactionKind::SetUpgradeDelayBlocks(_) => Self::SetUpgradeDelayBlocks,
@@ -679,6 +719,7 @@ enum BorshableTransactionMessage<'a> {
     V1(BorshableTransactionMessageV1<'a>),
     V2(BorshableTransactionMessageV2<'a>),
     V3(BorshableTransactionMessageV3<'a>),
+    V4(BorshableTransactionMessageV4<'a>),
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -720,6 +761,21 @@ struct BorshableTransactionMessageV3<'a> {
     pub raw_input: Cow<'a, Vec<u8>>,
 }
 
+#[derive(BorshDeserialize, BorshSerialize)]
+struct BorshableTransactionMessageV4<'a> {
+    pub block_hash: [u8; 32],
+    pub near_receipt_id: [u8; 32],
+    pub position: u16,
+    pub succeeded: bool,
+    pub signer: Cow<'a, AccountId>,
+    pub caller: Cow<'a, AccountId>,
+    pub attached_near: u128,
+    pub transaction: BorshableTransactionKind<'a>,
+    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
+    pub raw_input: Cow<'a, Vec<u8>>,
+    pub action_hash: [u8; 32],
+}
+
 impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
     fn from(t: &'a TransactionMessage) -> Self {
         Self::V3(BorshableTransactionMessageV3 {
@@ -756,6 +812,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                     transaction,
                     promise_data: Vec::new(),
                     raw_input,
+                    action_hash: H256::default(),
                 })
             }
             BorshableTransactionMessage::V2(t) => {
@@ -772,6 +829,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                     transaction,
                     promise_data: t.promise_data.into_owned(),
                     raw_input,
+                    action_hash: H256::default(),
                 })
             }
             BorshableTransactionMessage::V3(t) => Ok(Self {
@@ -785,6 +843,20 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                 transaction: t.transaction.try_into()?,
                 promise_data: t.promise_data.into_owned(),
                 raw_input: t.raw_input.into_owned(),
+                action_hash: H256::default(),
+            }),
+            BorshableTransactionMessage::V4(t) => Ok(Self {
+                block_hash: H256(t.block_hash),
+                near_receipt_id: H256(t.near_receipt_id),
+                position: t.position,
+                succeeded: t.succeeded,
+                signer: t.signer.into_owned(),
+                caller: t.caller.into_owned(),
+                attached_near: t.attached_near,
+                transaction: t.transaction.try_into()?,
+                promise_data: t.promise_data.into_owned(),
+                raw_input: t.raw_input.into_owned(),
+                action_hash: H256(t.action_hash),
             }),
         }
     }
@@ -846,6 +918,7 @@ enum BorshableTransactionKind<'a> {
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
     MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
+    WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -883,6 +956,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             }
             TransactionKind::FactorySetWNearAddress(address) => {
                 Self::FactorySetWNearAddress(*address)
+            }
+            TransactionKind::WithdrawWnearToRouter(x) => {
+                Self::WithdrawWnearToRouter(Cow::Borrowed(x))
             }
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::PausePrecompiles(x) => Self::PausePrecompiles(Cow::Borrowed(x)),
@@ -1010,6 +1086,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::MirrorErc20TokenCallback(x) => {
                 Ok(Self::MirrorErc20TokenCallback(x.into_owned()))
+            }
+            BorshableTransactionKind::WithdrawWnearToRouter(x) => {
+                Ok(Self::WithdrawWnearToRouter(x.into_owned()))
             }
         }
     }

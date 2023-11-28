@@ -100,6 +100,118 @@ impl Runtime {
             );
         }
     }
+
+    #[allow(clippy::too_many_lines)]
+    unsafe fn append_batch_actions(id: u64, args: &PromiseBatchAction) {
+        for action in &args.actions {
+            match action {
+                PromiseAction::CreateAccount => {
+                    exports::promise_batch_action_create_account(id);
+                }
+                PromiseAction::Transfer { amount } => {
+                    let amount = amount.as_u128();
+                    let amount_addr = core::ptr::addr_of!(amount);
+                    exports::promise_batch_action_transfer(id, amount_addr as _);
+                }
+                PromiseAction::DeployContract { code } => {
+                    let code = code.as_slice();
+                    exports::promise_batch_action_deploy_contract(
+                        id,
+                        code.len() as _,
+                        code.as_ptr() as _,
+                    );
+                }
+                PromiseAction::FunctionCall {
+                    name,
+                    gas,
+                    attached_yocto,
+                    args,
+                } => {
+                    let method_name = name.as_bytes();
+                    let arguments = args.as_slice();
+                    let amount = attached_yocto.as_u128();
+                    let amount_addr = core::ptr::addr_of!(amount);
+                    exports::promise_batch_action_function_call(
+                        id,
+                        method_name.len() as _,
+                        method_name.as_ptr() as _,
+                        arguments.len() as _,
+                        arguments.as_ptr() as _,
+                        amount_addr as _,
+                        gas.as_u64(),
+                    );
+                }
+                PromiseAction::Stake { amount, public_key } => {
+                    feature_gated!("all-promise-actions", {
+                        let amount = amount.as_u128();
+                        let amount_addr = core::ptr::addr_of!(amount);
+                        let pk: RawPublicKey = public_key.into();
+                        let pk_bytes = pk.as_bytes();
+                        exports::promise_batch_action_stake(
+                            id,
+                            amount_addr as _,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        );
+                    });
+                }
+                PromiseAction::AddFullAccessKey { public_key, nonce } => {
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_add_key_with_full_access(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                        *nonce,
+                    );
+                }
+                PromiseAction::AddFunctionCallKey {
+                    public_key,
+                    nonce,
+                    allowance,
+                    receiver_id,
+                    function_names,
+                } => {
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    let allowance = allowance.as_u128();
+                    let allowance_addr = core::ptr::addr_of!(allowance);
+                    let receiver_id = receiver_id.as_bytes();
+                    let function_names = function_names.as_bytes();
+                    exports::promise_batch_action_add_key_with_function_call(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                        *nonce,
+                        allowance_addr as _,
+                        receiver_id.len() as _,
+                        receiver_id.as_ptr() as _,
+                        function_names.len() as _,
+                        function_names.as_ptr() as _,
+                    );
+                }
+                PromiseAction::DeleteKey { public_key } => {
+                    let pk: RawPublicKey = public_key.into();
+                    let pk_bytes = pk.as_bytes();
+                    exports::promise_batch_action_delete_key(
+                        id,
+                        pk_bytes.len() as _,
+                        pk_bytes.as_ptr() as _,
+                    );
+                }
+                PromiseAction::DeleteAccount { beneficiary_id } => {
+                    feature_gated!("all-promise-actions", {
+                        let beneficiary_id = beneficiary_id.as_bytes();
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            beneficiary_id.len() as _,
+                            beneficiary_id.as_ptr() as _,
+                        );
+                    });
+                }
+            }
+        }
+    }
 }
 
 impl StorageIntermediate for RegisterIndex {
@@ -350,120 +462,28 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    #[allow(clippy::too_many_lines)]
     unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
 
         let id = { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) };
 
-        for action in &args.actions {
-            match action {
-                PromiseAction::CreateAccount => {
-                    exports::promise_batch_action_create_account(id);
-                }
-                PromiseAction::Transfer { amount } => {
-                    let amount = amount.as_u128();
-                    let amount_addr = core::ptr::addr_of!(amount);
-                    exports::promise_batch_action_transfer(id, amount_addr as _);
-                }
-                PromiseAction::DeployContract { code } => {
-                    let code = code.as_slice();
-                    exports::promise_batch_action_deploy_contract(
-                        id,
-                        code.len() as _,
-                        code.as_ptr() as _,
-                    );
-                }
-                PromiseAction::FunctionCall {
-                    name,
-                    gas,
-                    attached_yocto,
-                    args,
-                } => {
-                    let method_name = name.as_bytes();
-                    let arguments = args.as_slice();
-                    let amount = attached_yocto.as_u128();
-                    let amount_addr = core::ptr::addr_of!(amount);
-                    exports::promise_batch_action_function_call(
-                        id,
-                        method_name.len() as _,
-                        method_name.as_ptr() as _,
-                        arguments.len() as _,
-                        arguments.as_ptr() as _,
-                        amount_addr as _,
-                        gas.as_u64(),
-                    );
-                }
-                PromiseAction::Stake { amount, public_key } => {
-                    feature_gated!("all-promise-actions", {
-                        let amount = amount.as_u128();
-                        let amount_addr = core::ptr::addr_of!(amount);
-                        let pk: RawPublicKey = public_key.into();
-                        let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_stake(
-                            id,
-                            amount_addr as _,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                        );
-                    });
-                }
-                PromiseAction::AddFullAccessKey { public_key, nonce } => {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_add_key_with_full_access(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                    );
-                }
-                PromiseAction::AddFunctionCallKey {
-                    public_key,
-                    nonce,
-                    allowance,
-                    receiver_id,
-                    function_names,
-                } => {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    let allowance = allowance.as_u128();
-                    let allowance_addr = core::ptr::addr_of!(allowance);
-                    let receiver_id = receiver_id.as_bytes();
-                    let function_names = function_names.as_bytes();
-                    exports::promise_batch_action_add_key_with_function_call(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                        allowance_addr as _,
-                        receiver_id.len() as _,
-                        receiver_id.as_ptr() as _,
-                        function_names.len() as _,
-                        function_names.as_ptr() as _,
-                    );
-                }
-                PromiseAction::DeleteKey { public_key } => {
-                    let pk: RawPublicKey = public_key.into();
-                    let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_delete_key(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                    );
-                }
-                PromiseAction::DeleteAccount { beneficiary_id } => {
-                    feature_gated!("all-promise-actions", {
-                        let beneficiary_id = beneficiary_id.as_bytes();
-                        exports::promise_batch_action_delete_key(
-                            id,
-                            beneficiary_id.len() as _,
-                            beneficiary_id.as_ptr() as _,
-                        );
-                    });
-                }
-            }
-        }
+        Self::append_batch_actions(id, args);
+
+        PromiseId::new(id)
+    }
+
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        base: PromiseId,
+        args: &PromiseBatchAction,
+    ) -> PromiseId {
+        let account_id = args.target_account_id.as_bytes();
+
+        let id = {
+            exports::promise_batch_then(base.raw(), account_id.len() as _, account_id.as_ptr() as _)
+        };
+
+        Self::append_batch_actions(id, args);
 
         PromiseId::new(id)
     }
@@ -658,7 +678,11 @@ pub(crate) mod exports {
         ) -> u64;
         pub(crate) fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64;
         pub(crate) fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64;
-        fn promise_batch_then(promise_index: u64, account_id_len: u64, account_id_ptr: u64) -> u64;
+        pub(crate) fn promise_batch_then(
+            promise_index: u64,
+            account_id_len: u64,
+            account_id_ptr: u64,
+        ) -> u64;
         // #######################
         // # Promise API actions #
         // #######################

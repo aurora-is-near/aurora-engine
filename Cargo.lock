@@ -279,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine"
-version = "3.3.1"
+version = "3.4.0"
 dependencies = [
  "aurora-engine-hashchain",
  "aurora-engine-modexp",
@@ -420,7 +420,6 @@ dependencies = [
  "hex",
  "near-gas",
  "near-sdk",
- "near-units",
  "near-workspaces",
  "rlp",
  "serde",
@@ -466,7 +465,6 @@ dependencies = [
  "lazy_static",
  "near-gas",
  "near-sdk",
- "near-units",
  "near-workspaces",
  "serde",
  "serde_json",
@@ -3434,35 +3432,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e307313276eaeced2ca95740b5639e1f3125b7c97f0a1151809d105f1aa8c6d3"
 
 [[package]]
-name = "near-units"
+name = "near-token"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97a2b77f295d398589eeee51ad0887905ef1734fb12b45cb6d77bd7e401988b9"
+checksum = "7b68f3f8a2409f72b43efdbeff8e820b81e70824c49fee8572979d789d1683fb"
 dependencies = [
- "near-units-core",
- "near-units-macro",
-]
-
-[[package]]
-name = "near-units-core"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89aa2a7985de87a08ca35f28abd8d00f0f901e704257e6e029aadef981386bc6"
-dependencies = [
- "num-format",
- "regex",
-]
-
-[[package]]
-name = "near-units-macro"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89ab45d066220846f9bd5c21e9ab88c47c892edd36f962ada78bf8308523171a"
-dependencies = [
- "near-units-core",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
+ "serde",
 ]
 
 [[package]]
@@ -3571,9 +3546,9 @@ dependencies = [
 
 [[package]]
 name = "near-workspaces"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1f43c3cac1cf61d0f20fbc49f2c3182caa6422c0d2acd92c926a3e3190b26a9"
+checksum = "3a14e772e49ba9644c06dad20f635b6463f74d378fa19822bfc35fef479c72e5"
 dependencies = [
  "async-trait",
  "base64 0.21.4",
@@ -3592,6 +3567,7 @@ dependencies = [
  "near-primitives 0.17.0",
  "near-sandbox-utils",
  "near-sdk",
+ "near-token",
  "rand 0.8.5",
  "reqwest",
  "serde",
@@ -3687,16 +3663,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ba157ca0885411de85d6ca030ba7e2a83a28636056c7c699b07c8b6f7383214"
 dependencies = [
  "num-traits",
-]
-
-[[package]]
-name = "num-format"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a652d9771a63711fd3c3deb670acfbe5c30a4072e664d7a3bf5a9e1056ac72c3"
-dependencies = [
- "arrayvec 0.7.4",
- "itoa",
 ]
 
 [[package]]

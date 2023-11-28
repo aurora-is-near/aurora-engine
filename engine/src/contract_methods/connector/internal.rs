@@ -25,6 +25,7 @@ use aurora_engine_types::parameters::connector::{
     WithdrawResult,
 };
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
+use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs, WithdrawCallArgs};
 use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::types::address::error::AddressError;
@@ -208,7 +209,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -225,17 +226,19 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
         let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseArgsError>::into)?;
 
-        if predecessor_account_id == current_account_id {
+        let output = if predecessor_account_id == current_account_id {
             EthConnectorContract::init(io)?.ft_on_transfer(&engine, &args)?;
+            None
         } else {
-            engine.receive_erc20_tokens(
+            let result = engine.receive_erc20_tokens(
                 &predecessor_account_id,
                 &args,
                 &current_account_id,
                 handler,
             );
-        }
-        Ok(())
+            result.ok()
+        };
+        Ok(output)
     })
 }
 

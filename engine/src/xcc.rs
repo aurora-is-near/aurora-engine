@@ -1,11 +1,14 @@
+use crate::engine::{Engine, EngineResult};
 use crate::errors::ERR_SERIALIZE;
-use crate::parameters::{CallArgs, FunctionCallArgsV2};
-use aurora_engine_precompiles::xcc::state::{self, ERR_MISSING_WNEAR_ADDRESS};
+use crate::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
+use aurora_engine_modexp::ModExpAlgorithm;
+use aurora_engine_precompiles::xcc::state::ERR_MISSING_WNEAR_ADDRESS;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::PromiseHandler;
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::BorshSerialize;
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
@@ -16,11 +19,13 @@ pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXcc
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
 pub const ERR_ATTACHED_NEAR: &str = "ERR_ATTACHED_XCC_NEAR";
+pub const ERR_UPGRADE_ARG_SERIALIZATION: &str = "ERR_UPGRADE_ARG_SERIALIZATION";
 pub const CODE_KEY: &[u8] = b"router_code";
 /// Gas costs estimated from simulation tests.
 pub const VERSION_UPDATE_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const INITIALIZE_GAS: NearGas = NearGas::new(15_000_000_000_000);
-pub const UNWRAP_AND_REFUND_GAS: NearGas = NearGas::new(25_000_000_000_000);
+pub const UPGRADE_GAS: NearGas = NearGas::new(20_000_000_000_000);
+pub const REFUND_GAS: NearGas = NearGas::new(5_000_000_000_000);
 pub const WITHDRAW_GAS: NearGas = NearGas::new(40_000_000_000_000);
 /// Solidity selector for the `withdrawToNear` function
 /// `https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848`
@@ -46,6 +51,13 @@ impl<'a> RouterCode<'a> {
     pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(Cow::Borrowed(bytes))
     }
+}
+
+/// Same as the corresponding struct in the xcc-router
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct DeployUpgradeParams {
+    pub code: Vec<u8>,
+    pub initialize_args: Vec<u8>,
 }
 
 pub fn fund_xcc_sub_account<I, P, E>(
@@ -76,20 +88,9 @@ where
 
     // If account needs to be created and/or updated then include those actions.
     if let AddressVersionStatus::DeployNeeded { create_needed } = deploy_needed {
-        if create_needed {
-            if fund_amount < STORAGE_AMOUNT {
-                return Err(FundXccError::InsufficientBalance);
-            }
-
-            promise_actions.push(PromiseAction::CreateAccount);
-        }
-        promise_actions.push(PromiseAction::Transfer {
-            amount: fund_amount,
-        });
-        promise_actions.push(PromiseAction::DeployContract {
-            code: get_router_code(io).0.into_owned(),
-        });
-        // Either we need to assume it is set in the Engine or we need to accept it as input.
+        let code = get_router_code(io).0.into_owned();
+        // wnear_account is needed for initialization so we must assume it is set
+        // in the Engine or we need to accept it as input.
         let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
             wnear_account
         } else {
@@ -106,12 +107,36 @@ where
             wnear_account.as_ref(),
             create_needed,
         );
-        promise_actions.push(PromiseAction::FunctionCall {
-            name: "initialize".into(),
-            args: init_args.into_bytes(),
-            attached_yocto: ZERO_YOCTO,
-            gas: INITIALIZE_GAS,
-        });
+        if create_needed {
+            if fund_amount < STORAGE_AMOUNT {
+                return Err(FundXccError::InsufficientBalance);
+            }
+
+            promise_actions.push(PromiseAction::CreateAccount);
+            promise_actions.push(PromiseAction::Transfer {
+                amount: fund_amount,
+            });
+            promise_actions.push(PromiseAction::DeployContract { code });
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: "initialize".into(),
+                args: init_args.into_bytes(),
+                attached_yocto: ZERO_YOCTO,
+                gas: INITIALIZE_GAS,
+            });
+        } else {
+            let deploy_args = DeployUpgradeParams {
+                code,
+                initialize_args: init_args.into_bytes(),
+            };
+            promise_actions.push(PromiseAction::FunctionCall {
+                name: "deploy_upgrade".into(),
+                args: deploy_args
+                    .try_to_vec()
+                    .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                attached_yocto: fund_amount,
+                gas: UPGRADE_GAS + INITIALIZE_GAS,
+            });
+        }
     } else {
         // No matter what include the transfer of the funding amount
         promise_actions.push(PromiseAction::Transfer {
@@ -154,10 +179,12 @@ where
 pub fn handle_precompile_promise<I, P>(
     io: &I,
     handler: &mut P,
+    base_id: Option<PromiseId>,
     promise: &PromiseCreateArgs,
     required_near: Yocto,
     current_account_id: &AccountId,
-) where
+) -> PromiseId
+where
     P: PromiseHandler,
     I: IO + Copy,
 {
@@ -185,16 +212,8 @@ pub fn handle_precompile_promise<I, P>(
     let setup_id = match &deploy_needed {
         AddressVersionStatus::DeployNeeded { create_needed } => {
             let mut promise_actions = Vec::with_capacity(4);
-            if *create_needed {
-                promise_actions.push(PromiseAction::CreateAccount);
-                promise_actions.push(PromiseAction::Transfer {
-                    amount: STORAGE_AMOUNT,
-                });
-            }
-            promise_actions.push(PromiseAction::DeployContract {
-                code: get_router_code(io).0.into_owned(),
-            });
-            // After the deployment we call the contract's initialize function
+            let code = get_router_code(io).0.into_owned();
+            // After the deployment we will call the contract's initialize function
             let wnear_address = get_wnear_address(io);
             let wnear_account = crate::engine::nep141_erc20_map(*io)
                 .lookup_right(&crate::engine::ERC20Address(wnear_address))
@@ -204,12 +223,33 @@ pub fn handle_precompile_promise<I, P>(
                 wnear_account.0.as_ref(),
                 create_needed,
             );
-            promise_actions.push(PromiseAction::FunctionCall {
-                name: "initialize".into(),
-                args: init_args.into_bytes(),
-                attached_yocto: ZERO_YOCTO,
-                gas: INITIALIZE_GAS,
-            });
+            if *create_needed {
+                promise_actions.push(PromiseAction::CreateAccount);
+                promise_actions.push(PromiseAction::Transfer {
+                    amount: STORAGE_AMOUNT,
+                });
+                promise_actions.push(PromiseAction::DeployContract { code });
+                promise_actions.push(PromiseAction::FunctionCall {
+                    name: "initialize".into(),
+                    args: init_args.into_bytes(),
+                    attached_yocto: ZERO_YOCTO,
+                    gas: INITIALIZE_GAS,
+                });
+            } else {
+                let deploy_args = DeployUpgradeParams {
+                    code,
+                    initialize_args: init_args.into_bytes(),
+                };
+                promise_actions.push(PromiseAction::FunctionCall {
+                    name: "deploy_upgrade".into(),
+                    args: deploy_args
+                        .try_to_vec()
+                        .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                    attached_yocto: ZERO_YOCTO,
+                    gas: UPGRADE_GAS + INITIALIZE_GAS,
+                });
+            }
+
             let batch = PromiseBatchAction {
                 target_account_id: promise.target_account_id.clone(),
                 actions: promise_actions,
@@ -218,7 +258,12 @@ pub fn handle_precompile_promise<I, P>(
             // (not the main engine account), and the actions performed are only (1) create it
             // for the first time and/or (2) deploy the code from our storage (i.e. the deployed
             // code is controlled by us, not the user).
-            let promise_id = unsafe { handler.promise_create_batch(&batch) };
+            let promise_id = unsafe {
+                match base_id {
+                    Some(id) => handler.promise_attach_batch_callback(id, &batch),
+                    None => handler.promise_create_batch(&batch),
+                }
+            };
             // Add a callback here to update the version of the account
             let args = AddressVersionUpdateArgs {
                 address: sender,
@@ -237,7 +282,7 @@ pub fn handle_precompile_promise<I, P>(
             // metadata that has just been deployed above.
             unsafe { Some(handler.promise_attach_callback(promise_id, &callback)) }
         }
-        AddressVersionStatus::UpToDate => None,
+        AddressVersionStatus::UpToDate => base_id,
     };
     // 2. If some NEAR is required for this call (from storage staking for a new account
     //    and/or attached NEAR to the call the user wants to make), then we need to have the
@@ -248,15 +293,13 @@ pub fn handle_precompile_promise<I, P>(
     let withdraw_id = if required_near == ZERO_YOCTO {
         setup_id
     } else {
-        let wnear_address = state::get_wnear_address(io);
-        let withdraw_call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: wnear_address,
-            value: [0u8; 32],
-            input: withdraw_to_near_args(&promise.target_account_id, required_near),
-        });
+        let withdraw_call_args = WithdrawWnearToRouterArgs {
+            target: sender,
+            amount: required_near,
+        };
         let withdraw_call = PromiseCreateArgs {
             target_account_id: current_account_id.clone(),
-            method: "call".into(),
+            method: "withdraw_wnear_to_router".into(),
             args: withdraw_call_args.try_to_vec().unwrap(),
             attached_balance: ZERO_YOCTO,
             attached_gas: WITHDRAW_GAS,
@@ -276,22 +319,20 @@ pub fn handle_precompile_promise<I, P>(
             AddressVersionStatus::DeployNeeded { create_needed } => create_needed,
             AddressVersionStatus::UpToDate => false,
         };
-        let args = format!(
-            r#"{{"amount": "{}", "refund_needed": {}}}"#,
-            required_near.as_u128(),
-            refund_needed,
-        );
-        let unwrap_call = PromiseCreateArgs {
-            target_account_id: promise.target_account_id.clone(),
-            method: "unwrap_and_refund_storage".into(),
-            args: args.into_bytes(),
-            attached_balance: ZERO_YOCTO,
-            attached_gas: UNWRAP_AND_REFUND_GAS,
-        };
-        // Safety: This call is safe because the router's `unwrap_and_refund_storage` method
-        // does not violate any security invariants. It only interacts with the wrap.near contract
-        // to obtain NEAR from WNEAR.
-        unsafe { Some(handler.promise_attach_callback(id, &unwrap_call)) }
+        if refund_needed {
+            let refund_call = PromiseCreateArgs {
+                target_account_id: promise.target_account_id.clone(),
+                method: "send_refund".into(),
+                args: Vec::new(),
+                attached_balance: ZERO_YOCTO,
+                attached_gas: REFUND_GAS,
+            };
+            // Safety: This call is safe because the router's `send_refund` method
+            // does not violate any security invariants. It only sends NEAR back to this contract.
+            unsafe { Some(handler.promise_attach_callback(id, &refund_call)) }
+        } else {
+            Some(id)
+        }
     };
     // 3. Finally we can do the call the user wanted to do.
 
@@ -299,12 +340,12 @@ pub fn handle_precompile_promise<I, P>(
     // user directly. The XCC precompile will only construct promises that target the `execute`
     // and `schedule` methods of the user's router contract. Therefore, the user cannot have
     // the engine make arbitrary calls.
-    let _promise_id = unsafe {
+    unsafe {
         match withdraw_id {
             None => handler.promise_create_call(promise),
             Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
         }
-    };
+    }
 }
 
 /// Read the current wasm bytecode for the router contracts
@@ -334,6 +375,32 @@ pub fn set_code_version_of_address<I: IO>(io: &mut I, address: &Address, version
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, address.as_bytes());
     let value_bytes = version.0.to_le_bytes();
     io.write_storage(&key, &value_bytes);
+}
+
+pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, M: ModExpAlgorithm, H: PromiseHandler>(
+    recipient: &AccountId,
+    amount: Yocto,
+    wnear_address: Address,
+    engine: &mut Engine<I, E, M>,
+    handler: &mut H,
+) -> EngineResult<(SubmitResult, Vec<PromiseId>)> {
+    let mut interceptor = PromiseInterceptor::new(handler);
+    let withdraw_call_args = withdraw_wnear_call_args(recipient, amount, wnear_address);
+    let result = engine.call_with_args(withdraw_call_args, &mut interceptor)?;
+    Ok((result, interceptor.promises))
+}
+
+#[must_use]
+pub fn withdraw_wnear_call_args(
+    recipient: &AccountId,
+    amount: Yocto,
+    wnear_address: Address,
+) -> CallArgs {
+    CallArgs::V2(FunctionCallArgsV2 {
+        contract: wnear_address,
+        value: [0u8; 32],
+        input: withdraw_to_near_args(recipient, amount),
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -381,6 +448,11 @@ impl AddressVersionStatus {
             None => Self::DeployNeeded {
                 create_needed: true,
             },
+            Some(version) if version == CodeVersion::ONE => {
+                // It is impossible to upgrade the initial XCC routers because
+                // they lack the upgrade method.
+                Self::UpToDate
+            }
             Some(version) if version < latest_code_version => Self::DeployNeeded {
                 create_needed: false,
             },
@@ -390,11 +462,88 @@ impl AddressVersionStatus {
 }
 
 fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
+    let recipient_with_msg = format!("{recipient}:unwrap");
     let args = ethabi::encode(&[
-        ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+        ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
         ethabi::Token::Uint(U256::from(amount.as_u128())),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
+}
+
+/// A `PromiseHandler` that remembers all the `PromiseIds` it creates.
+/// This is used to make a promise the return value of a function even
+/// if the promise was not captured in the code where the handler is used.
+/// For example, this can capture the promises created by the exit precompiles.
+struct PromiseInterceptor<'a, H> {
+    inner: &'a mut H,
+    promises: Vec<PromiseId>,
+}
+
+impl<'a, H> PromiseInterceptor<'a, H> {
+    fn new(inner: &'a mut H) -> Self {
+        Self {
+            inner,
+            promises: Vec::new(),
+        }
+    }
+}
+
+impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
+    type ReadOnly = H::ReadOnly;
+
+    fn promise_results_count(&self) -> u64 {
+        self.inner.promise_results_count()
+    }
+
+    fn promise_result(&self, index: u64) -> Option<aurora_engine_types::types::PromiseResult> {
+        self.inner.promise_result(index)
+    }
+
+    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+        let id = self.inner.promise_create_call(args);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+        let id = self.inner.promise_create_and_combine(args);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_attach_callback(
+        &mut self,
+        base: PromiseId,
+        callback: &PromiseCreateArgs,
+    ) -> PromiseId {
+        let id = self.inner.promise_attach_callback(base, callback);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+        let id = self.inner.promise_create_batch(args);
+        self.promises.push(id);
+        id
+    }
+
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        base: PromiseId,
+        args: &PromiseBatchAction,
+    ) -> PromiseId {
+        let id = self.inner.promise_attach_batch_callback(base, args);
+        self.promises.push(id);
+        id
+    }
+
+    fn promise_return(&mut self, promise: PromiseId) {
+        self.inner.promise_return(promise);
+    }
+
+    fn read_only(&self) -> Self::ReadOnly {
+        self.inner.read_only()
+    }
 }
 
 #[cfg(test)]
@@ -404,6 +553,7 @@ mod tests {
     #[test]
     fn test_withdraw_to_near_encoding() {
         let recipient: AccountId = "some_account.near".parse().unwrap();
+        let recipient_with_msg = format!("{recipient}:unwrap");
         let amount = Yocto::new(1332654);
         #[allow(deprecated)]
         let withdraw_function = ethabi::Function {
@@ -426,7 +576,7 @@ mod tests {
         };
         let expected_tx_data = withdraw_function
             .encode_input(&[
-                ethabi::Token::Bytes(recipient.as_bytes().to_vec()),
+                ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
                 ethabi::Token::Uint(U256::from(amount.as_u128())),
             ])
             .unwrap();

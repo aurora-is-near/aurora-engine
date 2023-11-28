@@ -6,6 +6,7 @@ use aurora_engine_types::types::{Address, Wei};
 use near_sdk::serde_json::json;
 use near_sdk::{json_types::U128, serde_json};
 use near_workspaces::network::NetworkClient;
+use near_workspaces::types::NearToken;
 use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract, Worker};
 use std::path::Path;
 
@@ -63,7 +64,7 @@ impl TestContract {
             .batch(&root)
             .create_account()
             .add_key(sk.public_key(), AccessKey::full_access())
-            .transfer(near_units::parse_near!("100 N"))
+            .transfer(NearToken::from_near(100))
             .transact()
             .await?
             .into_result()?;
@@ -71,13 +72,13 @@ impl TestContract {
         let root_account = Account::from_secret_key(root, sk, &worker);
         let eth_connector = root_account
             .create_subaccount("aurora_eth_connector")
-            .initial_balance(near_units::parse_near!("15 N"))
+            .initial_balance(NearToken::from_near(15))
             .transact()
             .await?
             .into_result()?;
         let engine = root_account
             .create_subaccount("eth_connector")
-            .initial_balance(near_units::parse_near!("15 N"))
+            .initial_balance(NearToken::from_near(15))
             .transact()
             .await?
             .into_result()?;
@@ -204,7 +205,7 @@ impl TestContract {
         Ok(self
             .root_account
             .create_subaccount(name)
-            .initial_balance(near_units::parse_near!("15 N"))
+            .initial_balance(NearToken::from_near(15))
             .transact()
             .await?
             .into_result()?)

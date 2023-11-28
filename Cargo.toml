@@ -52,8 +52,7 @@ near-sdk = "4"
 near-vm-errors = "0.17"
 near-vm-logic = "0.17"
 near-vm-runner = { version = "0.17", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
-near-units = "0.2"
-near-workspaces = "0.8"
+near-workspaces = "0.9"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -129,3 +128,11 @@ rpath = false
 # it to actually happen when running tests with --release
 lto = true
 opt-level = 3
+
+# The profile is needed for faster linking in case we need to run locally a small amount of tests or just test
+# business logic rather than test gas cost. E.g. of using the profile with the cargo:
+# `cargo test --profile fast-link --features mainnet-test name_of_test_we_want_execute`
+[profile.fast-link]
+inherits = "dev"
+opt-level = 0
+lto = false

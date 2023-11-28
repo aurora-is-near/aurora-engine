@@ -212,14 +212,18 @@ fn test_transaction_to_zero_address() {
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
-    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
+    let result = runner
+        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .unwrap();
     assert_eq!(result.gas_used, 53_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
-    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
+    let result = runner
+        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .unwrap();
     assert_eq!(result.gas_used, 21_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
@@ -685,7 +689,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let expected_number = 1550;
+    let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
 
     assert!(
@@ -1297,7 +1301,6 @@ mod workspace {
         );
     }
 
-    #[allow(clippy::future_not_send)]
     async fn initialize_engine() -> (EngineContract, utils::Signer, Address) {
         let engine = utils::workspace::deploy_engine().await;
         let signer = utils::Signer::random();

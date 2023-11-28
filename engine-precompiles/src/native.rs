@@ -349,7 +349,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let flag = input[0];
+        let flag = input.first().copied().unwrap_or_default();
         #[cfg(feature = "error_refund")]
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]

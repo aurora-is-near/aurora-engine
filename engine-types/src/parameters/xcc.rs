@@ -1,6 +1,6 @@
 use crate::account_id::AccountId;
 use crate::borsh::{self, BorshDeserialize, BorshSerialize};
-use crate::types::Address;
+use crate::types::{Address, Yocto};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
 pub struct AddressVersionUpdateArgs {
@@ -14,6 +14,12 @@ pub struct FundXccArgs {
     pub wnear_account_id: Option<AccountId>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]
+pub struct WithdrawWnearToRouterArgs {
+    pub target: Address,
+    pub amount: Yocto,
+}
+
 /// Type wrapper for version of router contracts.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, BorshDeserialize, BorshSerialize,
@@ -21,6 +27,8 @@ pub struct FundXccArgs {
 pub struct CodeVersion(pub u32);
 
 impl CodeVersion {
+    pub const ONE: Self = Self(1);
+
     #[must_use]
     pub const fn increment(self) -> Self {
         Self(self.0 + 1)

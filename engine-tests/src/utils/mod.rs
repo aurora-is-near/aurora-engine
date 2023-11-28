@@ -98,6 +98,12 @@ pub struct AuroraRunner {
     // Empty by default. Can be set in tests if the transaction should be
     // executed as if it was a callback.
     pub promise_results: Vec<PromiseResult>,
+    // None by default. Can be set if the transaction requires randomness
+    // from the Near runtime.
+    // Note: this only sets the random value for the block, the random
+    // value available in the runtime is derived from this value and
+    // another hash that depends on the transaction itself.
+    pub block_random_value: Option<H256>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -234,7 +240,12 @@ impl AuroraRunner {
         self.previous_logs = outcome.logs.clone();
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
+            standalone_runner.submit_raw(
+                method_name,
+                &self.context,
+                &self.promise_results,
+                self.block_random_value,
+            )?;
             self.validate_standalone();
         }
 
@@ -539,8 +550,8 @@ impl AuroraRunner {
         outcome.return_data.as_value().unwrap()
     }
 
-    pub fn with_random_seed(mut self, random_seed: H256) -> Self {
-        self.context.random_seed = random_seed.as_bytes().to_vec();
+    pub const fn with_block_random_value(mut self, random_seed: H256) -> Self {
+        self.block_random_value = Some(random_seed);
         self
     }
 
@@ -600,6 +611,15 @@ impl AuroraRunner {
         std::fs::read(path).unwrap()
     }
 
+    pub fn get_engine_v331_code() -> Vec<u8> {
+        let path = if cfg!(feature = "ext-connector") {
+            "src/tests/res/aurora_silo_v3.3.1.wasm"
+        } else {
+            "src/tests/res/aurora_v3.3.1.wasm"
+        };
+        std::fs::read(path).unwrap()
+    }
+
     pub const fn get_default_chain_id() -> u64 {
         DEFAULT_CHAIN_ID
     }
@@ -645,6 +665,7 @@ impl Default for AuroraRunner {
             previous_logs: Vec::new(),
             standalone_runner: Some(standalone::StandaloneRunner::default()),
             promise_results: Vec::new(),
+            block_random_value: None,
         }
     }
 }
