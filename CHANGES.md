@@ -12,13 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Additions
 
 - Added a possibility to pass initialize arguments in json format to the `new` transaction by [@aleksuss]. ([#871])
-- The `SubmitResult` was made available in the standalone engine by [@birchmd]. ([#869])
+- The `SubmitResult` was made available for `ft_on_transfer` transactions in the standalone engine by [@birchmd]. ([#869])
 - The order of producing the exit precompile and XCC promises has been changed to sequential by [@birchmd]. ([#868])
-- The logic of unwrapping wNEAR has been changed to the Bridge's native by [@birchmd]. ([#867])
 
 ### Changes
 
 - Removed the code hidden behind the feature that isn't used anymore by [@joshuajbouw]. ([#870])
+- The logic of unwrapping wNEAR has been changed to the Bridge's native by [@birchmd]. ([#867])
 - Bumped the `near-workspaces` to 0.9 by [@aleksuss]. ([#862])
 
 ### Fixes
