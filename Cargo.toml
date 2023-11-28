@@ -130,7 +130,7 @@ lto = true
 opt-level = 3
 
 # The profile is needed for faster linking in case we need to run locally a small amount of tests or just test
-# buisness logic rather than test gas cost. E.g. of using the profile with the cargo:
+# business logic rather than test gas cost. E.g. of using the profile with the cargo:
 # `cargo test --profile fast-link --features mainnet-test name_of_test_we_want_execute`
 [profile.fast-link]
 inherits = "dev"
