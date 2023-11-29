@@ -24,3 +24,4 @@ hex.workspace = true
 [features]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
+contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
