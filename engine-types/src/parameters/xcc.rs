@@ -27,7 +27,7 @@ pub struct WithdrawWnearToRouterArgs {
 pub struct CodeVersion(pub u32);
 
 impl CodeVersion {
-    pub const ONE: Self = Self(1);
+    pub const ZERO: Self = Self(0);
 
     #[must_use]
     pub const fn increment(self) -> Self {
