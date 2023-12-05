@@ -11,14 +11,14 @@ use crate::operation::{
     CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
     CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
-    CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash,
-    ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress,
-    ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata, ViewFtTotalEthSupplyOnAurora,
-    ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewGetErc20Metadata,
-    ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams, ViewGetWhitelistStatus,
-    ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
-    ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
-    ViewView,
+    CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance,
+    ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
+    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
+    ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
+    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
+    ViewVersion, ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -265,6 +265,10 @@ impl EngineContract {
 
     pub fn factory_set_wnear_address(&self, address: Address) -> CallFactorySetWNearAddress {
         CallFactorySetWNearAddress::call(&self.contract).args_borsh(address)
+    }
+
+    pub fn upgrade(&self, bytes: Vec<u8>) -> CallUpgrade {
+        CallUpgrade::call(&self.contract).args(bytes)
     }
 
     pub fn stage_upgrade(&self, bytes: Vec<u8>) -> CallStageUpgrade {

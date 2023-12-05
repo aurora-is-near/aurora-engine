@@ -30,6 +30,7 @@ use aurora_engine_sdk::{
     promise::PromiseHandler,
 };
 use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
+use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
     borsh::BorshDeserialize,
     parameters::{
@@ -37,16 +38,17 @@ use aurora_engine_types::{
             NewCallArgs, PausePrecompilesCallArgs, RelayerKeyArgs, RelayerKeyManagerArgs,
             SetOwnerArgs, SetUpgradeDelayBlocksArgs, StartHashchainArgs,
         },
-        promise::{PromiseAction, PromiseBatchAction},
+        promise::{PromiseAction, PromiseBatchAction, PromiseCreateArgs},
     },
     storage::{self, KeyPrefix},
     types::{Address, Yocto},
-    vec,
+    vec, ToString,
 };
 use function_name::named;
 
 const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(100_000_000_000_000);
 
 #[named]
 pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
@@ -176,6 +178,38 @@ pub fn stage_upgrade<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Contrac
         );
         Ok(())
     })
+}
+
+pub fn upgrade<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+    require_running(&state)?;
+    require_owner_only(&state, &env.predecessor_account_id())?;
+
+    let code = io.read_input().to_vec();
+    let current_account_id = env.current_account_id();
+    let batch = PromiseBatchAction {
+        target_account_id: current_account_id.clone(),
+        actions: vec![PromiseAction::DeployContract { code }],
+    };
+    let state_migration_callback = PromiseCreateArgs {
+        target_account_id: current_account_id,
+        method: "state_migration".to_string(),
+        args: vec![],
+        attached_balance: ZERO_YOCTO,
+        attached_gas: GAS_FOR_STATE_MIGRATION,
+    };
+    let promise_id = unsafe {
+        let base_id = handler.promise_create_batch(&batch);
+        handler.promise_attach_callback(base_id, &state_migration_callback)
+    };
+
+    handler.promise_return(promise_id);
+
+    Ok(())
 }
 
 #[named]

@@ -182,6 +182,18 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Upgrade the contract with the provided code bytes.
+    #[no_mangle]
+    pub extern "C" fn upgrade() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+
+        contract_methods::admin::upgrade(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
