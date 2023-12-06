@@ -2,12 +2,12 @@
 on:
   push:
     tags:
-      - '*'
-name: Publish release
+      - '[0-9]+.[0-9]+.[0-9]+'
+name: Build
 jobs:
   build:
     name: Build contracts
-    runs-on: [self-hosted, heavy]
+    runs-on: github-hosted-heavy-runner
     strategy:
       matrix:
         profile: [mainnet, mainnet-silo, testnet, testnet-silo]
@@ -17,7 +17,15 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v3
-      - run: |
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-make
+        run: cargo install --no-default-features --force cargo-make
+      - name: Compile smart contracts
+        run: |
           cargo make --profile ${{ matrix.profile }} build-docker
           cargo make --profile ${{ matrix.profile }} build-xcc-docker
       - run: ls -lH bin/aurora-*${{ matrix.profile }}.wasm
@@ -29,7 +37,7 @@ jobs:
 
   publish:
     name: Publish contracts
-    runs-on: [self-hosted, heavy]
+    runs-on: github-hosted-heavy-runner
     needs: build
     steps:
       - name: Download artifacts
