@@ -7,6 +7,29 @@ async fn test_code_upgrade() {
     let aurora = deploy_engine().await;
     // do upgrade
     let result = aurora
+        .upgrade(contract_bytes())
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
+
+    // call a new method
+    let result = aurora
+        .as_raw_contract()
+        .view("some_new_fancy_function")
+        .await
+        .unwrap();
+
+    let output: [u32; 7] = result.borsh().unwrap();
+    assert_eq!(output, [3, 1, 4, 1, 5, 9, 2]);
+}
+
+#[tokio::test]
+async fn test_code_upgrade_with_stage() {
+    let aurora = deploy_engine().await;
+    // do upgrade
+    let result = aurora
         .stage_upgrade(contract_bytes())
         .max_gas()
         .transact()
