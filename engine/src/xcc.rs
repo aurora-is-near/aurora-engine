@@ -30,6 +30,10 @@ pub const WITHDRAW_GAS: NearGas = NearGas::new(40_000_000_000_000);
 /// Solidity selector for the `withdrawToNear` function
 /// `https://www.4byte.directory/signatures/?bytes4_signature=0x6b351848`
 pub const WITHDRAW_TO_NEAR_SELECTOR: [u8; 4] = [0x6b, 0x35, 0x18, 0x48];
+// Key for storing the XCC router version where upgradability was first introduced.
+// (The initial version of the router was not upgradable, see
+// https://github.com/aurora-is-near/aurora-engine/pull/866)
+const FIRST_UPGRADABLE: &[u8] = b"first_upgrd";
 
 pub use aurora_engine_precompiles::xcc::state::{
     get_code_version_of_address, get_latest_code_version, get_wnear_address, ERR_CORRUPTED_STORAGE,
@@ -80,7 +84,7 @@ where
 
     let latest_code_version = get_latest_code_version(io);
     let target_code_version = get_code_version_of_address(io, &args.target);
-    let deploy_needed = AddressVersionStatus::new(latest_code_version, target_code_version);
+    let deploy_needed = AddressVersionStatus::new(io, latest_code_version, target_code_version);
 
     let fund_amount = Yocto::new(env.attached_deposit());
 
@@ -205,7 +209,7 @@ where
 
     let latest_code_version = get_latest_code_version(io);
     let sender_code_version = get_code_version_of_address(io, &sender);
-    let deploy_needed = AddressVersionStatus::new(latest_code_version, sender_code_version);
+    let deploy_needed = AddressVersionStatus::new(io, latest_code_version, sender_code_version);
     // 1. If the router contract account does not exist or is out of date then we start
     //    with a batch transaction to deploy the router. This batch also has an attached
     //    callback to update the engine's storage with the new version of that router account.
@@ -361,7 +365,17 @@ pub fn update_router_code<I: IO>(io: &mut I, code: &RouterCode) {
     io.write_storage(&key, &code.0);
 
     let current_version = get_latest_code_version(io);
-    set_latest_code_version(io, current_version.increment());
+    let latest_version = current_version.increment();
+
+    // Store the latest version, this will be the first one where the
+    // router contract is upgradable.
+    let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, FIRST_UPGRADABLE);
+    if io.read_storage(&key).is_none() {
+        let version_bytes = latest_version.0.to_le_bytes();
+        io.write_storage(&key, &version_bytes);
+    }
+
+    set_latest_code_version(io, latest_version);
 }
 
 /// Set the address of the `wNEAR` ERC-20 contract
@@ -436,6 +450,12 @@ fn set_latest_code_version<I: IO>(io: &mut I, version: CodeVersion) {
     io.write_storage(&key, &value_bytes);
 }
 
+fn get_first_upgradable_version<I: IO>(io: &I) -> Option<CodeVersion> {
+    let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, FIRST_UPGRADABLE);
+    io.read_u32(&key)
+        .map_or(None, |value| Some(CodeVersion(value)))
+}
+
 /// Private enum used for bookkeeping what actions are needed in the call to the router contract.
 enum AddressVersionStatus {
     UpToDate,
@@ -443,12 +463,18 @@ enum AddressVersionStatus {
 }
 
 impl AddressVersionStatus {
-    fn new(latest_code_version: CodeVersion, target_code_version: Option<CodeVersion>) -> Self {
+    fn new<I: IO>(
+        io: &I,
+        latest_code_version: CodeVersion,
+        target_code_version: Option<CodeVersion>,
+    ) -> Self {
+        let first_upgradable_version =
+            get_first_upgradable_version(io).unwrap_or(CodeVersion::ZERO);
         match target_code_version {
             None => Self::DeployNeeded {
                 create_needed: true,
             },
-            Some(version) if version == CodeVersion::ONE => {
+            Some(version) if version < first_upgradable_version => {
                 // It is impossible to upgrade the initial XCC routers because
                 // they lack the upgrade method.
                 Self::UpToDate

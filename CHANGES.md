@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] 2023-12-06
+
+### Additions
+
+- Added a new transaction `upgrade` which allows upgrading the contract and invoking the `state_migration` callback
+  with one call by [@aleksuss]. ([#878])
+
+### Fixes
+
+- Updated the logic of upgrading XCC router which works properly on both `mainnet` and `testnet` by [@birchmd]. ([#877])  
+
+[#877]: https://github.com/aurora-is-near/aurora-engine/pull/877
+[#878]: https://github.com/aurora-is-near/aurora-engine/pull/878
+
 ## [3.4.0] 2023-11-28
 
 ### Additions
@@ -573,7 +587,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.4.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...develop
+[3.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.4.0
 [3.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.1...3.4.0
 [3.3.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...3.3.0
