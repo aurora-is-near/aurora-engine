@@ -359,6 +359,16 @@ mod tests {
     }
 
     #[test]
+    fn test_decoded_and_then_encoded_message_without_fee_does_not_change() {
+        let expect_message = "000000000000000000000000000000000000dead";
+        let message_data =
+            FtTransferMessageData::parse_on_transfer_message(expect_message).unwrap();
+        let actual_message = message_data.encode();
+
+        assert_eq!(expect_message, actual_message);
+    }
+
+    #[test]
     fn test_parsing_message_with_incorrect_amount_of_parts() {
         let message = "foo";
         let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
@@ -381,6 +391,16 @@ mod tests {
     #[test]
     fn test_parsing_message_with_invalid_hex_data() {
         let message = "foo:INVALID";
+        let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
+        let expected_error_message = errors::ERR_INVALID_ON_TRANSFER_MESSAGE_HEX;
+        let actual_error_message = error.as_ref();
+
+        assert_eq!(expected_error_message, actual_error_message);
+    }
+
+    #[test]
+    fn test_parsing_message_without_fee_with_invalid_hex_data() {
+        let message = "g00000000000000000000000000000000000dead";
         let error = FtTransferMessageData::parse_on_transfer_message(message).unwrap_err();
         let expected_error_message = errors::ERR_INVALID_ON_TRANSFER_MESSAGE_HEX;
         let actual_error_message = error.as_ref();
