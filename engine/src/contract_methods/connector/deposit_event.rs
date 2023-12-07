@@ -18,9 +18,16 @@ pub type EventParams = Vec<EventParam>;
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferMessageData {
-    pub relayer: AccountId,
     pub recipient: Address,
-    pub fee: Fee,
+    #[deprecated]
+    pub fee: Option<FtTransferFee>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
+pub struct FtTransferFee {
+    pub relayer: AccountId,
+    pub amount: Fee,
 }
 
 impl FtTransferMessageData {
@@ -29,6 +36,27 @@ impl FtTransferMessageData {
     pub fn parse_on_transfer_message(
         message: &str,
     ) -> Result<Self, errors::ParseOnTransferMessageError> {
+        if message.len() == 40 {
+            // Parse message to determine recipient
+            let recipient = {
+                // Message format:
+                //      Recipient of the transaction - 40 characters (Address in hex)
+                let mut address_bytes = [0; 20];
+                hex::decode_to_slice(message, &mut address_bytes)
+                    .map_err(|_| errors::ParseOnTransferMessageError::InvalidHexData)?;
+                Address::from_array(address_bytes)
+            };
+
+            #[allow(deprecated)]
+            return Ok(Self {
+                recipient,
+                fee: None,
+            });
+        }
+
+        // This logic is for backward compatibility to parse the message of the deprecated format.
+        // "{relayer_id}:0000000000000000000000000000000000000000000000000000000000000000{hex_address}"
+
         // Split message by separator
         let (account, msg) = message
             .split_once(':')
@@ -57,30 +85,39 @@ impl FtTransferMessageData {
         let fee_u128: u128 = U256::from_little_endian(&data[..32])
             .try_into()
             .map_err(|_| errors::ParseOnTransferMessageError::OverflowNumber)?;
-        let fee: Fee = fee_u128.into();
+        let fee_amount: Fee = fee_u128.into();
 
         // Get recipient Eth address from message slice
         let recipient = Address::try_from_slice(&data[32..]).unwrap();
 
+        #[allow(deprecated)]
         Ok(Self {
-            relayer: account_id,
             recipient,
-            fee,
+            fee: Some(FtTransferFee {
+                relayer: account_id,
+                amount: fee_amount,
+            }),
         })
     }
 
     /// Encode to String with specific rules
     #[must_use]
     pub fn encode(&self) -> String {
-        // The first data section should contain fee data.
-        // Pay attention, that for compatibility reasons we used U256 type.
-        // It means 32 bytes for fee data and 20 bytes for address.
-        let mut data = [0; 52];
-        U256::from(self.fee.as_u128()).to_little_endian(&mut data[..32]);
-        // Second data section should contain Eth address.
-        data[32..].copy_from_slice(self.recipient.as_bytes());
-        // Add `:` separator between relayer_id and the data encoded in hex.
-        format!("{}:{}", self.relayer, hex::encode(data))
+        #[allow(deprecated)]
+        self.fee.as_ref().map_or_else(
+            || hex::encode(self.recipient.as_bytes()),
+            |fee| {
+                // The first data section should contain fee data.
+                // Pay attention, that for compatibility reasons we used U256 type.
+                // It means 32 bytes for fee data and 20 bytes for address.
+                let mut data = [0; 52];
+                U256::from(fee.amount.as_u128()).to_little_endian(&mut data[..32]);
+                // Second data section should contain Eth address.
+                data[32..].copy_from_slice(self.recipient.as_bytes());
+                // Add `:` separator between relayer_id and the data encoded in hex.
+                format!("{}:{}", fee.relayer, hex::encode(data))
+            },
+        )
     }
 
     /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
@@ -103,10 +140,13 @@ impl FtTransferMessageData {
         let recipient_address = Address::decode(&address)
             .map_err(errors::ParseEventMessageError::EthAddressValidationError)?;
 
+        #[allow(deprecated)]
         Ok(Self {
-            relayer: relayer_account_id.clone(),
             recipient: recipient_address,
-            fee,
+            fee: Some(FtTransferFee {
+                relayer: relayer_account_id.clone(),
+                amount: fee,
+            }),
         })
     }
 }
