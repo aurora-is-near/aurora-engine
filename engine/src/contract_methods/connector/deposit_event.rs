@@ -122,8 +122,6 @@ impl FtTransferMessageData {
 
     /// Prepare message for `ft_transfer_call` -> `ft_on_transfer`
     pub fn prepare_message_for_on_transfer(
-        relayer_account_id: &AccountId,
-        fee: Fee,
         recipient: String,
     ) -> Result<Self, errors::ParseEventMessageError> {
         let address = if recipient.len() == 42 {
@@ -143,10 +141,7 @@ impl FtTransferMessageData {
         #[allow(deprecated)]
         Ok(Self {
             recipient: recipient_address,
-            fee: Some(FtTransferFee {
-                relayer: relayer_account_id.clone(),
-                amount: fee,
-            }),
+            fee: None,
         })
     }
 }
@@ -175,7 +170,6 @@ impl TokenMessageData {
     /// parsing for `ft_on_transfer` message parsing with correct and validated data.
     pub fn parse_event_message_and_prepare_token_message_data(
         message: &str,
-        fee: Fee,
     ) -> Result<Self, errors::ParseEventMessageError> {
         let data: Vec<_> = message.split(':').collect();
         // Data array can contain 1 or 2 elements
@@ -190,11 +184,7 @@ impl TokenMessageData {
             Ok(Self::Near(account_id))
         } else {
             let raw_message = data[1].into();
-            let message = FtTransferMessageData::prepare_message_for_on_transfer(
-                &account_id,
-                fee,
-                raw_message,
-            )?;
+            let message = FtTransferMessageData::prepare_message_for_on_transfer(raw_message)?;
 
             Ok(Self::Eth {
                 receiver_id: account_id,
@@ -327,7 +317,6 @@ impl DepositedEvent {
         let token_message_data =
             TokenMessageData::parse_event_message_and_prepare_token_message_data(
                 &event_message_data,
-                fee,
             )?;
 
         Ok(Self {
@@ -431,13 +420,11 @@ mod tests {
 
     #[test]
     fn test_eth_token_message_data_decodes_recipient_correctly() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let address = Address::zero();
         let message = format!("aurora:{}", address.encode());
 
         let token_message_data =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
         let actual_recipient = token_message_data.recipient().to_string();
         let expected_recipient = "aurora";
 
@@ -446,13 +433,11 @@ mod tests {
 
     #[test]
     fn test_eth_token_message_data_decodes_recipient_correctly_with_prefix() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let address = Address::zero();
         let message = format!("aurora:0x{}", address.encode());
 
         let token_message_data =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
         let actual_recipient = token_message_data.recipient().to_string();
         let expected_recipient = "aurora";
 
@@ -461,12 +446,10 @@ mod tests {
 
     #[test]
     fn test_near_token_message_data_decodes_recipient_correctly() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let message = "aurora";
 
         let token_message_data =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message).unwrap();
         let actual_recipient = token_message_data.recipient().to_string();
         let expected_recipient = "aurora";
 
@@ -475,11 +458,10 @@ mod tests {
 
     #[test]
     fn test_token_message_data_fails_with_too_many_parts() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let message = "aurora:foo:bar";
 
         let parse_error =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message)
                 .unwrap_err();
         let actual_parse_error = parse_error.as_ref();
         let expected_parse_error = errors::ERR_INVALID_EVENT_MESSAGE_FORMAT;
@@ -489,11 +471,10 @@ mod tests {
 
     #[test]
     fn test_token_message_data_fails_with_invalid_account() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let message = "INVALID";
 
         let parse_error =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message)
                 .unwrap_err();
         let actual_parse_error = parse_error.as_ref();
         let expected_parse_error = errors::ERR_INVALID_ACCOUNT_ID;
@@ -503,11 +484,10 @@ mod tests {
 
     #[test]
     fn test_eth_token_message_data_fails_with_invalid_address_length() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let message = "aurora:0xINVALID";
 
         let parse_error =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message)
                 .unwrap_err();
         let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
         let expected_parse_error = AddressError::IncorrectLength.to_string();
@@ -517,11 +497,10 @@ mod tests {
 
     #[test]
     fn test_eth_token_message_data_fails_with_invalid_address() {
-        let fee = Fee::new(NEP141Wei::new(0));
         let message = "aurora:0xINVALID_ADDRESS_WITH_CORRECT_LENGTH_HERE";
 
         let parse_error =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(message, fee)
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(message)
                 .unwrap_err();
         let actual_parse_error = std::str::from_utf8(parse_error.as_ref()).unwrap();
         let expected_parse_error = AddressError::FailedDecodeHex.to_string();
@@ -537,8 +516,7 @@ mod tests {
         let fee = Fee::new(NEP141Wei::new(0));
         let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
         let token_message_data: TokenMessageData =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
         let expected_deposited_event = DepositedEvent {
             eth_custodian_address,
