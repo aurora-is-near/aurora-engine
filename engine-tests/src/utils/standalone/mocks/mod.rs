@@ -3,8 +3,6 @@ use aurora_engine::engine;
 use aurora_engine::engine::Engine;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine::parameters::InitCallArgs;
-#[cfg(not(feature = "ext-connector"))]
-use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
 #[cfg(not(feature = "ext-connector"))]
@@ -114,19 +112,13 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     };
 
     #[cfg(not(feature = "ext-connector"))]
-    deposit(io, &engine, &env.current_account_id(), address, balance);
+    deposit(io, &env.current_account_id(), address, balance);
 
     engine.apply(std::iter::once(state_change), std::iter::empty(), false);
 }
 
 #[cfg(not(feature = "ext-connector"))]
-fn deposit<I: IO + Copy, E: Env, M: ModExpAlgorithm>(
-    mut io: I,
-    engine: &Engine<I, E, M>,
-    aurora_account_id: &AccountId,
-    address: Address,
-    balance: Wei,
-) {
+fn deposit<I: IO + Copy>(mut io: I, aurora_account_id: &AccountId, address: Address, balance: Wei) {
     const DEFAULT_GAS: u64 = 300_000_000_000_000;
     let deposit_args = aurora_engine_types::parameters::connector::FinishDepositCallArgs {
         new_owner_id: aurora_account_id.clone(),
@@ -165,7 +157,7 @@ fn deposit<I: IO + Copy, E: Env, M: ModExpAlgorithm>(
             hex::encode(address.as_bytes())
         ),
     };
-    connector.ft_on_transfer(engine, &transfer_args).unwrap();
+    connector.ft_on_transfer(&transfer_args).unwrap();
 }
 
 #[cfg(not(feature = "ext-connector"))]
