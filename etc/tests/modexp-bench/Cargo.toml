@@ -18,3 +18,6 @@ panic = "abort"
 aurora-engine-modexp = { path = "../../../engine-modexp", default-features = false, features = ["bench", "std"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 near-sdk = "4.1"
+
+[patch.crates-io]
+parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1', rev = "d05fd8e" }
