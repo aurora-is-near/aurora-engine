@@ -40,7 +40,7 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: cargo make -V || cargo install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build main contract
         run: |
           case ${{ matrix.profile }} in
@@ -80,7 +80,7 @@ jobs:
             target/
           key: ${{ matrix.profile }}-cargo-modexp-test
       - name: Install dependencies
-        run: cargo make -V || cargo install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Test ${{ matrix.profile }} bench-modexp
         run: cargo make --profile ${{ matrix.profile }} bench-modexp
 
