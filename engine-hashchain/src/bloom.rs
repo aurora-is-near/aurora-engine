@@ -5,6 +5,7 @@
 #![allow(
     clippy::expl_impl_clone_on_copy,
 // TODO: rust-2023-08-24 clippy::incorrect_clone_impl_on_copy_type
+    clippy::non_canonical_clone_impl,
 )]
 
 use aurora_engine_sdk::keccak;

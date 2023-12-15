@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod v0 {
     #[cfg(feature = "meta-call")]
     pub use aurora_engine::meta_parsing;

@@ -580,7 +580,7 @@ impl AuroraRunner {
                 panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
 
-            for (key, value) in standalone_state.iter() {
+            for (key, value) in standalone_state {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(
