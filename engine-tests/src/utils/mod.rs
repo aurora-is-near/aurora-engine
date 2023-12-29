@@ -13,19 +13,15 @@ use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
-use near_primitives::runtime::config_store::RuntimeConfigStore;
 use near_primitives::version::PROTOCOL_VERSION;
-use near_primitives_core::config::VMConfig;
-use near_primitives_core::contract::ContractCode;
-use near_primitives_core::profile::ProfileDataV3;
-use near_primitives_core::runtime::fees::RuntimeFeesConfig;
-use near_vm_errors::{FunctionCallError, HostError};
 use near_vm_logic::mocks::mock_external::MockedExternal;
 use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
-use near_vm_runner::MockCompiledContractCache;
+use near_vm_logic::{VMContext, VMOutcome};
+use near_vm_runner::{ContractCode, MockCompiledContractCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
+use near_primitives::errors::{FunctionCallError, HostError};
+use near_sdk::{RuntimeFeesConfig, VMConfig};
 
 #[cfg(not(feature = "ext-connector"))]
 use crate::prelude::parameters::InitCallArgs;
@@ -150,7 +146,6 @@ impl<'a> OneShotAuroraRunner<'a> {
             &self.base.wasm_config,
             &self.base.fees_config,
             &[],
-            self.base.current_protocol_version,
             Some(&self.base.cache),
         )
         .unwrap();
@@ -178,7 +173,7 @@ impl AuroraRunner {
         signer_account_id: &str,
         input: Vec<u8>,
     ) {
-        context.block_height += 1;
+        context.block_index += 1;
         context.block_timestamp += 1_000_000_000;
         context.input = input;
         context.signer_account_id = signer_account_id.parse().unwrap();
@@ -226,8 +221,7 @@ impl AuroraRunner {
             self.context.clone(),
             &self.wasm_config,
             &self.fees_config,
-            &vm_promise_results,
-            self.current_protocol_version,
+            vm_promise_results.as_slice(),
             Some(&self.cache),
         )
         .unwrap();
@@ -359,12 +353,12 @@ impl AuroraRunner {
         }
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.env.block_height = self.context.block_height;
+            standalone_runner.env.block_height = self.context.block_index;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
             self.validate_standalone();
         }
 
-        self.context.block_height += 1;
+        self.context.block_index += 1;
     }
 
     pub fn submit_with_signer<F: FnOnce(U256) -> TransactionLegacy>(
@@ -474,9 +468,7 @@ impl AuroraRunner {
     pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
-        runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
-        });
+        runner.context.is_view = true;
 
         runner.call("view", "viewer", input).map(|outcome| {
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap()
@@ -489,9 +481,7 @@ impl AuroraRunner {
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
-        runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
-        });
+        runner.context.is_view = true;
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
         let status =
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
@@ -647,7 +637,7 @@ impl Default for AuroraRunner {
                 signer_account_pk: vec![],
                 predecessor_account_id: origin_account_id,
                 input: vec![],
-                block_height: 0,
+                block_index: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
                 account_balance: 10u128.pow(25),
@@ -656,7 +646,7 @@ impl Default for AuroraRunner {
                 attached_deposit: 0,
                 prepaid_gas: 10u64.pow(18),
                 random_seed: vec![],
-                view_config: None,
+                is_view: false,
                 output_data_receivers: vec![],
             },
             wasm_config,
@@ -754,11 +744,11 @@ pub fn init_hashchain(
     assert!(result.is_ok());
 
     if let Some(h) = block_height {
-        runner.context.block_height = h;
+        runner.context.block_index = h;
     }
 
     let args = StartHashchainArgs {
-        block_height: runner.context.block_height,
+        block_height: runner.context.block_index,
         block_hashchain: [0u8; 32],
     };
     let result = runner.call(

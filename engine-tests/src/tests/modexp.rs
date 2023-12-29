@@ -1,5 +1,5 @@
 use aurora_engine::engine::EngineError;
-use near_primitives_core::contract::ContractCode;
+use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
 use super::sanity::initialize_transfer;

@@ -12,9 +12,9 @@ use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
 use aurora_engine_workspace::types::NearToken;
 use near_primitives::transaction::Action;
-use near_primitives_core::contract::ContractCode;
 use std::fs;
 use std::path::Path;
+use near_vm_runner::ContractCode;
 
 const WNEAR_AMOUNT: NearToken = NearToken::from_near(500);
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);

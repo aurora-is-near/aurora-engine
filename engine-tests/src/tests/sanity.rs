@@ -11,6 +11,7 @@ use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
+use near_vm_runner::ContractCode;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -211,7 +212,7 @@ fn test_transaction_to_zero_address() {
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
-    context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
         .submit_raw(utils::SUBMIT, &context, &[], None)
         .unwrap();
@@ -220,7 +221,7 @@ fn test_transaction_to_zero_address() {
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
-    context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
+    context.block_index = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
         .submit_raw(utils::SUBMIT, &context, &[], None)
         .unwrap();
@@ -455,7 +456,7 @@ fn test_solidity_pure_bench() {
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
-    let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
+    let code = ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
     let outcome = near_vm_runner::run(
@@ -466,7 +467,6 @@ fn test_solidity_pure_bench() {
         &runner.wasm_config,
         &runner.fees_config,
         &[],
-        runner.current_protocol_version,
         Some(&runner.cache),
     )
     .unwrap();

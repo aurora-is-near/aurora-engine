@@ -1,7 +1,7 @@
-use near_vm_errors::VMLogicError;
 use near_vm_logic::mocks::mock_external::MockedExternal;
-use near_vm_logic::StorageGetMode;
 use std::cell::Cell;
+use near_vm_logic::types::{AccountId, Balance, Gas, PublicKey, ReceiptIndex};
+use near_vm_logic::VMLogicError;
 
 /// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
 /// Uses the formulas:
@@ -56,11 +56,10 @@ impl near_vm_logic::External for MockedExternalWithTrie {
     fn storage_get<'a>(
         &'a self,
         key: &[u8],
-        mode: StorageGetMode,
     ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);
-        self.underlying.storage_get(key, mode)
+        self.underlying.storage_get(key)
     }
 
     fn storage_remove(&mut self, key: &[u8]) -> Result<(), VMLogicError> {
@@ -72,31 +71,66 @@ impl near_vm_logic::External for MockedExternalWithTrie {
         self.underlying.storage_remove_subtree(prefix)
     }
 
-    fn storage_has_key(&mut self, key: &[u8], mode: StorageGetMode) -> Result<bool, VMLogicError> {
-        self.underlying.storage_has_key(key, mode)
-    }
-
-    fn generate_data_id(&mut self) -> near_primitives::hash::CryptoHash {
-        self.underlying.generate_data_id()
-    }
-
-    fn get_trie_nodes_count(&self) -> near_primitives::types::TrieNodesCount {
-        let db_reads = self.new_trie_node_count.get();
-        let mem_reads = self.cached_trie_node_count.get();
-        near_primitives::types::TrieNodesCount {
-            db_reads,
-            mem_reads,
-        }
+    fn storage_has_key(&mut self, key: &[u8]) -> Result<bool, VMLogicError> {
+        self.underlying.storage_has_key(key)
     }
 
     fn validator_stake(
         &self,
-        account_id: &near_primitives::types::AccountId,
+        account_id: &String,
     ) -> Result<Option<near_primitives::types::Balance>, VMLogicError> {
         self.underlying.validator_stake(account_id)
     }
 
     fn validator_total_stake(&self) -> Result<near_primitives::types::Balance, VMLogicError> {
         self.underlying.validator_total_stake()
+    }
+
+    fn create_receipt(&mut self, receipt_indices: Vec<ReceiptIndex>, receiver_id: AccountId) -> Result<ReceiptIndex, VMLogicError> {
+        self.underlying.create_receipt(receipt_indices, receiver_id)
+    }
+
+    fn append_action_create_account(&mut self, receipt_index: ReceiptIndex) -> Result<(), VMLogicError> {
+        self.underlying.append_action_create_account(receipt_index)
+    }
+
+    fn append_action_deploy_contract(&mut self, receipt_index: ReceiptIndex, code: Vec<u8>) -> Result<(), VMLogicError> {
+        self.underlying.append_action_deploy_contract(receipt_index, code)
+    }
+
+    fn append_action_function_call(&mut self, receipt_index: ReceiptIndex, method_name: Vec<u8>, arguments: Vec<u8>, attached_deposit: Balance, prepaid_gas: Gas) -> Result<(), VMLogicError> {
+        self.underlying.append_action_function_call(receipt_index, method_name, arguments, attached_deposit, prepaid_gas)
+    }
+
+    fn append_action_transfer(&mut self, receipt_index: ReceiptIndex, amount: Balance) -> Result<(), VMLogicError> {
+        self.underlying.append_action_transfer(receipt_index, amount)
+    }
+
+    fn append_action_stake(&mut self, receipt_index: ReceiptIndex, stake: Balance, public_key: PublicKey) -> Result<(), VMLogicError> {
+        self.underlying.append_action_stake(receipt_index, stake, public_key)
+    }
+
+    fn append_action_add_key_with_full_access(&mut self, receipt_index: ReceiptIndex, public_key: PublicKey, nonce: u64) -> Result<(), VMLogicError> {
+        self.underlying.append_action_add_key_with_full_access(receipt_index, public_key, nonce)
+    }
+
+    fn append_action_add_key_with_function_call(&mut self, receipt_index: ReceiptIndex, public_key: PublicKey, nonce: u64, allowance: Option<Balance>, receiver_id: AccountId, method_names: Vec<Vec<u8>>) -> Result<(), VMLogicError> {
+        self.underlying.append_action_add_key_with_function_call(receipt_index, public_key, nonce, allowance, receiver_id, method_names)
+    }
+
+    fn append_action_delete_key(&mut self, receipt_index: ReceiptIndex, public_key: PublicKey) -> Result<(), VMLogicError> {
+        self.underlying.append_action_delete_key(receipt_index, public_key)
+    }
+
+    fn append_action_delete_account(&mut self, receipt_index: ReceiptIndex, beneficiary_id: AccountId) -> Result<(), VMLogicError> {
+        self.underlying.append_action_delete_account(receipt_index, beneficiary_id)
+    }
+
+    fn get_touched_nodes_count(&self) -> u64 {
+        self.underlying.get_touched_nodes_count()
+    }
+
+    fn reset_touched_nodes_counter(&mut self) {
+        self.underlying.reset_touched_nodes_counter()
     }
 }

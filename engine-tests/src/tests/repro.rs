@@ -148,7 +148,7 @@ fn repro_common(context: &ReproContext) {
     runner.wasm_config.limit_config.max_gas_burnt = 3_000_000_000_000_000;
     runner.context.storage_usage = 1_000_000_000;
     runner.consume_json_snapshot(snapshot.clone());
-    runner.context.block_height = *block_height;
+    runner.context.block_index = *block_height;
     runner.context.block_timestamp = *block_timestamp;
 
     let tx_hex = std::fs::read_to_string(input_path).unwrap();

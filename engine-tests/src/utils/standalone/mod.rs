@@ -201,7 +201,7 @@ impl StandaloneRunner {
         block_random_value: Option<H256>,
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
-        env.block_height = ctx.block_height;
+        env.block_height = ctx.block_index;
         env.attached_deposit = ctx.attached_deposit;
         env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
