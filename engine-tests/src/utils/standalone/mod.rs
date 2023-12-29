@@ -196,17 +196,17 @@ impl StandaloneRunner {
     pub fn submit_raw(
         &mut self,
         method_name: &str,
-        ctx: &near_vm_logic::VMContext,
+        ctx: &near_vm_runner::logic::VMContext,
         promise_results: &[PromiseResult],
         block_random_value: Option<H256>,
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
-        env.block_height = ctx.block_index;
+        env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit;
         env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
-        env.predecessor_account_id = ctx.predecessor_account_id.as_ref().parse().unwrap();
-        env.current_account_id = ctx.current_account_id.as_ref().parse().unwrap();
-        env.signer_account_id = ctx.signer_account_id.as_ref().parse().unwrap();
+        env.predecessor_account_id = ctx.predecessor_account_id.as_str().parse().unwrap();
+        env.current_account_id = ctx.current_account_id.as_str().parse().unwrap();
+        env.signer_account_id = ctx.signer_account_id.as_str().parse().unwrap();
         env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
         if let Some(value) = block_random_value {
             env.random_seed = value;

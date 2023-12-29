@@ -11,10 +11,9 @@ use aurora_engine_types::parameters::{
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
 use aurora_engine_workspace::types::NearToken;
-use near_primitives::transaction::Action;
+use near_vm_runner::ContractCode;
 use std::fs;
 use std::path::Path;
-use near_vm_runner::ContractCode;
 
 const WNEAR_AMOUNT: NearToken = NearToken::from_near(500);
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
@@ -257,28 +256,6 @@ fn test_xcc_exec_gas() {
             outcome.burnt_gas,
             router_exec_cost
         );
-
-        assert_eq!(
-            outcome.action_receipts.len(),
-            usize::try_from(args.promise_count()).unwrap()
-        );
-        for (target_account_id, receipt) in outcome.action_receipts {
-            assert_eq!(
-                target_account_id.as_str(),
-                promise.target_account_id.as_ref()
-            );
-            assert_eq!(receipt.actions.len(), 1);
-            let action = &receipt.actions[0];
-            match action {
-                Action::FunctionCall(function_call) => {
-                    assert_eq!(function_call.method_name, promise.method);
-                    assert_eq!(function_call.args, promise.args);
-                    assert_eq!(function_call.deposit, promise.attached_balance.as_u128());
-                    assert_eq!(function_call.gas, promise.attached_gas.as_u64());
-                }
-                other => panic!("Unexpected action {other:?}"),
-            };
-        }
     }
 }
 

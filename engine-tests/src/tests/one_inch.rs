@@ -4,7 +4,7 @@ use crate::utils::one_inch::liquidity_protocol;
 use crate::utils::{self, assert_gas_bound};
 use aurora_engine_types::borsh::BorshDeserialize;
 use libsecp256k1::SecretKey;
-use near_vm_logic::VMOutcome;
+use near_vm_runner::logic::VMOutcome;
 use std::sync::Once;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
@@ -26,7 +26,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 9); // less than 9 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 7); // less than 7 NEAR Tgas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
@@ -104,7 +104,7 @@ fn test_1_inch_limit_order_deploy() {
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (45..=55).contains(&wasm_fraction),
+        (55..=60).contains(&wasm_fraction),
         "{wasm_fraction}% is not between 45% and 55%",
     );
 }

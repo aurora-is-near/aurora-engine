@@ -36,6 +36,7 @@ git2.workspace = true
 hex.workspace = true
 libsecp256k1.workspace = true
 near-crypto.workspace = true
+near-parameters.workspace = true
 near-primitives-core.workspace = true
 near-primitives.workspace = true
 near-sdk.workspace = true

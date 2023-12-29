@@ -42,7 +42,7 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
 }
 
 #[test]
-#[should_panic(expected = "ERR_GETTING_ERC20_FROM_NEP141")]
+#[should_panic(expected = "ERR_ARG_PARSE")]
 fn test_deploy_erc20_token_with_invalid_account_id() {
     let mut runner = deploy_runner();
     let invalid_nep141 = "_";

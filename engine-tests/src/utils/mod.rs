@@ -13,15 +13,15 @@ use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
+use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
-use near_vm_logic::mocks::mock_external::MockedExternal;
-use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome};
+use near_vm_runner::logic::errors::FunctionCallError;
+use near_vm_runner::logic::mocks::mock_external::MockedExternal;
+use near_vm_runner::logic::types::ReturnData;
+use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
 use near_vm_runner::{ContractCode, MockCompiledContractCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
-use near_primitives::errors::{FunctionCallError, HostError};
-use near_sdk::{RuntimeFeesConfig, VMConfig};
 
 #[cfg(not(feature = "ext-connector"))]
 use crate::prelude::parameters::InitCallArgs;
@@ -84,7 +84,7 @@ pub struct AuroraRunner {
     pub cache: MockCompiledContractCache,
     pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
-    pub wasm_config: VMConfig,
+    pub wasm_config: Config,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
@@ -173,7 +173,7 @@ impl AuroraRunner {
         signer_account_id: &str,
         input: Vec<u8>,
     ) {
-        context.block_index += 1;
+        context.block_height += 1;
         context.block_timestamp += 1_000_000_000;
         context.input = input;
         context.signer_account_id = signer_account_id.parse().unwrap();
@@ -207,10 +207,10 @@ impl AuroraRunner {
             .promise_results
             .iter()
             .map(|p| match p {
-                PromiseResult::Failed => near_vm_logic::types::PromiseResult::Failed,
-                PromiseResult::NotReady => near_vm_logic::types::PromiseResult::NotReady,
+                PromiseResult::Failed => near_vm_runner::logic::types::PromiseResult::Failed,
+                PromiseResult::NotReady => near_vm_runner::logic::types::PromiseResult::NotReady,
                 PromiseResult::Successful(bytes) => {
-                    near_vm_logic::types::PromiseResult::Successful(bytes.clone())
+                    near_vm_runner::logic::types::PromiseResult::Successful(bytes.clone())
                 }
             })
             .collect();
@@ -327,7 +327,7 @@ impl AuroraRunner {
 
             let aurora_balance_key = [
                 ft_key.as_slice(),
-                self.context.current_account_id.as_ref().as_bytes(),
+                self.context.current_account_id.as_bytes(),
             ]
             .concat();
             let aurora_balance_value = {
@@ -353,12 +353,12 @@ impl AuroraRunner {
         }
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.env.block_height = self.context.block_index;
+            standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
             self.validate_standalone();
         }
 
-        self.context.block_index += 1;
+        self.context.block_height += 1;
     }
 
     pub fn submit_with_signer<F: FnOnce(U256) -> TransactionLegacy>(
@@ -467,8 +467,7 @@ impl AuroraRunner {
 
     pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
         let input = args.try_to_vec().unwrap();
-        let mut runner = self.one_shot();
-        runner.context.is_view = true;
+        let runner = self.one_shot();
 
         runner.call("view", "viewer", input).map(|outcome| {
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap()
@@ -480,8 +479,7 @@ impl AuroraRunner {
         args: &ViewCallArgs,
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
-        let mut runner = self.one_shot();
-        runner.context.is_view = true;
+        let runner = self.one_shot();
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
         let status =
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
@@ -637,7 +635,7 @@ impl Default for AuroraRunner {
                 signer_account_pk: vec![],
                 predecessor_account_id: origin_account_id,
                 input: vec![],
-                block_index: 0,
+                block_height: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
                 account_balance: 10u128.pow(25),
@@ -646,8 +644,8 @@ impl Default for AuroraRunner {
                 attached_deposit: 0,
                 prepaid_gas: 10u64.pow(18),
                 random_seed: vec![],
-                is_view: false,
                 output_data_receivers: vec![],
+                view_config: None,
             },
             wasm_config,
             fees_config: RuntimeFeesConfig::test(),
@@ -744,11 +742,11 @@ pub fn init_hashchain(
     assert!(result.is_ok());
 
     if let Some(h) = block_height {
-        runner.context.block_index = h;
+        runner.context.block_height = h;
     }
 
     let args = StartHashchainArgs {
-        block_height: runner.context.block_index,
+        block_height: runner.context.block_height,
         block_hashchain: [0u8; 32],
     };
     let result = runner.call(

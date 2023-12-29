@@ -9,9 +9,9 @@ use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
+use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
-use near_vm_runner::ContractCode;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -212,7 +212,7 @@ fn test_transaction_to_zero_address() {
     context.input = tx_bytes;
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
-    context.block_index = ZERO_ADDRESS_FIX_HEIGHT - 1;
+    context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
         .submit_raw(utils::SUBMIT, &context, &[], None)
         .unwrap();
@@ -221,7 +221,7 @@ fn test_transaction_to_zero_address() {
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
-    context.block_index = ZERO_ADDRESS_FIX_HEIGHT;
+    context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
         .submit_raw(utils::SUBMIT, &context, &[], None)
         .unwrap();
@@ -907,9 +907,8 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer_address =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     utils::validate_address_balance_and_nonce(
@@ -969,9 +968,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     );
 
     // validate post-state
-    let relayer = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     utils::validate_address_balance_and_nonce(
         &runner,

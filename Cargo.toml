@@ -46,6 +46,7 @@ lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.19"
 near-gas = "0.2"
+near-parameters = "0.19"
 near-primitives = "0.19"
 near-primitives-core = "0.19"
 near-sdk = "4"

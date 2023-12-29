@@ -19,7 +19,7 @@ fn test_hashchain() {
     let hc = get_latest_hashchain(&runner);
     // Hashchain starts 1 height lower than the current context height because
     // at `hc.block_height + 1` the `start_hashchain` is submitted.
-    assert_eq!(hc.block_height, runner.context.block_index - 1);
+    assert_eq!(hc.block_height, runner.context.block_height - 1);
     assert_eq!(hc.hashchain, hex::encode(H256::default()));
 
     // Execute a transaction and the hashchain changes
@@ -85,7 +85,7 @@ fn test_hashchain() {
         .unwrap();
 
     let hc = get_latest_hashchain(&runner);
-    assert_eq!(hc.block_height, runner.context.block_index - 1);
+    assert_eq!(hc.block_height, runner.context.block_height - 1);
     assert_eq!(hc.hashchain, hex::encode(expected_hc));
 }
 
