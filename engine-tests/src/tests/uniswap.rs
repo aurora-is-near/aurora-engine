@@ -52,16 +52,16 @@ fn test_uniswap_exact_output() {
     utils::assert_gas_bound(profile.all_gas(), 23);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (40..=50).contains(&wasm_fraction),
+        (50..=60).contains(&wasm_fraction),
         "{wasm_fraction}% is not between 40% and 50%",
     );
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    utils::assert_gas_bound(profile.all_gas(), 17);
+    utils::assert_gas_bound(profile.all_gas(), 13);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (45..=55).contains(&wasm_fraction),
+        (50..=60).contains(&wasm_fraction),
         "{wasm_fraction}% is not between 45% and 55%",
     );
 }

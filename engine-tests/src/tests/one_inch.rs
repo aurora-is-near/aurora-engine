@@ -38,7 +38,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 18);
+    assert_gas_bound(profile.all_gas(), 14);
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -57,7 +57,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 23);
+    assert_gas_bound(profile.all_gas(), 17);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -72,7 +72,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 24);
+    assert_gas_bound(profile.all_gas(), 18);
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -83,7 +83,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 20);
+    assert_gas_bound(profile.all_gas(), 15);
 }
 
 #[test]

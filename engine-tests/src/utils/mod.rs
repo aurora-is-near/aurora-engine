@@ -617,7 +617,7 @@ impl Default for AuroraRunner {
     fn default() -> Self {
         let evm_wasm_bytes = Self::get_engine_code();
         // Fetch config (mainly costs) for the latest protocol version.
-        let runtime_config_store = RuntimeConfigStore::new(None);
+        let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
         let wasm_config = runtime_config.wasm_config.clone();
         let origin_account_id: near_primitives::types::AccountId =
