@@ -15,6 +15,7 @@ use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
+use near_primitives_core::config::ViewConfig;
 use near_vm_runner::logic::errors::FunctionCallError;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::ReturnData;
@@ -221,7 +222,7 @@ impl AuroraRunner {
             self.context.clone(),
             &self.wasm_config,
             &self.fees_config,
-            vm_promise_results.as_slice(),
+            &vm_promise_results,
             Some(&self.cache),
         )
         .unwrap();
@@ -467,7 +468,10 @@ impl AuroraRunner {
 
     pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
         let input = args.try_to_vec().unwrap();
-        let runner = self.one_shot();
+        let mut runner = self.one_shot();
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
 
         runner.call("view", "viewer", input).map(|outcome| {
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap()
@@ -479,7 +483,12 @@ impl AuroraRunner {
         args: &ViewCallArgs,
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
-        let runner = self.one_shot();
+        let mut runner = self.one_shot();
+
+        runner.context.view_config = Some(ViewConfig {
+            max_gas_burnt: u64::MAX,
+        });
+
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
         let status =
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
