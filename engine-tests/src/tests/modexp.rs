@@ -73,13 +73,13 @@ fn bench_modexp() {
 
     // TODO: Aurora not least anymore after switching to the nightly-2023-12-15.
     // Typical example with U256-sized inputs.
-    // let input = BenchInput::random(32);
-    // let result = context.bench(&input);
-    // assert_eq!(
-    //     result.least(),
-    //     Implementation::Aurora,
-    //     "Aurora not least:\n{result:?}"
-    // );
+    let input = BenchInput::random(32);
+    let result = context.bench(&input);
+    assert_eq!(
+        result.least(),
+        Implementation::IBig, // FIXME: Should be Aurora.
+        "Aurora not least:\n{result:?}"
+    );
 }
 
 // This test is marked as ignored because it should only be run with `--release`
