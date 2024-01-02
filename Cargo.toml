@@ -44,13 +44,13 @@ ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.4", default-features = false}
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.19"
+near-crypto = { git = "https://github.com/aleksuss/nearcore", rev = "6832608" }
 near-gas = "0.2"
-near-parameters = "0.19"
-near-primitives = "0.19"
-near-primitives-core = "0.19"
+near-parameters = { git = "https://github.com/aleksuss/nearcore", rev = "6832608" }
+near-primitives = { git = "https://github.com/aleksuss/nearcore", rev = "6832608" }
+near-primitives-core = { git = "https://github.com/aleksuss/nearcore", rev = "6832608" }
 near-sdk = "4"
-near-vm-runner = { version = "0.19", default-features = false, features = [ "wasmtime_vm" ] }
+near-vm-runner = { git = "https://github.com/aleksuss/nearcore", rev = "6832608" }
 near-workspaces = "0.9"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
