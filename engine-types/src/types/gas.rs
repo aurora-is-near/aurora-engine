@@ -49,6 +49,10 @@ impl NearGas {
     pub const fn as_u64(self) -> u64 {
         self.0
     }
+
+    pub const fn saturating_add(self, rhs: NearGas) -> NearGas {
+        NearGas(self.0.saturating_add(rhs.0))
+    }
 }
 
 #[derive(

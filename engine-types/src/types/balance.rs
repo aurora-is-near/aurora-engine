@@ -91,6 +91,10 @@ impl Yocto {
     pub const fn as_u128(self) -> u128 {
         self.0
     }
+
+    pub const fn saturating_add(self, rhs: Yocto) -> Yocto {
+        Yocto(self.0.saturating_add(rhs.0))
+    }
 }
 
 impl Serialize for Yocto {
