@@ -122,7 +122,7 @@ impl NearPromise {
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Simple(x) => x.total_gas(),
-            Self::Then { base, callback } => base.total_gas() + callback.total_gas(),
+            Self::Then { base, callback } => base.total_gas().saturating_add(callback.total_gas()),
             Self::And(promises) => {
                 let total = promises.iter().map(|p| p.total_gas().as_u64()).sum();
                 NearGas::new(total)
@@ -134,7 +134,9 @@ impl NearPromise {
     pub fn total_near(&self) -> Yocto {
         match self {
             Self::Simple(x) => x.total_near(),
-            Self::Then { base, callback } => base.total_near() + callback.total_near(),
+            Self::Then { base, callback } => {
+                base.total_near().saturating_add(callback.total_near())
+            }
             Self::And(promises) => {
                 let total = promises.iter().map(|p| p.total_near().as_u128()).sum();
                 Yocto::new(total)
