@@ -124,7 +124,7 @@ impl NearPromise {
             Self::Simple(x) => x.total_gas(),
             Self::Then { base, callback } => base.total_gas().saturating_add(callback.total_gas()),
             Self::And(promises) => {
-                let total = promises.iter().map(|p| p.total_gas().as_u64()).sum();
+                let total = promises.iter().map(|p| p.total_gas().as_u64()).fold(0, |a, b| a.saturating_add(b));
                 NearGas::new(total)
             }
         }
