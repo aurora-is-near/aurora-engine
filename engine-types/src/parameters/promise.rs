@@ -31,7 +31,10 @@ impl PromiseArgs {
     pub fn total_gas(&self) -> NearGas {
         match self {
             Self::Create(call) => call.attached_gas,
-            Self::Callback(cb) => cb.base.attached_gas + cb.callback.attached_gas,
+            Self::Callback(cb) => cb
+                .base
+                .attached_gas
+                .saturating_add(cb.callback.attached_gas),
             Self::Recursive(p) => p.total_gas(),
         }
     }
@@ -40,7 +43,10 @@ impl PromiseArgs {
     pub fn total_near(&self) -> Yocto {
         match self {
             Self::Create(call) => call.attached_balance,
-            Self::Callback(cb) => cb.base.attached_balance + cb.callback.attached_balance,
+            Self::Callback(cb) => cb
+                .base
+                .attached_balance
+                .saturating_add(cb.callback.attached_balance),
             Self::Recursive(p) => p.total_near(),
         }
     }
@@ -68,7 +74,7 @@ impl SimpleNearPromise {
                             None
                         }
                     })
-                    .sum();
+                    .fold(0, |a, b| a.saturating_add(b));
                 NearGas::new(total)
             }
         }
@@ -89,7 +95,7 @@ impl SimpleNearPromise {
                         PromiseAction::Transfer { amount } => Some(amount.as_u128()),
                         _ => None,
                     })
-                    .sum();
+                    .fold(0, |a, b| a.saturating_add(b));
                 Yocto::new(total)
             }
         }
@@ -127,7 +133,7 @@ impl NearPromise {
                 let total = promises
                     .iter()
                     .map(|p| p.total_gas().as_u64())
-                    .fold(0, |a, b| a.saturating_add(b));
+                    .fold(0_u64, |a, b| a.saturating_add(b));
                 NearGas::new(total)
             }
         }
@@ -144,7 +150,7 @@ impl NearPromise {
                 let total = promises
                     .iter()
                     .map(|p| p.total_near().as_u128())
-                    .fold(0, |a, b| a.saturating_add(b));
+                    .fold(0_u128, |a, b| a.saturating_add(b));
                 Yocto::new(total)
             }
         }
