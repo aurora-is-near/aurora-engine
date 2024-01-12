@@ -74,7 +74,7 @@ impl SimpleNearPromise {
                             None
                         }
                     })
-                    .fold(0, |a, b| a.saturating_add(b));
+                    .fold(0, u64::saturating_add);
                 NearGas::new(total)
             }
         }
@@ -95,7 +95,7 @@ impl SimpleNearPromise {
                         PromiseAction::Transfer { amount } => Some(amount.as_u128()),
                         _ => None,
                     })
-                    .fold(0, |a, b| a.saturating_add(b));
+                    .fold(0, u128::saturating_add);
                 Yocto::new(total)
             }
         }
@@ -133,7 +133,7 @@ impl NearPromise {
                 let total = promises
                     .iter()
                     .map(|p| p.total_gas().as_u64())
-                    .fold(0_u64, |a, b| a.saturating_add(b));
+                    .fold(0, u64::saturating_add);
                 NearGas::new(total)
             }
         }
@@ -150,7 +150,7 @@ impl NearPromise {
                 let total = promises
                     .iter()
                     .map(|p| p.total_near().as_u128())
-                    .fold(0_u128, |a, b| a.saturating_add(b));
+                    .fold(0, u128::saturating_add);
                 Yocto::new(total)
             }
         }

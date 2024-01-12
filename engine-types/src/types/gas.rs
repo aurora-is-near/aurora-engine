@@ -50,8 +50,9 @@ impl NearGas {
         self.0
     }
 
-    pub const fn saturating_add(self, rhs: NearGas) -> NearGas {
-        NearGas(self.0.saturating_add(rhs.0))
+    #[must_use]
+    pub const fn saturating_add(self, rhs: Self) -> Self {
+        Self(self.0.saturating_add(rhs.0))
     }
 }
 
