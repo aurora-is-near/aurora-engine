@@ -13,6 +13,7 @@ use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
+use near_parameters::vm::VMKind;
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::ViewConfig;
@@ -628,7 +629,9 @@ impl Default for AuroraRunner {
         // Fetch config (mainly costs) for the latest protocol version.
         let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
-        let wasm_config = runtime_config.wasm_config.clone();
+        let mut wasm_config = runtime_config.wasm_config.clone();
+        wasm_config.vm_kind = VMKind::Wasmtime;
+
         let origin_account_id: near_primitives::types::AccountId =
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
 
