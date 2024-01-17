@@ -121,13 +121,13 @@ fn test_promise_result_gas_cost() {
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
     assert!(
-        utils::within_x_percent(35, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(15, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        utils::within_x_percent(35, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(15, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

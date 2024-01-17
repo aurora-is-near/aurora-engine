@@ -84,7 +84,13 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
     }
 
     fn get_trie_nodes_count(&self) -> TrieNodesCount {
-        self.underlying.get_trie_nodes_count()
+        let db_reads = self.new_trie_node_count.get();
+        let mem_reads = self.cached_trie_node_count.get();
+
+        TrieNodesCount {
+            db_reads,
+            mem_reads,
+        }
     }
 
     fn validator_stake(&self, account_id: &AccountId) -> Result<Option<Balance>, VMLogicError> {
