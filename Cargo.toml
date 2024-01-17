@@ -17,6 +17,7 @@ aurora-engine-types = { path = "engine-types", default-features = false }
 aurora-engine-modexp = { path = "engine-modexp", default-features = false }
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
 aurora-engine-workspace = { path = "engine-workspace" }
+aurora-engine-evm = { path = "engine-evm", features = ["sputnikvm"] }
 engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 

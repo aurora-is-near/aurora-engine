@@ -11,10 +11,12 @@ publish.workspace = true
 autobenches = false
 
 [dependencies]
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
-evm-interpreter = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
+# evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
+# evm-interpreter = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
 [features]
-spuntik = ["evm"]
-r-evm = ["revm"]
+# sputnikvm = ["evm"]
+sputnikvm = []
+# revm = []
+
