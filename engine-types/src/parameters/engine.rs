@@ -501,6 +501,6 @@ mod tests {
             "upgrade_delay_blocks": 19
         });
         let arguments = NewCallArgs::deserialize(&serde_json::to_vec(&outdated).unwrap());
-        assert!(matches!(arguments, Err(_)));
+        assert!(arguments.is_err());
     }
 }
