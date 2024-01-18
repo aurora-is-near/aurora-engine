@@ -11,6 +11,7 @@ use aurora_engine_types::parameters::{
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
 use aurora_engine_types::U256;
 use aurora_engine_workspace::types::NearToken;
+use near_vm_runner::logic::mocks::mock_external::MockAction;
 use near_vm_runner::ContractCode;
 use std::fs;
 use std::path::Path;
@@ -216,18 +217,18 @@ fn test_xcc_schedule_gas() {
 #[test]
 fn test_xcc_exec_gas() {
     let mut router = deploy_router();
+    router.ext.underlying.action_log.clear(); // we need to clear logs here to remove old entries.
 
-    let create_promise_chain =
-        |base_promise: &PromiseCreateArgs, callback_count: usize| -> NearPromise {
-            let mut result = NearPromise::Simple(SimpleNearPromise::Create(base_promise.clone()));
-            for _ in 0..callback_count {
-                result = NearPromise::Then {
-                    base: Box::new(result),
-                    callback: SimpleNearPromise::Create(base_promise.clone()),
-                };
-            }
-            result
-        };
+    let create_promise_chain = |base_promise: &PromiseCreateArgs, callback_count| -> NearPromise {
+        (0..callback_count).fold(
+            NearPromise::Simple(SimpleNearPromise::Create(base_promise.clone())),
+            |result, _| NearPromise::Then {
+                base: Box::new(result),
+                callback: SimpleNearPromise::Create(base_promise.clone()),
+            },
+        )
+    };
+
     let promise = PromiseCreateArgs {
         target_account_id: "some_account.near".parse().unwrap(),
         method: "some_method".into(),
@@ -256,6 +257,29 @@ fn test_xcc_exec_gas() {
             outcome.burnt_gas,
             router_exec_cost
         );
+
+        for action in &router.ext.underlying.action_log {
+            match action {
+                MockAction::FunctionCallWeight {
+                    method_name,
+                    args,
+                    attached_deposit,
+                    prepaid_gas,
+                    ..
+                } => {
+                    assert_eq!(method_name, promise.method.as_bytes());
+                    assert_eq!(args, &promise.args);
+                    assert_eq!(attached_deposit, &promise.attached_balance.as_u128());
+                    assert_eq!(prepaid_gas, &promise.attached_gas.as_u64());
+                }
+                MockAction::CreateReceipt { receiver_id, .. } => {
+                    assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes())
+                }
+                other => panic!("Unexpected action {other:?}"),
+            };
+        }
+
+        router.ext.underlying.action_log.clear();
     }
 }
 
