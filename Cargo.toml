@@ -50,7 +50,7 @@ near-parameters = "0.20"
 near-primitives = "0.20"
 near-primitives-core = "0.20"
 near-sdk = "4"
-near-vm-runner = { version = "0.20", features = [ "wasmtime_vm" ] }
+near-vm-runner = { version = "0.20", features = [ "wasmtime_vm", "wasmer2_vm" ] }
 near-workspaces = "0.9"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"

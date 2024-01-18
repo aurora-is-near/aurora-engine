@@ -630,7 +630,12 @@ impl Default for AuroraRunner {
         let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
         let mut wasm_config = runtime_config.wasm_config.clone();
-        wasm_config.vm_kind = VMKind::Wasmtime;
+
+        if cfg!(not(target_arch = "x86_64")) {
+            wasm_config.vm_kind = VMKind::Wasmtime;
+        } else {
+            wasm_config.vm_kind = VMKind::Wasmer2;
+        }
 
         let origin_account_id: near_primitives::types::AccountId =
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
