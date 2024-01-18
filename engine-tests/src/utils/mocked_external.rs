@@ -1,6 +1,9 @@
-use near_vm_errors::VMLogicError;
-use near_vm_logic::mocks::mock_external::MockedExternal;
-use near_vm_logic::StorageGetMode;
+use near_crypto::PublicKey;
+use near_primitives_core::hash::CryptoHash;
+use near_primitives_core::types::GasWeight;
+use near_vm_runner::logic::mocks::mock_external::MockedExternal;
+use near_vm_runner::logic::types::{AccountId, Balance, Gas, ReceiptIndex};
+use near_vm_runner::logic::{StorageGetMode, TrieNodesCount, VMLogicError};
 use std::cell::Cell;
 
 /// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
@@ -47,7 +50,7 @@ impl MockedExternalWithTrie {
     }
 }
 
-impl near_vm_logic::External for MockedExternalWithTrie {
+impl near_vm_runner::logic::External for MockedExternalWithTrie {
     fn storage_set(&mut self, key: &[u8], value: &[u8]) -> Result<(), VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TRIE_DEPTH);
         self.underlying.storage_set(key, value)
@@ -57,7 +60,7 @@ impl near_vm_logic::External for MockedExternalWithTrie {
         &'a self,
         key: &[u8],
         mode: StorageGetMode,
-    ) -> Result<Option<Box<dyn near_vm_logic::ValuePtr + 'a>>, VMLogicError> {
+    ) -> Result<Option<Box<dyn near_vm_runner::logic::ValuePtr + 'a>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);
         self.underlying.storage_get(key, mode)
@@ -76,27 +79,134 @@ impl near_vm_logic::External for MockedExternalWithTrie {
         self.underlying.storage_has_key(key, mode)
     }
 
-    fn generate_data_id(&mut self) -> near_primitives::hash::CryptoHash {
+    fn generate_data_id(&mut self) -> CryptoHash {
         self.underlying.generate_data_id()
     }
 
-    fn get_trie_nodes_count(&self) -> near_primitives::types::TrieNodesCount {
+    fn get_trie_nodes_count(&self) -> TrieNodesCount {
         let db_reads = self.new_trie_node_count.get();
         let mem_reads = self.cached_trie_node_count.get();
-        near_primitives::types::TrieNodesCount {
+
+        TrieNodesCount {
             db_reads,
             mem_reads,
         }
     }
 
-    fn validator_stake(
-        &self,
-        account_id: &near_primitives::types::AccountId,
-    ) -> Result<Option<near_primitives::types::Balance>, VMLogicError> {
+    fn validator_stake(&self, account_id: &AccountId) -> Result<Option<Balance>, VMLogicError> {
         self.underlying.validator_stake(account_id)
     }
 
-    fn validator_total_stake(&self) -> Result<near_primitives::types::Balance, VMLogicError> {
+    fn validator_total_stake(&self) -> Result<Balance, VMLogicError> {
         self.underlying.validator_total_stake()
+    }
+
+    fn create_receipt(
+        &mut self,
+        receipt_indices: Vec<ReceiptIndex>,
+        receiver_id: AccountId,
+    ) -> Result<ReceiptIndex, VMLogicError> {
+        self.underlying.create_receipt(receipt_indices, receiver_id)
+    }
+
+    fn append_action_create_account(
+        &mut self,
+        receipt_index: ReceiptIndex,
+    ) -> Result<(), VMLogicError> {
+        self.underlying.append_action_create_account(receipt_index)
+    }
+
+    fn append_action_deploy_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        code: Vec<u8>,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_deploy_contract(receipt_index, code)
+    }
+
+    fn append_action_function_call_weight(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        method_name: Vec<u8>,
+        args: Vec<u8>,
+        attached_deposit: Balance,
+        prepaid_gas: Gas,
+        gas_weight: GasWeight,
+    ) -> Result<(), VMLogicError> {
+        self.underlying.append_action_function_call_weight(
+            receipt_index,
+            method_name,
+            args,
+            attached_deposit,
+            prepaid_gas,
+            gas_weight,
+        )
+    }
+
+    fn append_action_transfer(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        amount: Balance,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_transfer(receipt_index, amount)
+    }
+
+    fn append_action_stake(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        stake: Balance,
+        public_key: PublicKey,
+    ) {
+        self.underlying
+            .append_action_stake(receipt_index, stake, public_key);
+    }
+
+    fn append_action_add_key_with_full_access(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        nonce: u64,
+    ) {
+        self.underlying
+            .append_action_add_key_with_full_access(receipt_index, public_key, nonce);
+    }
+
+    fn append_action_add_key_with_function_call(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        nonce: u64,
+        allowance: Option<Balance>,
+        receiver_id: AccountId,
+        method_names: Vec<Vec<u8>>,
+    ) -> Result<(), VMLogicError> {
+        self.underlying.append_action_add_key_with_function_call(
+            receipt_index,
+            public_key,
+            nonce,
+            allowance,
+            receiver_id,
+            method_names,
+        )
+    }
+
+    fn append_action_delete_key(&mut self, receipt_index: ReceiptIndex, public_key: PublicKey) {
+        self.underlying
+            .append_action_delete_key(receipt_index, public_key);
+    }
+
+    fn append_action_delete_account(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        beneficiary_id: AccountId,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_delete_account(receipt_index, beneficiary_id)
+    }
+
+    fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {
+        self.underlying.get_receipt_receiver(receipt_index)
     }
 }

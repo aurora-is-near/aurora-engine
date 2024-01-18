@@ -96,10 +96,7 @@ mod contract {
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// ADMINISTRATIVE METHODS
-    ///
-
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
     #[no_mangle]
@@ -282,10 +279,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// MUTATIVE METHODS
-    ///
-
     /// Deploy code into the EVM.
     #[no_mangle]
     pub extern "C" fn deploy_code() {
@@ -1033,10 +1027,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24#[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// Utility methods.
-    ///
-
     fn internal_get_upgrade_index() -> u64 {
         let io = Runtime;
         match io.read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {

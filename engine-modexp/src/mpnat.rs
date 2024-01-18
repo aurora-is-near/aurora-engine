@@ -843,7 +843,7 @@ fn test_mp_nat_be() {
         let output = mp.to_big_endian();
         let hex_output = hex::encode(output);
         let trimmed = match hex_input.trim_start_matches('0') {
-            x if x.is_empty() => "00",
+            "" => "00",
             x => x,
         };
         assert_eq!(hex_output, trimmed)
