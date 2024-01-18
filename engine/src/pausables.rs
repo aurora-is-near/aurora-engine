@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "PrecompileFlags value is corrupted")]
     fn test_no_precompile_is_paused_if_storage_contains_too_few_bytes() {
         let key = EnginePrecompilesPauser::<StoragePointer>::storage_key();
         let storage = RefCell::new(Storage::default());

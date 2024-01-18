@@ -255,7 +255,7 @@ impl Storage {
         let diff_bytes = diff.try_to_bytes().unwrap();
         action(&mut batch, &storage_key, &diff_bytes);
 
-        for (key, value) in diff.iter() {
+        for (key, value) in diff {
             let storage_key = construct_engine_key(key, block_height, tx_included.position);
             let value_bytes = value.try_to_bytes().unwrap();
             action(&mut batch, &storage_key, &value_bytes);
