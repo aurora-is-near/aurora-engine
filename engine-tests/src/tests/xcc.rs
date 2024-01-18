@@ -273,7 +273,7 @@ fn test_xcc_exec_gas() {
                     assert_eq!(prepaid_gas, &promise.attached_gas.as_u64());
                 }
                 MockAction::CreateReceipt { receiver_id, .. } => {
-                    assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes())
+                    assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes());
                 }
                 other => panic!("Unexpected action {other:?}"),
             };
