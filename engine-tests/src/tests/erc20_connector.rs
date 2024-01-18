@@ -7,7 +7,7 @@ use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use ethabi::Token;
 use libsecp256k1::SecretKey;
-use near_vm_logic::VMOutcome;
+use near_vm_runner::logic::VMOutcome;
 use serde_json::json;
 use sha3::Digest;
 

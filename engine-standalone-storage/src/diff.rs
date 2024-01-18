@@ -83,3 +83,11 @@ impl Diff {
         Self::try_from_slice(bytes)
     }
 }
+
+impl<'diff> IntoIterator for &'diff Diff {
+    type Item = (&'diff Vec<u8>, &'diff DiffValue);
+    type IntoIter = btree_map::Iter<'diff, Vec<u8>, DiffValue>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
