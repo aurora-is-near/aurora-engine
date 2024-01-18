@@ -13,17 +13,15 @@ use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
-use near_primitives::runtime::config_store::RuntimeConfigStore;
+use near_parameters::vm::VMKind;
+use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
-use near_primitives_core::config::VMConfig;
-use near_primitives_core::contract::ContractCode;
-use near_primitives_core::profile::ProfileDataV3;
-use near_primitives_core::runtime::fees::RuntimeFeesConfig;
-use near_vm_errors::{FunctionCallError, HostError};
-use near_vm_logic::mocks::mock_external::MockedExternal;
-use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
-use near_vm_runner::MockCompiledContractCache;
+use near_primitives_core::config::ViewConfig;
+use near_vm_runner::logic::errors::FunctionCallError;
+use near_vm_runner::logic::mocks::mock_external::MockedExternal;
+use near_vm_runner::logic::types::ReturnData;
+use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
+use near_vm_runner::{ContractCode, MockCompiledContractCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
 
@@ -88,7 +86,7 @@ pub struct AuroraRunner {
     pub cache: MockCompiledContractCache,
     pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
-    pub wasm_config: VMConfig,
+    pub wasm_config: Config,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
@@ -150,7 +148,6 @@ impl<'a> OneShotAuroraRunner<'a> {
             &self.base.wasm_config,
             &self.base.fees_config,
             &[],
-            self.base.current_protocol_version,
             Some(&self.base.cache),
         )
         .unwrap();
@@ -212,10 +209,10 @@ impl AuroraRunner {
             .promise_results
             .iter()
             .map(|p| match p {
-                PromiseResult::Failed => near_vm_logic::types::PromiseResult::Failed,
-                PromiseResult::NotReady => near_vm_logic::types::PromiseResult::NotReady,
+                PromiseResult::Failed => near_vm_runner::logic::types::PromiseResult::Failed,
+                PromiseResult::NotReady => near_vm_runner::logic::types::PromiseResult::NotReady,
                 PromiseResult::Successful(bytes) => {
-                    near_vm_logic::types::PromiseResult::Successful(bytes.clone())
+                    near_vm_runner::logic::types::PromiseResult::Successful(bytes.clone())
                 }
             })
             .collect();
@@ -227,7 +224,6 @@ impl AuroraRunner {
             &self.wasm_config,
             &self.fees_config,
             &vm_promise_results,
-            self.current_protocol_version,
             Some(&self.cache),
         )
         .unwrap();
@@ -333,7 +329,7 @@ impl AuroraRunner {
 
             let aurora_balance_key = [
                 ft_key.as_slice(),
-                self.context.current_account_id.as_ref().as_bytes(),
+                self.context.current_account_id.as_bytes(),
             ]
             .concat();
             let aurora_balance_value = {
@@ -489,9 +485,11 @@ impl AuroraRunner {
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
         let input = args.try_to_vec().unwrap();
         let mut runner = self.one_shot();
+
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
         });
+
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
         let status =
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
@@ -580,7 +578,7 @@ impl AuroraRunner {
                 panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
 
-            for (key, value) in standalone_state.iter() {
+            for (key, value) in standalone_state {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(
@@ -629,9 +627,16 @@ impl Default for AuroraRunner {
     fn default() -> Self {
         let evm_wasm_bytes = Self::get_engine_code();
         // Fetch config (mainly costs) for the latest protocol version.
-        let runtime_config_store = RuntimeConfigStore::new(None);
+        let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
-        let wasm_config = runtime_config.wasm_config.clone();
+        let mut wasm_config = runtime_config.wasm_config.clone();
+
+        if cfg!(not(target_arch = "x86_64")) {
+            wasm_config.vm_kind = VMKind::Wasmtime;
+        } else {
+            wasm_config.vm_kind = VMKind::Wasmer2;
+        }
+
         let origin_account_id: near_primitives::types::AccountId =
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
 
@@ -656,8 +661,8 @@ impl Default for AuroraRunner {
                 attached_deposit: 0,
                 prepaid_gas: 10u64.pow(18),
                 random_seed: vec![],
-                view_config: None,
                 output_data_receivers: vec![],
+                view_config: None,
             },
             wasm_config,
             fees_config: RuntimeFeesConfig::test(),

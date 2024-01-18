@@ -4,7 +4,7 @@ use crate::utils::one_inch::liquidity_protocol;
 use crate::utils::{self, assert_gas_bound};
 use aurora_engine_types::borsh::BorshDeserialize;
 use libsecp256k1::SecretKey;
-use near_vm_logic::VMOutcome;
+use near_vm_runner::logic::VMOutcome;
 use std::sync::Once;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
@@ -22,7 +22,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 10); // less than 10 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 11); // less than 11 NEAR Tgas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used

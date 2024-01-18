@@ -68,6 +68,7 @@ pub fn download_and_compile_solidity_sources(
     while !*ready {
         ready = CV.wait(ready).unwrap();
     }
+    drop(ready);
 
     sources_dir.join("artifacts/contracts")
 }

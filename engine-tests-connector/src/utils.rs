@@ -132,6 +132,7 @@ impl TestContract {
                 "metadata": metadata,
                 "account_with_access_right": account_with_access_right,
                 "owner_id": owner_id,
+                "min_proof_acceptance_height": 0,
             }))
             .gas(DEFAULT_GAS)
             .transact()

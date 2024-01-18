@@ -191,7 +191,7 @@ fn test_consume_deploy_message() {
         })
         .unwrap();
     let mut deployed_address = Address::zero();
-    for (key, value) in diff.iter() {
+    for (key, value) in &diff {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
                 deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
