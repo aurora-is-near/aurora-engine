@@ -148,7 +148,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                         .try_to_vec()
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
-                    attached_gas: router_exec_cost + call_gas,
+                    attached_gas: router_exec_cost.saturating_add(call_gas),
                 };
                 (promise, attached_near)
             }
