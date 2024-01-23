@@ -338,6 +338,9 @@ dependencies = [
 name = "aurora-engine-evm"
 version = "1.0.0"
 dependencies = [
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "revm",
 ]
 
