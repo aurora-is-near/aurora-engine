@@ -14,7 +14,7 @@ use crate::engine::Engine;
 use crate::hashchain::with_hashchain;
 use crate::prelude::{format, sdk, ToString, Vec};
 use crate::state;
-use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::io::StorageIntermediate;
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::{env::Env, io::IO};
@@ -25,6 +25,7 @@ use aurora_engine_types::parameters::connector::{
     WithdrawResult,
 };
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
+use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs, WithdrawCallArgs};
 use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::types::address::error::AddressError;
@@ -208,7 +209,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -225,17 +226,19 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
         let args: NEP141FtOnTransferArgs = serde_json::from_slice(&io.read_input().to_vec())
             .map_err(Into::<ParseArgsError>::into)?;
 
-        if predecessor_account_id == current_account_id {
-            EthConnectorContract::init(io)?.ft_on_transfer(&engine, &args)?;
+        let output = if predecessor_account_id == current_account_id {
+            EthConnectorContract::init(io)?.ft_on_transfer(&args)?;
+            None
         } else {
-            engine.receive_erc20_tokens(
+            let result = engine.receive_erc20_tokens(
                 &predecessor_account_id,
                 &args,
                 &current_account_id,
                 handler,
             );
-        }
-        Ok(())
+            result.ok()
+        };
+        Ok(output)
     })
 }
 
@@ -901,10 +904,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         if args.receiver_id == current_account_id {
             let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
                 .map_err(errors::FtTransferCallError::MessageParseFailed)?;
-            // Check is transfer amount > fee
-            if message_data.fee.as_u128() >= args.amount.as_u128() {
-                return Err(errors::FtTransferCallError::InsufficientAmountForFee);
-            }
 
             // Additional check for overflowing before `ft_on_transfer` calling.
             // But skip checking for overflowing for the relayer.
@@ -1006,9 +1005,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// `ft_on_transfer` callback function.
-    pub fn ft_on_transfer<E: Env, M: ModExpAlgorithm>(
+    pub fn ft_on_transfer(
         &mut self,
-        engine: &Engine<I, E, M>,
         args: &NEP141FtOnTransferArgs,
     ) -> Result<(), errors::FtTransferCallError> {
         sdk::log!("Call ft_on_transfer");
@@ -1016,22 +1014,6 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         let message_data = FtTransferMessageData::parse_on_transfer_message(&args.msg)
             .map_err(errors::FtTransferCallError::MessageParseFailed)?;
         let amount = Wei::new_u128(args.amount.as_u128());
-        // Special case when predecessor_account_id is current_account_id
-        let fee = Wei::from(message_data.fee);
-        // Mint fee to relayer
-        let relayer = engine.get_relayer(message_data.relayer.as_bytes());
-        let (amount, relayer_fee) = relayer
-            .filter(|_| fee > aurora_engine_types::types::ZERO_WEI)
-            .map_or(Ok((amount, None)), |address| {
-                amount.checked_sub(fee).map_or(
-                    Err(errors::FtTransferCallError::InsufficientAmountForFee),
-                    |amount| Ok((amount, Some((address, fee)))),
-                )
-            })?;
-
-        if let Some((address, fee)) = relayer_fee {
-            self.mint_eth_on_aurora(address, fee)?;
-        }
 
         self.mint_eth_on_aurora(message_data.recipient, amount)?;
         self.save_ft_contract();

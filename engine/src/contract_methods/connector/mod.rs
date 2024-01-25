@@ -103,13 +103,13 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<(), ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     #[cfg(not(feature = "ext-connector"))]
-    internal::ft_on_transfer(io, env, handler)?;
+    let result = internal::ft_on_transfer(io, env, handler)?;
     #[cfg(feature = "ext-connector")]
-    external::ft_on_transfer(io, env, handler)?;
+    let result = external::ft_on_transfer(io, env, handler)?;
 
-    Ok(())
+    Ok(result)
 }
 
 #[named]
@@ -609,8 +609,7 @@ mod tests {
         let fee = Fee::new(NEP141Wei::new(0));
         let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
         let token_message_data: TokenMessageData =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
         let deposit_event = DepositedEvent {
             eth_custodian_address,

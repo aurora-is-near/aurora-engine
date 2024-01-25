@@ -9,6 +9,7 @@ use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
+use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
 
@@ -304,7 +305,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 10);
+    utils::assert_gas_bound(profile.all_gas(), 11);
 }
 
 #[test]
@@ -455,7 +456,7 @@ fn test_solidity_pure_bench() {
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
-    let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
+    let code = ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
     let outcome = near_vm_runner::run(
@@ -466,7 +467,6 @@ fn test_solidity_pure_bench() {
         &runner.wasm_config,
         &runner.fees_config,
         &[],
-        runner.current_protocol_version,
         Some(&runner.cache),
     )
     .unwrap();
@@ -689,7 +689,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let expected_number = 1550;
+    let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
 
     assert!(
@@ -907,9 +907,8 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer_address =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     utils::validate_address_balance_and_nonce(
@@ -969,9 +968,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     );
 
     // validate post-state
-    let relayer = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     utils::validate_address_balance_and_nonce(
         &runner,

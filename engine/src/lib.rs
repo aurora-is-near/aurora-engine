@@ -76,8 +76,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::{self, Engine};
-    #[cfg(feature = "evm_bully")]
-    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
@@ -98,10 +96,7 @@ mod contract {
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// ADMINISTRATIVE METHODS
-    ///
-
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
     #[no_mangle]
@@ -180,6 +175,18 @@ mod contract {
     pub extern "C" fn get_upgrade_index() {
         let io = Runtime;
         contract_methods::admin::get_upgrade_index(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Upgrade the contract with the provided code bytes.
+    #[no_mangle]
+    pub extern "C" fn upgrade() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+
+        contract_methods::admin::upgrade(io, &env, &mut handler)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -272,10 +279,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// MUTATIVE METHODS
-    ///
-
     /// Deploy code into the EVM.
     #[no_mangle]
     pub extern "C" fn deploy_code() {
@@ -553,45 +557,6 @@ mod contract {
         contract_methods::connector::get_erc20_metadata(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
-    }
-
-    ///
-    /// BENCHMARKING METHODS
-    ///
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_chain() {
-        use crate::prelude::U256;
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
-        state.chain_id = args.chain_id;
-        state::set_state(&mut io, &state).sdk_unwrap();
-        // set genesis block balances
-        for account_balance in args.genesis_alloc {
-            engine::set_balance(
-                &mut io,
-                &account_balance.address,
-                &crate::prelude::Wei::new(U256::from(account_balance.balance)),
-            );
-        }
-        // return new chain ID
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
-    }
-
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_block() {
-        let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
     ///
@@ -1062,10 +1027,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24#[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// Utility methods.
-    ///
-
     fn internal_get_upgrade_index() -> u64 {
         let io = Runtime;
         match io.read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {

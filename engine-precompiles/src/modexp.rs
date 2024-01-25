@@ -38,7 +38,7 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
             Ok(U256::from(exp.bits()) - U256::from(1))
         } else {
             // else > 32
-            Ok(U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits()) - U256::from(1))
+            Ok(U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits().saturating_sub(1)))
         }
     }
 
@@ -725,5 +725,13 @@ mod tests {
         let res =
             ModExp::<Berlin>::new().run(&input, Some(EthGas::new(100_000)), &new_context(), false);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_calc_iter_count_underflow() {
+        let input = hex::decode("0000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000002600");
+        let gas = ModExp::<Berlin>::required_gas(&input.unwrap()).unwrap();
+        let min_gas = EthGas::new(65536);
+        assert_eq!(gas, min_gas);
     }
 }

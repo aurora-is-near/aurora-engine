@@ -191,7 +191,7 @@ fn test_consume_deploy_message() {
         })
         .unwrap();
     let mut deployed_address = Address::zero();
-    for (key, value) in diff.iter() {
+    for (key, value) in &diff {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
                 deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
@@ -472,8 +472,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     let fee = Fee::new(NEP141Wei::new(0));
     let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
     let token_message_data: TokenMessageData =
-        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-            .unwrap();
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
     let deposit_event = DepositedEvent {
         eth_custodian_address,

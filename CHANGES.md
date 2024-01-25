@@ -7,12 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] 2023-12-06
+
+### Additions
+
+- Added a new transaction `upgrade` which allows upgrading the contract and invoking the `state_migration` callback
+  with one call by [@aleksuss]. ([#878])
+
+### Fixes
+
+- Updated the logic of upgrading XCC router which works properly on both `mainnet` and `testnet` by [@birchmd]. ([#877])  
+
+[#877]: https://github.com/aurora-is-near/aurora-engine/pull/877
+[#878]: https://github.com/aurora-is-near/aurora-engine/pull/878
+
+## [3.4.0] 2023-11-28
+
+### Additions
+
+- Added a possibility to pass initialize arguments in json format to the `new` transaction by [@aleksuss]. ([#871])
+- The `SubmitResult` was made available for `ft_on_transfer` transactions in the standalone engine by [@birchmd]. ([#869])
+- The order of producing the exit precompile and XCC promises has been changed to sequential by [@birchmd]. ([#868])
+
+### Changes
+
+- Removed the code hidden behind the feature that isn't used anymore by [@joshuajbouw]. ([#870])
+- The logic of unwrapping wNEAR has been changed to the Bridge's native by [@birchmd]. ([#867])
+- Bumped the `near-workspaces` to 0.9 by [@aleksuss]. ([#862])
+
+### Fixes
+
+- Add a method for upgrading XCC router contract by [@birchmd]. ([#866])
+- Fixed a potential panic in the `ExitToNear` precompile by [@guidovranken]. ([#865])
+- Fixed a behaviour when the `ft_transfer` could occur before the `near_withdraw` by [@birchmd]. ([#864])
+- Fixed correctness of reproducing the NEAR runtime random value in the standalone engine by [@birchmd]. ([#863])  
+
+[#862]: https://github.com/aurora-is-near/aurora-engine/pull/862
+[#863]: https://github.com/aurora-is-near/aurora-engine/pull/863
+[#864]: https://github.com/aurora-is-near/aurora-engine/pull/864
+[#865]: https://github.com/aurora-is-near/aurora-engine/pull/865
+[#866]: https://github.com/aurora-is-near/aurora-engine/pull/866
+[#867]: https://github.com/aurora-is-near/aurora-engine/pull/867
+[#868]: https://github.com/aurora-is-near/aurora-engine/pull/868
+[#869]: https://github.com/aurora-is-near/aurora-engine/pull/869
+[#870]: https://github.com/aurora-is-near/aurora-engine/pull/870
+[#871]: https://github.com/aurora-is-near/aurora-engine/pull/871
+
 ## [3.3.1] 2023-10-26
 
 ### Fixes
 
 - The smart contract owner whose account id is not the same as the contract account id can set ERC-20 metadata
-  by [@aleksuss] ([#858]). 
+  by [@aleksuss]. ([#858]) 
 
 [#858]: https://github.com/aurora-is-near/aurora-engine/pull/858
 
@@ -33,18 +79,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changes
 
 - Changed structure `SetEthConnectorContractAccountArgs` for setting eth connector account. It was extended with
- additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834]) 
-
+ additional field: `withdraw_serialize_type` for defining serialization type for withdraw arguments by [@aleksuss]. ([#834])
 - Updated rocksdb up to 0.21.0 by [@aleksuss]. ([#840])
 
 ### Additions
 
 - Added a possibility of mirroring deployed ERC-20 contracts in the main Aurora contract in Silo mode by [@aleksuss]. ([#845])
-
 - Allow to initialize hashchain directly with the `new` method by [@birchmd]. ([#846])
-
 - Added a silo logic which allows to set fixed gas costs per transaction by [@aleksuss]. ([#746])
-
 - Added a new type of transaction which allows to add full access key into account of the smart contract by [@aleksuss]. ([#847])
 
 [#746]: https://github.com/aurora-is-near/aurora-engine/pull/746
@@ -59,9 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Additions
 
 - Added the possibility to use native NEAR instead of wNEAR on Aurora by [@karim-en]. ([#750])
-
 - Added hashchain integration by [@birchmd]. ([#831])
-
 - Added functions for setting and getting metadata of ERC-20 contracts deployed with `deploy_erc20_token` transaction
   by [@aleksuss]. ([#837])
 
@@ -547,7 +587,9 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...develop
+[3.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.4.0
+[3.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.1...3.4.0
 [3.3.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...3.3.0
 [3.2.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.1.0...3.2.0
