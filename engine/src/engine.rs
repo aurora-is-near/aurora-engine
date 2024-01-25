@@ -549,6 +549,23 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 let contract = call_args.contract;
                 let value = call_args.value.into();
                 let input = call_args.input;
+
+                // TODO: experimental
+                let tx_info = aurora_engine_evm::TransactionInfo {
+                    gas_price: self.gas_price,
+                    address: Some(contract),
+                    origin,
+                    value,
+                    input: input.clone(),
+                    gas_limit: u64::MAX,
+                    access_list: Vec::new(),
+                    set_balance_handler: |address: Box<Address>, balance: Box<Wei>| {
+                        set_balance(self.io, address, &*balance)
+                    },
+                };
+                let fn1 = |address: &Address, balance: &Wei| set_balance(self.io, address, balance);
+                aurora_engine_evm::EngineEVM::new(self.io, self.env, &tx_info);
+
                 self.call(
                     &origin,
                     &contract,
@@ -1491,7 +1508,7 @@ pub fn add_balance<I: IO>(
     Ok(())
 }
 
-pub fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
+pub fn set_balance<I: IO>(io: &mut I, address: Box<Address>, balance: &Wei) {
     io.write_storage(
         &address_to_key(KeyPrefix::Balance, address),
         &balance.to_bytes(),
