@@ -1,8 +1,11 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code, unused_variables)]
+
+extern crate alloc;
+
 use crate::revm::REVMHandler;
-use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{Box, Vec};
 use aurora_engine_types::{H160, H256, U256};
 
 #[cfg(feature = "revm")]
@@ -14,6 +17,11 @@ pub trait EVMHandler {
     fn transact_call(&mut self);
 }
 
+pub type SetBalanceHandler = dyn Fn(Box<Address>, Box<Wei>);
+pub type EnvTimeStamp = dyn Fn() -> u64;
+pub type EnvCoinbase = dyn Fn() -> [u8; 20];
+pub type EnvBlockHeight = dyn Fn() -> u64;
+
 // #[derive(Clone, Debug)]
 pub struct TransactionInfo {
     pub gas_price: U256,
@@ -23,32 +31,33 @@ pub struct TransactionInfo {
     pub address: Option<Address>,
     pub gas_limit: u64,
     pub access_list: Vec<(H160, Vec<H256>)>,
-    pub set_balance_handler: dyn Fn(Box<Address>, Box<Wei>),
+    // pub set_balance_handler: Box<SetBalanceHandler>,
+    // pub time_stamp: Box<EnvTimeStamp>,
+    // pub coinbase: Box<EnvCoinbase>,
+    // pub block_height: Rc<EnvBlockHeight>,
 }
 
-pub struct EngineEVM<'tx, 'env, I: IO, E: Env> {
-    io: I,
-    env: &'env E,
+pub struct EngineEVM<'tx> {
     handler: Box<dyn EVMHandler>,
     transaction: &'tx TransactionInfo,
 }
 
-impl<'tx, 'env, I: IO + Copy + 'env, E: Env> EngineEVM<'tx, 'env, I, E> {
+pub struct EnvInfo {}
+
+impl<'tx> EngineEVM<'tx> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(io: I, env: &'env E, transaction: &'tx TransactionInfo) -> Self {
+    pub fn new(transaction: &'tx TransactionInfo) -> Self {
         #[cfg(feature = "revm")]
-        let handler = Box::new(REVMHandler::new(io, env, transaction));
+        let handler = Box::new(REVMHandler::new(transaction));
         Self {
-            io,
-            env,
             handler,
             transaction,
         }
     }
 }
 
-impl<'tx, 'env, I: IO + Copy + 'env, E: Env> EVMHandler for EngineEVM<'tx, 'env, I, E> {
+impl<'tx> EVMHandler for EngineEVM<'tx> {
     /// Invoke EVM transact-create
     fn transact_create(&mut self) {
         self.handler.transact_create();

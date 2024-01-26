@@ -20,5 +20,6 @@ aurora-engine-types.workspace = true
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
 [features]
+std = []
 # sputnikvm = ["evm"]
 sputnikvm = []

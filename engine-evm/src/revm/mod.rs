@@ -1,37 +1,32 @@
+use crate::Box;
 use crate::{EVMHandler, TransactionInfo};
-use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{NEP141Wei, Wei};
 use aurora_engine_types::H160;
-use revm::handler::LoadPrecompilesHandle;
 use revm::precompile::{Address, B256};
 use revm::primitives::{
     Account, AccountInfo, Bytecode, Env, HashMap, ResultAndState, SpecId, U256,
 };
 use revm::{Database, DatabaseCommit, Evm};
-use std::sync::Arc;
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
 
 /// REVM handler
-pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
-    state: ContractState<'env, I, E>,
-    state_env: &'env E,
+pub struct REVMHandler {
+    state: ContractState,
     env: Box<Env>,
 }
 
-impl<'env, I: IO, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
-    pub fn new(io: I, state_env: &'env E, transaction: &TransactionInfo) -> Self {
-        let state = ContractState::new(io, state_env);
+impl REVMHandler {
+    pub fn new(transaction: &TransactionInfo) -> Self {
+        let state = ContractState::new();
         let mut env = Box::new(Env::default());
 
         // env.cfg.chain_id = self.chain_id;
         env.block.gas_limit = U256::MAX;
-        env.block.number = U256::from(state_env.block_height());
-        env.block.coinbase = Address::new([
-            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
-            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
-        ]);
-        env.block.timestamp = U256::from(state_env.block_timestamp().secs());
+        // env.block.number = U256::from((transaction.block_height)());
+        // env.block.coinbase = Address::new((transaction.coinbase)());
+        // env.block.timestamp = U256::from((transaction.time_stamp)());
+        // (transaction.set_balance_handler)(address, balance);
         env.block.difficulty = U256::ZERO;
         env.block.basefee = U256::ZERO;
         // For callback test
@@ -39,13 +34,8 @@ impl<'env, I: IO, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
         let address = Box::new(aurora_engine_types::types::Address::new(
             H160::from_low_u64_be(0),
         ));
-        (transaction.set_balance_handler)(address, balance);
 
-        Self {
-            state,
-            state_env,
-            env,
-        }
+        Self { state, env }
 
         /* TODO: remove - for investigation only
         // env.tx.transact_to +
@@ -76,30 +66,27 @@ impl<'env, I: IO, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
         */
     }
 
-    /// EVM precompiles
-    pub fn set_precompiles<'a>(
-        precompiles: &LoadPrecompilesHandle<'a>,
-    ) -> LoadPrecompilesHandle<'a> {
-        // TODO: extend precompiles
-        let c = precompiles();
-        Arc::new(move || c.clone())
-    }
+    // EVM precompiles
+    // pub fn set_precompiles<'a>(
+    //     precompiles: &LoadPrecompilesHandle<'a>,
+    // ) -> LoadPrecompilesHandle<'a> {
+    //     // TODO: extend precompiles
+    //     let c = precompiles();
+    //     Arc::new(move || c.clone())
+    // }
 }
 
 /// REVM contract state handler
 /// Operates with REVM `DB`
-pub struct ContractState<'env, I: IO, E: aurora_engine_sdk::env::Env> {
-    io: I,
-    env: &'env E,
-}
+pub struct ContractState;
 
-impl<'env, I: IO, E: aurora_engine_sdk::env::Env> ContractState<'env, I, E> {
-    pub fn new(io: I, env: &'env E) -> Self {
-        Self { io, env }
+impl ContractState {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl<'env, I: IO, E: aurora_engine_sdk::env::Env> Database for ContractState<'env, I, E> {
+impl Database for ContractState {
     type Error = ();
 
     fn basic(&mut self, _address: Address) -> Result<Option<AccountInfo>, Self::Error> {
@@ -119,21 +106,21 @@ impl<'env, I: IO, E: aurora_engine_sdk::env::Env> Database for ContractState<'en
     }
 }
 
-impl<'env, I: IO, E: aurora_engine_sdk::env::Env> DatabaseCommit for ContractState<'env, I, E> {
+impl DatabaseCommit for ContractState {
     fn commit(&mut self, _evm_state: HashMap<Address, Account>) {
         todo!()
     }
 }
 
-impl<'env, I: IO, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
+impl EVMHandler for REVMHandler {
     fn transact_create(&mut self) {
         let mut evm = Evm::builder()
             .with_db(&mut self.state)
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
@@ -145,8 +132,8 @@ impl<'env, I: IO, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'en
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
@@ -158,8 +145,8 @@ impl<'env, I: IO, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'en
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
