@@ -1,3 +1,4 @@
+use crate::Box;
 use crate::{EVMHandler, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use revm::handler::LoadPrecompilesHandle;
@@ -6,21 +7,25 @@ use revm::primitives::{
     Account, AccountInfo, Bytecode, Env, HashMap, ResultAndState, SpecId, U256,
 };
 use revm::{Database, DatabaseCommit, Evm};
-use std::sync::Arc;
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
 
 /// REVM handler
-pub struct REVMHandler<I: IO> {
+pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
+    env_state: &'env E,
     state: ContractState<I>,
     env: Box<Env>,
 }
 
-impl<I: IO> REVMHandler<I> {
-    pub fn new(io: I, transaction: &TransactionInfo) -> Self {
+impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
+    pub fn new(io: &I, env_state: &'env E, transaction: &TransactionInfo) -> Self {
         let state = ContractState::new(io);
         let env = Box::new(Env::default());
-        Self { state, env }
+        Self {
+            state,
+            env_state,
+            env,
+        }
 
         /*
         // env.cfg.chain_id +
@@ -215,8 +220,9 @@ impl<I: IO> REVMHandler<I> {
         precompiles: &LoadPrecompilesHandle<'a>,
     ) -> LoadPrecompilesHandle<'a> {
         // TODO: extend precompiles
-        let c = precompiles();
-        Arc::new(move || c.clone())
+        // let c = precompiles();
+        // Arc::new(move || c.clone())
+        precompiles.clone()
     }
 }
 
@@ -226,9 +232,9 @@ pub struct ContractState<I: IO> {
     io: I,
 }
 
-impl<I: IO> ContractState<I> {
-    pub fn new(io: I) -> Self {
-        Self { io }
+impl<I: IO + Copy> ContractState<I> {
+    pub fn new(io: &I) -> Self {
+        Self { io: *io }
     }
 }
 
@@ -258,15 +264,15 @@ impl<I: IO> DatabaseCommit for ContractState<I> {
     }
 }
 
-impl<I: IO> EVMHandler for REVMHandler<I> {
+impl<'env, I: IO, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
     fn transact_create(&mut self) {
         let mut evm = Evm::builder()
             .with_db(&mut self.state)
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
@@ -278,8 +284,8 @@ impl<I: IO> EVMHandler for REVMHandler<I> {
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
@@ -291,8 +297,8 @@ impl<I: IO> EVMHandler for REVMHandler<I> {
             .modify_env(|e| *e = *self.env.clone())
             .spec_id(EVM_FORK)
             .build();
-        let precompiles = evm.handler.pre_execution.load_precompiles;
-        evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
+        // let precompiles = evm.handler.pre_execution.load_precompiles;
+        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);

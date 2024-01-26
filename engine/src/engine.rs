@@ -549,6 +549,27 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 let contract = call_args.contract;
                 let value = call_args.value.into();
                 let input = call_args.input;
+
+                // TODO: experimental
+                let tx_info = aurora_engine_evm::TransactionInfo {
+                    gas_price: self.gas_price,
+                    address: Some(contract),
+                    origin,
+                    value,
+                    input: input.clone(),
+                    gas_limit: u64::MAX,
+                    access_list: Vec::new(),
+                    // set_balance_handler: Box::new(|address: Box<Address>, balance: Box<Wei>| {
+                    //     set_balance(self.io, &*address, &*balance)
+                    // }),
+                    // time_stamp: Box::new(|| self.env.block_timestamp().secs()),
+                    // coinbase: Box::new(|| self.block_coinbase().0),
+                    // block_height: Rc::new(|| self.env.block_height()),
+                };
+
+                let _x = aurora_engine_evm::init_evm(&self.io, self.env, &tx_info);
+                // aurora_engine_evm::EngineEVM::new(&tx_info);
+
                 self.call(
                     &origin,
                     &contract,
