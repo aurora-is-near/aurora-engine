@@ -551,10 +551,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 let input = call_args.input;
 
                 // TODO: experimental
-                // #[cfg(feature = "contract")]
-                // use alloc::rc::Rc;
-                // #[cfg(not(feature = "contract"))]
-                // use std::rc::Rc;
                 let tx_info = aurora_engine_evm::TransactionInfo {
                     gas_price: self.gas_price,
                     address: Some(contract),
@@ -570,7 +566,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     // coinbase: Box::new(|| self.block_coinbase().0),
                     // block_height: Rc::new(|| self.env.block_height()),
                 };
-                aurora_engine_evm::EngineEVM::new(&tx_info);
+
+                use aurora_engine_evm::EVMHandler;
+                let mut evm = aurora_engine_evm::init_evm(&self.io, self.env, &tx_info);
+                evm.transact_call();
 
                 self.call(
                     &origin,
