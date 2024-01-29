@@ -341,6 +341,7 @@ dependencies = [
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-types",
+ "evm",
  "revm",
 ]
 

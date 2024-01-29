@@ -91,12 +91,12 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
 /// Operates with REVM `DB`
 pub struct ContractState<'env, I: IO, E: aurora_engine_sdk::env::Env> {
     io: I,
-    state_env: &'env E,
+    env_state: &'env E,
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> ContractState<'env, I, E> {
     pub fn new(io: &I, state_env: &'env E) -> Self {
-        Self { io: *io, state_env }
+        Self { io: *io, env_state }
     }
 }
 

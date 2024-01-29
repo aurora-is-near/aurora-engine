@@ -15,11 +15,9 @@ aurora-engine-precompiles.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
 
-# evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
-# evm-interpreter = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "evm-v1.0.0-alpha.2", default-features = false, optional = true }
+evm = { workspace = true, features = [ "create-fixed" ], optional = true }
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
 [features]
 std = []
-# sputnikvm = ["evm"]
-sputnikvm = []
+sputnikvm = ["evm"]

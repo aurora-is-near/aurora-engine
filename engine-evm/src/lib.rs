@@ -3,26 +3,28 @@
 
 extern crate alloc;
 
+#[cfg(feature = "revm")]
 use crate::revm::REVMHandler;
+#[cfg(feature = "sputnikvm")]
+use crate::sputnikvm::SputnikVMHandler;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{Box, Vec};
+#[cfg(feature = "revm")]
+use aurora_engine_types::Box;
+use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
 
 #[cfg(feature = "revm")]
 mod revm;
+#[cfg(feature = "sputnikvm")]
+mod sputnikvm;
 
 pub trait EVMHandler {
     fn transact_create(&mut self);
     fn transact_create_fixed(&mut self);
     fn transact_call(&mut self);
 }
-
-pub type SetBalanceHandler = dyn Fn(Box<Address>, Box<Wei>);
-pub type EnvTimeStamp = dyn Fn() -> u64;
-pub type EnvCoinbase = dyn Fn() -> [u8; 20];
-pub type EnvBlockHeight = dyn Fn() -> u64;
 
 // #[derive(Clone, Debug)]
 pub struct TransactionInfo {
@@ -40,6 +42,17 @@ pub struct EngineEVM<'tx, 'env, I: IO, E: Env, H: EVMHandler> {
     env: &'env E,
     handler: H,
     transaction: &'tx TransactionInfo,
+}
+
+#[cfg(feature = "sputnikvm")]
+/// Init REVM
+pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env>(
+    io: &I,
+    env: &'env E,
+    transaction: &'tx TransactionInfo,
+) -> EngineEVM<'tx, 'env, I, E, SputnikVMHandler<'env, I, E>> {
+    let handler = SputnikVMHandler::new(io, env, &transaction);
+    EngineEVM::new(io, env, transaction, handler)
 }
 
 #[cfg(feature = "revm")]
