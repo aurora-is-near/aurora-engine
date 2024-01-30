@@ -20,4 +20,5 @@ revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-fea
 
 [features]
 std = []
-sputnikvm = ["evm"]
+evm-sputnikvm = ["evm"]
+evm-revm = ["revm"]

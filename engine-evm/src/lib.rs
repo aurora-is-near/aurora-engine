@@ -3,28 +3,21 @@
 
 extern crate alloc;
 
-#[cfg(feature = "revm")]
-use crate::revm::REVMHandler;
-#[cfg(feature = "sputnikvm")]
-use crate::sputnikvm::SputnikVMHandler;
-#[cfg(feature = "sputnikvm")]
-use aurora_engine_precompiles::Precompiles;
-#[cfg(feature = "sputnikvm")]
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
-use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::types::{Address, Wei};
-#[cfg(feature = "revm")]
-use aurora_engine_types::Box;
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
-#[cfg(feature = "sputnikvm")]
-use evm::Config;
 
-#[cfg(feature = "revm")]
+#[cfg(feature = "evm-revm")]
 mod revm;
-#[cfg(feature = "sputnikvm")]
+#[cfg(feature = "evm-sputnikvm")]
 mod sputnikvm;
+
+#[cfg(feature = "evm-revm")]
+pub use crate::revm::init_evm;
+#[cfg(feature = "evm-sputnikvm")]
+pub use crate::sputnikvm::init_evm;
 
 pub trait EVMHandler {
     fn transact_create(&mut self);
@@ -48,30 +41,6 @@ pub struct EngineEVM<'tx, 'env, I: IO, E: Env, H: EVMHandler> {
     env: &'env E,
     handler: H,
     transaction: &'tx TransactionInfo,
-}
-
-#[cfg(feature = "sputnikvm")]
-/// Init REVM
-pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler>(
-    io: &I,
-    env: &'env E,
-    transaction: &'tx TransactionInfo,
-    precompiles: Precompiles<'env, I, E, H>,
-    config: &'env Config,
-) -> EngineEVM<'tx, 'env, I, E, SputnikVMHandler<'env, I, E, H>> {
-    let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
-    EngineEVM::new(io, env, transaction, handler)
-}
-
-#[cfg(feature = "revm")]
-/// Init REVM
-pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env>(
-    io: &I,
-    env: &'env E,
-    transaction: &'tx TransactionInfo,
-) -> EngineEVM<'tx, 'env, I, E, REVMHandler<'env, I, E>> {
-    let handler = REVMHandler::new(io, env, &transaction);
-    EngineEVM::new(io, env, transaction, handler)
 }
 
 impl<'tx, 'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'tx, 'env, I, E, H> {

@@ -559,19 +559,18 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     input: input.clone(),
                     gas_limit: u64::MAX,
                     access_list: Vec::new(),
-                    // set_balance_handler: Box::new(|address: Box<Address>, balance: Box<Wei>| {
-                    //     set_balance(self.io, &*address, &*balance)
-                    // }),
-                    // time_stamp: Box::new(|| self.env.block_timestamp().secs()),
-                    // coinbase: Box::new(|| self.block_coinbase().0),
-                    // block_height: Rc::new(|| self.env.block_height()),
                 };
 
                 use aurora_engine_evm::EVMHandler;
-                let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-                let precompiles = self.create_precompiles(pause_flags, handler);
-                let mut evm =
-                    aurora_engine_evm::init_evm(&self.io, self.env, &tx_info, precompiles, CONFIG);
+                #[cfg(feature = "evm-sputnik")]
+                let mut evm = {
+                    let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+                    let precompiles = self.create_precompiles(pause_flags, handler);
+                    aurora_engine_evm::init_evm(&self.io, self.env, &tx_info, precompiles, CONFIG)
+                };
+                #[cfg(feature = "evm-revm")]
+                let mut evm = aurora_engine_evm::init_evm(&self.io, self.env, &tx_info);
+
                 evm.transact_call();
 
                 self.call(

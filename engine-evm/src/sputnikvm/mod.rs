@@ -1,4 +1,4 @@
-use crate::{EVMHandler, TransactionInfo};
+use crate::{EVMHandler, EngineEVM, TransactionInfo};
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
@@ -11,6 +11,18 @@ pub struct SputnikVMHandler<'env, I: IO, E: Env, H> {
     env_state: &'env E,
     state: ContractState<'env, I, E>,
     precompiles: Precompiles<'env, I, E, H>,
+}
+
+/// Init REVM
+pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler>(
+    io: &I,
+    env: &'env E,
+    transaction: &'tx TransactionInfo,
+    precompiles: Precompiles<'env, I, E, H>,
+    config: &'env Config,
+) -> EngineEVM<'tx, 'env, I, E, SputnikVMHandler<'env, I, E, H>> {
+    let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
+    EngineEVM::new(io, env, transaction, handler)
 }
 
 pub struct ContractState<'env, I: IO, E: Env> {

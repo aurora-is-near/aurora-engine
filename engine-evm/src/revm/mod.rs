@@ -1,8 +1,7 @@
-use crate::Box;
-use crate::{EVMHandler, TransactionInfo};
+use crate::{EVMHandler, EngineEVM, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{NEP141Wei, Wei};
-use aurora_engine_types::H160;
+use aurora_engine_types::{Box, H160};
 use revm::handler::LoadPrecompilesHandle;
 use revm::precompile::{Address, B256};
 use revm::primitives::{
@@ -11,6 +10,16 @@ use revm::primitives::{
 use revm::{Database, DatabaseCommit, Evm};
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
+
+/// Init REVM
+pub fn init_evm<'tx, 'env, I: IO + Copy, E: aurora_engine_sdk::env::Env>(
+    io: &I,
+    env: &'env E,
+    transaction: &'tx TransactionInfo,
+) -> EngineEVM<'tx, 'env, I, E, REVMHandler<'env, I, E>> {
+    let handler = REVMHandler::new(io, env, &transaction);
+    EngineEVM::new(io, env, transaction, handler)
+}
 
 /// REVM handler
 pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
@@ -95,7 +104,7 @@ pub struct ContractState<'env, I: IO, E: aurora_engine_sdk::env::Env> {
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> ContractState<'env, I, E> {
-    pub fn new(io: &I, state_env: &'env E) -> Self {
+    pub fn new(io: &I, env_state: &'env E) -> Self {
         Self { io: *io, env_state }
     }
 }
@@ -116,7 +125,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
     }
 
     fn block_hash(&mut self, number: U256) -> Result<B256, Self::Error> {
-        let idx = U256::from(self.state_env.block_height());
+        let idx = U256::from(self.env_state.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // TODO: refactor
             // compute_block_hash(
