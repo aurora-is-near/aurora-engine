@@ -7,13 +7,19 @@ extern crate alloc;
 use crate::revm::REVMHandler;
 #[cfg(feature = "sputnikvm")]
 use crate::sputnikvm::SputnikVMHandler;
+#[cfg(feature = "sputnikvm")]
+use aurora_engine_precompiles::Precompiles;
+#[cfg(feature = "sputnikvm")]
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::types::{Address, Wei};
 #[cfg(feature = "revm")]
 use aurora_engine_types::Box;
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
+#[cfg(feature = "sputnikvm")]
+use evm::Config;
 
 #[cfg(feature = "revm")]
 mod revm;
@@ -46,12 +52,14 @@ pub struct EngineEVM<'tx, 'env, I: IO, E: Env, H: EVMHandler> {
 
 #[cfg(feature = "sputnikvm")]
 /// Init REVM
-pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env>(
+pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler>(
     io: &I,
     env: &'env E,
     transaction: &'tx TransactionInfo,
-) -> EngineEVM<'tx, 'env, I, E, SputnikVMHandler<'env, I, E>> {
-    let handler = SputnikVMHandler::new(io, env, &transaction);
+    precompiles: Precompiles<'env, I, E, H>,
+    config: &'env Config,
+) -> EngineEVM<'tx, 'env, I, E, SputnikVMHandler<'env, I, E, H>> {
+    let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
     EngineEVM::new(io, env, transaction, handler)
 }
 
