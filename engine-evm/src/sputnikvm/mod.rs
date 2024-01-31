@@ -1,4 +1,4 @@
-use crate::{EVMHandler, EngineEVM, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, EngineEVM, TransactionInfo};
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::promise::PromiseHandler;
@@ -10,13 +10,15 @@ use aurora_engine_types::{Vec, H160, H256, U256};
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Config};
 
+const CONFIG: &Config = &Config::shanghai();
+
 /// SputnikVM handler
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     io: I,
     env_state: &'env E,
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-    config: &'env Config,
     transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
 }
 
 /// Init SputnikVM
@@ -25,10 +27,10 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     env: &'env E,
     transaction: &'env TransactionInfo,
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-    config: &'env Config,
+    block: &'env BlockInfo,
 ) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
-    let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
-    EngineEVM::new(io, env, transaction, handler)
+    let handler = SputnikVMHandler::new(io, env, &transaction, block, precompiles);
+    EngineEVM::new(io, env, transaction, block, handler)
 }
 
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E, H> {
@@ -36,15 +38,15 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E,
         io: I,
         env_state: &'env E,
         transaction: &'env TransactionInfo,
+        block: &'env BlockInfo,
         precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-        config: &'env Config,
     ) -> Self {
         Self {
             io,
             env_state,
             precompiles,
-            config,
             transaction,
+            block,
         }
     }
 }
@@ -59,15 +61,16 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     }
 
     fn transact_call(&mut self) {
-        let mut contract_state = ContractState::new(self.io, self.env_state);
-        execute::<I, E, H>(
-            &contract_state,
-            self.transaction,
-            &self.precompiles,
-            self.config,
-        );
+        let mut contract_state =
+            ContractState::new(self.io, self.env_state, self.transaction, self.block);
+        // execute::<I, E, H>(
+        //     &contract_state,
+        //     self.transaction,
+        //     &self.precompiles,
+        //     CONFIG,
+        // );
         let executor_params =
-            StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles, self.config);
+            StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
         let mut executor = executor_params.make_executor(&contract_state);
         let (exit_reason, result) = executor.transact_call(
             self.transaction.origin.raw(),
@@ -86,19 +89,13 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
 
 pub struct StackExecutorParams<'env, I, E, H> {
     precompiles: &'env Precompiles<'env, I, E, H>,
-    config: &'env Config,
     gas_limit: u64,
 }
 
 impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
-    const fn new(
-        gas_limit: u64,
-        precompiles: &'env Precompiles<'env, I, E, H>,
-        config: &'env Config,
-    ) -> Self {
+    const fn new(gas_limit: u64, precompiles: &'env Precompiles<'env, I, E, H>) -> Self {
         Self {
             precompiles,
-            config,
             gas_limit,
         }
     }
@@ -113,9 +110,9 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         executor::stack::MemoryStackState<ContractState<'env, I, E>>,
         Precompiles<'env, I, E, H>,
     > {
-        let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, self.config);
+        let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, contract_state);
-        executor::stack::StackExecutor::new_with_precompiles(state, self.config, self.precompiles)
+        executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, self.precompiles)
     }
 }
 
@@ -134,25 +131,35 @@ fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 pub struct ContractState<'env, I: IO, E: Env> {
     io: I,
     env_state: &'env E,
+    transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
 }
 
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
-    pub const fn new(io: I, env_state: &'env E) -> Self {
-        Self { io, env_state }
+    pub const fn new(
+        io: I,
+        env_state: &'env E,
+        transaction: &'env TransactionInfo,
+        block: &'env BlockInfo,
+    ) -> Self {
+        Self {
+            io,
+            env_state,
+            transaction,
+            block,
+        }
     }
 }
 
 impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
-        // self.gas_price
-        todo!()
+        self.block.gas_price
     }
 
     /// Returns the origin address that created the contract.
     fn origin(&self) -> H160 {
-        // self.origin.raw()
-        todo!()
+        self.transaction.origin.raw()
     }
 
     /// Returns a block hash from a given index.

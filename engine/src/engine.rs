@@ -553,13 +553,17 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 //==================================
                 // TODO: experimental
                 let tx_info = aurora_engine_evm::TransactionInfo {
-                    gas_price: self.gas_price,
                     address: Some(contract),
                     origin,
                     value,
                     input: input.clone(),
                     gas_limit: u64::MAX,
                     access_list: Vec::new(),
+                };
+                let block_info = aurora_engine_evm::BlockInfo {
+                    gas_price: self.gas_price,
+                    current_account_id: self.current_account_id.clone(),
+                    chain_id: self.state.chain_id,
                 };
 
                 use aurora_engine_evm::EVMHandler;
@@ -572,7 +576,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                         self.env,
                         &tx_info,
                         precompiles,
-                        CONFIG,
+                        &block_info,
                     )
                 };
                 #[cfg(feature = "evm-revm")]

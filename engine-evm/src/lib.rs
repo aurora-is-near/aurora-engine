@@ -5,6 +5,7 @@ extern crate alloc;
 
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
@@ -25,9 +26,7 @@ pub trait EVMHandler {
     fn transact_call(&mut self);
 }
 
-// #[derive(Clone, Debug)]
 pub struct TransactionInfo {
-    pub gas_price: U256,
     pub origin: Address,
     pub value: Wei,
     pub input: Vec<u8>,
@@ -36,22 +35,36 @@ pub struct TransactionInfo {
     pub access_list: Vec<(H160, Vec<H256>)>,
 }
 
+pub struct BlockInfo {
+    pub gas_price: U256,
+    pub current_account_id: AccountId,
+    pub chain_id: [u8; 32],
+}
+
 pub struct EngineEVM<'env, I: IO, E: Env, H: EVMHandler> {
     io: I,
     env: &'env E,
     handler: H,
     transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
 }
 
 impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'env, I, E, H> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(io: I, env: &'env E, transaction: &'env TransactionInfo, handler: H) -> Self {
+    pub fn new(
+        io: I,
+        env: &'env E,
+        transaction: &'env TransactionInfo,
+        block: &'env BlockInfo,
+        handler: H,
+    ) -> Self {
         Self {
             io,
             env,
             handler,
             transaction,
+            block,
         }
     }
 }
