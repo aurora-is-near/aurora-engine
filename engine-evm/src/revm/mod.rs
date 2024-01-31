@@ -15,8 +15,8 @@ pub const EVM_FORK: SpecId = SpecId::LATEST;
 pub fn init_evm<'tx, 'env, I: IO + Copy, E: aurora_engine_sdk::env::Env>(
     io: &I,
     env: &'env E,
-    transaction: &'tx TransactionInfo,
-) -> EngineEVM<'tx, 'env, I, E, REVMHandler<'env, I, E>> {
+    transaction: &'env TransactionInfo,
+) -> EngineEVM<'env, I, E, REVMHandler<'env, I, E>> {
     let handler = REVMHandler::new(io, env, &transaction);
     EngineEVM::new(io, env, transaction, handler)
 }

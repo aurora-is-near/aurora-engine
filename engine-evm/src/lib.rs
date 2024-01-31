@@ -36,17 +36,17 @@ pub struct TransactionInfo {
     pub access_list: Vec<(H160, Vec<H256>)>,
 }
 
-pub struct EngineEVM<'tx, 'env, I: IO, E: Env, H: EVMHandler> {
+pub struct EngineEVM<'env, I: IO, E: Env, H: EVMHandler> {
     io: I,
     env: &'env E,
     handler: H,
-    transaction: &'tx TransactionInfo,
+    transaction: &'env TransactionInfo,
 }
 
-impl<'tx, 'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'tx, 'env, I, E, H> {
+impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'env, I, E, H> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(io: &I, env: &'env E, transaction: &'tx TransactionInfo, handler: H) -> Self {
+    pub fn new(io: &I, env: &'env E, transaction: &'env TransactionInfo, handler: H) -> Self {
         Self {
             io: *io,
             env,
@@ -56,8 +56,7 @@ impl<'tx, 'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'tx, 'env, I, E, 
     }
 }
 
-impl<'tx, 'env, I: IO + Copy, E: Env, H: EVMHandler> EVMHandler for EngineEVM<'tx, 'env, I, E, H> {
-    //impl<'tx> EVMHandler for EngineEVM<'tx> {
+impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EVMHandler for EngineEVM<'env, I, E, H> {
     /// Invoke EVM transact-create
     fn transact_create(&mut self) {
         self.handler.transact_create();

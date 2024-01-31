@@ -550,6 +550,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 let value = call_args.value.into();
                 let input = call_args.input;
 
+                //==================================
                 // TODO: experimental
                 let tx_info = aurora_engine_evm::TransactionInfo {
                     gas_price: self.gas_price,
@@ -572,6 +573,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 let mut evm = aurora_engine_evm::init_evm(&self.io, self.env, &tx_info);
 
                 evm.transact_call();
+                //==================================
 
                 self.call(
                     &origin,
