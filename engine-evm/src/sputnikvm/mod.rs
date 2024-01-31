@@ -14,7 +14,7 @@ use evm::{executor, Config};
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     io: I,
     env_state: &'env E,
-    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
     config: &'env Config,
     transaction: &'env TransactionInfo,
 }
@@ -24,7 +24,7 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     io: &I,
     env: &'env E,
     transaction: &'env TransactionInfo,
-    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
     config: &'env Config,
 ) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
     let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
@@ -36,7 +36,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E,
         io: &I,
         env_state: &'env E,
         transaction: &'env TransactionInfo,
-        precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+        precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
         config: &'env Config,
     ) -> Self {
         Self {
@@ -59,7 +59,14 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     }
 
     fn transact_call(&mut self) {
-        let mut contract_state = ContractState::new(&self.io, self.env_state);
+        let contract_state = ContractState::new(&self.io, self.env_state);
+        execute::<I, E, H>(
+            contract_state,
+            self.transaction,
+            self.precompiles,
+            self.config,
+        );
+        /*
         let executor_params =
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles, self.config);
         let mut executor = executor_params.make_executor(&contract_state);
@@ -74,6 +81,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
+        */
         // TODO: aggregate generic results
     }
 }
@@ -111,6 +119,18 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         let state = executor::stack::MemoryStackState::new(metadata, contract_state);
         executor::stack::StackExecutor::new_with_precompiles(state, self.config, self.precompiles)
     }
+}
+
+fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
+    contract_state: ContractState<'env, I, E>,
+    transaction: &'env TransactionInfo,
+    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
+    config: &'static Config,
+) {
+    let metadata = executor::stack::StackSubstateMetadata::new(transaction.gas_limit, config);
+    let state = executor::stack::MemoryStackState::new(metadata, &contract_state);
+    let ex = executor::stack::StackExecutor::new_with_precompiles(state, config, precompiles);
+    //let res = ex.transact_call();
 }
 
 pub struct ContractState<'env, I: IO, E: Env> {
