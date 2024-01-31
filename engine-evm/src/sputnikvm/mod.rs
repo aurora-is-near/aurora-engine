@@ -14,17 +14,17 @@ use evm::{executor, Config};
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     io: I,
     env_state: &'env E,
-    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
+    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     config: &'env Config,
     transaction: &'env TransactionInfo,
 }
 
 /// Init SputnikVM
 pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
-    io: &I,
+    io: I,
     env: &'env E,
     transaction: &'env TransactionInfo,
-    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
+    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     config: &'env Config,
 ) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
     let handler = SputnikVMHandler::new(io, env, &transaction, precompiles, config);
@@ -33,14 +33,14 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E, H> {
     pub fn new(
-        io: &I,
+        io: I,
         env_state: &'env E,
         transaction: &'env TransactionInfo,
-        precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
+        precompiles: Precompiles<'env, I, E, H::ReadOnly>,
         config: &'env Config,
     ) -> Self {
         Self {
-            io: *io,
+            io,
             env_state,
             precompiles,
             config,
@@ -59,14 +59,13 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     }
 
     fn transact_call(&mut self) {
-        let contract_state = ContractState::new(&self.io, self.env_state);
+        let mut contract_state = ContractState::new(self.io, self.env_state);
         execute::<I, E, H>(
-            contract_state,
+            &contract_state,
             self.transaction,
-            self.precompiles,
+            &self.precompiles,
             self.config,
         );
-        /*
         let executor_params =
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles, self.config);
         let mut executor = executor_params.make_executor(&contract_state);
@@ -81,14 +80,13 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        */
         // TODO: aggregate generic results
     }
 }
 
 pub struct StackExecutorParams<'env, I, E, H> {
     precompiles: &'env Precompiles<'env, I, E, H>,
-    config: &'static Config,
+    config: &'env Config,
     gas_limit: u64,
 }
 
@@ -96,7 +94,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     const fn new(
         gas_limit: u64,
         precompiles: &'env Precompiles<'env, I, E, H>,
-        config: &'static Config,
+        config: &'env Config,
     ) -> Self {
         Self {
             precompiles,
@@ -110,7 +108,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
         &'a self,
         contract_state: &'a ContractState<'env, I, E>,
     ) -> executor::stack::StackExecutor<
-        'static,
+        'env,
         'a,
         executor::stack::MemoryStackState<ContractState<'env, I, E>>,
         Precompiles<'env, I, E, H>,
@@ -122,10 +120,10 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
 }
 
 fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
-    contract_state: ContractState<'env, I, E>,
+    contract_state: &'env ContractState<'env, I, E>,
     transaction: &'env TransactionInfo,
     precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
-    config: &'static Config,
+    config: &'env Config,
 ) {
     let metadata = executor::stack::StackSubstateMetadata::new(transaction.gas_limit, config);
     let state = executor::stack::MemoryStackState::new(metadata, &contract_state);
@@ -139,8 +137,8 @@ pub struct ContractState<'env, I: IO, E: Env> {
 }
 
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
-    pub const fn new(io: &I, env_state: &'env E) -> Self {
-        Self { io: *io, env_state }
+    pub const fn new(io: I, env_state: &'env E) -> Self {
+        Self { io, env_state }
     }
 }
 

@@ -46,9 +46,9 @@ pub struct EngineEVM<'env, I: IO, E: Env, H: EVMHandler> {
 impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'env, I, E, H> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(io: &I, env: &'env E, transaction: &'env TransactionInfo, handler: H) -> Self {
+    pub fn new(io: I, env: &'env E, transaction: &'env TransactionInfo, handler: H) -> Self {
         Self {
-            io: *io,
+            io,
             env,
             handler,
             transaction,
