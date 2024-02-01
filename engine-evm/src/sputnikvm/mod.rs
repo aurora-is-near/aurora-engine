@@ -51,6 +51,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     fn transact_call(&mut self) {
         let mut contract_state =
             ContractState::new(self.io, self.env_state, self.transaction, self.block);
+        // TODO: remove after tests
         // execute::<I, E, H>(
         //     &contract_state,
         //     self.transaction,
@@ -104,6 +105,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
+/*
 fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     contract_state: &'env ContractState<'env, I, E>,
     transaction: &'env TransactionInfo,
@@ -113,8 +115,7 @@ fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     let metadata = executor::stack::StackSubstateMetadata::new(transaction.gas_limit, config);
     let state = executor::stack::MemoryStackState::new(metadata, &contract_state);
     let ex = executor::stack::StackExecutor::new_with_precompiles(state, config, precompiles);
-    //let res = ex.transact_call();
-}
+}*/
 
 pub struct ContractState<'env, I: IO, E: Env> {
     io: I,
@@ -168,24 +169,23 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
     ///
     /// See: `https://doc.aurora.dev/develop/compat/evm#blockhash`
     fn block_hash(&self, number: U256) -> H256 {
-        todo!()
-        // let idx = U256::from(self.env.block_height());
-        // if idx.saturating_sub(U256::from(256)) <= number && number < idx {
-        //     // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
-        //     compute_block_hash(
-        //         self.state.chain_id,
-        //         number.low_u64(),
-        //         self.current_account_id.as_bytes(),
-        //     )
-        // } else {
-        //     H256::zero()
-        // }
+        let idx = U256::from(self.env_state.block_height());
+        if idx.saturating_sub(U256::from(256)) <= number && number < idx {
+            // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
+            // compute_block_hash(
+            //     self.state.chain_id,
+            //     number.low_u64(),
+            //     self.current_account_id.as_bytes(),
+            // )
+            H256::zero()
+        } else {
+            H256::zero()
+        }
     }
 
     /// Returns the current block index number.
     fn block_number(&self) -> U256 {
-        // U256::from(self.env.block_height())
-        todo!()
+        U256::from(self.env_state.block_height())
     }
 
     /// Returns a mocked coinbase which is the EVM address for the Aurora
@@ -201,8 +201,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the current block timestamp.
     fn block_timestamp(&self) -> U256 {
-        // U256::from(self.env.block_timestamp().secs())
-        todo!()
+        U256::from(self.env_state.block_timestamp().secs())
     }
 
     /// Returns the current block difficulty.
@@ -214,8 +213,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Get environmental block randomness.
     fn block_randomness(&self) -> Option<H256> {
-        // Some(self.env.random_seed())
-        todo!()
+        Some(self.env_state.random_seed())
     }
 
     /// Returns the current block gas limit.
@@ -241,8 +239,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
-        // U256::from(self.state.chain_id)
-        todo!()
+        U256::from(self.block.chain_id)
     }
 
     /// Checks if an address exists.
