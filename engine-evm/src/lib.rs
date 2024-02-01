@@ -3,8 +3,10 @@
 
 extern crate alloc;
 
+use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::Vec;
@@ -16,9 +18,36 @@ mod revm;
 mod sputnikvm;
 
 #[cfg(feature = "evm-revm")]
-pub use crate::revm::init_evm;
+use crate::revm::REVMHandler;
+
+#[cfg(feature = "evm-revm")]
+/// Init REVM
+pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &'env E,
+    transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
+    _precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+) -> EngineEVM<'env, I, E, REVMHandler<'env, I, E>> {
+    let handler = REVMHandler::new(io, env, transaction, block);
+    EngineEVM::new(io, env, transaction, block, handler)
+}
+
 #[cfg(feature = "evm-sputnikvm")]
-pub use crate::sputnikvm::init_evm;
+use crate::sputnikvm::SputnikVMHandler;
+
+#[cfg(feature = "evm-sputnikvm")]
+/// Init SputnikVM
+pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &'env E,
+    transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
+    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
+    let handler = SputnikVMHandler::new(io, env, transaction, block, precompiles);
+    EngineEVM::new(io, env, transaction, block, handler)
+}
 
 pub trait EVMHandler {
     fn transact_create(&mut self);

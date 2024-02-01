@@ -567,21 +567,15 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 };
 
                 use aurora_engine_evm::EVMHandler;
-                #[cfg(feature = "evm-sputnik")]
-                let mut evm = {
-                    let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-                    let precompiles = self.create_precompiles(pause_flags, handler);
-                    aurora_engine_evm::init_evm::<I, E, P>(
-                        self.io,
-                        self.env,
-                        &tx_info,
-                        precompiles,
-                        &block_info,
-                    )
-                };
-                #[cfg(feature = "evm-revm")]
-                let mut evm = aurora_engine_evm::init_evm(&self.io, self.env, &tx_info);
-
+                let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+                let precompiles = self.create_precompiles(pause_flags, handler);
+                let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
+                    self.io,
+                    self.env,
+                    &tx_info,
+                    &block_info,
+                    precompiles,
+                );
                 evm.transact_call();
                 //==================================
 

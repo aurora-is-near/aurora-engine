@@ -1,4 +1,4 @@
-use crate::{EVMHandler, EngineEVM, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::types::{NEP141Wei, Wei};
 use aurora_engine_types::{Box, H160};
@@ -11,16 +11,6 @@ use revm::{Database, DatabaseCommit, Evm};
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
 
-/// Init REVM
-pub fn init_evm<'tx, 'env, I: IO + Copy, E: aurora_engine_sdk::env::Env>(
-    io: &I,
-    env: &'env E,
-    transaction: &'env TransactionInfo,
-) -> EngineEVM<'env, I, E, REVMHandler<'env, I, E>> {
-    let handler = REVMHandler::new(io, env, &transaction);
-    EngineEVM::new(io, env, transaction, handler)
-}
-
 /// REVM handler
 pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
     env_state: &'env E,
@@ -29,7 +19,12 @@ pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
-    pub fn new(io: &I, env_state: &'env E, transaction: &TransactionInfo) -> Self {
+    pub fn new(
+        io: I,
+        env_state: &'env E,
+        transaction: &'env TransactionInfo,
+        _block: &'env BlockInfo,
+    ) -> Self {
         let state = ContractState::new(io, env_state);
         let mut env = Box::new(Env::default());
 
@@ -104,8 +99,8 @@ pub struct ContractState<'env, I: IO, E: aurora_engine_sdk::env::Env> {
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> ContractState<'env, I, E> {
-    pub fn new(io: &I, env_state: &'env E) -> Self {
-        Self { io: *io, env_state }
+    pub fn new(io: I, env_state: &'env E) -> Self {
+        Self { io, env_state }
     }
 }
 

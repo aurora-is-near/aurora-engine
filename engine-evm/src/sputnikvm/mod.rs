@@ -1,4 +1,4 @@
-use crate::{BlockInfo, EVMHandler, EngineEVM, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, TransactionInfo};
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::promise::PromiseHandler;
@@ -19,18 +19,6 @@ pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
-}
-
-/// Init SputnikVM
-pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
-    io: I,
-    env: &'env E,
-    transaction: &'env TransactionInfo,
-    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-    block: &'env BlockInfo,
-) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
-    let handler = SputnikVMHandler::new(io, env, &transaction, block, precompiles);
-    EngineEVM::new(io, env, transaction, block, handler)
 }
 
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E, H> {
