@@ -543,6 +543,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         args: CallArgs,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
+        use aurora_engine_evm::EVMHandler;
+
         let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
@@ -566,7 +568,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     chain_id: self.state.chain_id,
                 };
 
-                use aurora_engine_evm::EVMHandler;
                 let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
                 let precompiles = self.create_precompiles(pause_flags, handler);
                 let mut evm = aurora_engine_evm::init_evm::<I, E, P>(

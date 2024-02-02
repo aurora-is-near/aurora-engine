@@ -37,7 +37,7 @@ fn test_evm_tracing_with_storage() {
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
-    for (key, value) in runner.get_current_state().iter() {
+    for (key, value) in runner.get_current_state() {
         if key.len() >= 22 && &key[2..22] == contract_address.as_bytes() {
             let mut new_key = key.clone();
             new_key[2..22].copy_from_slice(weth_address.as_bytes());

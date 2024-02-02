@@ -138,7 +138,10 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
             CrossContractCallArgs::Eager(call) => {
                 let call_gas = call.total_gas();
                 let attached_near = call.total_near();
-                let callback_count = call.promise_count() - 1;
+                let callback_count = call
+                    .promise_count()
+                    .checked_sub(1)
+                    .ok_or_else(|| ExitError::Other(Cow::from(consts::ERR_INVALID_INPUT)))?;
                 let router_exec_cost = costs::ROUTER_EXEC_BASE
                     + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
                 let promise = PromiseCreateArgs {
@@ -148,7 +151,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                         .try_to_vec()
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
-                    attached_gas: router_exec_cost + call_gas,
+                    attached_gas: router_exec_cost.saturating_add(call_gas),
                 };
                 (promise, attached_near)
             }
