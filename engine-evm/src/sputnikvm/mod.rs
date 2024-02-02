@@ -18,7 +18,7 @@ const CONFIG: &Config = &Config::shanghai();
 /// SputnikVM handler
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     io: I,
-    env_state: &'env E,
+    env: &'env E,
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
@@ -27,14 +27,14 @@ pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E, H> {
     pub fn new(
         io: I,
-        env_state: &'env E,
+        env: &'env E,
         transaction: &'env TransactionInfo,
         block: &'env BlockInfo,
         precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     ) -> Self {
         Self {
             io,
-            env_state,
+            env,
             precompiles,
             transaction,
             block,
@@ -53,7 +53,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
 
     fn transact_call(&mut self) {
         let mut contract_state =
-            ContractState::new(self.io, self.env_state, self.transaction, self.block);
+            ContractState::new(self.io, self.env, self.transaction, self.block);
         let executor_params =
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
         let mut executor = executor_params.make_executor(&contract_state);
@@ -103,7 +103,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
 
 pub struct ContractState<'env, I: IO, E: Env> {
     io: I,
-    env_state: &'env E,
+    env: &'env E,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
@@ -115,13 +115,13 @@ pub struct ContractState<'env, I: IO, E: Env> {
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
     pub fn new(
         io: I,
-        env_state: &'env E,
+        env: &'env E,
         transaction: &'env TransactionInfo,
         block: &'env BlockInfo,
     ) -> Self {
         Self {
             io,
-            env_state,
+            env,
             transaction,
             block,
             generation_cache: RefCell::new(BTreeMap::new()),
@@ -161,7 +161,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
     ///
     /// See: `https://doc.aurora.dev/develop/compat/evm#blockhash`
     fn block_hash(&self, number: U256) -> H256 {
-        let idx = U256::from(self.env_state.block_height());
+        let idx = U256::from(self.env.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
             compute_block_hash(
@@ -176,7 +176,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the current block index number.
     fn block_number(&self) -> U256 {
-        U256::from(self.env_state.block_height())
+        U256::from(self.env.block_height())
     }
 
     /// Returns a mocked coinbase which is the EVM address for the Aurora
@@ -192,7 +192,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the current block timestamp.
     fn block_timestamp(&self) -> U256 {
-        U256::from(self.env_state.block_timestamp().secs())
+        U256::from(self.env.block_timestamp().secs())
     }
 
     /// Returns the current block difficulty.
@@ -204,7 +204,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Get environmental block randomness.
     fn block_randomness(&self) -> Option<H256> {
-        Some(self.env_state.random_seed())
+        Some(self.env.random_seed())
     }
 
     /// Returns the current block gas limit.
