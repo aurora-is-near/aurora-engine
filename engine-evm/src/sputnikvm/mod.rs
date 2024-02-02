@@ -1,12 +1,15 @@
 use crate::{BlockInfo, EVMHandler, TransactionInfo};
+use alloc::collections::BTreeMap;
 use aurora_engine_precompiles::Precompiles;
+use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
-
-use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
+use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::Address;
 use aurora_engine_types::{Vec, H160, H256, U256};
+use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Config};
 
@@ -105,7 +108,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
-/*
+/* TODO: remove after tests
 fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     contract_state: &'env ContractState<'env, I, E>,
     transaction: &'env TransactionInfo,
@@ -122,10 +125,12 @@ pub struct ContractState<'env, I: IO, E: Env> {
     env_state: &'env E,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
+    generation_cache: RefCell<BTreeMap<Address, u32>>,
+    contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
 }
 
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
-    pub const fn new(
+    pub fn new(
         io: I,
         env_state: &'env E,
         transaction: &'env TransactionInfo,
@@ -136,6 +141,8 @@ impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
             env_state,
             transaction,
             block,
+            generation_cache: RefCell::new(BTreeMap::new()),
+            contract_storage_cache: RefCell::new(FullCache::default()),
         }
     }
 }
@@ -172,12 +179,11 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
         let idx = U256::from(self.env_state.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
-            // compute_block_hash(
-            //     self.state.chain_id,
-            //     number.low_u64(),
-            //     self.current_account_id.as_bytes(),
-            // )
-            H256::zero()
+            compute_block_hash(
+                self.block.chain_id,
+                number.low_u64(),
+                self.block.current_account_id.as_bytes(),
+            )
         } else {
             H256::zero()
         }
@@ -276,7 +282,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the code of the contract from an address.
     fn code(&self, address: H160) -> Vec<u8> {
-        let address = Address::new(address);
+        // let address = Address::new(address);
         // self.contract_code_cache
         //     .borrow_mut()
         //     .get_or_insert_with(address, || get_code(&self.io, &address))
@@ -286,20 +292,19 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Get storage value of address at index.
     fn storage(&self, address: H160, index: H256) -> H256 {
-        // let address = Address::new(address);
-        // let generation = *self
-        //     .generation_cache
-        //     .borrow_mut()
-        //     .entry(address)
-        //     .or_insert_with(|| get_generation(&self.io, &address));
-        // let result = *self
-        //     .contract_storage_cache
-        //     .borrow_mut()
-        //     .get_or_insert_with((address, index), || {
-        //         get_storage(&self.io, &address, &index, generation)
-        //     });
-        // result
-        todo!()
+        let address = Address::new(address);
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
+        let result = *self
+            .contract_storage_cache
+            .borrow_mut()
+            .get_or_insert_with((address, index), || {
+                get_storage(&self.io, &address, &index, generation)
+            });
+        result
     }
 
     /// Get original storage value of address at index, if available.
@@ -441,4 +446,62 @@ impl<'env, J: IO, E: Env> ApplyBackend for ContractState<'env, J, E> {
         );
          */
     }
+}
+
+const BLOCK_HASH_PREFIX: u8 = 0;
+const BLOCK_HASH_PREFIX_SIZE: usize = 1;
+const BLOCK_HEIGHT_SIZE: usize = 8;
+const CHAIN_ID_SIZE: usize = 32;
+
+/// There is one Aurora block per NEAR block height (note: when heights in NEAR are skipped
+/// they are interpreted as empty blocks on Aurora). The blockhash is derived from the height
+/// according to
+/// ```text
+/// block_hash = sha256(concat(
+///     BLOCK_HASH_PREFIX,
+///     block_height as u64,
+///     chain_id,
+///     engine_account_id,
+/// ))
+/// ```
+#[must_use]
+pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
+    debug_assert_eq!(
+        BLOCK_HASH_PREFIX_SIZE,
+        core::mem::size_of_val(&BLOCK_HASH_PREFIX)
+    );
+    debug_assert_eq!(BLOCK_HEIGHT_SIZE, core::mem::size_of_val(&block_height));
+    debug_assert_eq!(CHAIN_ID_SIZE, core::mem::size_of_val(&chain_id));
+    let mut data = Vec::with_capacity(
+        BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
+    );
+    data.push(BLOCK_HASH_PREFIX);
+    data.extend_from_slice(&chain_id);
+    data.extend_from_slice(account_id);
+    data.extend_from_slice(&block_height.to_be_bytes());
+
+    aurora_engine_sdk::sha256(&data)
+}
+
+fn get_generation<I: IO>(io: &I, address: &Address) -> u32 {
+    io.read_storage(&address_to_key(KeyPrefix::Generation, address))
+        .map_or(0, |value| {
+            let mut bytes = [0u8; 4];
+            value.copy_to_slice(&mut bytes);
+            u32::from_be_bytes(bytes)
+        })
+}
+
+fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> H256 {
+    io.read_storage(storage_to_key(address, key, generation).as_ref())
+        .and_then(|value| {
+            if value.len() == 32 {
+                let mut buf = [0u8; 32];
+                value.copy_to_slice(&mut buf);
+                Some(H256(buf))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
 }
