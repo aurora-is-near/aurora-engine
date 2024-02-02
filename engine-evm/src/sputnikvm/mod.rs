@@ -1,5 +1,5 @@
 use crate::{BlockInfo, EVMHandler, TransactionInfo};
-use alloc::collections::BTreeMap;
+
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
@@ -7,8 +7,8 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
-use aurora_engine_types::types::Address;
-use aurora_engine_types::{Vec, H160, H256, U256};
+use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::{BTreeMap, Vec, H160, H256, U256};
 use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Config};
@@ -54,13 +54,6 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     fn transact_call(&mut self) {
         let mut contract_state =
             ContractState::new(self.io, self.env_state, self.transaction, self.block);
-        // TODO: remove after tests
-        // execute::<I, E, H>(
-        //     &contract_state,
-        //     self.transaction,
-        //     &self.precompiles,
-        //     CONFIG,
-        // );
         let executor_params =
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
         let mut executor = executor_params.make_executor(&contract_state);
@@ -108,18 +101,6 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     }
 }
 
-/* TODO: remove after tests
-fn execute<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
-    contract_state: &'env ContractState<'env, I, E>,
-    transaction: &'env TransactionInfo,
-    precompiles: &'env Precompiles<'env, I, E, H::ReadOnly>,
-    config: &'env Config,
-) {
-    let metadata = executor::stack::StackSubstateMetadata::new(transaction.gas_limit, config);
-    let state = executor::stack::MemoryStackState::new(metadata, &contract_state);
-    let ex = executor::stack::StackExecutor::new_with_precompiles(state, config, precompiles);
-}*/
-
 pub struct ContractState<'env, I: IO, E: Env> {
     io: I,
     env_state: &'env E,
@@ -127,6 +108,8 @@ pub struct ContractState<'env, I: IO, E: Env> {
     block: &'env BlockInfo,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
     contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
+    account_info_cache: RefCell<FullCache<Address, Basic>>,
+    contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
 }
 
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
@@ -143,6 +126,8 @@ impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
             block,
             generation_cache: RefCell::new(BTreeMap::new()),
             contract_storage_cache: RefCell::new(FullCache::default()),
+            account_info_cache: RefCell::new(FullCache::default()),
+            contract_code_cache: RefCell::new(FullCache::default()),
         }
     }
 }
@@ -250,44 +235,41 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Checks if an address exists.
     fn exists(&self, address: H160) -> bool {
-        // let address = Address::new(address);
-        // let mut cache = self.account_info_cache.borrow_mut();
-        // let basic_info = cache.get_or_insert_with(address, || Basic {
-        //     nonce: get_nonce(&self.io, &address),
-        //     balance: get_balance(&self.io, &address).raw(),
-        // });
-        // if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
-        //     return true;
-        // }
-        // let mut cache = self.contract_code_cache.borrow_mut();
-        // let code = cache.get_or_insert_with(address, || get_code(&self.io, &address));
-        // !code.is_empty()
-        todo!()
+        let address = Address::new(address);
+        let mut cache = self.account_info_cache.borrow_mut();
+        let basic_info = cache.get_or_insert_with(address, || Basic {
+            nonce: get_nonce(&self.io, &address),
+            balance: get_balance(&self.io, &address).raw(),
+        });
+        if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
+            return true;
+        }
+        let mut cache = self.contract_code_cache.borrow_mut();
+        let code = cache.get_or_insert_with(address, || get_code(&self.io, &address));
+        !code.is_empty()
     }
 
     /// Returns basic account information.
     fn basic(&self, address: H160) -> Basic {
-        // let address = Address::new(address);
-        // let result = self
-        //     .account_info_cache
-        //     .borrow_mut()
-        //     .get_or_insert_with(address, || Basic {
-        //         nonce: get_nonce(&self.io, &address),
-        //         balance: get_balance(&self.io, &address).raw(),
-        //     })
-        //     .clone();
-        // result
-        todo!()
+        let address = Address::new(address);
+        let result = self
+            .account_info_cache
+            .borrow_mut()
+            .get_or_insert_with(address, || Basic {
+                nonce: get_nonce(&self.io, &address),
+                balance: get_balance(&self.io, &address).raw(),
+            })
+            .clone();
+        result
     }
 
     /// Returns the code of the contract from an address.
     fn code(&self, address: H160) -> Vec<u8> {
-        // let address = Address::new(address);
-        // self.contract_code_cache
-        //     .borrow_mut()
-        //     .get_or_insert_with(address, || get_code(&self.io, &address))
-        //     .clone()
-        todo!()
+        let address = Address::new(address);
+        self.contract_code_cache
+            .borrow_mut()
+            .get_or_insert_with(address, || get_code(&self.io, &address))
+            .clone()
     }
 
     /// Get storage value of address at index.
@@ -313,8 +295,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
     /// the "original storage" will always be the same as the storage because no values
     /// are written to storage until after the transaction is complete.
     fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
-        //Some(self.storage(address, index))
-        todo!()
+        Some(self.storage(address, index))
     }
 }
 
@@ -504,4 +485,22 @@ fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) ->
             }
         })
         .unwrap_or_default()
+}
+
+fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
+    io.read_storage(&address_to_key(KeyPrefix::Code, address))
+        .map(|s| s.to_vec())
+        .unwrap_or_default()
+}
+
+fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
+    let raw = io
+        .read_u256(&address_to_key(KeyPrefix::Balance, address))
+        .unwrap_or_else(|_| U256::zero());
+    Wei::new(raw)
+}
+
+fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
+    io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
+        .unwrap_or_else(|_| U256::zero())
 }

@@ -71,7 +71,6 @@ tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.20"
 wee_alloc = { version = "0.4", default-features = false }
-zeroize = "1.7.0"
 
 [patch.crates-io]
 parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1', rev = "d05fd8e" }
