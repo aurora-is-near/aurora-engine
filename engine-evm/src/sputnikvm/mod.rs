@@ -7,11 +7,13 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{BTreeMap, Vec, H160, H256, U256};
 use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Config};
+
+mod accounting;
 
 const CONFIG: &Config = &Config::shanghai();
 
@@ -299,15 +301,13 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
     }
 }
 
-impl<'env, J: IO, E: Env> ApplyBackend for ContractState<'env, J, E> {
+impl<'env, J: IO + Copy, E: Env> ApplyBackend for ContractState<'env, J, E> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
         I: IntoIterator<Item = (H256, H256)>,
         L: IntoIterator<Item = Log>,
     {
-        todo!()
-        /*
         let mut writes_counter: usize = 0;
 
         let mut code_bytes_written: usize = 0;
@@ -342,7 +342,11 @@ impl<'env, J: IO, E: Env> ApplyBackend for ContractState<'env, J, E> {
                     if let Some(code) = code {
                         set_code(&mut self.io, &address, &code);
                         code_bytes_written = code.len();
-                        sdk::log!("code_write_at_address {:?} {}", address, code_bytes_written);
+                        aurora_engine_sdk::log!(
+                            "code_write_at_address {:?} {}",
+                            address,
+                            code_bytes_written
+                        );
                     }
 
                     let next_generation = if reset_storage {
@@ -389,18 +393,19 @@ impl<'env, J: IO, E: Env> ApplyBackend for ContractState<'env, J, E> {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
             accounting::Net::Lost(amount) => {
                 let _ = amount;
-                sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
+                aurora_engine_sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
                 // if we cannot read the storage then there is nothing to remove.
-                #[cfg(not(feature = "ext-connector"))]
-                connector::EthConnectorContract::init(self.io)
-                    .map(|mut connector| {
-                        // The `unwrap` is safe here because (a) if the connector
-                        // is implemented correctly then the total supply will never underflow and (b) we are passing
-                        // in the balance directly so there will always be enough balance.
-                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
-                    })
-                    .ok();
+                // TODO: eth-connector refactoring
+                // #[cfg(not(feature = "ext-connector"))]
+                // connector::EthConnectorContract::init(self.io)
+                //     .map(|mut connector| {
+                //         // The `unwrap` is safe here because (a) if the connector
+                //         // is implemented correctly then the total supply will never underflow and (b) we are passing
+                //         // in the balance directly so there will always be enough balance.
+                //         connector.internal_remove_eth(Wei::new(amount)).unwrap();
+                //     })
+                //     .ok();
             }
             accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {
@@ -415,17 +420,16 @@ impl<'env, J: IO, E: Env> ApplyBackend for ContractState<'env, J, E> {
         // These variable are only used if logging feature is enabled.
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
-            let total_bytes = 32 * writes_counter + code_bytes_written;
+        let total_bytes = 32 * writes_counter + code_bytes_written;
         #[allow(unused_assignments)]
         if code_bytes_written > 0 {
             writes_counter += 1;
         }
-        sdk::log!(
+        aurora_engine_sdk::log!(
             "total_writes_count {}\ntotal_written_bytes {}",
             writes_counter,
             total_bytes
         );
-         */
     }
 }
 
@@ -503,4 +507,82 @@ fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
 fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
     io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
         .unwrap_or_else(|_| U256::zero())
+}
+
+fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
+    get_balance(io, address).is_zero()
+        && get_nonce(io, address).is_zero()
+        && get_code_size(io, address) == 0
+}
+
+fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
+    io.read_storage_len(&address_to_key(KeyPrefix::Code, address))
+        .unwrap_or(0)
+}
+
+fn set_nonce<I: IO>(io: &mut I, address: &Address, nonce: &U256) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Nonce, address),
+        &u256_to_arr(nonce),
+    );
+}
+
+/// Removes an account.
+fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) {
+    remove_nonce(io, address);
+    remove_balance(io, address);
+    remove_code(io, address);
+    remove_all_storage(io, address, generation);
+}
+
+fn remove_nonce<I: IO>(io: &mut I, address: &Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Nonce, address));
+}
+
+fn remove_balance<I: IO + Copy>(io: &mut I, address: &Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Balance, address));
+}
+
+fn remove_code<I: IO>(io: &mut I, address: &Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Code, address));
+}
+
+/// Removes all storage for the given address.
+fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
+    // FIXME: there is presently no way to prefix delete trie state.
+    // NOTE: There is not going to be a method on runtime for this.
+    //     You may need to store all keys in a list if you want to do this in a contract.
+    //     Maybe you can incentivize people to delete dead old keys. They can observe them from
+    //     external indexer node and then issue special cleaning transaction.
+    //     Either way you may have to store the nonce per storage address root. When the account
+    //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
+    //     can be deleted over time. That's how TurboGeth does storage.
+    set_generation(io, address, generation + 1);
+}
+
+/// Increments storage generation for a given address.
+fn set_generation<I: IO>(io: &mut I, address: &Address, generation: u32) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Generation, address),
+        &generation.to_be_bytes(),
+    );
+}
+
+fn remove_storage<I: IO>(io: &mut I, address: &Address, key: &H256, generation: u32) {
+    io.remove_storage(storage_to_key(address, key, generation).as_ref());
+}
+
+fn set_storage<I: IO>(io: &mut I, address: &Address, key: &H256, value: &H256, generation: u32) {
+    io.write_storage(storage_to_key(address, key, generation).as_ref(), &value.0);
+}
+
+fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Balance, address),
+        &balance.to_bytes(),
+    );
+}
+
+fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {
+    io.write_storage(&address_to_key(KeyPrefix::Code, address), code);
 }
