@@ -6,12 +6,13 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{BTreeMap, Vec, H160, H256, U256};
 use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Config};
+use evm::{executor, Config, ExitError, ExitReason};
 
 mod accounting;
 
@@ -60,8 +61,9 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
         let mut executor = executor_params.make_executor(&contract_state);
         let (exit_reason, result) = executor.transact_call(
-            self.transaction.origin.raw(),
-            self.transaction.address.unwrap().raw(),
+            self.transaction.origin,
+            // TODO: check it
+            self.transaction.address.unwrap(),
             self.transaction.value.raw(),
             self.transaction.input.clone(),
             self.transaction.gas_limit,
@@ -70,6 +72,8 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
+        let status = exit_reason_into_result(exit_reason, result);
+        //let _res = Ok(SubmitResult::new(status, used_gas, Vec::new()));
         // TODO: aggregate generic results
     }
 }
@@ -142,7 +146,7 @@ impl<'env, I: IO, E: Env> Backend for ContractState<'env, I, E> {
 
     /// Returns the origin address that created the contract.
     fn origin(&self) -> H160 {
-        self.transaction.origin.raw()
+        self.transaction.origin
     }
 
     /// Returns a block hash from a given index.
@@ -585,4 +589,18 @@ fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
 
 fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {
     io.write_storage(&address_to_key(KeyPrefix::Code, address), code);
+}
+
+fn exit_reason_into_result(
+    exit_reason: ExitReason,
+    data: Vec<u8>,
+) -> Result<TransactionStatus, ExitReason> {
+    match exit_reason {
+        ExitReason::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
+        ExitReason::Revert(_) => Ok(TransactionStatus::Revert(data)),
+        ExitReason::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+        ExitReason::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+        ExitReason::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
+        _ => Err(exit_reason),
+    }
 }

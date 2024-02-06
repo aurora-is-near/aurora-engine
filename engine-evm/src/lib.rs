@@ -8,7 +8,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::Wei;
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
 
@@ -44,9 +44,9 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-) -> EngineEVM<'env, I, E, SputnikVMHandler<'env, I, E, H>> {
+) -> EngineEVM<SputnikVMHandler<'env, I, E, H>> {
     let handler = SputnikVMHandler::new(io, env, transaction, block, precompiles);
-    EngineEVM::new(io, env, transaction, block, handler)
+    EngineEVM::new(handler)
 }
 
 pub trait EVMHandler {
@@ -56,10 +56,10 @@ pub trait EVMHandler {
 }
 
 pub struct TransactionInfo {
-    pub origin: Address,
+    pub origin: H160,
     pub value: Wei,
     pub input: Vec<u8>,
-    pub address: Option<Address>,
+    pub address: Option<H160>,
     pub gas_limit: u64,
     pub access_list: Vec<(H160, Vec<H256>)>,
 }
@@ -70,35 +70,19 @@ pub struct BlockInfo {
     pub chain_id: [u8; 32],
 }
 
-pub struct EngineEVM<'env, I: IO, E: Env, H: EVMHandler> {
-    io: I,
-    env: &'env E,
+pub struct EngineEVM<H: EVMHandler> {
     handler: H,
-    transaction: &'env TransactionInfo,
-    block: &'env BlockInfo,
 }
 
-impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EngineEVM<'env, I, E, H> {
+impl<H: EVMHandler> EngineEVM<H> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(
-        io: I,
-        env: &'env E,
-        transaction: &'env TransactionInfo,
-        block: &'env BlockInfo,
-        handler: H,
-    ) -> Self {
-        Self {
-            io,
-            env,
-            handler,
-            transaction,
-            block,
-        }
+    pub fn new(handler: H) -> Self {
+        Self { handler }
     }
 }
 
-impl<'env, I: IO + Copy, E: Env, H: EVMHandler> EVMHandler for EngineEVM<'env, I, E, H> {
+impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     /// Invoke EVM transact-create
     fn transact_create(&mut self) {
         self.handler.transact_create();

@@ -1,6 +1,7 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
+use aurora_engine_evm::EVMHandler;
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
@@ -543,43 +544,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         args: CallArgs,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        use aurora_engine_evm::EVMHandler;
-
         let origin = Address::new(self.origin());
         match args {
             CallArgs::V2(call_args) => {
                 let contract = call_args.contract;
                 let value = call_args.value.into();
                 let input = call_args.input;
-
-                //==================================
-                // TODO: experimental
-                let tx_info = aurora_engine_evm::TransactionInfo {
-                    address: Some(contract),
-                    origin,
-                    value,
-                    input: input.clone(),
-                    gas_limit: u64::MAX,
-                    access_list: Vec::new(),
-                };
-                let block_info = aurora_engine_evm::BlockInfo {
-                    gas_price: self.gas_price,
-                    current_account_id: self.current_account_id.clone(),
-                    chain_id: self.state.chain_id,
-                };
-
-                let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-                let precompiles = self.create_precompiles(pause_flags, handler);
-                let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
-                    self.io,
-                    self.env,
-                    &tx_info,
-                    &block_info,
-                    precompiles,
-                );
-                evm.transact_call();
-                //==================================
-
                 self.call(
                     &origin,
                     &contract,
@@ -621,6 +591,32 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
         let precompiles = self.create_precompiles(pause_flags, handler);
 
+        //==================================
+        // TODO: experimental
+        let tx_info = aurora_engine_evm::TransactionInfo {
+            address: Some(contract.raw()),
+            origin: origin.raw(),
+            value,
+            input: input.clone(),
+            gas_limit: u64::MAX,
+            access_list: Vec::new(),
+        };
+        let block_info = aurora_engine_evm::BlockInfo {
+            gas_price: self.gas_price,
+            current_account_id: self.current_account_id.clone(),
+            chain_id: self.state.chain_id,
+        };
+
+        let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
+            self.io,
+            self.env,
+            &tx_info,
+            &block_info,
+            precompiles,
+        );
+        evm.transact_call();
+        //==================================
+        let precompiles = self.create_precompiles(pause_flags, handler);
         let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
         let (exit_reason, result) = executor.transact_call(
