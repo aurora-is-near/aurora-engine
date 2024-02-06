@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] 2024-02-06
+
+### Fixes
+
+- Fixed underflow in the modexp gas calculation by [@guidovranken]. ([#883])
+- Prevented subtraction underflow in th xcc module by [@guidovranken]. ([#888])
+- Fixed balance and gas overflows in the xcc module by [@guidovranken]. ([#889])
+
+### Changes
+
+- CI was updated by changing self-hosted runner to the GitHub heavy by [@aleksuss]. ([#881])
+- Removed a logic of fee calculation in the eth-connector by [@karim-en]. ([#882])
+- Version of the rust nightly was updated to 2023-12-15 by [@RomanHodulak]. ([#885])
+
+[#881]: https://github.com/aurora-is-near/aurora-engine/pull/881
+[#882]: https://github.com/aurora-is-near/aurora-engine/pull/882
+[#883]: https://github.com/aurora-is-near/aurora-engine/pull/883
+[#885]: https://github.com/aurora-is-near/aurora-engine/pull/885
+[#888]: https://github.com/aurora-is-near/aurora-engine/pull/888
+[#889]: https://github.com/aurora-is-near/aurora-engine/pull/889
+
 ## [3.5.0] 2023-12-06
 
 ### Additions
@@ -587,8 +608,9 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...develop
-[3.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.4.0
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.0...develop
+[3.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.6.0
+[3.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.4.0...3.5.0
 [3.4.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.1...3.4.0
 [3.3.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.3.0...3.3.1
 [3.3.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.2.0...3.3.0

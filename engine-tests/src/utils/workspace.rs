@@ -71,7 +71,8 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
         "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E",
         "metadata": metadata,
         "account_with_access_right": aurora.id(),
-        "owner_id": aurora.id()
+        "owner_id": aurora.id(),
+        "min_proof_acceptance_height": 0
     });
 
     let result = contract

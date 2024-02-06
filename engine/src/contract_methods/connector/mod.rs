@@ -609,8 +609,7 @@ mod tests {
         let fee = Fee::new(NEP141Wei::new(0));
         let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
         let token_message_data: TokenMessageData =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-                .unwrap();
+            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
         let deposit_event = DepositedEvent {
             eth_custodian_address,

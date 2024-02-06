@@ -258,9 +258,8 @@ fn test_relayer_balance_after_transfer() {
         .submit_with_signer(&mut source_account, transaction)
         .unwrap();
 
-    let relayer = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     validate_address_balance_and_nonce(
