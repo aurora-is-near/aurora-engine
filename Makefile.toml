@@ -16,7 +16,7 @@ skip_core_tasks = true
 CARGO = "cargo"
 ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
 SWEEP_DAYS = 30
-BUILDER_HASH_COMMIT = "00226858199419aaa8c99f756bd192851666fb36" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
+BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
 
 [tasks.sweep]
 category = "Cleanup"
