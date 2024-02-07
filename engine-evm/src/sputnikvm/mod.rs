@@ -1,4 +1,4 @@
-use crate::{BlockInfo, EVMHandler, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, TransactResult, TransactionInfo};
 
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::caching::FullCache;
@@ -9,6 +9,7 @@ use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::{u256_to_arr, Address, Wei};
+use aurora_engine_types::Box;
 use aurora_engine_types::{BTreeMap, Vec, H160, H256, U256};
 use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
@@ -25,6 +26,7 @@ pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
+    remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
 }
 
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E, H> {
@@ -34,6 +36,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E,
         transaction: &'env TransactionInfo,
         block: &'env BlockInfo,
         precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+        remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
     ) -> Self {
         Self {
             io,
@@ -41,6 +44,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E,
             precompiles,
             transaction,
             block,
+            remove_eth_fn,
         }
     }
 }
@@ -54,9 +58,14 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         todo!()
     }
 
-    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>) {
-        let mut contract_state =
-            ContractState::new(self.io, self.env, self.transaction, self.block);
+    fn transact_call(&mut self) -> TransactResult {
+        let mut contract_state = ContractState::new(
+            self.io,
+            self.env,
+            self.transaction,
+            self.block,
+            self.remove_eth_fn.take(),
+        );
         let executor_params =
             StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
         let mut executor = executor_params.make_executor(&contract_state);
@@ -73,10 +82,11 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
         let status = exit_reason_into_result(exit_reason, result).unwrap();
-        (
-            SubmitResult::new(status, used_gas, Vec::new()),
-            logs.into_iter().collect(),
-        )
+        TransactResult {
+            submit_result: SubmitResult::new(status, used_gas, Vec::new()),
+            logs: logs.into_iter().collect(),
+            remove_eth: contract_state.get_remove_eth(),
+        }
     }
 }
 
@@ -118,6 +128,8 @@ pub struct ContractState<'env, I: IO, E: Env> {
     contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
     account_info_cache: RefCell<FullCache<Address, Basic>>,
     contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
+    remove_eth: Option<U256>,
+    remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
 }
 
 impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
@@ -126,6 +138,7 @@ impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
         env: &'env E,
         transaction: &'env TransactionInfo,
         block: &'env BlockInfo,
+        remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
     ) -> Self {
         Self {
             io,
@@ -136,7 +149,13 @@ impl<'env, I: IO + Copy, E: Env> ContractState<'env, I, E> {
             contract_storage_cache: RefCell::new(FullCache::default()),
             account_info_cache: RefCell::new(FullCache::default()),
             contract_code_cache: RefCell::new(FullCache::default()),
+            remove_eth: None,
+            remove_eth_fn,
         }
+    }
+
+    pub fn get_remove_eth(&self) -> Option<U256> {
+        self.remove_eth
     }
 }
 
@@ -402,16 +421,9 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for ContractState<'env, J, E> {
                 aurora_engine_sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
                 // if we cannot read the storage then there is nothing to remove.
-                // TODO: eth-connector refactoring
-                // #[cfg(not(feature = "ext-connector"))]
-                // connector::EthConnectorContract::init(self.io)
-                //     .map(|mut connector| {
-                //         // The `unwrap` is safe here because (a) if the connector
-                //         // is implemented correctly then the total supply will never underflow and (b) we are passing
-                //         // in the balance directly so there will always be enough balance.
-                //         connector.internal_remove_eth(Wei::new(amount)).unwrap();
-                //     })
-                //     .ok();
+                if let Some(remove_eth) = self.remove_eth_fn.take() {
+                    remove_eth(Wei::new(amount));
+                }
             }
             accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {

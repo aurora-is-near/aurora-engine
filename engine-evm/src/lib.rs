@@ -10,6 +10,7 @@ use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::types::Wei;
+use aurora_engine_types::Box;
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
 use evm::backend::Log;
@@ -46,15 +47,22 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
     precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+    remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
 ) -> EngineEVM<SputnikVMHandler<'env, I, E, H>> {
-    let handler = SputnikVMHandler::new(io, env, transaction, block, precompiles);
+    let handler = SputnikVMHandler::new(io, env, transaction, block, precompiles, remove_eth_fn);
     EngineEVM::new(handler)
+}
+
+pub struct TransactResult {
+    pub submit_result: SubmitResult,
+    pub logs: Vec<Log>,
+    pub remove_eth: Option<U256>,
 }
 
 pub trait EVMHandler {
     fn transact_create(&mut self);
     fn transact_create_fixed(&mut self);
-    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>);
+    fn transact_call(&mut self) -> TransactResult;
 }
 
 pub struct TransactionInfo {
@@ -82,6 +90,11 @@ impl<H: EVMHandler> EngineEVM<H> {
     pub fn new(handler: H) -> Self {
         Self { handler }
     }
+
+    pub fn apply<F: FnOnce(Wei)>(&self, apply_fn: F) {
+        let x = Wei::new(U256::from(10));
+        apply_fn(x)
+    }
 }
 
 impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
@@ -96,7 +109,7 @@ impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     }
 
     /// Invoke EVM transact-call
-    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>) {
+    fn transact_call(&mut self) -> TransactResult {
         self.handler.transact_call()
     }
 }

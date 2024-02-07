@@ -31,9 +31,9 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
-    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
-    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    BTreeMap, BorshDeserialize, Box, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei,
+    Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
@@ -605,17 +605,28 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             chain_id: self.state.chain_id,
         };
 
+        let apply_fn: Option<Box<dyn FnOnce(Wei)>> = None;
+        #[cfg(not(feature = "ext-connector"))]
+        let apply_fn: Option<Box<dyn FnOnce(Wei)>> = {
+            let _ = apply_fn;
+            Some(Box::new(|v| {
+                let mut connector = connector::EthConnectorContract::init(self.io).unwrap();
+                connector.internal_remove_eth(v).unwrap();
+            }))
+        };
+        //###
         let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
             self.io,
             self.env,
             &tx_info,
             &block_info,
             precompiles,
+            apply_fn,
         );
         let res = evm.transact_call();
 
-        let logs = filter_promises_from_logs(&self.io, handler, res.1, &self.current_account_id);
-        let submit_result = res.0;
+        let logs = filter_promises_from_logs(&self.io, handler, res.logs, &self.current_account_id);
+        let submit_result = res.submit_result;
         Ok(SubmitResult::new(
             submit_result.status,
             submit_result.gas_used,
