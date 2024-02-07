@@ -54,7 +54,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         todo!()
     }
 
-    fn transact_call(&mut self) {
+    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>) {
         let mut contract_state =
             ContractState::new(self.io, self.env, self.transaction, self.block);
         let executor_params =
@@ -72,9 +72,11 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let status = exit_reason_into_result(exit_reason, result);
-        //let _res = Ok(SubmitResult::new(status, used_gas, Vec::new()));
-        // TODO: aggregate generic results
+        let status = exit_reason_into_result(exit_reason, result).unwrap();
+        (
+            SubmitResult::new(status, used_gas, Vec::new()),
+            logs.into_iter().collect(),
+        )
     }
 }
 

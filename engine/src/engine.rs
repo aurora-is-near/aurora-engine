@@ -591,15 +591,13 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
         let precompiles = self.create_precompiles(pause_flags, handler);
 
-        //==================================
-        // TODO: experimental
         let tx_info = aurora_engine_evm::TransactionInfo {
             address: Some(contract.raw()),
             origin: origin.raw(),
             value,
-            input: input.clone(),
-            gas_limit: u64::MAX,
-            access_list: Vec::new(),
+            input,
+            gas_limit,
+            access_list,
         };
         let block_info = aurora_engine_evm::BlockInfo {
             gas_price: self.gas_price,
@@ -614,29 +612,15 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             &block_info,
             precompiles,
         );
-        evm.transact_call();
-        //==================================
-        let precompiles = self.create_precompiles(pause_flags, handler);
-        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
-        let mut executor = executor_params.make_executor(self);
-        let (exit_reason, result) = executor.transact_call(
-            origin.raw(),
-            contract.raw(),
-            value.raw(),
-            input,
-            gas_limit,
-            access_list,
-        );
+        let res = evm.transact_call();
 
-        let used_gas = executor.used_gas();
-        let status = exit_reason.into_result(result)?;
-
-        let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
-        // The logs could be encoded as base64 or hex string.
-        self.apply(values, Vec::<Log>::new(), true);
-
-        Ok(SubmitResult::new(status, used_gas, logs))
+        let logs = filter_promises_from_logs(&self.io, handler, res.1, &self.current_account_id);
+        let submit_result = res.0;
+        Ok(SubmitResult::new(
+            submit_result.status,
+            submit_result.gas_used,
+            logs,
+        ))
     }
 
     pub fn view_with_args(&self, args: ViewCallArgs) -> Result<TransactionStatus, EngineErrorKind> {

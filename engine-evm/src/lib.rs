@@ -8,9 +8,11 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::Vec;
 use aurora_engine_types::{H160, H256, U256};
+use evm::backend::Log;
 
 #[cfg(feature = "evm-revm")]
 mod revm;
@@ -52,7 +54,7 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 pub trait EVMHandler {
     fn transact_create(&mut self);
     fn transact_create_fixed(&mut self);
-    fn transact_call(&mut self);
+    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>);
 }
 
 pub struct TransactionInfo {
@@ -94,7 +96,7 @@ impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     }
 
     /// Invoke EVM transact-call
-    fn transact_call(&mut self) {
-        self.handler.transact_call();
+    fn transact_call(&mut self) -> (SubmitResult, Vec<Log>) {
+        self.handler.transact_call()
     }
 }
