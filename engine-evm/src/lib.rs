@@ -8,7 +8,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::engine::SubmitResult;
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::Box;
 use aurora_engine_types::Vec;
@@ -63,6 +63,7 @@ pub trait EVMHandler {
     fn transact_create(&mut self);
     fn transact_create_fixed(&mut self);
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult>;
+    fn view(&mut self) -> TransactExecutionResult<TransactionStatus>;
 }
 
 pub struct TransactionInfo {
@@ -106,5 +107,10 @@ impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     /// Invoke EVM transact-call
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
         self.handler.transact_call()
+    }
+
+    /// View call
+    fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
+        self.handler.view()
     }
 }

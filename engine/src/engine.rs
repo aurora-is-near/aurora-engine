@@ -692,7 +692,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             apply_remove_eth_fn,
         );
         //##
-        let res = evm.transact_call().map_err(|err| {
+        let status = evm.view().map_err(|err| {
             let err: EngineErrorKind = match err {
                 TransactErrorKind::EvmError(e) => e.into(),
                 TransactErrorKind::EvmFatal(e) => e.into(),
@@ -700,7 +700,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             err
         })?;
 
-        Ok(res.submit_result.status)
+        Ok(status)
     }
 
     fn relayer_key(account_id: &[u8]) -> Vec<u8> {

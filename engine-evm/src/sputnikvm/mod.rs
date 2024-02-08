@@ -11,7 +11,7 @@ use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::{PromiseHandler, ReadOnlyPromiseHandler};
-use aurora_engine_types::parameters::engine::SubmitResult;
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{BTreeMap, Box, Vec, H160, H256, U256};
 use core::cell::RefCell;
@@ -91,6 +91,30 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
             logs: logs.into_iter().collect(),
         })
+    }
+
+    fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
+        let contract_state = ContractState::new(
+            self.io,
+            self.env,
+            self.transaction,
+            self.block,
+            self.remove_eth_fn.take(),
+        );
+        let executor_params =
+            StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
+        let mut executor = executor_params.make_executor(&contract_state);
+        let (exit_reason, result) = executor.transact_call(
+            self.transaction.origin,
+            // TODO: check it
+            self.transaction.address.unwrap(),
+            self.transaction.value.raw(),
+            self.transaction.input.clone(),
+            self.transaction.gas_limit,
+            self.transaction.access_list.clone(),
+        );
+        let status = exit_reason_into_result(exit_reason, result)?;
+        Ok(status)
     }
 }
 
