@@ -1,7 +1,7 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
-use aurora_engine_evm::EVMHandler;
+use aurora_engine_evm::{EVMHandler, TransactErrorKind};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
@@ -605,25 +605,31 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             chain_id: self.state.chain_id,
         };
 
-        let apply_fn: Option<Box<dyn FnOnce(Wei)>> = None;
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = None;
         #[cfg(not(feature = "ext-connector"))]
-        let apply_fn: Option<Box<dyn FnOnce(Wei)>> = {
-            let _ = apply_fn;
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = {
+            let _ = apply_remove_eth_fn;
             Some(Box::new(|v| {
                 let mut connector = connector::EthConnectorContract::init(self.io).unwrap();
                 connector.internal_remove_eth(v).unwrap();
             }))
         };
-        //###
         let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
             self.io,
             self.env,
             &tx_info,
             &block_info,
             precompiles,
-            apply_fn,
+            apply_remove_eth_fn,
         );
-        let res = evm.transact_call();
+
+        let res = evm.transact_call().map_err(|err| {
+            let err: EngineErrorKind = match err {
+                TransactErrorKind::EvmError(e) => e.into(),
+                TransactErrorKind::EvmFatal(e) => e.into(),
+            };
+            err
+        })?;
 
         let logs = filter_promises_from_logs(&self.io, handler, res.logs, &self.current_account_id);
         let submit_result = res.submit_result;

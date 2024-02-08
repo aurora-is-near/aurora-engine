@@ -22,6 +22,7 @@ mod sputnikvm;
 
 #[cfg(feature = "evm-revm")]
 use crate::revm::REVMHandler;
+pub use crate::sputnikvm::errors::{TransactErrorKind, TransactExecutionResult};
 
 #[cfg(feature = "evm-revm")]
 /// Init REVM
@@ -56,13 +57,12 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 pub struct TransactResult {
     pub submit_result: SubmitResult,
     pub logs: Vec<Log>,
-    pub remove_eth: Option<U256>,
 }
 
 pub trait EVMHandler {
     fn transact_create(&mut self);
     fn transact_create_fixed(&mut self);
-    fn transact_call(&mut self) -> TransactResult;
+    fn transact_call(&mut self) -> TransactExecutionResult<TransactResult>;
 }
 
 pub struct TransactionInfo {
@@ -90,11 +90,6 @@ impl<H: EVMHandler> EngineEVM<H> {
     pub fn new(handler: H) -> Self {
         Self { handler }
     }
-
-    pub fn apply<F: FnOnce(Wei)>(&self, apply_fn: F) {
-        let x = Wei::new(U256::from(10));
-        apply_fn(x)
-    }
 }
 
 impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
@@ -109,7 +104,7 @@ impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     }
 
     /// Invoke EVM transact-call
-    fn transact_call(&mut self) -> TransactResult {
+    fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
         self.handler.transact_call()
     }
 }
