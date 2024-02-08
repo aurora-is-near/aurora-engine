@@ -644,19 +644,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let origin = &args.sender;
         let contract = &args.address;
         let value = U256::from_big_endian(&args.amount);
-        // View calls cannot interact with promises
-        let handler = aurora_engine_sdk::promise::Noop;
-        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &handler);
 
-        let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
-        self.view(
-            origin,
-            contract,
-            Wei::new(value),
-            args.input,
-            &executor_params,
-        )
+        self.view(origin, contract, Wei::new(value), args.input)
     }
 
     pub fn view(
@@ -665,18 +654,53 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         contract: &Address,
         value: Wei,
         input: Vec<u8>,
-        executor_params: &StackExecutorParams<I, E, aurora_engine_sdk::promise::Noop>,
     ) -> Result<TransactionStatus, EngineErrorKind> {
-        let mut executor = executor_params.make_executor(self);
-        let (status, result) = executor.transact_call(
-            origin.raw(),
-            contract.raw(),
-            value.raw(),
+        // View calls cannot interact with promises
+        let handler = aurora_engine_sdk::promise::Noop;
+        let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
+        let precompiles = self.create_precompiles(pause_flags, &handler);
+
+        let tx_info = aurora_engine_evm::TransactionInfo {
+            address: Some(contract.raw()),
+            origin: origin.raw(),
+            value,
             input,
-            executor_params.gas_limit,
-            Vec::new(),
+            gas_limit: u64::MAX,
+            access_list: Vec::new(),
+        };
+        let block_info = aurora_engine_evm::BlockInfo {
+            gas_price: self.gas_price,
+            current_account_id: self.current_account_id.clone(),
+            chain_id: self.state.chain_id,
+        };
+
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = None;
+        #[cfg(not(feature = "ext-connector"))]
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = {
+            let _ = apply_remove_eth_fn;
+            Some(Box::new(|v| {
+                let mut connector = connector::EthConnectorContract::init(self.io).unwrap();
+                connector.internal_remove_eth(v).unwrap();
+            }))
+        };
+        let mut evm = aurora_engine_evm::init_evm::<I, E, aurora_engine_sdk::promise::Noop>(
+            self.io,
+            self.env,
+            &tx_info,
+            &block_info,
+            precompiles,
+            apply_remove_eth_fn,
         );
-        status.into_result(result)
+        //##
+        let res = evm.transact_call().map_err(|err| {
+            let err: EngineErrorKind = match err {
+                TransactErrorKind::EvmError(e) => e.into(),
+                TransactErrorKind::EvmFatal(e) => e.into(),
+            };
+            err
+        })?;
+
+        Ok(res.submit_result.status)
     }
 
     fn relayer_key(account_id: &[u8]) -> Vec<u8> {

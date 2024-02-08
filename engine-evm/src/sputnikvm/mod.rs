@@ -86,7 +86,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let status = exit_reason_into_result(exit_reason, result).unwrap();
+        let status = exit_reason_into_result(exit_reason, result)?;
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
             logs: logs.into_iter().collect(),

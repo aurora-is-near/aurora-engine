@@ -1,3 +1,4 @@
+use crate::TransactErrorKind;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::storage::{address_to_key, storage_to_key, KeyPrefix};
@@ -168,13 +169,14 @@ pub fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {
 pub fn exit_reason_into_result(
     exit_reason: ExitReason,
     data: Vec<u8>,
-) -> Result<TransactionStatus, ExitReason> {
+) -> Result<TransactionStatus, TransactErrorKind> {
     match exit_reason {
         ExitReason::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
         ExitReason::Revert(_) => Ok(TransactionStatus::Revert(data)),
         ExitReason::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
         ExitReason::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
         ExitReason::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-        _ => Err(exit_reason),
+        ExitReason::Error(e) => Err(e.into()),
+        ExitReason::Fatal(e) => Err(e.into()),
     }
 }
