@@ -60,8 +60,7 @@ pub struct TransactResult {
 }
 
 pub trait EVMHandler {
-    fn transact_create(&mut self);
-    fn transact_create_fixed(&mut self);
+    fn transact_create(&mut self) -> TransactExecutionResult<TransactResult>;
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult>;
     fn view(&mut self) -> TransactExecutionResult<TransactionStatus>;
 }
@@ -95,13 +94,8 @@ impl<H: EVMHandler> EngineEVM<H> {
 
 impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     /// Invoke EVM transact-create
-    fn transact_create(&mut self) {
-        self.handler.transact_create();
-    }
-
-    /// Invoke EVM transact-create-fixed
-    fn transact_create_fixed(&mut self) {
-        self.handler.transact_create_fixed();
+    fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
+        self.handler.transact_create()
     }
 
     /// Invoke EVM transact-call

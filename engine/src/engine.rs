@@ -6,8 +6,7 @@ use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor;
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use evm::{Config, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -347,35 +346,6 @@ impl AsRef<[u8]> for ReadMetadataError {
     }
 }
 
-pub struct StackExecutorParams<'a, I, E, H> {
-    precompiles: Precompiles<'a, I, E, H>,
-    gas_limit: u64,
-}
-
-impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<'env, I, E, H> {
-    const fn new(gas_limit: u64, precompiles: Precompiles<'env, I, E, H>) -> Self {
-        Self {
-            precompiles,
-            gas_limit,
-        }
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn make_executor<'a, M: ModExpAlgorithm>(
-        &'a self,
-        engine: &'a Engine<'env, I, E, M>,
-    ) -> executor::stack::StackExecutor<
-        'static,
-        'a,
-        executor::stack::MemoryStackState<Engine<'env, I, E, M>>,
-        Precompiles<'env, I, E, H>,
-    > {
-        let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
-        let state = executor::stack::MemoryStackState::new(metadata, engine);
-        executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, &self.precompiles)
-    }
-}
-
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct GasPaymentResult {
     pub prepaid_amount: Wei,
@@ -498,44 +468,53 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
         let precompiles = self.create_precompiles(pause_flags, handler);
 
-        let executor_params = StackExecutorParams::new(gas_limit, precompiles);
-        let mut executor = executor_params.make_executor(self);
-        let scheme = address.map_or_else(
-            || CreateScheme::Legacy {
-                caller: origin.raw(),
-            },
-            |address| CreateScheme::Fixed(address.raw()),
+        let tx_info = aurora_engine_evm::TransactionInfo {
+            address: address.map(|addr| addr.raw()),
+            origin: origin.raw(),
+            value,
+            input,
+            gas_limit,
+            access_list,
+        };
+        let block_info = aurora_engine_evm::BlockInfo {
+            gas_price: self.gas_price,
+            current_account_id: self.current_account_id.clone(),
+            chain_id: self.state.chain_id,
+        };
+
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = None;
+        #[cfg(not(feature = "ext-connector"))]
+        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = {
+            let _ = apply_remove_eth_fn;
+            Some(Box::new(|v| {
+                let mut connector = connector::EthConnectorContract::init(self.io).unwrap();
+                connector.internal_remove_eth(v).unwrap();
+            }))
+        };
+        let mut evm = aurora_engine_evm::init_evm::<I, E, P>(
+            self.io,
+            self.env,
+            &tx_info,
+            &block_info,
+            precompiles,
+            apply_remove_eth_fn,
         );
-        let address = executor.create_address(scheme);
-        let (exit_reason, return_value) = match scheme {
-            CreateScheme::Legacy { caller } => {
-                executor.transact_create(caller, value.raw(), input, gas_limit, access_list)
-            }
-            CreateScheme::Fixed(address) => executor.transact_create_fixed(
-                origin.raw(),
-                address,
-                value.raw(),
-                input,
-                gas_limit,
-                access_list,
-            ),
-            CreateScheme::Create2 { .. } => unreachable!(),
-        };
-        let result = if exit_reason.is_succeed() {
-            address.0.to_vec()
-        } else {
-            return_value
-        };
 
-        let used_gas = executor.used_gas();
-        let status = exit_reason.into_result(result)?;
+        let res = evm.transact_create().map_err(|err| {
+            let err: EngineErrorKind = match err {
+                TransactErrorKind::EvmError(e) => e.into(),
+                TransactErrorKind::EvmFatal(e) => e.into(),
+            };
+            err
+        })?;
 
-        let (values, logs) = executor.into_state().deconstruct();
-        let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
-
-        self.apply(values, Vec::<Log>::new(), true);
-
-        Ok(SubmitResult::new(status, used_gas, logs))
+        let logs = filter_promises_from_logs(&self.io, handler, res.logs, &self.current_account_id);
+        let submit_result = res.submit_result;
+        Ok(SubmitResult::new(
+            submit_result.status,
+            submit_result.gas_used,
+            logs,
+        ))
     }
 
     /// Call the EVM contract with arguments
@@ -622,7 +601,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             precompiles,
             apply_remove_eth_fn,
         );
-
         let res = evm.transact_call().map_err(|err| {
             let err: EngineErrorKind = match err {
                 TransactErrorKind::EvmError(e) => e.into(),
@@ -674,24 +652,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             chain_id: self.state.chain_id,
         };
 
-        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = None;
-        #[cfg(not(feature = "ext-connector"))]
-        let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = {
-            let _ = apply_remove_eth_fn;
-            Some(Box::new(|v| {
-                let mut connector = connector::EthConnectorContract::init(self.io).unwrap();
-                connector.internal_remove_eth(v).unwrap();
-            }))
-        };
         let mut evm = aurora_engine_evm::init_evm::<I, E, aurora_engine_sdk::promise::Noop>(
             self.io,
             self.env,
             &tx_info,
             &block_info,
             precompiles,
-            apply_remove_eth_fn,
+            None,
         );
-        //##
         let status = evm.view().map_err(|err| {
             let err: EngineErrorKind = match err {
                 TransactErrorKind::EvmError(e) => e.into(),

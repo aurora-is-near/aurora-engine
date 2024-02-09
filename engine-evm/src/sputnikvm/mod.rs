@@ -16,7 +16,7 @@ use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{BTreeMap, Box, Vec, H160, H256, U256};
 use core::cell::RefCell;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Config};
+use evm::{executor, Config, CreateScheme};
 
 mod accounting;
 pub mod errors;
@@ -55,12 +55,56 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> SputnikVMHandler<'env, I, E,
 }
 
 impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHandler<'env, I, E, H> {
-    fn transact_create(&mut self) {
-        todo!()
-    }
+    fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
+        let mut contract_state = ContractState::new(
+            self.io,
+            self.env,
+            self.transaction,
+            self.block,
+            self.remove_eth_fn.take(),
+        );
+        let executor_params =
+            StackExecutorParams::new(self.transaction.gas_limit, &self.precompiles);
+        let mut executor = executor_params.make_executor(&contract_state);
+        let scheme = self.transaction.address.map_or_else(
+            || CreateScheme::Legacy {
+                caller: self.transaction.origin,
+            },
+            CreateScheme::Fixed,
+        );
+        let address = executor.create_address(scheme);
+        let (exit_reason, return_value) = match scheme {
+            CreateScheme::Legacy { caller } => executor.transact_create(
+                caller,
+                self.transaction.value.raw(),
+                self.transaction.input.clone(),
+                self.transaction.gas_limit,
+                self.transaction.access_list.clone(),
+            ),
+            CreateScheme::Fixed(address) => executor.transact_create_fixed(
+                self.transaction.origin,
+                address,
+                self.transaction.value.raw(),
+                self.transaction.input.clone(),
+                self.transaction.gas_limit,
+                self.transaction.access_list.clone(),
+            ),
+            CreateScheme::Create2 { .. } => unreachable!(),
+        };
+        let result = if exit_reason.is_succeed() {
+            address.0.to_vec()
+        } else {
+            return_value
+        };
 
-    fn transact_create_fixed(&mut self) {
-        todo!()
+        let used_gas = executor.used_gas();
+        let (values, logs) = executor.into_state().deconstruct();
+        contract_state.apply(values, Vec::<Log>::new(), true);
+        let status = exit_reason_into_result(exit_reason, result)?;
+        Ok(TransactResult {
+            submit_result: SubmitResult::new(status, used_gas, Vec::new()),
+            logs: logs.into_iter().collect(),
+        })
     }
 
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
