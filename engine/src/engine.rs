@@ -3,9 +3,9 @@ use crate::parameters::{
 };
 use aurora_engine_evm::{EVMHandler, TransactErrorKind};
 use aurora_engine_types::public_key::PublicKey;
-use aurora_engine_types::PhantomData;
+use aurora_engine_types::{BTreeMap, PhantomData};
 use core::mem;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
+use evm::backend::{Apply, ApplyBackend, Basic, Log};
 use evm::{Config, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
@@ -30,9 +30,9 @@ use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, Box, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei,
-    Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
-    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    BorshDeserialize, Box, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
+    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
+    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
@@ -360,11 +360,10 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     current_account_id: AccountId,
     io: I,
     env: &'env E,
-    generation_cache: RefCell<BTreeMap<Address, u32>>,
     account_info_cache: RefCell<FullCache<Address, Basic>>,
-    contract_code_cache: RefCell<FullCache<Address, Vec<u8>>>,
-    contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
     modexp_algorithm: PhantomData<M>,
+    generation_cache: RefCell<BTreeMap<Address, u32>>,
+    contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
 }
 
 pub(crate) const CONFIG: &Config = &Config::shanghai();
@@ -395,11 +394,60 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             io,
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
-            account_info_cache: RefCell::new(FullCache::default()),
-            contract_code_cache: RefCell::new(FullCache::default()),
             contract_storage_cache: RefCell::new(FullCache::default()),
+            account_info_cache: RefCell::new(FullCache::default()),
             modexp_algorithm: PhantomData,
         }
+    }
+
+    /// Get storage value of address at index.
+    pub fn storage(&self, address: H160, index: H256) -> H256 {
+        let address = Address::new(address);
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
+        let result = *self
+            .contract_storage_cache
+            .borrow_mut()
+            .get_or_insert_with((address, index), || {
+                get_storage(&self.io, &address, &index, generation)
+            });
+        result
+    }
+
+    /// Get original storage value of address at index, if available.
+    ///
+    /// Since `SputnikVM` collects storage changes in memory until the transaction is over,
+    /// the "original storage" will always be the same as the storage because no values
+    /// are written to storage until after the transaction is complete.
+    pub fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
+        Some(self.storage(address, index))
+    }
+
+    /// Returns basic account information.
+    pub fn basic(&self, address: H160) -> Basic {
+        let address = Address::new(address);
+        let result = self
+            .account_info_cache
+            .borrow_mut()
+            .get_or_insert_with(address, || Basic {
+                nonce: get_nonce(&self.io, &address),
+                balance: get_balance(&self.io, &address).raw(),
+            })
+            .clone();
+        result
+    }
+
+    /// Returns the current base fee for the current block.
+    ///
+    /// Currently, this returns 0 as there is no concept of a base fee at this
+    /// time but this may change in the future.
+    ///
+    /// TODO: doc.aurora.dev link
+    pub const fn block_base_fee_per_gas(&self) -> U256 {
+        U256::zero()
     }
 
     pub fn charge_gas(
@@ -449,7 +497,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         address: Option<Address>,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let origin = Address::new(self.origin());
+        let origin = Address::new(self.origin.raw());
         let value = Wei::zero();
         self.deploy_code(origin, value, input, address, u64::MAX, Vec::new(), handler)
     }
@@ -523,7 +571,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         args: CallArgs,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let origin = Address::new(self.origin());
+        let origin = Address::new(self.origin.raw());
         match args {
             CallArgs::V2(call_args) => {
                 let contract = call_args.contract;
@@ -1771,173 +1819,6 @@ fn assert_access<I: IO + Copy, E: Env>(
     Ok(())
 }
 
-impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
-    /// Returns the "effective" gas price (as defined by EIP-1559)
-    fn gas_price(&self) -> U256 {
-        self.gas_price
-    }
-
-    /// Returns the origin address that created the contract.
-    fn origin(&self) -> H160 {
-        self.origin.raw()
-    }
-
-    /// Returns a block hash from a given index.
-    ///
-    /// Currently, this returns
-    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff if
-    /// only for the 256 most recent blocks, excluding of the current one.
-    /// Otherwise, it returns 0x0.
-    ///
-    /// In other words, if the requested block index is less than the current
-    /// block index, return
-    /// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.
-    /// Otherwise, return 0.
-    ///
-    /// This functionality may change in the future. Follow
-    /// [nearcore#3456](https://github.com/near/nearcore/issues/3456) for more
-    /// details.
-    ///
-    /// See: `https://doc.aurora.dev/develop/compat/evm#blockhash`
-    fn block_hash(&self, number: U256) -> H256 {
-        let idx = U256::from(self.env.block_height());
-        if idx.saturating_sub(U256::from(256)) <= number && number < idx {
-            // since `idx` comes from `u64` it is always safe to downcast `number` from `U256`
-            compute_block_hash(
-                self.state.chain_id,
-                number.low_u64(),
-                self.current_account_id.as_bytes(),
-            )
-        } else {
-            H256::zero()
-        }
-    }
-
-    /// Returns the current block index number.
-    fn block_number(&self) -> U256 {
-        U256::from(self.env.block_height())
-    }
-
-    /// Returns a mocked coinbase which is the EVM address for the Aurora
-    /// account, being 0x4444588443C3a91288c5002483449Aba1054192b.
-    ///
-    /// See: `https://doc.aurora.dev/develop/compat/evm#coinbase`
-    fn block_coinbase(&self) -> H160 {
-        H160([
-            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
-            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
-        ])
-    }
-
-    /// Returns the current block timestamp.
-    fn block_timestamp(&self) -> U256 {
-        U256::from(self.env.block_timestamp().secs())
-    }
-
-    /// Returns the current block difficulty.
-    ///
-    /// See: `https://doc.aurora.dev/develop/compat/evm#difficulty`
-    fn block_difficulty(&self) -> U256 {
-        U256::zero()
-    }
-
-    /// Get environmental block randomness.
-    fn block_randomness(&self) -> Option<H256> {
-        Some(self.env.random_seed())
-    }
-
-    /// Returns the current block gas limit.
-    ///
-    /// Currently, this returns 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    /// as there isn't a gas limit alternative right now but this may change in
-    /// the future.
-    ///
-    /// See: `https://doc.aurora.dev/develop/compat/evm#gaslimit`
-    fn block_gas_limit(&self) -> U256 {
-        U256::max_value()
-    }
-
-    /// Returns the current base fee for the current block.
-    ///
-    /// Currently, this returns 0 as there is no concept of a base fee at this
-    /// time but this may change in the future.
-    ///
-    /// TODO: doc.aurora.dev link
-    fn block_base_fee_per_gas(&self) -> U256 {
-        U256::zero()
-    }
-
-    /// Returns the states chain ID.
-    fn chain_id(&self) -> U256 {
-        U256::from(self.state.chain_id)
-    }
-
-    /// Checks if an address exists.
-    fn exists(&self, address: H160) -> bool {
-        let address = Address::new(address);
-        let mut cache = self.account_info_cache.borrow_mut();
-        let basic_info = cache.get_or_insert_with(address, || Basic {
-            nonce: get_nonce(&self.io, &address),
-            balance: get_balance(&self.io, &address).raw(),
-        });
-        if !basic_info.balance.is_zero() || !basic_info.nonce.is_zero() {
-            return true;
-        }
-        let mut cache = self.contract_code_cache.borrow_mut();
-        let code = cache.get_or_insert_with(address, || get_code(&self.io, &address));
-        !code.is_empty()
-    }
-
-    /// Returns basic account information.
-    fn basic(&self, address: H160) -> Basic {
-        let address = Address::new(address);
-        let result = self
-            .account_info_cache
-            .borrow_mut()
-            .get_or_insert_with(address, || Basic {
-                nonce: get_nonce(&self.io, &address),
-                balance: get_balance(&self.io, &address).raw(),
-            })
-            .clone();
-        result
-    }
-
-    /// Returns the code of the contract from an address.
-    fn code(&self, address: H160) -> Vec<u8> {
-        let address = Address::new(address);
-        self.contract_code_cache
-            .borrow_mut()
-            .get_or_insert_with(address, || get_code(&self.io, &address))
-            .clone()
-    }
-
-    /// Get storage value of address at index.
-    fn storage(&self, address: H160, index: H256) -> H256 {
-        let address = Address::new(address);
-        let generation = *self
-            .generation_cache
-            .borrow_mut()
-            .entry(address)
-            .or_insert_with(|| get_generation(&self.io, &address));
-        let result = *self
-            .contract_storage_cache
-            .borrow_mut()
-            .get_or_insert_with((address, index), || {
-                get_storage(&self.io, &address, &index, generation)
-            });
-        result
-    }
-
-    /// Get original storage value of address at index, if available.
-    ///
-    /// Since `SputnikVM` collects storage changes in memory until the transaction is over,
-    /// the "original storage" will always be the same as the storage because no values
-    /// are written to storage until after the transaction is complete.
-    fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
-        Some(self.storage(address, index))
-    }
-}
-
 impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
@@ -2074,7 +1955,7 @@ mod tests {
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::parameters::engine::RelayerKeyArgs;
     use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
-    use std::cell::RefCell;
+    use core::cell::RefCell;
 
     #[test]
     fn test_view_call_to_empty_contract_without_input_returns_empty_data() {
