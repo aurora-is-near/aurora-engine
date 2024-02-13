@@ -20,7 +20,6 @@ aurora-engine-test-doubles.workspace = true
 aurora-engine-transactions = { workspace = true, features = ["std", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
 aurora-engine-workspace.workspace = true
-# aurora-engine-evm.workspace = { workspace = true, features = ["integration-test"] }
 aurora-engine-evm = { workspace = true, features = ["evm-sputnikvm", "integration-test"] }
 
 anyhow.workspace = true

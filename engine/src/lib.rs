@@ -861,7 +861,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::prelude::{NEP141Wei, U256};
-        use evm::backend::ApplyBackend;
+        use aurora_engine_evm::{apply, ApplyModify};
 
         #[cfg(not(feature = "ext-connector"))]
         let mut io = Runtime;
@@ -871,20 +871,14 @@ mod contract {
         let address = Address::from_array(args.0);
         let nonce = U256::from(args.1);
         let balance = NEP141Wei::new(u128::from(args.2));
-        let current_account_id = io.current_account_id();
-        let mut engine: Engine<_, _> =
-            Engine::new(address, current_account_id, io, &io).sdk_unwrap();
-        let state_change = evm::backend::Apply::Modify {
+
+        let state_change = ApplyModify {
             address: address.raw(),
-            basic: evm::backend::Basic {
-                balance: U256::from(balance.as_u128()),
-                nonce,
-            },
+            basic_balance: U256::from(balance.as_u128()),
+            basic_nonce: nonce,
             code: None,
-            storage: core::iter::empty(),
-            reset_storage: false,
         };
-        engine.apply(core::iter::once(state_change), core::iter::empty(), false);
+        apply(io, &io, state_change);
 
         #[cfg(not(feature = "ext-connector"))]
         {
