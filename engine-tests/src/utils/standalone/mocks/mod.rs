@@ -1,6 +1,5 @@
 use crate::utils;
 use aurora_engine::engine;
-use aurora_engine::engine::Engine;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine::parameters::InitCallArgs;
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
@@ -97,24 +96,19 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     io: I,
     env: &E,
 ) {
-    use evm::backend::ApplyBackend;
+    use aurora_engine_evm::{apply, ApplyModify};
 
-    let mut engine: Engine<_, _> = Engine::new(address, env.current_account_id(), io, env).unwrap();
-    let state_change = evm::backend::Apply::Modify {
+    let state_change = ApplyModify {
         address: address.raw(),
-        basic: evm::backend::Basic {
-            balance: balance.raw(),
-            nonce,
-        },
+        basic_balance: balance.raw(),
+        basic_nonce: nonce,
         code,
-        storage: std::iter::empty(),
-        reset_storage: false,
     };
 
     #[cfg(not(feature = "ext-connector"))]
     deposit(io, &env.current_account_id(), address, balance);
 
-    engine.apply(std::iter::once(state_change), std::iter::empty(), false);
+    apply(io, env, state_change);
 }
 
 #[cfg(not(feature = "ext-connector"))]

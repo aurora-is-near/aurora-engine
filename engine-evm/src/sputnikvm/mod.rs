@@ -98,12 +98,13 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         };
 
         let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
+        let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
         let status = exit_reason_into_result(exit_reason, result)?;
+        let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
-            logs: logs.into_iter().collect(),
+            logs,
         })
     }
 
@@ -128,12 +129,13 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
             self.transaction.access_list.clone(),
         );
         let used_gas = executor.used_gas();
-        let (values, logs) = executor.into_state().deconstruct();
+        let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
         let status = exit_reason_into_result(exit_reason, result)?;
+        let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
-            logs: logs.into_iter().collect(),
+            logs,
         })
     }
 
@@ -515,4 +517,23 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for ContractState<'env, J, E> {
             total_bytes
         );
     }
+}
+
+impl From<Log> for crate::Log {
+    fn from(value: Log) -> Self {
+        Self {
+            address: value.address,
+            topics: value.topics,
+            data: value.data,
+        }
+    }
+}
+
+#[cfg(feature = "integration-test")]
+#[derive(Clone, Debug)]
+pub struct ApplyModify {
+    pub address: H160,
+    pub basic_balance: U256,
+    pub basic_nonce: U256,
+    pub code: Option<Vec<u8>>,
 }

@@ -1,12 +1,11 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
-use aurora_engine_evm::{EVMHandler, TransactErrorKind};
+use aurora_engine_evm::{EVMHandler, Log, TransactErrorKind};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::{BTreeMap, PhantomData};
 use core::mem;
-use evm::backend::{Apply, ApplyBackend, Basic, Log};
-use evm::{Config, ExitError, ExitFatal, ExitReason};
+use evm::{Config, ExitError, ExitFatal};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -15,7 +14,6 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
 
-use crate::accounting;
 #[cfg(not(feature = "ext-connector"))]
 use crate::contract_methods::connector;
 use crate::contract_methods::silo;
@@ -172,20 +170,6 @@ pub type EngineResult<T> = Result<T, EngineError>;
 trait ExitIntoResult {
     /// Checks if the EVM exit is ok or an error.
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind>;
-}
-
-impl ExitIntoResult for ExitReason {
-    fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
-        match self {
-            Self::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
-            Self::Revert(_) => Ok(TransactionStatus::Revert(data)),
-            Self::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
-            Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
-            Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-            Self::Error(e) => Err(e.into()),
-            Self::Fatal(e) => Err(e.into()),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -360,7 +344,6 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     current_account_id: AccountId,
     io: I,
     env: &'env E,
-    account_info_cache: RefCell<FullCache<Address, Basic>>,
     modexp_algorithm: PhantomData<M>,
     generation_cache: RefCell<BTreeMap<Address, u32>>,
     contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
@@ -395,7 +378,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             env,
             generation_cache: RefCell::new(BTreeMap::new()),
             contract_storage_cache: RefCell::new(FullCache::default()),
-            account_info_cache: RefCell::new(FullCache::default()),
             modexp_algorithm: PhantomData,
         }
     }
@@ -424,20 +406,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     /// are written to storage until after the transaction is complete.
     pub fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
         Some(self.storage(address, index))
-    }
-
-    /// Returns basic account information.
-    pub fn basic(&self, address: H160) -> Basic {
-        let address = Address::new(address);
-        let result = self
-            .account_info_cache
-            .borrow_mut()
-            .get_or_insert_with(address, || Basic {
-                nonce: get_nonce(&self.io, &address),
-                balance: get_balance(&self.io, &address).raw(),
-            })
-            .clone();
-        result
     }
 
     /// Returns the current base fee for the current block.
@@ -1643,27 +1611,6 @@ pub fn remove_function_call_key<I: IO>(io: &mut I, key: &PublicKey) -> Result<()
     Ok(())
 }
 
-/// Removes all storage for the given address.
-fn remove_all_storage<I: IO>(io: &mut I, address: &Address, generation: u32) {
-    // FIXME: there is presently no way to prefix delete trie state.
-    // NOTE: There is not going to be a method on runtime for this.
-    //     You may need to store all keys in a list if you want to do this in a contract.
-    //     Maybe you can incentivize people to delete dead old keys. They can observe them from
-    //     external indexer node and then issue special cleaning transaction.
-    //     Either way you may have to store the nonce per storage address root. When the account
-    //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
-    //     can be deleted over time. That's how TurboGeth does storage.
-    set_generation(io, address, generation + 1);
-}
-
-/// Removes an account.
-fn remove_account<I: IO + Copy>(io: &mut I, address: &Address, generation: u32) {
-    remove_nonce(io, address);
-    remove_balance(io, address);
-    remove_code(io, address);
-    remove_all_storage(io, address, generation);
-}
-
 fn filter_promises_from_logs<I, T, P>(
     io: &I,
     handler: &mut P,
@@ -1817,132 +1764,6 @@ fn assert_access<I: IO + Copy, E: Env>(
     }
 
     Ok(())
-}
-
-impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
-    fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
-    where
-        A: IntoIterator<Item = Apply<I>>,
-        I: IntoIterator<Item = (H256, H256)>,
-        L: IntoIterator<Item = Log>,
-    {
-        let mut writes_counter: usize = 0;
-        let mut code_bytes_written: usize = 0;
-        let mut accounting = accounting::Accounting::default();
-        for apply in values {
-            match apply {
-                Apply::Modify {
-                    address,
-                    basic,
-                    code,
-                    storage,
-                    reset_storage,
-                } => {
-                    let current_basic = self.basic(address);
-                    accounting.change(accounting::Change {
-                        new_value: basic.balance,
-                        old_value: current_basic.balance,
-                    });
-
-                    let address = Address::new(address);
-                    let generation = get_generation(&self.io, &address);
-
-                    if current_basic.nonce != basic.nonce {
-                        set_nonce(&mut self.io, &address, &basic.nonce);
-                        writes_counter += 1;
-                    }
-                    if current_basic.balance != basic.balance {
-                        set_balance(&mut self.io, &address, &Wei::new(basic.balance));
-                        writes_counter += 1;
-                    }
-
-                    if let Some(code) = code {
-                        set_code(&mut self.io, &address, &code);
-                        code_bytes_written = code.len();
-                        sdk::log!("code_write_at_address {:?} {}", address, code_bytes_written);
-                    }
-
-                    let next_generation = if reset_storage {
-                        remove_all_storage(&mut self.io, &address, generation);
-                        generation + 1
-                    } else {
-                        generation
-                    };
-
-                    for (index, value) in storage {
-                        if value == H256::default() {
-                            remove_storage(&mut self.io, &address, &index, next_generation);
-                        } else {
-                            set_storage(&mut self.io, &address, &index, &value, next_generation);
-                        }
-                        writes_counter += 1;
-                    }
-
-                    // We only need to remove the account if:
-                    // 1. we are supposed to delete an empty account
-                    // 2. the account is empty
-                    // 3. we didn't already clear out the storage (because if we did then there is
-                    //    nothing to do)
-                    if delete_empty
-                        && is_account_empty(&self.io, &address)
-                        && generation == next_generation
-                    {
-                        remove_account(&mut self.io, &address, generation);
-                        writes_counter += 1;
-                    }
-                }
-                Apply::Delete { address } => {
-                    let current_basic = self.basic(address);
-                    accounting.remove(current_basic.balance);
-
-                    let address = Address::new(address);
-                    let generation = get_generation(&self.io, &address);
-                    remove_account(&mut self.io, &address, generation);
-                    writes_counter += 1;
-                }
-            }
-        }
-        match accounting.net() {
-            // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
-            accounting::Net::Lost(amount) => {
-                let _ = amount;
-                sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
-                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
-                // if we cannot read the storage then there is nothing to remove.
-                #[cfg(not(feature = "ext-connector"))]
-                connector::EthConnectorContract::init(self.io)
-                    .map(|mut connector| {
-                        // The `unwrap` is safe here because (a) if the connector
-                        // is implemented correctly then the total supply will never underflow and (b) we are passing
-                        // in the balance directly so there will always be enough balance.
-                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
-                    })
-                    .ok();
-            }
-            accounting::Net::Zero => (),
-            accounting::Net::Gained(_) => {
-                // It should be impossible to gain ETH using normal EVM operations in production.
-                // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
-                #[cfg(all(not(feature = "integration-test"), feature = "contract"))]
-                {
-                    panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
-                }
-            }
-        }
-        // These variable are only used if logging feature is enabled.
-        // In production logging is always enabled, so we can ignore the warnings.
-        #[allow(unused_variables)]
-        let total_bytes = 32 * writes_counter + code_bytes_written;
-        #[allow(unused_assignments)]
-        if code_bytes_written > 0 {
-            writes_counter += 1;
-        }
-        sdk::log!(
-            "total_writes_count {}\ntotal_written_bytes {}",
-            writes_counter,
-            total_bytes
-        );
-    }
 }
 
 #[cfg(test)]

@@ -420,6 +420,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aurora-engine",
+ "aurora-engine-evm",
  "aurora-engine-hashchain",
  "aurora-engine-modexp 1.0.0",
  "aurora-engine-precompiles",
