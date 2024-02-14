@@ -1439,8 +1439,7 @@ pub fn check_nonce<I: IO>(
     if transaction_nonce != &account_nonce {
         return Err(EngineErrorKind::IncorrectNonce(format!(
             "ERR_INCORRECT_NONCE: ac: {}, tx: {}",
-            account_nonce.as_u64(),
-            transaction_nonce.as_u64()
+            account_nonce, transaction_nonce
         )));
     }
 
