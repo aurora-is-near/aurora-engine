@@ -2683,7 +2683,10 @@ mod tests {
         increment_nonce(&mut io, &origin);
         let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
 
-        assert_eq!(actual_error_kind.as_bytes(), errors::ERR_INCORRECT_NONCE);
+        assert_eq!(
+            actual_error_kind.as_bytes(),
+            b"ERR_INCORRECT_NONCE: ac: 1, tx: 0"
+        );
     }
 
     #[test]
