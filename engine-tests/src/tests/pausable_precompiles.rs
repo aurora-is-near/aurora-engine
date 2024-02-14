@@ -41,13 +41,12 @@ fn test_executing_paused_precompile_throws_error() {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
     let input = call_args.try_to_vec().unwrap();
-
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let is_to_near = false;
     let error = tester
         .withdraw(&mut runner, &mut signer, is_to_near)
         .unwrap_err();
-
+    println!("{:?}", error.kind);
     assert!(matches!(
         error.kind,
         EngineErrorKind::EvmFatal(evm::ExitFatal::Other(e)) if e == "ERR_PAUSED"

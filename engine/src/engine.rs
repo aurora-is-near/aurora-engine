@@ -5,7 +5,7 @@ use aurora_engine_evm::{EVMHandler, Log, TransactErrorKind};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::{BTreeMap, PhantomData};
 use core::mem;
-use evm::{Config, ExitError, ExitFatal};
+use evm::{ExitError, ExitFatal};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -348,8 +348,6 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     generation_cache: RefCell<BTreeMap<Address, u32>>,
     contract_storage_cache: RefCell<FullCache<(Address, H256), H256>>,
 }
-
-pub(crate) const CONFIG: &Config = &Config::shanghai();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -1094,7 +1092,7 @@ pub fn submit_with_alt_modexp<
     }
 
     // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(CONFIG) {
+    match transaction.intrinsic_gas() {
         Err(_e) => {
             return Err(EngineErrorKind::GasOverflow.into());
         }

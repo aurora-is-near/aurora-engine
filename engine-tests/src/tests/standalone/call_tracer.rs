@@ -75,7 +75,7 @@ fn test_trace_precompile_direct_call() {
             utils::sign_transaction(tx.clone(), Some(runner.chain_id), &signer.secret_key);
         let kind = aurora_engine_transactions::EthTransactionKind::Legacy(signed_tx);
         let norm_tx = aurora_engine_transactions::NormalizedEthTransaction::try_from(kind).unwrap();
-        norm_tx.intrinsic_gas(&evm::Config::shanghai()).unwrap()
+        norm_tx.intrinsic_gas().unwrap()
     };
 
     let mut listener = CallTracer::default();

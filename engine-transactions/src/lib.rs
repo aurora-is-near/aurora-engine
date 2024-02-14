@@ -133,11 +133,12 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
 
 impl NormalizedEthTransaction {
     #[allow(clippy::naive_bytecount)]
-    pub fn intrinsic_gas(&self, config: &evm::Config) -> Result<u64, Error> {
+    pub fn intrinsic_gas(&self) -> Result<u64, Error> {
+        let config = aurora_engine_evm::config();
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
-            config.gas_transaction_create + init_code_cost(config, &self.data)?
+            config.gas_transaction_create + init_code_cost(&config, &self.data)?
         } else {
             config.gas_transaction_call
         };
@@ -185,7 +186,7 @@ impl NormalizedEthTransaction {
     }
 }
 
-fn init_code_cost(config: &evm::Config, data: &[u8]) -> Result<u64, Error> {
+fn init_code_cost(config: &aurora_engine_evm::Config, data: &[u8]) -> Result<u64, Error> {
     // As per EIP-3860:
     // > We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
     // where INITCODE_WORD_COST is 2.

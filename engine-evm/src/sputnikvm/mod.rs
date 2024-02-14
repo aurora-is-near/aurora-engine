@@ -22,7 +22,7 @@ mod accounting;
 pub mod errors;
 mod utility;
 
-const CONFIG: &Config = &Config::shanghai();
+pub const CONFIG: &Config = &Config::shanghai();
 
 /// SputnikVM handler
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
@@ -121,8 +121,9 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let mut executor = executor_params.make_executor(&contract_state);
         let (exit_reason, result) = executor.transact_call(
             self.transaction.origin,
-            // TODO: check it
-            self.transaction.address.unwrap(),
+            self.transaction
+                .address
+                .expect("transact_call address must be set"),
             self.transaction.value.raw(),
             self.transaction.input.clone(),
             self.transaction.gas_limit,
@@ -536,4 +537,60 @@ pub struct ApplyModify {
     pub basic_balance: U256,
     pub basic_nonce: U256,
     pub code: Option<Vec<u8>>,
+}
+
+impl From<Config> for crate::Config {
+    fn from(value: Config) -> Self {
+        Self {
+            gas_ext_code: value.gas_ext_code,
+            gas_ext_code_hash: value.gas_ext_code_hash,
+            gas_sstore_set: value.gas_sstore_set,
+            gas_sstore_reset: value.gas_sstore_reset,
+            refund_sstore_clears: value.refund_sstore_clears,
+            max_refund_quotient: value.max_refund_quotient,
+            gas_balance: value.gas_balance,
+            gas_sload: value.gas_sload,
+            gas_sload_cold: value.gas_sload_cold,
+            gas_suicide: value.gas_suicide,
+
+            gas_suicide_new_account: value.gas_suicide_new_account,
+            gas_call: value.gas_call,
+            gas_expbyte: value.gas_expbyte,
+            gas_transaction_create: value.gas_transaction_create,
+            gas_transaction_call: value.gas_transaction_call,
+            gas_transaction_zero_data: value.gas_transaction_zero_data,
+            gas_transaction_non_zero_data: value.gas_transaction_non_zero_data,
+            gas_access_list_address: value.gas_access_list_address,
+            gas_access_list_storage_key: value.gas_access_list_storage_key,
+            gas_account_access_cold: value.gas_account_access_cold,
+            gas_storage_read_warm: value.gas_storage_read_warm,
+            sstore_gas_metering: value.sstore_gas_metering,
+            sstore_revert_under_stipend: value.sstore_revert_under_stipend,
+            increase_state_access_gas: value.increase_state_access_gas,
+            decrease_clears_refund: value.decrease_clears_refund,
+            disallow_executable_format: value.disallow_executable_format,
+            warm_coinbase_address: value.warm_coinbase_address,
+            err_on_call_with_more_gas: value.err_on_call_with_more_gas,
+            call_l64_after_gas: value.call_l64_after_gas,
+            empty_considered_exists: value.empty_considered_exists,
+            create_increase_nonce: value.create_increase_nonce,
+            stack_limit: value.stack_limit,
+            memory_limit: value.memory_limit,
+            call_stack_limit: value.call_stack_limit,
+            create_contract_limit: value.create_contract_limit,
+            max_initcode_size: value.max_initcode_size,
+            call_stipend: value.call_stipend,
+            has_delegate_call: value.has_delegate_call,
+            has_create2: value.has_create2,
+            has_revert: value.has_revert,
+            has_return_data: value.has_return_data,
+            has_bitwise_shifting: value.has_bitwise_shifting,
+            has_chain_id: value.has_chain_id,
+            has_self_balance: value.has_self_balance,
+            has_ext_code_hash: value.has_ext_code_hash,
+            has_base_fee: value.has_base_fee,
+            has_push0: value.has_push0,
+            estimate: value.estimate,
+        }
+    }
 }

@@ -482,10 +482,10 @@ dependencies = [
 name = "aurora-engine-transactions"
 version = "1.0.0"
 dependencies = [
+ "aurora-engine-evm",
  "aurora-engine-precompiles",
  "aurora-engine-sdk",
  "aurora-engine-types",
- "evm",
  "hex",
  "rlp",
  "serde",
