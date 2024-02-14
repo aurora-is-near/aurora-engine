@@ -53,7 +53,7 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 pub use sputnikvm::ApplyModify;
 
 #[cfg(feature = "integration-test")]
-pub fn apply<I: IO + Copy, E: Env>(io: I, env: &E, state_change: sputnikvm::ApplyModify) {
+pub fn apply<I: IO + Copy, E: Env>(io: I, env: &E, state_change: ApplyModify) {
     use evm::backend::ApplyBackend;
     let tx = TransactionInfo::default();
     let block = BlockInfo::default();
@@ -64,7 +64,7 @@ pub fn apply<I: IO + Copy, E: Env>(io: I, env: &E, state_change: sputnikvm::Appl
             balance: state_change.basic_balance,
             nonce: state_change.basic_nonce,
         },
-        code: None,
+        code: state_change.code,
         storage: core::iter::empty(),
         reset_storage: false,
     };
