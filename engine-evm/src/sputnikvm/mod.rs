@@ -96,11 +96,11 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         } else {
             return_value
         };
+        let status = exit_reason_into_result(exit_reason, result)?;
 
         let used_gas = executor.used_gas();
         let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let status = exit_reason_into_result(exit_reason, result)?;
         let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
@@ -129,10 +129,11 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
             self.transaction.gas_limit,
             self.transaction.access_list.clone(),
         );
+        let status = exit_reason_into_result(exit_reason, result)?;
+
         let used_gas = executor.used_gas();
         let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let status = exit_reason_into_result(exit_reason, result)?;
         let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),

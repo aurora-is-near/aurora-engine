@@ -352,7 +352,6 @@ command = "${CARGO}"
 dependencies = ["build-test", "build-aurora-eth-connector"]
 args = [
     "test",
-    "test_executing_paused_precompile_throws_error",
     "--workspace",
     "--exclude",
     "aurora-engine-tests-connector",
