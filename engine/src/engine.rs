@@ -29,10 +29,10 @@ use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
-    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
-    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
-    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
+    Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
+    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
@@ -90,7 +90,7 @@ pub enum EngineErrorKind {
     /// Fatal EVM errors.
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
-    IncorrectNonce,
+    IncorrectNonce(String),
     FailedTransactionParse(crate::prelude::transactions::Error),
     InvalidChainId,
     InvalidSignature,
@@ -129,7 +129,7 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::Other(m)) | Self::EvmFatal(ExitFatal::Other(m)) => {
                 m.as_bytes()
             }
-            Self::IncorrectNonce => errors::ERR_INCORRECT_NONCE,
+            Self::IncorrectNonce(msg) => msg.as_bytes(),
             Self::FailedTransactionParse(e) => e.as_ref(),
             Self::InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
             Self::InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
@@ -1437,7 +1437,9 @@ pub fn check_nonce<I: IO>(
     let account_nonce = get_nonce(io, address);
 
     if transaction_nonce != &account_nonce {
-        return Err(EngineErrorKind::IncorrectNonce);
+        return Err(EngineErrorKind::IncorrectNonce(format!(
+            "ERR_INCORRECT_NONCE: ac: {account_nonce}, tx: {transaction_nonce}"
+        )));
     }
 
     Ok(())
@@ -2679,7 +2681,10 @@ mod tests {
         increment_nonce(&mut io, &origin);
         let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
 
-        assert_eq!(actual_error_kind.as_bytes(), errors::ERR_INCORRECT_NONCE);
+        assert_eq!(
+            actual_error_kind.as_bytes(),
+            b"ERR_INCORRECT_NONCE: ac: 1, tx: 0"
+        );
     }
 
     #[test]
