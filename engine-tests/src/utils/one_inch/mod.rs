@@ -1,3 +1,4 @@
+use bstr::ByteSlice;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Condvar, Mutex, Once};
@@ -32,25 +33,27 @@ pub fn download_and_compile_solidity_sources(
         }
 
         // install packages
-        let status = Command::new("/usr/bin/env")
+        let output = Command::new("/usr/bin/env")
             .current_dir(&sources_dir)
             .args(["yarn", "install"])
-            .status()
+            .output()
             .unwrap();
         assert!(
-            status.success(),
-            "Unsuccessful exit status while install hardhat dependencies: {status}"
+            output.status.success(),
+            "Unsuccessful exit status while install hardhat dependencies: {}",
+            String::from_utf8_lossy(&output.stdout),
         );
 
         let hardhat = |command: &str| {
-            let status = Command::new("/usr/bin/env")
+            let output = Command::new("/usr/bin/env")
                 .current_dir(&sources_dir)
                 .args(["node_modules/hardhat/internal/cli/cli.js", command])
-                .status()
+                .output()
                 .unwrap();
             assert!(
-                status.success(),
-                "Unsuccessful exit status while install while executing `{command}`: {status}",
+                output.status.success(),
+                "Unsuccessful exit status while install while executing `{command}`: {}",
+                String::from_utf8_lossy(&output.stdout)
             );
         };
 
