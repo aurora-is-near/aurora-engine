@@ -1037,11 +1037,13 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
-                "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
                 "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
                 "ERR_FIXED_GAS_OVERFLOW" => EngineErrorKind::FixedGasOverflow,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
+                msg if msg.starts_with("ERR_INCORRECT_NONCE") => {
+                    EngineErrorKind::IncorrectNonce(msg.to_string())
+                }
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }
         }

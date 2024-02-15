@@ -799,7 +799,9 @@ fn test_eth_transfer_incorrect_nonce() {
             utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    assert_eq!(error.kind, EngineErrorKind::IncorrectNonce);
+    assert!(
+        matches!(error.kind, EngineErrorKind::IncorrectNonce(msg) if &msg == "ERR_INCORRECT_NONCE: ac: 0, tx: 1")
+    );
 
     // validate post-state (which is the same as pre-state in this case)
     utils::validate_address_balance_and_nonce(
