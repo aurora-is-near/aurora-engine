@@ -15,6 +15,8 @@ aurora-engine-precompiles.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
 
+serde.workspace = true
+serde_json.workspace = true
 evm = { workspace = true, features = [ "create-fixed" ], optional = true }
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
@@ -25,3 +27,4 @@ evm-sputnikvm = ["evm"]
 evm-revm = ["revm"]
 integration-test = []
 tracing = ["evm/tracing"]
+impl-serde = ["aurora-engine-types/impl-serde", "evm/with-serde"]

@@ -23,7 +23,6 @@ aurora-engine-sdk.workspace = true
 aurora-engine-evm.workspace = true
 bitflags.workspace = true
 ethabi.workspace = true
-evm = { workspace = true, features = [ "create-fixed" ] }
 function_name.workspace = true
 hex.workspace = true
 rlp.workspace = true
@@ -50,5 +49,5 @@ integration-test = ["log", "aurora-engine-evm/integration-test"]
 all-promise-actions = ["aurora-engine-sdk/all-promise-actions"]
 mainnet = ["contract", "log", "aurora-engine-sdk/mainnet"]
 testnet = ["contract", "log", "aurora-engine-sdk/testnet"]
-impl-serde = ["aurora-engine-types/impl-serde", "aurora-engine-transactions/impl-serde", "evm/with-serde"]
+impl-serde = ["aurora-engine-types/impl-serde", "aurora-engine-transactions/impl-serde", "aurora-engine-evm/impl-serde"]
 ext-connector = ["aurora-engine-precompiles/ext-connector"]

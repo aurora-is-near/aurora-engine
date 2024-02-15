@@ -1,11 +1,9 @@
 use crate::parameters::{
     CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
 };
-use aurora_engine_evm::{EVMHandler, Log, TransactErrorKind};
+use aurora_engine_evm::{EVMHandler, ExitError, ExitFatal, Log, TransactErrorKind};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::{BTreeMap, PhantomData};
-use core::mem;
-use evm::{ExitError, ExitFatal};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -40,8 +38,7 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use aurora_engine_types::types::EthGas;
-use core::cell::RefCell;
-use core::iter::once;
+use core::{cell::RefCell, iter::once, mem};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -116,7 +113,7 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
             Self::EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
             Self::EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
-            Self::EvmError(ExitError::InvalidCode(_)) => errors::ERR_INVALID_OPCODE,
+            Self::EvmError(ExitError::InvalidCode) => errors::ERR_INVALID_OPCODE,
             Self::EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
             Self::EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
             Self::EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,

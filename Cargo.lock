@@ -321,7 +321,6 @@ dependencies = [
  "bitflags 1.3.2",
  "digest 0.10.7",
  "ethabi",
- "evm",
  "function_name",
  "hex",
  "rlp",
@@ -340,6 +339,8 @@ dependencies = [
  "aurora-engine-types",
  "evm",
  "revm",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

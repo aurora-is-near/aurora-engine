@@ -176,7 +176,13 @@ pub fn exit_reason_into_result(
         ExitReason::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
         ExitReason::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
         ExitReason::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-        ExitReason::Error(e) => Err(e.into()),
-        ExitReason::Fatal(e) => Err(e.into()),
+        ExitReason::Error(e) => {
+            let err: crate::ExitError = e.into();
+            Err(err.into())
+        }
+        ExitReason::Fatal(e) => {
+            let err: crate::ExitFatal = e.into();
+            Err(err.into())
+        }
     }
 }

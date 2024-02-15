@@ -141,6 +141,7 @@ pub struct Config {
 pub type TransactExecutionResult<T> = Result<T, crate::TransactErrorKind>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub enum ExitError {
     StackUnderflow,
     StackOverflow,
@@ -158,9 +159,11 @@ pub enum ExitError {
     CreateEmpty,
     Other(Cow<'static, str>),
     MaxNonce,
+    InvalidCode,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
 pub enum ExitFatal {
     NotSupported,
     UnhandledInterrupt,

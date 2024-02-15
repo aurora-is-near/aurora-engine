@@ -1,6 +1,5 @@
-use crate::{BlockInfo, EVMHandler, TransactResult, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 
-use crate::sputnikvm::errors::TransactExecutionResult;
 use crate::sputnikvm::utility::{
     compute_block_hash, exit_reason_into_result, get_balance, get_code, get_generation, get_nonce,
     get_storage, is_account_empty, remove_account, remove_all_storage, remove_storage, set_balance,

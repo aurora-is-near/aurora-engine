@@ -17,8 +17,10 @@ mod revm;
 mod sputnikvm;
 mod types;
 
-pub use crate::sputnikvm::errors::{TransactErrorKind, TransactExecutionResult};
-pub use types::{BlockInfo, Config, Log, TransactResult, TransactionInfo};
+pub use types::{
+    BlockInfo, Config, ExitError, ExitFatal, Log, TransactErrorKind, TransactExecutionResult,
+    TransactResult, TransactionInfo,
+};
 
 #[cfg(feature = "evm-revm")]
 /// Init REVM

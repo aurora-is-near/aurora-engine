@@ -11,7 +11,6 @@ use aurora_engine_types::parameters::connector::{
 use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
-use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::vm::VMKind;
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
@@ -1041,8 +1040,12 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
                 "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
                 "ERR_FIXED_GAS_OVERFLOW" => EngineErrorKind::FixedGasOverflow,
-                "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
-                msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
+                "ERR_PAUSED" => EngineErrorKind::EvmFatal(aurora_engine_evm::ExitFatal::Other(
+                    "ERR_PAUSED".into(),
+                )),
+                msg => EngineErrorKind::EvmFatal(aurora_engine_evm::ExitFatal::Other(Cow::Owned(
+                    msg.into(),
+                ))),
             }
         }
         other => panic!("Other FunctionCallError: {other:?}"),
