@@ -43,7 +43,6 @@ std = ["aurora-engine-types/std", "aurora-engine-hashchain/std", "aurora-engine-
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-hashchain/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat"]
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
-tracing = ["aurora-engine-evm/tracing"]
 error_refund = ["aurora-engine-precompiles/error_refund"]
 integration-test = ["log", "aurora-engine-evm/integration-test"]
 all-promise-actions = ["aurora-engine-sdk/all-promise-actions"]
