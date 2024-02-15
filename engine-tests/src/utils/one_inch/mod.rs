@@ -1,4 +1,3 @@
-use bstr::ByteSlice;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Condvar, Mutex, Once};
