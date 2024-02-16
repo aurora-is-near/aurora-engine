@@ -1,30 +1,39 @@
-use crate::{BlockInfo, EVMHandler, TransactionInfo};
+mod utility;
+
+use crate::revm::utility::{get_balance, get_code, get_nonce};
+use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::types::{NEP141Wei, Wei};
-use aurora_engine_types::{Box, H160};
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use revm::handler::LoadPrecompilesHandle;
-use revm::precompile::{Address, B256};
 use revm::primitives::{
-    Account, AccountInfo, Bytecode, Env, HashMap, ResultAndState, SpecId, U256,
+    Account, AccountInfo, Address, Bytecode, HashMap, SpecId, B256, KECCAK_EMPTY, U256,
 };
-use revm::{Database, DatabaseCommit, Evm};
+use revm::{Database, DatabaseCommit};
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
 
 /// REVM handler
 pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
-    env_state: &'env E,
-    state: ContractState<'env, I, E>,
-    env: Box<Env>,
+    io: I,
+    env: &'env E,
+    transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
     pub fn new(
         io: I,
-        env_state: &'env E,
+        env: &'env E,
         transaction: &'env TransactionInfo,
-        _block: &'env BlockInfo,
+        block: &'env BlockInfo,
     ) -> Self {
+        Self {
+            io,
+            env,
+            transaction,
+            block,
+        }
+        /*
         let state = ContractState::new(io, env_state);
         let mut env = Box::new(Env::default());
 
@@ -51,7 +60,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             env,
         }
 
-        /* TODO: remove - for investigation only
+        // TODO: remove - for investigation only
         // env.tx.transact_to +
         // env.tx.caller +
         // env.tx.gas_price +
@@ -81,6 +90,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
     }
 
     /// EVM precompiles
+    /// TODO: adjust it
     pub fn set_precompiles<'a>(
         precompiles: &LoadPrecompilesHandle<'a>,
     ) -> LoadPrecompilesHandle<'a> {
@@ -95,24 +105,52 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
 /// Operates with REVM `DB`
 pub struct ContractState<'env, I: IO, E: aurora_engine_sdk::env::Env> {
     io: I,
-    env_state: &'env E,
+    env: &'env E,
+    transaction: &'env TransactionInfo,
+    block: &'env BlockInfo,
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> ContractState<'env, I, E> {
-    pub fn new(io: I, env_state: &'env E) -> Self {
-        Self { io, env_state }
+    pub fn new(
+        io: I,
+        env: &'env E,
+        transaction: &'env TransactionInfo,
+        block: &'env BlockInfo,
+    ) -> Self {
+        Self {
+            io,
+            env,
+            transaction,
+            block,
+        }
     }
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractState<'env, I, E> {
     type Error = ();
 
-    fn basic(&mut self, _address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        todo!()
+    fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
+        let balance = get_balance(&self.io, &address);
+        let nonce = get_nonce(&self.io, &address);
+        let code_raw = get_code(&self.io, &address);
+        let (code_hash, code) = if code_raw.is_empty() {
+            (KECCAK_EMPTY, None)
+        } else {
+            let bytes = Bytecode::new_raw(code_raw.into());
+            (bytes.hash_slow(), Some(bytes))
+        };
+        let acc = Some(AccountInfo {
+            balance,
+            nonce,
+            code_hash,
+            code,
+        });
+        Ok(acc)
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        todo!()
+        // TODO: map for code_hash->code
+        Ok(Bytecode::default())
     }
 
     fn storage(&mut self, _address: Address, _index: U256) -> Result<U256, Self::Error> {
@@ -120,7 +158,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
     }
 
     fn block_hash(&mut self, number: U256) -> Result<B256, Self::Error> {
-        let idx = U256::from(self.env_state.block_height());
+        /*    let idx = U256::from(self.env_state.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
             // TODO: refactor
             // compute_block_hash(
@@ -132,6 +170,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
         } else {
             Ok(B256::ZERO)
         }
+        */
+        todo!()
     }
 }
 
@@ -144,7 +184,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
 }
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
-    fn transact_create(&mut self) {
+    fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
+        /*
         let mut evm = Evm::builder()
             .with_db(&mut self.state)
             .modify_env(|e| *e = *self.env.clone())
@@ -155,9 +196,12 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
+         */
+        todo!()
     }
 
-    fn transact_create_fixed(&mut self) {
+    fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
+        /*
         let mut evm = Evm::builder()
             .with_db(&mut self.state)
             .modify_env(|e| *e = *self.env.clone())
@@ -168,18 +212,11 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
         // TODO: handle error and remove unwrap
         let ResultAndState { result, state } = evm.transact().unwrap();
         evm.context.evm.db.commit(state);
+         */
+        todo!()
     }
 
-    fn transact_call(&mut self) {
-        let mut evm = Evm::builder()
-            .with_db(&mut self.state)
-            .modify_env(|e| *e = *self.env.clone())
-            .spec_id(EVM_FORK)
-            .build();
-        // let precompiles = evm.handler.pre_execution.load_precompiles;
-        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
-        // TODO: handle error and remove unwrap
-        let ResultAndState { result, state } = evm.transact().unwrap();
-        evm.context.evm.db.commit(state);
+    fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
+        todo!()
     }
 }

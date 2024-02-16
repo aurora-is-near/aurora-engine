@@ -21,9 +21,8 @@ evm = { workspace = true, features = [ "create-fixed" ], optional = true }
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
 [features]
-default = ["evm-sputnikvm"]
-std = ["evm/std"]
+std = ["revm/std"]
 evm-sputnikvm = ["evm"]
 evm-revm = ["revm"]
-integration-test = []
-impl-serde = ["aurora-engine-types/impl-serde", "evm/with-serde"]
+integration-test = ["evm-sputnikvm"]
+impl-serde = ["evm/with-serde"]

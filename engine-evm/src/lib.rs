@@ -8,8 +8,7 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::parameters::engine::TransactionStatus;
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::Box;
+use aurora_engine_types::{types::Wei, Box};
 
 #[cfg(feature = "evm-revm")]
 mod revm;
@@ -30,9 +29,10 @@ pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
     _precompiles: Precompiles<'env, I, E, H::ReadOnly>,
-) -> EngineEVM<'env, I, E, revm::REVMHandler<'env, I, E>> {
+    _remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
+) -> EngineEVM<revm::REVMHandler<'env, I, E>> {
     let handler = revm::REVMHandler::new(io, env, transaction, block);
-    EngineEVM::new(io, env, transaction, block, handler)
+    EngineEVM::new(handler)
 }
 
 #[cfg(feature = "evm-sputnikvm")]
@@ -48,6 +48,11 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     let handler =
         sputnikvm::SputnikVMHandler::new(io, env, transaction, block, precompiles, remove_eth_fn);
     EngineEVM::new(handler)
+}
+
+#[cfg(feature = "evm-revm")]
+pub fn config() -> Config {
+    todo!()
 }
 
 #[cfg(feature = "evm-sputnikvm")]
