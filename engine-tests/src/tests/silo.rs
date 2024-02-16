@@ -190,7 +190,9 @@ fn test_eth_transfer_incorrect_nonce() {
             utils::transfer(receiver, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    assert_eq!(err.kind, EngineErrorKind::IncorrectNonce);
+    assert!(
+        matches!(err.kind, EngineErrorKind::IncorrectNonce(msg) if &msg == "ERR_INCORRECT_NONCE: ac: 0, tx: 1")
+    );
 
     // validate post-state (which is the same as pre-state in this case)
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
