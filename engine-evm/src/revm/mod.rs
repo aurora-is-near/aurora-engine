@@ -1,6 +1,6 @@
 mod utility;
 
-use crate::revm::utility::{get_balance, get_code, get_nonce};
+use crate::revm::utility::{get_balance, get_code, get_code_by_code_hash, get_nonce};
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::parameters::engine::TransactionStatus;
@@ -149,8 +149,13 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        // TODO: map for code_hash->code
-        Ok(Bytecode::default())
+        let bytes = if code_hash == KECCAK_EMPTY {
+            Bytecode::default()
+        } else {
+            let code_raw = get_code_by_code_hash(&self.io, &code_hash);
+            Bytecode::new_raw(code_raw.into())
+        };
+        Ok(bytes)
     }
 
     fn storage(&mut self, _address: Address, _index: U256) -> Result<U256, Self::Error> {

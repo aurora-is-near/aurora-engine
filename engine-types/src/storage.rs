@@ -36,6 +36,7 @@ pub enum KeyPrefix {
     Hashchain = 0xc,
     Silo = 0xd,
     Whitelist = 0xe,
+    CodeHash = 0xf,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -56,6 +57,7 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Hashchain => 0xc,
             KeyPrefix::Silo => 0xd,
             KeyPrefix::Whitelist => 0xe,
+            KeyPrefix::CodeHash => 0xf,
         }
     }
 }
@@ -110,6 +112,7 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0xc => Self::Hashchain,
             0xd => Self::Silo,
             0xe => Self::Whitelist,
+            0xf => Self::CodeHash,
             _ => unreachable!("Unknown key prefix"),
         }
     }
