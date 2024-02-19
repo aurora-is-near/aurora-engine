@@ -21,8 +21,9 @@ evm = { workspace = true, features = [ "create-fixed" ], optional = true }
 revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
 
 [features]
+default = ["evm-sputnikvm"]
 std = ["revm/std"]
 evm-sputnikvm = ["evm"]
 evm-revm = ["revm"]
-integration-test = ["evm-sputnikvm"]
+integration-test = []
 impl-serde = ["evm/with-serde"]

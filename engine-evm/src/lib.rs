@@ -60,28 +60,6 @@ pub fn config() -> Config {
     sputnikvm::CONFIG.clone().into()
 }
 
-#[cfg(feature = "integration-test")]
-pub use sputnikvm::ApplyModify;
-
-#[cfg(feature = "integration-test")]
-pub fn apply<I: IO + Copy, E: Env>(io: I, env: &E, state_change: ApplyModify) {
-    use evm::backend::ApplyBackend;
-    let tx = TransactionInfo::default();
-    let block = BlockInfo::default();
-    let mut contract_state = sputnikvm::ContractState::new(io, env, &tx, &block, None);
-    let state_change = evm::backend::Apply::Modify {
-        address: state_change.address,
-        basic: evm::backend::Basic {
-            balance: state_change.basic_balance,
-            nonce: state_change.basic_nonce,
-        },
-        code: state_change.code,
-        storage: core::iter::empty(),
-        reset_storage: false,
-    };
-    contract_state.apply(core::iter::once(state_change), core::iter::empty(), false);
-}
-
 pub trait EVMHandler {
     fn transact_create(&mut self) -> TransactExecutionResult<TransactResult>;
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult>;
@@ -114,5 +92,69 @@ impl<H: EVMHandler> EVMHandler for EngineEVM<H> {
     /// View call
     fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
         self.handler.view()
+    }
+}
+
+#[cfg(feature = "integration-test")]
+pub mod test_util {
+    use aurora_engine_sdk::io::IO;
+    use aurora_engine_types::storage::{address_to_key, KeyPrefix};
+    use aurora_engine_types::types::{u256_to_arr, Address, Wei};
+    use aurora_engine_types::{Vec, H160, U256};
+
+    #[derive(Clone, Debug)]
+    pub struct MintEthData {
+        pub address: H160,
+        pub balance: U256,
+        pub nonce: U256,
+        pub code: Option<Vec<u8>>,
+    }
+
+    pub fn mint_eth<I: IO + Copy>(mut io: I, accounts: Vec<MintEthData>) {
+        for account in accounts {
+            let address = Address::new(account.address);
+            let old_nonce = get_nonce(&io, &address);
+            let old_balance = get_balance(&io, &address).raw();
+
+            if old_nonce != account.nonce {
+                set_nonce(&mut io, &address, &account.nonce);
+            }
+            if old_balance != account.balance {
+                set_balance(&mut io, &address, &Wei::new(account.balance));
+            }
+            if let Some(code) = account.code {
+                set_code(&mut io, &address, &code);
+            }
+        }
+    }
+
+    fn get_balance<I: IO>(io: &I, address: &Address) -> Wei {
+        let raw = io
+            .read_u256(&address_to_key(KeyPrefix::Balance, address))
+            .unwrap_or_else(|_| U256::zero());
+        Wei::new(raw)
+    }
+
+    fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
+        io.read_u256(&address_to_key(KeyPrefix::Nonce, address))
+            .unwrap_or_else(|_| U256::zero())
+    }
+
+    fn set_balance<I: IO>(io: &mut I, address: &Address, balance: &Wei) {
+        io.write_storage(
+            &address_to_key(KeyPrefix::Balance, address),
+            &balance.to_bytes(),
+        );
+    }
+
+    fn set_nonce<I: IO>(io: &mut I, address: &Address, nonce: &U256) {
+        io.write_storage(
+            &address_to_key(KeyPrefix::Nonce, address),
+            &u256_to_arr(nonce),
+        );
+    }
+
+    fn set_code<I: IO>(io: &mut I, address: &Address, code: &[u8]) {
+        io.write_storage(&address_to_key(KeyPrefix::Code, address), code);
     }
 }

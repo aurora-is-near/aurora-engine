@@ -94,21 +94,21 @@ pub fn mint_evm_account<I: IO + Copy, E: Env>(
     nonce: U256,
     code: Option<Vec<u8>>,
     io: I,
-    env: &E,
+    #[allow(unused_variables)] env: &E,
 ) {
-    use aurora_engine_evm::{apply, ApplyModify};
+    use aurora_engine_evm::test_util::{mint_eth, MintEthData};
 
-    let state_change = ApplyModify {
+    let state_change = MintEthData {
         address: address.raw(),
-        basic_balance: balance.raw(),
-        basic_nonce: nonce,
+        balance: balance.raw(),
+        nonce,
         code,
     };
 
     #[cfg(not(feature = "ext-connector"))]
     deposit(io, &env.current_account_id(), address, balance);
 
-    apply(io, env, state_change);
+    mint_eth(io, vec![state_change]);
 }
 
 #[cfg(not(feature = "ext-connector"))]

@@ -530,15 +530,6 @@ impl From<Log> for crate::Log {
     }
 }
 
-#[cfg(feature = "integration-test")]
-#[derive(Clone, Debug)]
-pub struct ApplyModify {
-    pub address: H160,
-    pub basic_balance: U256,
-    pub basic_nonce: U256,
-    pub code: Option<Vec<u8>>,
-}
-
 impl From<Config> for crate::Config {
     fn from(value: Config) -> Self {
         Self {

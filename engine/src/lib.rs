@@ -860,8 +860,8 @@ mod contract {
     #[cfg(feature = "integration-test")]
     #[no_mangle]
     pub extern "C" fn mint_account() {
-        use crate::prelude::{NEP141Wei, U256};
-        use aurora_engine_evm::{apply, ApplyModify};
+        use crate::prelude::{vec, NEP141Wei, U256};
+        use aurora_engine_evm::test_util::{mint_eth, MintEthData};
 
         #[cfg(not(feature = "ext-connector"))]
         let mut io = Runtime;
@@ -872,13 +872,13 @@ mod contract {
         let nonce = U256::from(args.1);
         let balance = NEP141Wei::new(u128::from(args.2));
 
-        let state_change = ApplyModify {
+        let state_change = MintEthData {
             address: address.raw(),
-            basic_balance: U256::from(balance.as_u128()),
-            basic_nonce: nonce,
+            balance: U256::from(balance.as_u128()),
+            nonce,
             code: None,
         };
-        apply(io, &io, state_change);
+        mint_eth(io, vec![state_change]);
 
         #[cfg(not(feature = "ext-connector"))]
         {
