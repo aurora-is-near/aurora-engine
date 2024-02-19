@@ -1,6 +1,9 @@
 mod utility;
 
-use crate::revm::utility::{get_balance, get_code, get_code_by_code_hash, get_nonce};
+use crate::revm::utility::{
+    compute_block_hash, get_balance, get_code, get_code_by_code_hash, get_generation, get_nonce,
+    get_storage,
+};
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::parameters::engine::TransactionStatus;
@@ -158,25 +161,22 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
         Ok(bytes)
     }
 
-    fn storage(&mut self, _address: Address, _index: U256) -> Result<U256, Self::Error> {
-        todo!()
+    fn storage(&mut self, address: Address, index: U256) -> Result<U256, Self::Error> {
+        let generation = get_generation(&self.io, &address);
+        Ok(get_storage(&self.io, &address, &index, generation))
     }
 
     fn block_hash(&mut self, number: U256) -> Result<B256, Self::Error> {
-        /*    let idx = U256::from(self.env_state.block_height());
+        let idx = U256::from(self.env.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
-            // TODO: refactor
-            // compute_block_hash(
-            //     self.state.chain_id,
-            //     number.low_u64(),
-            //     self.current_account_id.as_bytes(),
-            // )
-            Ok(B256::ZERO)
+            Ok(compute_block_hash(
+                self.block.chain_id,
+                number,
+                self.block.current_account_id.as_bytes(),
+            ))
         } else {
             Ok(B256::ZERO)
         }
-        */
-        todo!()
     }
 }
 
