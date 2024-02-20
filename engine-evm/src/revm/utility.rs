@@ -148,3 +148,70 @@ pub fn set_code<I: IO>(io: &mut I, address: &revm::primitives::Address, code: &[
         code,
     );
 }
+
+/// Removes an account.
+pub fn remove_account<I: IO + Copy>(
+    io: &mut I,
+    address: &revm::primitives::Address,
+    generation: u32,
+) {
+    remove_nonce(io, address);
+    remove_balance(io, address);
+    remove_code(io, address);
+    remove_all_storage(io, address, generation);
+}
+
+fn remove_nonce<I: IO>(io: &mut I, address: &revm::primitives::Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Nonce, &from_address(address)));
+}
+
+pub fn remove_balance<I: IO + Copy>(io: &mut I, address: &revm::primitives::Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Balance, &from_address(address)));
+}
+
+pub fn remove_code<I: IO>(io: &mut I, address: &revm::primitives::Address) {
+    io.remove_storage(&address_to_key(KeyPrefix::Code, &from_address(address)));
+}
+
+/// Removes all storage for the given address.
+pub fn remove_all_storage<I: IO>(io: &mut I, address: &revm::primitives::Address, generation: u32) {
+    // FIXME: there is presently no way to prefix delete trie state.
+    // NOTE: There is not going to be a method on runtime for this.
+    //     You may need to store all keys in a list if you want to do this in a contract.
+    //     Maybe you can incentivize people to delete dead old keys. They can observe them from
+    //     external indexer node and then issue special cleaning transaction.
+    //     Either way you may have to store the nonce per storage address root. When the account
+    //     has to be deleted the storage nonce needs to be increased, and the old nonce keys
+    //     can be deleted over time. That's how TurboGeth does storage.
+    set_generation(io, address, generation + 1);
+}
+
+/// Increments storage generation for a given address.
+pub fn set_generation<I: IO>(io: &mut I, address: &revm::primitives::Address, generation: u32) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Generation, &from_address(address)),
+        &generation.to_be_bytes(),
+    );
+}
+
+pub fn remove_storage<I: IO>(
+    io: &mut I,
+    address: &revm::primitives::Address,
+    key: &H256,
+    generation: u32,
+) {
+    io.remove_storage(storage_to_key(&from_address(address), key, generation).as_ref());
+}
+
+pub fn set_storage<I: IO>(
+    io: &mut I,
+    address: &revm::primitives::Address,
+    key: &H256,
+    value: &H256,
+    generation: u32,
+) {
+    io.write_storage(
+        storage_to_key(&from_address(address), key, generation).as_ref(),
+        &value.0,
+    );
+}

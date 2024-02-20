@@ -1,8 +1,6 @@
-mod utility;
-
 use crate::revm::utility::{
     compute_block_hash, get_balance, get_code, get_code_by_code_hash, get_generation, get_nonce,
-    get_storage, set_balance, set_code, set_nonce,
+    get_storage, remove_account, set_balance, set_code, set_nonce,
 };
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
@@ -12,6 +10,9 @@ use revm::primitives::{
     Account, AccountInfo, Address, Bytecode, HashMap, SpecId, B256, KECCAK_EMPTY, U256,
 };
 use revm::{Database, DatabaseCommit};
+
+mod accounting;
+mod utility;
 
 pub const EVM_FORK: SpecId = SpecId::LATEST;
 
@@ -186,9 +187,26 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
     fn commit(&mut self, evm_state: HashMap<Address, Account>) {
         let mut writes_counter: usize = 0;
         let mut code_bytes_written: usize = 0;
+        let mut accounting = accounting::Accounting::default();
         for (address, account) in evm_state {
+            if !account.is_touched() {
+                continue;
+            }
+
             let old_nonce = get_nonce(&self.io, &address);
             let old_balance = get_balance(&self.io, &address);
+            if account.is_selfdestructed() {
+                accounting.remove(old_balance);
+                let generation = get_generation(&self.io, &address);
+                remove_account(&mut self.io, &address, generation);
+                writes_counter += 1;
+                continue;
+            }
+
+            accounting.change(accounting::Change {
+                new_value: account.info.balance,
+                old_value: old_balance,
+            });
             if old_nonce != account.info.nonce {
                 set_nonce(&mut self.io, &address, account.info.nonce);
                 writes_counter += 1;
@@ -205,6 +223,29 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                     address,
                     code_bytes_written
                 );
+            }
+        }
+
+        match accounting.net() {
+            // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
+            accounting::Net::Lost(amount) => {
+                let _ = amount;
+                aurora_engine_sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
+                // TODO: implement for REVM
+                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
+                // if we cannot read the storage then there is nothing to remove.
+                // if let Some(remove_eth) = self.remove_eth_fn.take() {
+                //     //remove_eth(Wei::new(amount));
+                // }
+            }
+            accounting::Net::Zero => (),
+            accounting::Net::Gained(_) => {
+                // It should be impossible to gain ETH using normal EVM operations in production.
+                // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
+                #[cfg(all(not(feature = "integration-test"), feature = "std"))]
+                {
+                    panic!("ERR_INVALID_ETH_SUPPLY_INCREASE");
+                }
             }
         }
 
