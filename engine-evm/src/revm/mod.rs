@@ -1,6 +1,7 @@
 use crate::revm::utility::{
     compute_block_hash, get_balance, get_code, get_code_by_code_hash, get_generation, get_nonce,
-    get_storage, remove_account, set_balance, set_code, set_nonce,
+    get_storage, is_account_empty, remove_account, remove_storage, set_balance, set_code,
+    set_nonce, set_storage,
 };
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
@@ -223,6 +224,40 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                     address,
                     code_bytes_written
                 );
+            }
+
+            // TODO: Reset storage - it's no analog flag `reset_storage` for REVM
+            let generation = get_generation(&self.io, &address);
+            // remove_all_storage(&mut self.io, &address, generation);
+            // let next_generation = generation + 1;
+            let next_generation = generation;
+
+            // TODO: it's unknown behavior
+            for (index, value) in account.storage {
+                if value.present_value() == U256::default() {
+                    remove_storage(&mut self.io, &address, &index, next_generation);
+                } else {
+                    set_storage(
+                        &mut self.io,
+                        &address,
+                        &index,
+                        &value.present_value(),
+                        next_generation,
+                    );
+                }
+                writes_counter += 1;
+            }
+
+            // We only need to remove the account if:
+            // 1. we are supposed to delete an empty account
+            // 2. the account is empty
+            // 3. we didn't already clear out the storage (because if we did then there is
+            //    nothing to do)
+            if is_account_empty(&self.io, &address)
+            // && generation == next_generation
+            {
+                remove_account(&mut self.io, &address, generation);
+                writes_counter += 1;
             }
         }
 

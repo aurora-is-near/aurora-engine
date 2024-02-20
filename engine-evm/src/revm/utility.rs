@@ -197,21 +197,38 @@ pub fn set_generation<I: IO>(io: &mut I, address: &revm::primitives::Address, ge
 pub fn remove_storage<I: IO>(
     io: &mut I,
     address: &revm::primitives::Address,
-    key: &H256,
+    key: &revm::primitives::U256,
     generation: u32,
 ) {
-    io.remove_storage(storage_to_key(&from_address(address), key, generation).as_ref());
+    let raw_key = key.to_be_bytes();
+    let key = H256::from(raw_key);
+    io.remove_storage(storage_to_key(&from_address(address), &key, generation).as_ref());
 }
 
 pub fn set_storage<I: IO>(
     io: &mut I,
     address: &revm::primitives::Address,
-    key: &H256,
-    value: &H256,
+    key: &revm::primitives::U256,
+    value: &revm::primitives::U256,
     generation: u32,
 ) {
+    let raw_key = key.to_be_bytes();
+    let key = H256::from(raw_key);
+    let raw_value = value.to_be_bytes();
+    let value = H256::from(raw_value);
     io.write_storage(
-        storage_to_key(&from_address(address), key, generation).as_ref(),
+        storage_to_key(&from_address(address), &key, generation).as_ref(),
         &value.0,
     );
+}
+
+pub fn get_code_size<I: IO>(io: &I, address: &revm::primitives::Address) -> usize {
+    io.read_storage_len(&address_to_key(KeyPrefix::Code, &from_address(address)))
+        .unwrap_or(0)
+}
+
+pub fn is_account_empty<I: IO>(io: &I, address: &revm::primitives::Address) -> bool {
+    get_balance(io, address).is_zero()
+        && get_nonce(io, address) == 0
+        && get_code_size(io, address) == 0
 }
