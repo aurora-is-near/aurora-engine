@@ -2,7 +2,7 @@ mod utility;
 
 use crate::revm::utility::{
     compute_block_hash, get_balance, get_code, get_code_by_code_hash, get_generation, get_nonce,
-    get_storage,
+    get_storage, set_balance, set_code, set_nonce,
 };
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
@@ -183,8 +183,44 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
     for ContractState<'env, I, E>
 {
-    fn commit(&mut self, _evm_state: HashMap<Address, Account>) {
-        todo!()
+    fn commit(&mut self, evm_state: HashMap<Address, Account>) {
+        let mut writes_counter: usize = 0;
+        let mut code_bytes_written: usize = 0;
+        for (address, account) in evm_state {
+            let old_nonce = get_nonce(&self.io, &address);
+            let old_balance = get_balance(&self.io, &address);
+            if old_nonce != account.info.nonce {
+                set_nonce(&mut self.io, &address, account.info.nonce);
+                writes_counter += 1;
+            }
+            if old_balance != account.info.balance {
+                set_balance(&mut self.io, &address, &account.info.balance);
+                writes_counter += 1;
+            }
+            if let Some(code) = account.info.code {
+                set_code(&mut self.io, &address, code.bytes());
+                code_bytes_written = code.len();
+                aurora_engine_sdk::log!(
+                    "code_write_at_address {:?} {}",
+                    address,
+                    code_bytes_written
+                );
+            }
+        }
+
+        // These variable are only used if logging feature is enabled.
+        // In production logging is always enabled, so we can ignore the warnings.
+        #[allow(unused_variables)]
+        let total_bytes = 32 * writes_counter + code_bytes_written;
+        #[allow(unused_assignments)]
+        if code_bytes_written > 0 {
+            writes_counter += 1;
+        }
+        aurora_engine_sdk::log!(
+            "total_writes_count {}\ntotal_written_bytes {}",
+            writes_counter,
+            total_bytes
+        );
     }
 }
 

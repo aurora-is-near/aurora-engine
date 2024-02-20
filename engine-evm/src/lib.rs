@@ -23,7 +23,7 @@ pub use types::{
 
 #[cfg(feature = "evm-revm")]
 /// Init REVM
-pub fn init_evm<'tx, 'env, I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &'env E,
     transaction: &'env TransactionInfo,

@@ -1,6 +1,6 @@
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix};
-use aurora_engine_types::types::Address;
+use aurora_engine_types::types::{u256_to_arr, Address};
 use aurora_engine_types::{Vec, H160, H256, U256};
 
 const BLOCK_HASH_PREFIX: u8 = 0;
@@ -120,4 +120,31 @@ fn storage_key(value: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(1 + value.len());
     bytes.extend_from_slice(value);
     bytes_to_key(KeyPrefix::CodeHash, &bytes)
+}
+
+pub fn set_balance<I: IO>(
+    io: &mut I,
+    address: &revm::primitives::Address,
+    balance: &revm::primitives::U256,
+) {
+    let balance = balance.to_be_bytes_vec();
+    io.write_storage(
+        &address_to_key(KeyPrefix::Balance, &from_address(address)),
+        &balance,
+    );
+}
+
+pub fn set_nonce<I: IO>(io: &mut I, address: &revm::primitives::Address, nonce: u64) {
+    let nonce = U256::from(nonce);
+    io.write_storage(
+        &address_to_key(KeyPrefix::Nonce, &from_address(address)),
+        &u256_to_arr(&nonce),
+    );
+}
+
+pub fn set_code<I: IO>(io: &mut I, address: &revm::primitives::Address, code: &[u8]) {
+    io.write_storage(
+        &address_to_key(KeyPrefix::Code, &from_address(address)),
+        code,
+    );
 }
