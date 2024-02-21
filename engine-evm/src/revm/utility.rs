@@ -41,9 +41,13 @@ pub fn get_code<I: IO>(io: &I, address: &revm::primitives::Address) -> Vec<u8> {
 
 /// Get EVM code by `code_hash` from contract storage
 pub fn get_code_by_code_hash<I: IO>(io: &I, code_hash: &revm::primitives::B256) -> Vec<u8> {
-    io.read_storage(&storage_key(code_hash.0.as_slice()))
+    io.read_storage(&code_hash_storage_key(code_hash.0.as_slice()))
         .map(|s| s.to_vec())
         .unwrap_or_default()
+}
+
+pub fn set_code_hash<I: IO>(io: &mut I, code_hash: &revm::primitives::B256, code: &[u8]) {
+    io.write_storage(&code_hash_storage_key(code_hash.0.as_slice()), code);
 }
 
 /// Convert REVM `Address` to Engine `Address`
@@ -116,7 +120,7 @@ pub fn compute_block_hash(
 }
 
 /// Contract storage key for `CodeHash`
-fn storage_key(value: &[u8]) -> Vec<u8> {
+fn code_hash_storage_key(value: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(1 + value.len());
     bytes.extend_from_slice(value);
     bytes_to_key(KeyPrefix::CodeHash, &bytes)

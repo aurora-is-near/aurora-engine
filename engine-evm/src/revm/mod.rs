@@ -1,7 +1,7 @@
 use crate::revm::utility::{
     compute_block_hash, from_address, get_balance, get_code, get_code_by_code_hash, get_generation,
     get_nonce, get_storage, is_account_empty, remove_account, remove_storage, set_balance,
-    set_code, set_nonce, set_storage,
+    set_code, set_code_hash, set_nonce, set_storage,
 };
 use crate::{BlockInfo, EVMHandler, Log, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
@@ -235,16 +235,27 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                 writes_counter += 1;
             }
             if let Some(code) = account.info.code {
-                set_code(&mut self.io, &address, code.bytes());
-                code_bytes_written = code.len();
-                aurora_engine_sdk::log!(
-                    "code_write_at_address {:?} {}",
-                    address,
-                    code_bytes_written
-                );
+                if !code.is_empty() {
+                    let code_hash = if account.info.code_hash == KECCAK_EMPTY {
+                        code.hash_slow()
+                    } else {
+                        account.info.code_hash
+                    };
+                    set_code_hash(&mut self.io, &code_hash, code.bytes());
+                    writes_counter += 1;
+
+                    set_code(&mut self.io, &address, code.bytes());
+                    writes_counter += 1;
+                    code_bytes_written = code.len();
+                    aurora_engine_sdk::log!(
+                        "code_write_at_address {:?} {}",
+                        address,
+                        code_bytes_written
+                    );
+                }
             }
 
-            // TODO: Reset storage - it's no analog flag `reset_storage` for REVM
+            // TODO: Reset storage - it's no corresponding flag `reset_storage` for REVM
             let generation = get_generation(&self.io, &address);
             // remove_all_storage(&mut self.io, &address, generation);
             // let next_generation = generation + 1;
@@ -306,10 +317,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
-        #[allow(unused_assignments)]
-        if code_bytes_written > 0 {
-            writes_counter += 1;
-        }
         aurora_engine_sdk::log!(
             "total_writes_count {}\ntotal_written_bytes {}",
             writes_counter,
