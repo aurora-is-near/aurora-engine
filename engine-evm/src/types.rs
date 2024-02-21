@@ -138,7 +138,7 @@ pub struct Config {
 }
 
 /// Transact execution result
-pub type TransactExecutionResult<T> = Result<T, crate::TransactErrorKind>;
+pub type TransactExecutionResult<T> = Result<T, TransactErrorKind>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]

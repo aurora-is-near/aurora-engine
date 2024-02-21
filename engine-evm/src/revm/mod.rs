@@ -1,16 +1,18 @@
 use crate::revm::utility::{
-    compute_block_hash, get_balance, get_code, get_code_by_code_hash, get_generation, get_nonce,
-    get_storage, is_account_empty, remove_account, remove_storage, set_balance, set_code,
-    set_nonce, set_storage,
+    compute_block_hash, from_address, get_balance, get_code, get_code_by_code_hash, get_generation,
+    get_nonce, get_storage, is_account_empty, remove_account, remove_storage, set_balance,
+    set_code, set_nonce, set_storage,
 };
-use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, Log, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::parameters::engine::TransactionStatus;
+use aurora_engine_types::Vec;
 use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
-    Account, AccountInfo, Address, Bytecode, HashMap, SpecId, B256, KECCAK_EMPTY, U256,
+    Account, AccountInfo, Address, Bytecode, Env, HashMap, ResultAndState, SpecId, B256,
+    KECCAK_EMPTY, U256,
 };
-use revm::{Database, DatabaseCommit};
+use revm::{Database, DatabaseCommit, Evm};
 
 mod accounting;
 mod utility;
@@ -96,13 +98,29 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
 
     /// EVM precompiles
     /// TODO: adjust it
-    pub fn set_precompiles<'a>(
-        precompiles: &LoadPrecompilesHandle<'a>,
-    ) -> LoadPrecompilesHandle<'a> {
+    fn set_precompiles<'a>(precompiles: &LoadPrecompilesHandle<'a>) -> LoadPrecompilesHandle<'a> {
         // TODO: extend precompiles
         // let c = precompiles();
         // Arc::new(move || c.clone())
         precompiles.clone()
+    }
+
+    /// REVM Environment
+    fn evm_env(&self) -> Env {
+        let mut env = Env::default();
+        // Set Config data
+        let chain_id = aurora_engine_types::U256::from(self.block.chain_id).as_u64();
+        env.cfg.chain_id = chain_id;
+        // Set Block data
+        env.block.gas_limit = U256::MAX;
+        env.block.number = U256::from(self.env.block_height());
+        env.block.coinbase = Address::new([
+            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
+            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
+        ]);
+        env.block.timestamp = U256::from(self.env.block_timestamp().secs());
+        env.block.difficulty = U256::ZERO;
+        env
     }
 }
 
@@ -318,18 +336,37 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
     }
 
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
-        /*
+        let mut state = ContractState {
+            io: self.io,
+            env: self.env,
+            transaction: self.transaction,
+            block: self.block,
+        };
         let mut evm = Evm::builder()
-            .with_db(&mut self.state)
-            .modify_env(|e| *e = *self.env.clone())
+            .with_db(&mut state)
+            .modify_env(|e| *e = self.evm_env())
             .spec_id(EVM_FORK)
             .build();
-        // let precompiles = evm.handler.pre_execution.load_precompiles;
-        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
-        // TODO: handle error and remove unwrap
-        let ResultAndState { result, state } = evm.transact().unwrap();
-        evm.context.evm.db.commit(state);
-         */
+        let exec_result = evm.transact();
+        if let Ok(ResultAndState { result, state }) = evm.transact() {
+            evm.context.evm.db.commit(state);
+            // let mut logs = Vec::new();
+            // for log in result.logs() {
+            //     let address = from_address(&log.address).raw();
+            //     logs.push(Log { address })
+            // }
+            // TransactResult {
+            //     submit_result: (),
+            //     logs,
+            // }
+            todo!()
+        } else {
+            // TODO: implement error `from` convert
+            let err = exec_result.unwrap_err();
+            aurora_engine_sdk::log(&aurora_engine_types::format!("{err:#?}"));
+            unreachable!("NOT")
+        }
+
         todo!()
     }
 

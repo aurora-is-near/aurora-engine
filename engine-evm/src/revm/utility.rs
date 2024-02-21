@@ -47,7 +47,7 @@ pub fn get_code_by_code_hash<I: IO>(io: &I, code_hash: &revm::primitives::B256) 
 }
 
 /// Convert REVM `Address` to Engine `Address`
-fn from_address(address: &revm::primitives::Address) -> Address {
+pub fn from_address(address: &revm::primitives::Address) -> Address {
     Address::new(H160::from(address.0 .0))
 }
 
