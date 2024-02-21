@@ -249,8 +249,6 @@ pub fn ft_resolve_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     handler: &H,
 ) -> Result<(), ContractError> {
     with_hashchain(io, env, function_name!(), |io| {
-        require_running(&state::get_state(&io)?)?;
-
         env.assert_private_call()?;
         if handler.promise_results_count() != 1 {
             return Err(crate::errors::ERR_PROMISE_COUNT.into());
