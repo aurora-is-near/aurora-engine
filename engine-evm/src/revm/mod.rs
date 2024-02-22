@@ -1,12 +1,12 @@
 use crate::revm::utility::{
-    compute_block_hash, from_address, get_balance, get_code, get_code_by_code_hash, get_generation,
-    get_nonce, get_storage, h160_to_address, h256_to_u256, is_account_empty, remove_account,
-    remove_storage, set_balance, set_code, set_code_hash, set_nonce, set_storage, u256_to_u256,
-    wei_to_u256,
+    compute_block_hash, exec_result_to_err, execution_result_into_result, get_balance, get_code,
+    get_code_by_code_hash, get_generation, get_nonce, get_storage, h160_to_address, h256_to_u256,
+    is_account_empty, log_to_log, remove_account, remove_storage, set_balance, set_code,
+    set_code_hash, set_nonce, set_storage, u256_to_u256, wei_to_u256,
 };
-use crate::{BlockInfo, EVMHandler, Log, TransactExecutionResult, TransactResult, TransactionInfo};
+use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
-use aurora_engine_types::parameters::engine::TransactionStatus;
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::Vec;
 use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
@@ -99,10 +99,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             .transaction
             .access_list
             .iter()
-            .map(|(key, addr)| {
+            .map(|(key, addrs)| {
                 (
                     h160_to_address(key),
-                    addr.iter().map(|val| h256_to_u256(val)).collect(),
+                    addrs.iter().map(|val| h256_to_u256(val)).collect(),
                 )
             })
             .collect();
@@ -334,21 +334,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
         let exec_result = evm.transact();
         if let Ok(ResultAndState { result, state }) = evm.transact() {
             evm.context.evm.db.commit(state);
-            // let mut logs = Vec::new();
-            // for log in result.logs() {
-            //     let address = from_address(&log.address).raw();
-            //     logs.push(Log { address })
-            // }
-            // TransactResult {
-            //     submit_result: (),
-            //     logs,
-            // }
-            todo!()
+            let logs = log_to_log(result.logs());
+            let used_gas = result.gas_used();
+            let status = execution_result_into_result(result)?;
+            Ok(TransactResult {
+                submit_result: SubmitResult::new(status, used_gas, Vec::new()),
+                logs,
+            })
         } else {
-            // TODO: implement error `from` convert
-            let err = exec_result.unwrap_err();
-            aurora_engine_sdk::log(&aurora_engine_types::format!("{err:#?}"));
-            unreachable!("NOT")
+            Err(exec_result_to_err(exec_result.unwrap_err()))
         }
     }
 

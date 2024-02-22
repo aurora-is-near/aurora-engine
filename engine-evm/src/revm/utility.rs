@@ -1,7 +1,11 @@
+use crate::{ExitError, ExitFatal, TransactErrorKind};
+use alloc::borrow::Cow;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
+use revm::primitives::{EVMError, ExecutionResult, HaltReason};
 
 const BLOCK_HASH_PREFIX: u8 = 0;
 const BLOCK_HASH_PREFIX_SIZE: usize = 1;
@@ -251,4 +255,92 @@ pub fn h160_to_address(address: &H160) -> revm::primitives::Address {
 
 pub fn h256_to_u256(val: &H256) -> revm::primitives::U256 {
     revm::primitives::U256::from_be_slice(val.0.as_slice())
+}
+
+pub fn b256_to_h256(val: &revm::primitives::B256) -> H256 {
+    let raw = val.as_slice();
+    H256::from_slice(raw)
+}
+
+pub fn log_to_log(logs: Vec<revm::primitives::Log>) -> Vec<crate::Log> {
+    logs.iter()
+        .map(|log| {
+            let address = from_address(&log.address);
+            let topics = log
+                .data
+                .topics()
+                .iter()
+                .map(|val| b256_to_h256(val))
+                .collect();
+            crate::Log {
+                address: address.raw(),
+                topics,
+                data: log.data.data.as_ref().to_vec(),
+            }
+        })
+        .collect()
+}
+
+pub fn execution_result_into_result(
+    result: ExecutionResult,
+) -> Result<TransactionStatus, TransactErrorKind> {
+    match result {
+        ExecutionResult::Success { output, .. } => {
+            Ok(TransactionStatus::Succeed(output.data().to_vec()))
+        }
+        ExecutionResult::Revert { output, .. } => Ok(TransactionStatus::Succeed(output.to_vec())),
+        ExecutionResult::Halt { reason, .. } => match reason {
+            HaltReason::OutOfGas(_) => Ok(TransactionStatus::OutOfGas),
+            HaltReason::OutOfOffset => Ok(TransactionStatus::OutOfOffset),
+            HaltReason::OutOfFunds => Ok(TransactionStatus::OutOfFund),
+
+            HaltReason::StackUnderflow => {
+                Err(TransactErrorKind::EvmError(ExitError::StackUnderflow))
+            }
+            HaltReason::StackOverflow => Err(TransactErrorKind::EvmError(ExitError::StackOverflow)),
+            HaltReason::InvalidJump => Err(TransactErrorKind::EvmError(ExitError::InvalidJump)),
+            HaltReason::CreateCollision => {
+                Err(TransactErrorKind::EvmError(ExitError::CreateCollision))
+            }
+            HaltReason::CallTooDeep => Err(TransactErrorKind::EvmError(ExitError::CallTooDeep)),
+            HaltReason::CreateContractSizeLimit => {
+                Err(TransactErrorKind::EvmError(ExitError::CreateContractLimit))
+            }
+            HaltReason::OpcodeNotFound => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("OpcodeNotFound"),
+            ))),
+            HaltReason::InvalidFEOpcode => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("InvalidFEOpcode"),
+            ))),
+            HaltReason::NotActivated => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("NotActivated"),
+            ))),
+            HaltReason::PrecompileError => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("PrecompileError"),
+            ))),
+            HaltReason::NonceOverflow => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("NonceOverflow"),
+            ))),
+            HaltReason::CreateContractStartingWithEF => Err(TransactErrorKind::EvmError(
+                ExitError::Other(Cow::from("CreateContractStartingWithEF")),
+            )),
+            HaltReason::CreateInitCodeSizeLimit => Err(TransactErrorKind::EvmError(
+                ExitError::Other(Cow::from("CreateInitCodeSizeLimit")),
+            )),
+            HaltReason::OverflowPayment => Err(TransactErrorKind::EvmError(ExitError::Other(
+                Cow::from("OverflowPayment"),
+            ))),
+            HaltReason::StateChangeDuringStaticCall => Err(TransactErrorKind::EvmError(
+                ExitError::Other(Cow::from("StateChangeDuringStaticCall")),
+            )),
+            HaltReason::CallNotAllowedInsideStatic => Err(TransactErrorKind::EvmError(
+                ExitError::Other(Cow::from("CallNotAllowedInsideStatic")),
+            )),
+        },
+    }
+}
+
+pub fn exec_result_to_err(err: EVMError<()>) -> TransactErrorKind {
+    use aurora_engine_types::format;
+    TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(format!("{:?}", err))))
 }
