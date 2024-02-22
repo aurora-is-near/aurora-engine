@@ -1,6 +1,6 @@
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix};
-use aurora_engine_types::types::{u256_to_arr, Address};
+use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
 
 const BLOCK_HASH_PREFIX: u8 = 0;
@@ -235,4 +235,20 @@ pub fn is_account_empty<I: IO>(io: &I, address: &revm::primitives::Address) -> b
     get_balance(io, address).is_zero()
         && get_nonce(io, address) == 0
         && get_code_size(io, address) == 0
+}
+
+pub fn u256_to_u256(val: &U256) -> revm::primitives::U256 {
+    revm::primitives::U256::from_be_slice(u256_to_arr(val).as_slice())
+}
+
+pub fn wei_to_u256(val: &Wei) -> revm::primitives::U256 {
+    revm::primitives::U256::from_be_slice(val.to_bytes().as_slice())
+}
+
+pub fn h160_to_address(address: &H160) -> revm::primitives::Address {
+    revm::primitives::Address::new(address.0)
+}
+
+pub fn h256_to_u256(val: &H256) -> revm::primitives::U256 {
+    revm::primitives::U256::from_be_slice(val.0.as_slice())
 }

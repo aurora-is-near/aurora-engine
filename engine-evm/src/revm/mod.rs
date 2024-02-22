@@ -1,7 +1,8 @@
 use crate::revm::utility::{
     compute_block_hash, from_address, get_balance, get_code, get_code_by_code_hash, get_generation,
-    get_nonce, get_storage, is_account_empty, remove_account, remove_storage, set_balance,
-    set_code, set_code_hash, set_nonce, set_storage,
+    get_nonce, get_storage, h160_to_address, h256_to_u256, is_account_empty, remove_account,
+    remove_storage, set_balance, set_code, set_code_hash, set_nonce, set_storage, u256_to_u256,
+    wei_to_u256,
 };
 use crate::{BlockInfo, EVMHandler, Log, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_sdk::io::IO;
@@ -9,8 +10,8 @@ use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::Vec;
 use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
-    Account, AccountInfo, Address, Bytecode, Env, HashMap, ResultAndState, SpecId, B256,
-    KECCAK_EMPTY, U256,
+    Account, AccountInfo, Address, Bytecode, Env, HashMap, ResultAndState, SpecId, TransactTo,
+    B256, KECCAK_EMPTY, U256,
 };
 use revm::{Database, DatabaseCommit, Evm};
 
@@ -41,44 +42,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             block,
         }
         /*
-        let state = ContractState::new(io, env_state);
-        let mut env = Box::new(Env::default());
-
-        // env.cfg.chain_id = self.chain_id;
-        // Set Block data
-        env.block.gas_limit = U256::MAX;
-        env.block.number = U256::from(env_state.block_height());
-        env.block.coinbase = Address::new([
-            0x44, 0x44, 0x58, 0x84, 0x43, 0xC3, 0xa9, 0x12, 0x88, 0xc5, 0x00, 0x24, 0x83, 0x44,
-            0x9A, 0xba, 0x10, 0x54, 0x19, 0x2b,
-        ]);
-        env.block.timestamp = U256::from(env_state.block_timestamp().secs());
-        env.block.difficulty = U256::ZERO;
-        env.block.basefee = U256::ZERO;
-        // For callback test
-        let balance = Box::new(Wei::from(NEP141Wei::new(1)));
-        let address = Box::new(aurora_engine_types::types::Address::new(
-            H160::from_low_u64_be(0),
-        ));
-
-        Self {
-            state,
-            env_state,
-            env,
-        }
-
-        // TODO: remove - for investigation only
-        // env.tx.transact_to +
-        // env.tx.caller +
-        // env.tx.gas_price +
-        // env.tx.gas_priority_fee
-        // env.tx.gas_limit +
-        // env.tx.data +
-        // env.tx.transact_to + -> for Deploy it's value from CREATE
-        // env.tx.value +
-        // env.tx.nonce
-        // env.tx.access_list +
-
         // TRANSACT_CREATE
         // caller: H160,
         // value: U256,
@@ -120,6 +83,32 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
         ]);
         env.block.timestamp = U256::from(self.env.block_timestamp().secs());
         env.block.difficulty = U256::ZERO;
+        env.block.basefee = U256::ZERO;
+        // Set transaction data
+        env.tx.caller = h160_to_address(&self.transaction.origin);
+        env.tx.gas_limit = self.transaction.gas_limit;
+        env.tx.data = self.transaction.input.clone().into();
+        // For Deploy it's value from CREATE
+        env.tx.transact_to = if let Some(addr) = self.transaction.address {
+            TransactTo::call(h160_to_address(&addr))
+        } else {
+            TransactTo::create()
+        };
+        env.tx.value = wei_to_u256(&self.transaction.value);
+        env.tx.access_list = self
+            .transaction
+            .access_list
+            .iter()
+            .map(|(key, addr)| {
+                (
+                    h160_to_address(key),
+                    addr.iter().map(|val| h256_to_u256(val)).collect(),
+                )
+            })
+            .collect();
+        env.tx.gas_price = u256_to_u256(&self.block.gas_price);
+        // env.tx.nonce = get_nonce(origin)
+        // env.tx.gas_priority_fee
         env
     }
 }
@@ -327,18 +316,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
     fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
-        /*
-        let mut evm = Evm::builder()
-            .with_db(&mut self.state)
-            .modify_env(|e| *e = *self.env.clone())
-            .spec_id(EVM_FORK)
-            .build();
-        // let precompiles = evm.handler.pre_execution.load_precompiles;
-        // evm.handler.pre_execution.load_precompiles = Self::set_precompiles(&precompiles);
-        // TODO: handle error and remove unwrap
-        let ResultAndState { result, state } = evm.transact().unwrap();
-        evm.context.evm.db.commit(state);
-         */
         todo!()
     }
 
@@ -373,8 +350,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             aurora_engine_sdk::log(&aurora_engine_types::format!("{err:#?}"));
             unreachable!("NOT")
         }
-
-        todo!()
     }
 
     fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
