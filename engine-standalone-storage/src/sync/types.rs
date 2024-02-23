@@ -345,33 +345,33 @@ impl TransactionKind {
                                         access_list: Vec::new(),
                                     }
                                 },
-                                                               |erc20_address| {
-                                                                   // ERC-20 refund
-                                                                   let from = Self::get_implicit_address(engine_account);
-                                                                   let nonce = Self::get_implicit_nonce(
-                                                                       &from,
-                                                                       block_height,
-                                                                       transaction_position,
-                                                                       storage,
-                                                                   );
-                                                                   let to = erc20_address;
-                                                                   let data = aurora_engine::engine::setup_refund_on_error_input(
-                                                                       U256::from_big_endian(&args.amount),
-                                                                       args.recipient_address,
-                                                                   );
-                                                                   NormalizedEthTransaction {
-                                                                       address: from,
-                                                                       chain_id: None,
-                                                                       nonce,
-                                                                       gas_limit: U256::from(u64::MAX),
-                                                                       max_priority_fee_per_gas: U256::zero(),
-                                                                       max_fee_per_gas: U256::zero(),
-                                                                       to: Some(to),
-                                                                       value: Wei::zero(),
-                                                                       data,
-                                                                       access_list: Vec::new(),
-                                                                   }
-                                                               },
+                                   |erc20_address| {
+                                       // ERC-20 refund
+                                       let from = Self::get_implicit_address(engine_account);
+                                       let nonce = Self::get_implicit_nonce(
+                                           &from,
+                                           block_height,
+                                           transaction_position,
+                                           storage,
+                                       );
+                                       let to = erc20_address;
+                                       let data = aurora_engine::engine::setup_refund_on_error_input(
+                                           U256::from_big_endian(&args.amount),
+                                           args.recipient_address,
+                                       );
+                                       NormalizedEthTransaction {
+                                           address: from,
+                                           chain_id: None,
+                                           nonce,
+                                           gas_limit: U256::from(u64::MAX),
+                                           max_priority_fee_per_gas: U256::zero(),
+                                           max_fee_per_gas: U256::zero(),
+                                           to: Some(to),
+                                           value: Wei::zero(),
+                                           data,
+                                           access_list: Vec::new(),
+                                       }
+                                   },
                                 )
                             },
                         )

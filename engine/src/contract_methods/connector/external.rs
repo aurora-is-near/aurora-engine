@@ -285,7 +285,7 @@ pub fn set_eth_connector_account_id<I: IO + Copy, E: Env>(
 
 pub fn get_eth_connector_account_id<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     let account = EthConnectorContract::init(io)?.get_eth_connector_contract_account();
-    let data = borsh::to_vec(&account).expect(errors::ERR_FAILED_PARSE);
+    let data = borsh::to_vec(&account).unwrap();
     io.return_output(&data);
 
     Ok(())
