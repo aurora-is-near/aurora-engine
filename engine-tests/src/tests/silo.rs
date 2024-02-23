@@ -291,17 +291,15 @@ fn test_admin_access_right() {
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     // Allow to submit transactions.
 
-    let account = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+    let account = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
         account_id: caller.clone(),
         kind: WhitelistKind::Account,
-    })
-    .try_to_vec()
+    }))
     .unwrap();
-    let address = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+    let address = borsh::to_vec(&WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
         address: sender,
         kind: WhitelistKind::Address,
-    })
-    .try_to_vec()
+    }))
     .unwrap();
 
     let err = runner
@@ -883,7 +881,7 @@ fn set_silo_params(runner: &mut AuroraRunner, silo_params: Option<SiloParamsArgs
 }
 
 fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &str, args: T) {
-    let input = args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&args).unwrap();
     let result = runner.call(func, &runner.aurora_account_id.clone(), input);
     assert!(
         result.is_ok(),

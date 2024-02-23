@@ -41,12 +41,11 @@ pub fn withdraw<I: IO + Copy + PromiseHandler, E: Env>(
     require_running(&state::get_state(&io)?)?;
     env.assert_one_yocto()?;
     let args: WithdrawCallArgs = io.read_input_borsh()?;
-    let input = EngineWithdrawCallArgs {
+    let input = borsh::to_vec(&EngineWithdrawCallArgs {
         sender_id: env.predecessor_account_id(),
         recipient_address: args.recipient_address,
         amount: args.amount,
-    }
-    .try_to_vec()
+    })
     .unwrap();
 
     let promise_args = EthConnectorContract::init(io)?.withdraw_eth_from_near(input);
@@ -286,7 +285,7 @@ pub fn set_eth_connector_account_id<I: IO + Copy, E: Env>(
 
 pub fn get_eth_connector_account_id<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     let account = EthConnectorContract::init(io)?.get_eth_connector_contract_account();
-    let data = account.try_to_vec().unwrap(); // expect(errors::ERR_FAILED_PARSE);
+    let data = borsh::to_vec(&account).expect(errors::ERR_FAILED_PARSE);
     io.return_output(&data);
 
     Ok(())
@@ -321,6 +320,7 @@ pub struct EthConnectorContract<I: IO> {
 /// Eth connector specific data. It always must contain `prover_account` - account id of the smart
 /// contract which is used for verifying a proof used in the deposit flow.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EthConnector {
     /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
     /// a log entry from incoming proof.

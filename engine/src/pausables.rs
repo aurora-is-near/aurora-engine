@@ -1,13 +1,14 @@
 use crate::prelude::{AccountId, Address, BTreeSet, Vec};
 use aurora_engine_precompiles::native::{exit_to_ethereum, exit_to_near};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use bitflags::bitflags;
 
 bitflags! {
     /// Wraps unsigned integer where each bit identifies a different precompile.
     #[derive(BorshSerialize, BorshDeserialize, Default)]
+    #[borsh(crate = "aurora_engine_types::borsh")]
     pub struct PrecompileFlags: u32 {
         const EXIT_TO_NEAR        = 0b01;
         const EXIT_TO_ETHEREUM    = 0b10;
@@ -82,6 +83,7 @@ pub trait PausedPrecompilesManager {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EngineAuthorizer {
     /// List of [AccountId]s with the permission to pause precompiles.
     pub acl: BTreeSet<AccountId>,
@@ -97,6 +99,7 @@ impl EngineAuthorizer {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EnginePrecompilesPauser<I: IO> {
     /// Storage to read pause flags from and write into.
     io: I,
