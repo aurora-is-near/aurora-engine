@@ -23,7 +23,7 @@ mod utility;
 
 pub const CONFIG: &Config = &Config::shanghai();
 
-/// SputnikVM handler
+/// `SputnikVM` handler
 pub struct SputnikVMHandler<'env, I: IO, E: Env, H: PromiseHandler> {
     io: I,
     env: &'env E,
@@ -100,7 +100,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
+        let logs: Vec<crate::Log> = executor_logs.into_iter().map(Into::into).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
             logs,
@@ -133,7 +133,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
         let used_gas = executor.used_gas();
         let (values, executor_logs) = executor.into_state().deconstruct();
         contract_state.apply(values, Vec::<Log>::new(), true);
-        let logs: Vec<crate::Log> = executor_logs.into_iter().map(|log| log.into()).collect();
+        let logs: Vec<crate::Log> = executor_logs.into_iter().map(Into::into).collect();
         Ok(TransactResult {
             submit_result: SubmitResult::new(status, used_gas, Vec::new()),
             logs,

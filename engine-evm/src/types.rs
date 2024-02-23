@@ -35,6 +35,7 @@ pub struct Log {
 }
 
 /// EVM Runtime configuration.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Gas paid for extcode.

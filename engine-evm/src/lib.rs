@@ -1,4 +1,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(clippy::pedantic, clippy::nursery)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
+    clippy::as_conversions
+)]
 
 extern crate alloc;
 
@@ -22,6 +29,7 @@ pub use types::{
 
 #[cfg(feature = "evm-revm")]
 /// Init REVM
+#[allow(clippy::needless_pass_by_value)]
 pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &'env E,
@@ -35,7 +43,7 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 }
 
 #[cfg(feature = "evm-sputnikvm")]
-/// Init SputnikVM
+/// Init `SputnikVM`
 pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &'env E,
@@ -50,11 +58,13 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 }
 
 #[cfg(feature = "evm-revm")]
-pub fn config() -> Config {
+#[must_use]
+pub const fn config() -> Config {
     todo!()
 }
 
 #[cfg(feature = "evm-sputnikvm")]
+#[must_use]
 pub fn config() -> Config {
     sputnikvm::CONFIG.clone().into()
 }
@@ -72,7 +82,7 @@ pub struct EngineEVM<H: EVMHandler> {
 impl<H: EVMHandler> EngineEVM<H> {
     /// Initialize Engine EVM.
     /// Where `handler` initialized from the feature flag.
-    pub fn new(handler: H) -> Self {
+    pub const fn new(handler: H) -> Self {
         Self { handler }
     }
 }

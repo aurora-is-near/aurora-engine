@@ -248,11 +248,11 @@ pub fn wei_to_u256(val: &Wei) -> revm::primitives::U256 {
     revm::primitives::U256::from_be_slice(val.to_bytes().as_slice())
 }
 
-pub fn h160_to_address(address: &H160) -> revm::primitives::Address {
+pub const fn h160_to_address(address: &H160) -> revm::primitives::Address {
     revm::primitives::Address::new(address.0)
 }
 
-pub fn h256_to_u256(val: &H256) -> revm::primitives::U256 {
+pub const fn h256_to_u256(val: &H256) -> revm::primitives::U256 {
     revm::primitives::U256::from_be_slice(val.0.as_slice())
 }
 
@@ -261,7 +261,7 @@ pub fn b256_to_h256(val: &revm::primitives::B256) -> H256 {
     H256::from_slice(raw)
 }
 
-pub fn log_to_log(logs: Vec<revm::primitives::Log>) -> Vec<crate::Log> {
+pub fn log_to_log(logs: &[revm::primitives::Log]) -> Vec<crate::Log> {
     logs.iter()
         .map(|log| {
             let address = from_address(&log.address);
@@ -334,8 +334,8 @@ pub fn execution_result_into_result(
     }
 }
 
-pub fn exec_result_to_err(err: EVMError<()>) -> TransactErrorKind {
+pub fn exec_result_to_err(err: &EVMError<()>) -> TransactErrorKind {
     TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(aurora_engine_types::format!(
-        "{:?}", err
+        "{err:?}"
     ))))
 }
