@@ -5,7 +5,7 @@ use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
-use revm::primitives::{EVMError, ExecutionResult, HaltReason};
+use revm::primitives::{EVMError, ExecutionResult, HaltReason, Output};
 
 const BLOCK_HASH_PREFIX: u8 = 0;
 const BLOCK_HASH_PREFIX_SIZE: usize = 1;
@@ -280,7 +280,13 @@ pub fn execution_result_into_result(
 ) -> Result<TransactionStatus, TransactErrorKind> {
     match result {
         ExecutionResult::Success { output, .. } => {
-            Ok(TransactionStatus::Succeed(output.data().to_vec()))
+            let data = match output {
+                Output::Call(data) => data.to_vec(),
+                Output::Create(data, address) => {
+                    address.map_or(data.to_vec(), |addr| addr.to_vec())
+                }
+            };
+            Ok(TransactionStatus::Succeed(data))
         }
         ExecutionResult::Revert { output, .. } => Ok(TransactionStatus::Succeed(output.to_vec())),
         ExecutionResult::Halt { reason, .. } => match reason {

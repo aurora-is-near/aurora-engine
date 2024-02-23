@@ -41,22 +41,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             transaction,
             block,
         }
-        /*
-        // TRANSACT_CREATE
-        // caller: H160,
-        // value: U256,
-        // init_code: Vec<u8>,
-        // gas_limit: u64,
-        // access_list: Vec<(H160, Vec<H256>)>,
-
-        // TRANSACT_CALL
-        // caller: H160,
-        // address: H160,
-        // value: U256,
-        // data: Vec<u8>,
-        // gas_limit: u64,
-        // access_list: Vec<(H160, Vec<H256>)>,
-        */
     }
 
     /// EVM precompiles
@@ -366,5 +350,17 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
         } else {
             Err(exec_result_to_err(&exec_result.unwrap_err()))
         }
+    }
+}
+
+pub fn config() -> crate::Config {
+    crate::Config {
+        gas_transaction_create: 53000,
+        gas_transaction_call: 21000,
+        gas_transaction_zero_data: 4,
+        gas_transaction_non_zero_data: 16,
+        gas_access_list_address: 2400,
+        gas_access_list_storage_key: 1900,
+        ..Default::default()
     }
 }

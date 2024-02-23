@@ -59,8 +59,8 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
 
 #[cfg(feature = "evm-revm")]
 #[must_use]
-pub const fn config() -> Config {
-    todo!()
+pub fn config() -> Config {
+    revm::config()
 }
 
 #[cfg(feature = "evm-sputnikvm")]
