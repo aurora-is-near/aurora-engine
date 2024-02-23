@@ -71,6 +71,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
     /// REVM Environment
     fn evm_env(&self) -> Env {
         let mut env = Env::default();
+
         // Set Config data
         let chain_id = aurora_engine_types::U256::from(self.block.chain_id).as_u64();
         env.cfg.chain_id = chain_id;
@@ -102,7 +103,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             .map(|(key, addrs)| {
                 (
                     h160_to_address(key),
-                    addrs.iter().map(|val| h256_to_u256(val)).collect(),
+                    addrs.iter().map(h256_to_u256).collect(),
                 )
             })
             .collect();
@@ -316,7 +317,30 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
 
 impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
     fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
-        todo!()
+        let mut state = ContractState {
+            io: self.io,
+            env: self.env,
+            transaction: self.transaction,
+            block: self.block,
+        };
+        let mut evm = Evm::builder()
+            .with_db(&mut state)
+            .modify_env(|e| *e = self.evm_env())
+            .spec_id(EVM_FORK)
+            .build();
+        let exec_result = evm.transact();
+        if let Ok(ResultAndState { result, state }) = exec_result {
+            evm.context.evm.db.commit(state);
+            let logs = log_to_log(result.logs());
+            let used_gas = result.gas_used();
+            let status = execution_result_into_result(result)?;
+            Ok(TransactResult {
+                submit_result: SubmitResult::new(status, used_gas, Vec::new()),
+                logs,
+            })
+        } else {
+            Err(exec_result_to_err(exec_result.unwrap_err()))
+        }
     }
 
     fn transact_call(&mut self) -> TransactExecutionResult<TransactResult> {
@@ -332,7 +356,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .spec_id(EVM_FORK)
             .build();
         let exec_result = evm.transact();
-        if let Ok(ResultAndState { result, state }) = evm.transact() {
+        if let Ok(ResultAndState { result, state }) = exec_result {
             evm.context.evm.db.commit(state);
             let logs = log_to_log(result.logs());
             let used_gas = result.gas_used();
@@ -347,6 +371,23 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
     }
 
     fn view(&mut self) -> TransactExecutionResult<TransactionStatus> {
-        todo!()
+        let mut state = ContractState {
+            io: self.io,
+            env: self.env,
+            transaction: self.transaction,
+            block: self.block,
+        };
+        let mut evm = Evm::builder()
+            .with_db(&mut state)
+            .modify_env(|e| *e = self.evm_env())
+            .spec_id(EVM_FORK)
+            .build();
+        let exec_result = evm.transact();
+        if let Ok(ResultAndState { result, state }) = exec_result {
+            let status = execution_result_into_result(result)?;
+            Ok(status)
+        } else {
+            Err(exec_result_to_err(exec_result.unwrap_err()))
+        }
     }
 }

@@ -62,11 +62,10 @@ pub fn from_address(address: &revm::primitives::Address) -> Address {
 /// Get balance from contract storage
 pub fn get_balance<I: IO>(io: &I, address: &revm::primitives::Address) -> revm::primitives::U256 {
     let addr = from_address(address);
-    let mut raw: Vec<u8> = Vec::new();
-    io.read_u256(&address_to_key(KeyPrefix::Balance, &addr))
-        .unwrap_or_else(|_| U256::zero())
-        .to_big_endian(&mut raw);
-    revm::primitives::U256::from_be_slice(&raw)
+    let value = io
+        .read_u256(&address_to_key(KeyPrefix::Balance, &addr))
+        .unwrap_or_else(|_| U256::zero());
+    u256_to_u256(&value)
 }
 
 /// Get nonce from contract storage
@@ -266,12 +265,7 @@ pub fn log_to_log(logs: Vec<revm::primitives::Log>) -> Vec<crate::Log> {
     logs.iter()
         .map(|log| {
             let address = from_address(&log.address);
-            let topics = log
-                .data
-                .topics()
-                .iter()
-                .map(|val| b256_to_h256(val))
-                .collect();
+            let topics = log.data.topics().iter().map(b256_to_h256).collect();
             crate::Log {
                 address: address.raw(),
                 topics,
@@ -341,6 +335,7 @@ pub fn execution_result_into_result(
 }
 
 pub fn exec_result_to_err(err: EVMError<()>) -> TransactErrorKind {
-    use aurora_engine_types::format;
-    TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(format!("{:?}", err))))
+    TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(aurora_engine_types::format!(
+        "{:?}", err
+    ))))
 }
