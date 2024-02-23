@@ -651,9 +651,9 @@ mod contract {
 
     #[no_mangle]
     #[cfg(not(feature = "ext-connector"))]
-    pub extern "C" fn ft_balance_of_accounts() {
+    pub extern "C" fn ft_balances_of() {
         let io = Runtime;
-        contract_methods::connector::ft_balance_of_accounts(io)
+        contract_methods::connector::ft_balances_of(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }

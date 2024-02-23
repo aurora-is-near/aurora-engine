@@ -380,9 +380,9 @@ pub fn ft_balance_of<I: IO + Copy>(io: I) -> Result<(), ContractError> {
 }
 
 #[cfg(not(feature = "ext-connector"))]
-pub fn ft_balance_of_accounts<I: IO + Copy>(io: I) -> Result<(), ContractError> {
+pub fn ft_balances_of<I: IO + Copy>(io: I) -> Result<(), ContractError> {
     let accounts: Vec<AccountId> = io.read_input_borsh()?;
-    EthConnectorContract::init(io)?.ft_balance_of_accounts(accounts);
+    EthConnectorContract::init(io)?.ft_balances_of(accounts);
     Ok(())
 }
 
@@ -830,7 +830,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return `nETH` balances for accounts (ETH on NEAR).
-    pub fn ft_balance_of_accounts(&mut self, accounts: Vec<AccountId>) {
+    pub fn ft_balances_of(&mut self, accounts: Vec<AccountId>) {
         let mut balances = aurora_engine_types::HashMap::new();
         for account_id in accounts {
             let balance = self.ft.ft_balance_of(&account_id);

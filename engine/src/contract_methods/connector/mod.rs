@@ -350,8 +350,8 @@ pub fn ft_balance_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Contrac
 }
 
 #[cfg(not(feature = "ext-connector"))]
-pub fn ft_balance_of_accounts<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
-    internal::ft_balance_of_accounts(io)?;
+pub fn ft_balances_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+    internal::ft_balances_of(io)?;
     Ok(())
 }
 
