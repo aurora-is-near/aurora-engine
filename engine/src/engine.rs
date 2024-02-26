@@ -511,13 +511,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             apply_remove_eth_fn,
         );
 
-        let res = evm.transact_create().map_err(|err| {
-            let err: EngineErrorKind = match err {
-                TransactErrorKind::EvmError(e) => e.into(),
-                TransactErrorKind::EvmFatal(e) => e.into(),
-            };
-            err
-        })?;
+        let res = evm.transact_create().map_err(from_transact_error_kind)?;
 
         let logs = filter_promises_from_logs(&self.io, handler, res.logs, &self.current_account_id);
         let submit_result = res.submit_result;
@@ -612,13 +606,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             precompiles,
             apply_remove_eth_fn,
         );
-        let res = evm.transact_call().map_err(|err| {
-            let err: EngineErrorKind = match err {
-                TransactErrorKind::EvmError(e) => e.into(),
-                TransactErrorKind::EvmFatal(e) => e.into(),
-            };
-            err
-        })?;
+        let res = evm.transact_call().map_err(from_transact_error_kind)?;
 
         let logs = filter_promises_from_logs(&self.io, handler, res.logs, &self.current_account_id);
         let submit_result = res.submit_result;
@@ -671,13 +659,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             precompiles,
             None,
         );
-        let status = evm.view().map_err(|err| {
-            let err: EngineErrorKind = match err {
-                TransactErrorKind::EvmError(e) => e.into(),
-                TransactErrorKind::EvmFatal(e) => e.into(),
-            };
-            err
-        })?;
+        let status = evm.view().map_err(from_transact_error_kind)?;
 
         Ok(status)
     }
@@ -1761,6 +1743,13 @@ fn assert_access<I: IO + Copy, E: Env>(
     }
 
     Ok(())
+}
+
+fn from_transact_error_kind(err: TransactErrorKind) -> EngineErrorKind {
+    match err {
+        TransactErrorKind::EvmError(e) => e.into(),
+        TransactErrorKind::EvmFatal(e) => e.into(),
+    }
 }
 
 #[cfg(test)]
