@@ -3,7 +3,7 @@ use aurora_engine::contract_methods::connector::deposit_event::TokenMessageData;
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 #[cfg(not(feature = "ext-connector"))]
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::types::{Address, Balance, Wei};
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::types::{Fee, NEP141Wei};
@@ -50,7 +50,7 @@ fn test_consume_deposit_message() {
     let recipient_address = Address::new(H160([22u8; 20]));
     let deposit_amount = Wei::new_u64(123_456_789);
     let proof = mock_proof(recipient_address, deposit_amount);
-    let tx_kind = sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap());
+    let tx_kind = sync::types::TransactionKind::Deposit(borsh::to_vec(&proof).unwrap());
     let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
@@ -101,7 +101,7 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         // Need to pass the result of calling the proof verifier
         // (which is `true` because the proof is valid in this case).
-        promise_data: vec![Some(true.try_to_vec().unwrap())],
+        promise_data: vec![Some(borsh::to_vec(&true).unwrap())],
         raw_input,
         action_hash: H256::default(),
     };

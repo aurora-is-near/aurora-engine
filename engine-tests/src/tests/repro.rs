@@ -2,7 +2,7 @@
 
 use crate::utils::{standalone, AuroraRunner, ExecutionProfile};
 use aurora_engine::parameters::SubmitResult;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 use engine_standalone_storage::json_snapshot;
 
 /// This test reproduces a transaction from testnet:
@@ -174,8 +174,8 @@ fn repro_common(context: &ReproContext) {
         .submit_raw("submit", &runner.context, &[], None)
         .unwrap();
     assert_eq!(
-        submit_result.try_to_vec().unwrap(),
-        standalone_result.try_to_vec().unwrap()
+        borsh::to_vec(&submit_result).unwrap(),
+        borsh::to_vec(&standalone_result).unwrap()
     );
     standalone.close();
 }

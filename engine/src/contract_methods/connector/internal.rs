@@ -110,9 +110,7 @@ pub fn withdraw<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractErro
             &predecessor_account_id,
             &args,
         )?;
-        let result_bytes = result
-            .try_to_vec()
-            .map_err(|_| crate::errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| crate::errors::ERR_SERIALIZE)?;
 
         // We only return the output via IO in the case of standalone.
         // In the case of contract we intentionally avoid IO to call Wasm directly.
@@ -351,7 +349,7 @@ pub fn set_paused_flags<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Cont
 
 pub fn get_paused_flags<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     let paused_flags = EthConnectorContract::init(io)?.get_paused_flags();
-    let data = paused_flags.try_to_vec().unwrap();
+    let data = borsh::to_vec(&paused_flags).unwrap();
     io.return_output(&data);
 
     Ok(())
@@ -361,7 +359,7 @@ pub fn is_used_proof<I: IO + Copy + PromiseHandler>(mut io: I) -> Result<(), Con
     let args: IsUsedProofCallArgs = io.read_input_borsh()?;
 
     let is_used_proof = EthConnectorContract::init(io)?.is_used_proof(&args.proof);
-    let res = is_used_proof.try_to_vec().unwrap();
+    let res = borsh::to_vec(&is_used_proof).unwrap();
     io.return_output(&res);
 
     Ok(())
@@ -492,6 +490,7 @@ pub struct EthConnectorContract<I: IO> {
 /// Eth connector specific data. It always must contain `prover_account` - account id of the smart
 /// contract which is used for verifying a proof used in the deposit flow.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EthConnector {
     /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
     /// a log entry from incoming proof.
@@ -616,7 +615,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         );
 
         // Do not skip bridge call. This is only used for development and diagnostics.
-        let skip_bridge_call = false.try_to_vec().unwrap();
+        let skip_bridge_call = borsh::to_vec(&false).unwrap();
         let proof_to_verify = [raw_proof, skip_bridge_call].concat();
 
         let verify_call = PromiseCreateArgs {
@@ -630,15 +629,14 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         // Finalize deposit
         let data = match event.token_message_data {
             // Deposit to NEAR accounts
-            TokenMessageData::Near(account_id) => FinishDepositCallArgs {
+            TokenMessageData::Near(account_id) => borsh::to_vec(&FinishDepositCallArgs {
                 new_owner_id: account_id,
                 amount: event.amount,
                 proof_key: proof_key(&proof),
                 relayer_id: predecessor_account_id,
                 fee: event.fee,
                 msg: None,
-            }
-            .try_to_vec()
+            })
             .unwrap(),
             // Deposit to Eth accounts
             // fee is being minted in the `ft_on_transfer` callback method
@@ -648,25 +646,23 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             } => {
                 // Transfer to self and then transfer ETH in `ft_on_transfer`
                 // address - is NEAR account
-                let transfer_data = TransferCallCallArgs {
+                let transfer_data = borsh::to_vec(&TransferCallCallArgs {
                     receiver_id,
                     amount: event.amount,
                     memo: None,
                     msg: message.encode(),
-                }
-                .try_to_vec()
+                })
                 .unwrap();
 
                 // Send to self - current account id
-                FinishDepositCallArgs {
+                borsh::to_vec(&FinishDepositCallArgs {
                     new_owner_id: current_account_id.clone(),
                     amount: event.amount,
                     proof_key: proof_key(&proof),
                     relayer_id: predecessor_account_id,
                     fee: event.fee,
                     msg: Some(transfer_data),
-                }
-                .try_to_vec()
+                })
                 .unwrap()
             }
         };

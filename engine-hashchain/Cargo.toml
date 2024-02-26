@@ -19,4 +19,3 @@ impl-serde.workspace = true
 [features]
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "fixed-hash/std", "impl-serde/std"]
-borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat"]

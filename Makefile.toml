@@ -135,29 +135,12 @@ args = [
     "clippy::as_conversions",
 ]
 
-[tasks.clippy-borsh-compat]
-extend = "clippy-base"
-args = [
-    "clippy",
-    "-p",
-    "aurora-engine-types",
-    "--all-targets",
-    "--features",
-    "borsh-compat",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
-]
-
 [tasks.clippy]
 dependencies = [
     "clippy-base",
     "clippy-ext-connector",
     "clippy-contract",
     "clippy-contract-refund",
-    "clippy-borsh-compat",
 ]
 
 [tasks.check-fmt]

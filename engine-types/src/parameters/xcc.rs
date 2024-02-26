@@ -1,5 +1,5 @@
 use crate::account_id::AccountId;
-use crate::borsh::{self, BorshDeserialize, BorshSerialize};
+use crate::borsh::{BorshDeserialize, BorshSerialize};
 use crate::types::{Address, Yocto};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshDeserialize, BorshSerialize)]

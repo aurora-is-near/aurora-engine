@@ -56,6 +56,7 @@ pub struct WhitelistKindArgs {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[borsh(use_discriminant = false)]
 pub enum WhitelistKind {
     /// The whitelist of this type is for storing NEAR accounts. Accounts stored in this whitelist
     /// have an admin role. The admin role allows to add new admins and add new entities
@@ -90,7 +91,7 @@ fn test_account_whitelist_serialize() {
         account_id: "aurora".parse().unwrap(),
         kind: WhitelistKind::Admin,
     });
-    let bytes = args.try_to_vec().unwrap();
+    let bytes = borsh::to_vec(&args).unwrap();
     let args = WhitelistArgs::try_from_slice(&bytes).unwrap();
 
     assert_eq!(
@@ -109,7 +110,7 @@ fn test_address_whitelist_serialize() {
         address,
         kind: WhitelistKind::EvmAdmin,
     });
-    let bytes = args.try_to_vec().unwrap();
+    let bytes = borsh::to_vec(&args).unwrap();
     let args = WhitelistArgs::try_from_slice(&bytes).unwrap();
 
     assert_eq!(
