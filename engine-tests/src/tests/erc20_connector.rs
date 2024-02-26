@@ -3,7 +3,7 @@ use crate::utils::{self, create_eth_transaction, AuroraRunner, DEFAULT_AURORA_AC
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use ethabi::Token;
 use libsecp256k1::SecretKey;
@@ -72,12 +72,11 @@ impl AuroraRunner {
         self.make_call(
             "call",
             origin,
-            CallArgs::V2(FunctionCallArgsV2 {
+            borsh::to_vec(&CallArgs::V2(FunctionCallArgsV2 {
                 contract,
                 value: WeiU256::default(),
                 input,
-            })
-            .try_to_vec()
+            }))
             .unwrap(),
         )
     }
@@ -95,7 +94,7 @@ impl AuroraRunner {
             .make_call(
                 "deploy_erc20_token",
                 DEFAULT_AURORA_ACCOUNT_ID,
-                nep141.try_to_vec().unwrap(),
+                borsh::to_vec(&nep141).unwrap(),
             )
             .unwrap();
 
@@ -205,7 +204,7 @@ impl AuroraRunner {
         self.make_call(
             "register_relayer",
             relayer_account_id,
-            relayer_address.try_to_vec().unwrap(),
+            borsh::to_vec(&relayer_address).unwrap(),
         )
     }
 
@@ -216,7 +215,7 @@ impl AuroraRunner {
         self.make_call(
             "factory_set_wnear_address",
             DEFAULT_AURORA_ACCOUNT_ID,
-            wnear_address.try_to_vec().unwrap(),
+            borsh::to_vec(&wnear_address).unwrap(),
         )
     }
 }

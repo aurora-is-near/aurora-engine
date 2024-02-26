@@ -1,8 +1,5 @@
 use base64::Engine;
-#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 use crate::account_id::AccountId;

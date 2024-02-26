@@ -2,7 +2,6 @@ use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -425,7 +424,7 @@ fn test_trace_precompiles_with_subcalls() {
         gas_limit: u64::MAX.into(),
         to: Some(xcc_address),
         value: Wei::zero(),
-        data: xcc_args.try_to_vec().unwrap(),
+        data: borsh::to_vec(&xcc_args).unwrap(),
     };
     let mut listener = CallTracer::default();
     let standalone_result = sputnik::traced_call(&mut listener, || {

@@ -2,7 +2,7 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{borsh::BorshSerialize, Cow, Vec};
+use aurora_engine_types::{borsh, Cow, Vec};
 use evm::{Context, ExitError};
 
 /// `get_promise_results` precompile address
@@ -71,8 +71,7 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
             }
         }
 
-        let bytes = results
-            .try_to_vec()
+        let bytes = borsh::to_vec(&results)
             .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_PROMISE_RESULT_SERIALIZATION")))?;
         Ok(PrecompileOutput::without_logs(cost, bytes))
     }

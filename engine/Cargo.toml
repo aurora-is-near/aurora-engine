@@ -41,7 +41,6 @@ test-case.workspace = true
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-hashchain/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "aurora-engine-evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
-borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-hashchain/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat"]
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
 error_refund = ["aurora-engine-precompiles/error_refund"]
 integration-test = ["log", "aurora-engine-evm/integration-test"]

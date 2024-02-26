@@ -1,8 +1,5 @@
 use crate::{fmt, str::FromStr, String, ToString};
-#[cfg(not(feature = "borsh-compat"))]
-use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{maybestd::io, BorshDeserialize, BorshSerialize};
+use borsh::{io, BorshDeserialize, BorshSerialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublicKey {
@@ -38,7 +35,6 @@ impl BorshSerialize for PublicKey {
     }
 }
 
-#[cfg(not(feature = "borsh-compat"))]
 impl BorshDeserialize for PublicKey {
     fn deserialize_reader<R: io::Read>(rd: &mut R) -> io::Result<Self> {
         let key_type = u8::deserialize_reader(rd).and_then(KeyType::try_from)?;
@@ -46,18 +42,6 @@ impl BorshDeserialize for PublicKey {
         match key_type {
             KeyType::Ed25519 => Ok(Self::Ed25519(BorshDeserialize::deserialize_reader(rd)?)),
             KeyType::Secp256k1 => Ok(Self::Secp256k1(BorshDeserialize::deserialize_reader(rd)?)),
-        }
-    }
-}
-
-#[cfg(feature = "borsh-compat")]
-impl BorshDeserialize for PublicKey {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        let key_type = <u8 as BorshDeserialize>::deserialize(buf).and_then(KeyType::try_from)?;
-
-        match key_type {
-            KeyType::Ed25519 => Ok(Self::Ed25519(BorshDeserialize::deserialize(buf)?)),
-            KeyType::Secp256k1 => Ok(Self::Secp256k1(BorshDeserialize::deserialize(buf)?)),
         }
     }
 }

@@ -56,7 +56,7 @@ pub extern "C" fn run() {
     .unwrap();
 
     let mut rt = near_runtime::Runtime;
-    let return_bytes = result.try_to_vec().unwrap();
+    let return_bytes = borsh::to_vec(&result).unwrap();
     rt.return_output(&return_bytes);
 }
 

@@ -59,6 +59,7 @@ impl<'a> RouterCode<'a> {
 
 /// Same as the corresponding struct in the xcc-router
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct DeployUpgradeParams {
     pub code: Vec<u8>,
     pub initialize_args: Vec<u8>,
@@ -134,9 +135,7 @@ where
             };
             promise_actions.push(PromiseAction::FunctionCall {
                 name: "deploy_upgrade".into(),
-                args: deploy_args
-                    .try_to_vec()
-                    .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                args: borsh::to_vec(&deploy_args).expect(ERR_UPGRADE_ARG_SERIALIZATION),
                 attached_yocto: fund_amount,
                 gas: UPGRADE_GAS + INITIALIZE_GAS,
             });
@@ -166,9 +165,7 @@ where
         let callback = PromiseCreateArgs {
             target_account_id: current_account_id,
             method: "factory_update_address_version".into(),
-            args: args
-                .try_to_vec()
-                .map_err(|_| FundXccError::SerializationFailure)?,
+            args: borsh::to_vec(&args).map_err(|_| FundXccError::SerializationFailure)?,
             attached_balance: ZERO_YOCTO,
             attached_gas: VERSION_UPDATE_GAS,
         };
@@ -246,9 +243,7 @@ where
                 };
                 promise_actions.push(PromiseAction::FunctionCall {
                     name: "deploy_upgrade".into(),
-                    args: deploy_args
-                        .try_to_vec()
-                        .expect(ERR_UPGRADE_ARG_SERIALIZATION),
+                    args: borsh::to_vec(&deploy_args).expect(ERR_UPGRADE_ARG_SERIALIZATION),
                     attached_yocto: ZERO_YOCTO,
                     gas: UPGRADE_GAS + INITIALIZE_GAS,
                 });
@@ -276,7 +271,7 @@ where
             let callback = PromiseCreateArgs {
                 target_account_id: current_account_id.clone(),
                 method: "factory_update_address_version".into(),
-                args: args.try_to_vec().unwrap(),
+                args: borsh::to_vec(&args).unwrap(),
                 attached_balance: ZERO_YOCTO,
                 attached_gas: VERSION_UPDATE_GAS,
             };
@@ -304,7 +299,7 @@ where
         let withdraw_call = PromiseCreateArgs {
             target_account_id: current_account_id.clone(),
             method: "withdraw_wnear_to_router".into(),
-            args: withdraw_call_args.try_to_vec().unwrap(),
+            args: borsh::to_vec(&withdraw_call_args).unwrap(),
             attached_balance: ZERO_YOCTO,
             attached_gas: WITHDRAW_GAS,
         };

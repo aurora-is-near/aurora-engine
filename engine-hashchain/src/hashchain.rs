@@ -2,7 +2,7 @@ use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompact
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
     account_id::AccountId,
-    borsh::{self, maybestd::io, BorshDeserialize, BorshSerialize},
+    borsh::{self, io, BorshDeserialize, BorshSerialize},
     format,
     types::RawH256,
     Cow, Vec,
@@ -107,7 +107,7 @@ impl Hashchain {
 
     pub fn try_serialize(&self) -> Result<Vec<u8>, io::Error> {
         let serializable: BorshableHashchain = self.into();
-        serializable.try_to_vec()
+        borsh::to_vec(&serializable)
     }
 
     pub fn try_deserialize(bytes: &[u8]) -> Result<Self, io::Error> {
@@ -168,6 +168,7 @@ impl HashchainBuilder {
 /// is not bogged down with details of serialization (for example this data type is an enum
 /// to allow for easy changes to the serialized form in the future).
 #[derive(Debug, BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 enum BorshableHashchain<'a> {
     V1 {
         chain_id: Cow<'a, [u8; 32]>,
@@ -221,6 +222,7 @@ impl<'a> TryFrom<BorshableHashchain<'a>> for Hashchain {
 /// 4. Clear the transactions of the current block.
 /// 5. Go back to step 2 for the next block.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct BlockHashchainComputer {
     pub txs_logs_bloom: Bloom,
     pub txs_merkle_tree: StreamCompactMerkleTree,
