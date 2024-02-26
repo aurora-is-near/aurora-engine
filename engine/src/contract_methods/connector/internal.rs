@@ -832,7 +832,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
             let balance = self.ft.ft_balance_of(&account_id);
             balances.insert(account_id, balance);
         }
-        self.io.return_output(&balances.try_to_vec().unwrap());
+        self.io.return_output(&borsh::to_vec(&balances).unwrap());
     }
 
     /// Return `ETH` balance (ETH on Aurora).
