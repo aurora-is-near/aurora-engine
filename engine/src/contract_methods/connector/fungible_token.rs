@@ -20,6 +20,7 @@ const GAS_FOR_RESOLVE_TRANSFER: NearGas = NearGas::new(5_000_000_000_000);
 const GAS_FOR_FT_TRANSFER_CALL: NearGas = NearGas::new(35_000_000_000_000);
 
 #[derive(Debug, Default, BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct FungibleToken {
     /// Total ETH supply on Near (nETH as NEP-141 token)
     pub total_eth_supply_on_near: NEP141Wei,
@@ -233,12 +234,11 @@ impl<I: IO + Copy> FungibleTokenOps<I> {
         })
         .unwrap();
 
-        let data2 = ResolveTransferCallArgs {
+        let data2 = borsh::to_vec(&ResolveTransferCallArgs {
             receiver_id: receiver_id.clone(),
             amount,
             sender_id,
-        }
-        .try_to_vec()
+        })
         .unwrap();
         // Initiating receiver's call and the callback
         let ft_on_transfer_call = PromiseCreateArgs {

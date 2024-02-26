@@ -4,7 +4,6 @@ use crate::prelude::{
     format, vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec,
     U256,
 };
-use aurora_engine_types::borsh;
 use aurora_engine_types::parameters::connector::LogEntry;
 use aurora_engine_types::types::address::error::AddressError;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -16,6 +15,7 @@ pub type EventParams = Vec<EventParam>;
 /// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
 /// Message parsed from input args with `parse_on_transfer_message`.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferMessageData {
     pub recipient: Address,
@@ -24,6 +24,7 @@ pub struct FtTransferMessageData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferFee {
     pub relayer: AccountId,
@@ -151,6 +152,7 @@ impl FtTransferMessageData {
 /// The message parsed from event `recipient` field - `log_entry_data`
 /// after fetching proof `log_entry_data`
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub enum TokenMessageData {
     /// Deposit no NEAR account

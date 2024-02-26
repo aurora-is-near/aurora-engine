@@ -15,11 +15,11 @@ debug = false
 panic = "abort"
 
 [dependencies]
-aurora-engine-types = { path = "../../engine-types", default-features = false, features = ["borsh-compat"] }
-near-sdk = "4.1"
+aurora-engine-types = { path = "../../engine-types", default-features = false }
+near-sdk = { version = "5", default-features = false, features = ["legacy", "unit-testing"] }
 
-[patch.crates-io]
-parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1', rev = "d05fd8e" }
+[dev-dependencies]
+near-primitives = "0.20"
 
 [features]
 default = []

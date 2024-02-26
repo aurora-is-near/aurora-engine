@@ -32,9 +32,7 @@ pub struct EngineState {
 impl EngineState {
     pub fn borsh_serialize(&self) -> Result<Vec<u8>, EngineStateError> {
         let borshable: BorshableEngineState = self.into();
-        borshable
-            .try_to_vec()
-            .map_err(|_| EngineStateError::SerializationFailed)
+        borsh::to_vec(&borshable).map_err(|_| EngineStateError::SerializationFailed)
     }
 
     /// Deserialization with lazy state migration.
@@ -54,6 +52,7 @@ impl EngineState {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq, Debug)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub enum BorshableEngineState<'a> {
     V1(BorshableEngineStateV1<'a>),
     V2(BorshableEngineStateV2<'a>),
@@ -61,6 +60,7 @@ pub enum BorshableEngineState<'a> {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct BorshableEngineStateV1<'a> {
     pub chain_id: [u8; 32],
     pub owner_id: Cow<'a, AccountId>,
@@ -69,6 +69,7 @@ pub struct BorshableEngineStateV1<'a> {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct BorshableEngineStateV2<'a> {
     pub chain_id: [u8; 32],
     pub owner_id: Cow<'a, AccountId>,
@@ -76,6 +77,7 @@ pub struct BorshableEngineStateV2<'a> {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone, PartialEq, Eq, Debug)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct BorshableEngineStateV3<'a> {
     pub chain_id: [u8; 32],
     pub owner_id: Cow<'a, AccountId>,

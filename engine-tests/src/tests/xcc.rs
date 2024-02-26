@@ -3,7 +3,7 @@ use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 use aurora_engine_precompiles::xcc::{costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::{
     CrossContractCallArgs, NearPromise, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
     SimpleNearPromise,
@@ -78,7 +78,7 @@ fn test_xcc_eth_gas_cost() {
     );
 
     let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64, u64) {
-        let data = CrossContractCallArgs::Eager(p).try_to_vec().unwrap();
+        let data = borsh::to_vec(&CrossContractCallArgs::Eager(p)).unwrap();
         let input_length = data.len();
         let (submit_result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
@@ -126,7 +126,7 @@ fn test_xcc_eth_gas_cost() {
         utils::within_x_percent(
             5,
             xcc_base_cost.as_u64(),
-            costs::CROSS_CONTRACT_CALL_BASE.as_u64()
+            costs::CROSS_CONTRACT_CALL_BASE.as_u64(),
         ),
         "Incorrect xcc base cost. Expected: {} Actual: {}",
         xcc_base_cost,
@@ -137,7 +137,7 @@ fn test_xcc_eth_gas_cost() {
         utils::within_x_percent(
             5,
             xcc_cost_per_byte,
-            costs::CROSS_CONTRACT_CALL_BYTE.as_u64()
+            costs::CROSS_CONTRACT_CALL_BYTE.as_u64(),
         ),
         "Incorrect xcc per byte cost. Expected: {} Actual: {}",
         xcc_cost_per_byte,
@@ -201,7 +201,7 @@ fn test_xcc_schedule_gas() {
         .call(
             "schedule",
             DEFAULT_AURORA_ACCOUNT_ID,
-            PromiseArgs::Create(promise).try_to_vec().unwrap(),
+            borsh::to_vec(&PromiseArgs::Create(promise)).unwrap(),
         )
         .unwrap();
     assert!(
@@ -245,7 +245,7 @@ fn test_xcc_exec_gas() {
             .call(
                 "execute",
                 DEFAULT_AURORA_ACCOUNT_ID,
-                args.try_to_vec().unwrap(),
+                borsh::to_vec(&args).unwrap(),
             )
             .unwrap();
         let callback_count = args.promise_count() - 1;
@@ -316,7 +316,7 @@ fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
         .call(
             "deploy_erc20_token",
             &engine_account,
-            args.try_to_vec().unwrap(),
+            borsh::to_vec(&args).unwrap(),
         )
         .unwrap();
     let address = {
@@ -339,7 +339,7 @@ fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
                 )
                 .data,
         });
-    let result = runner.call("call", &engine_account, call_args.try_to_vec().unwrap());
+    let result = runner.call("call", &engine_account, borsh::to_vec(&call_args).unwrap());
     assert!(result.is_ok());
 
     contract
@@ -415,7 +415,6 @@ pub mod workspace {
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
     use aurora_engine_types::account_id::AccountId;
-    use aurora_engine_types::borsh::BorshSerialize;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_types::parameters::{
         CrossContractCallArgs, NearPromise, PromiseArgs, PromiseCreateArgs,
@@ -1034,7 +1033,7 @@ pub mod workspace {
             gas_limit: u64::MAX.into(),
             to: Some(cross_contract_call::ADDRESS),
             value: Wei::zero(),
-            data: xcc_args.try_to_vec().unwrap(),
+            data: borsh::to_vec(&xcc_args).unwrap(),
         };
         let signed_transaction =
             utils::sign_transaction(transaction, Some(chain_id), &signer.secret_key);
