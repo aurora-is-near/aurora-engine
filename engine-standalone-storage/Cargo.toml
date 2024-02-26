@@ -30,7 +30,6 @@ strum.workspace = true
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]
-borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat", "aurora-engine/borsh-compat"]
 mainnet = []
 testnet = []
 ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector"]

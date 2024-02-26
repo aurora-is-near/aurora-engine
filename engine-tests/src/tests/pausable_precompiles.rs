@@ -6,7 +6,6 @@ use crate::utils::{
 };
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::{PausePrecompilesCallArgs, TransactionStatus};
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::types::Wei;
 
 const EXIT_TO_ETHEREUM_FLAG: u32 = 0b10;
@@ -19,7 +18,7 @@ fn test_paused_precompile_is_shown_when_viewing() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
-    let input = call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&call_args).unwrap();
 
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let result = runner
@@ -40,7 +39,7 @@ fn test_executing_paused_precompile_throws_error() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
-    let input = call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&call_args).unwrap();
 
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
     let is_to_near = false;
@@ -61,7 +60,7 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
     let call_args = PausePrecompilesCallArgs {
         paused_mask: EXIT_TO_ETHEREUM_FLAG,
     };
-    let input = call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&call_args).unwrap();
 
     let _res = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input.clone());
     let _res = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
@@ -83,7 +82,7 @@ fn test_resuming_precompile_does_not_throw_error() {
     let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
-    let input = call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&call_args).unwrap();
     let result = runner.call(RESUME_PRECOMPILES, CALLED_ACCOUNT_ID, input);
 
     assert!(result.is_ok(), "{result:?}");
@@ -93,7 +92,7 @@ fn test_resuming_precompile_does_not_throw_error() {
 fn test_pausing_precompile_does_not_throw_error() {
     let mut runner = utils::deploy_runner();
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
-    let input = call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&call_args).unwrap();
     let result = runner.call(PAUSE_PRECOMPILES, CALLED_ACCOUNT_ID, input);
 
     assert!(result.is_ok(), "{result:?}");
