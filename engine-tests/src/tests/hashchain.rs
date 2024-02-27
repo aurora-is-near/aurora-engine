@@ -3,7 +3,6 @@ use aurora_engine::parameters::{StartHashchainArgs, SubmitResult, TransactionSta
 use aurora_engine_hashchain::bloom::Bloom;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{
-    borsh::BorshSerialize,
     types::{Address, Wei},
     H256, U256,
 };
@@ -34,9 +33,12 @@ fn test_hashchain() {
     let signed_transaction =
         utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let input = rlp::encode(&signed_transaction).to_vec();
-    let output = SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21_000, Vec::new())
-        .try_to_vec()
-        .unwrap();
+    let output = borsh::to_vec(&SubmitResult::new(
+        TransactionStatus::Succeed(Vec::new()),
+        21_000,
+        Vec::new(),
+    ))
+    .unwrap();
 
     let expected_hc = {
         let start_hc_args = StartHashchainArgs {
@@ -54,7 +56,7 @@ fn test_hashchain() {
         hc.add_block_tx(
             block_height,
             "start_hashchain",
-            &start_hc_args.try_to_vec().unwrap(),
+            &borsh::to_vec(&start_hc_args).unwrap(),
             &[],
             &Bloom::default(),
         )

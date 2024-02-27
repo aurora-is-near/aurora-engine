@@ -3,7 +3,6 @@ use crate::prelude::{
     Address, WeiU256, U256,
 };
 use crate::utils::{self, solidity, AuroraRunner, Signer};
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::types::Wei;
 
 pub struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
@@ -173,12 +172,11 @@ impl SelfDestruct {
             .encode_input(&[])
             .unwrap();
 
-        let input = CallArgs::V2(FunctionCallArgsV2 {
+        let input = borsh::to_vec(&CallArgs::V2(FunctionCallArgsV2 {
             contract: self.contract.address,
             value: WeiU256::default(),
             input: data,
-        })
-        .try_to_vec()
+        }))
         .unwrap();
 
         runner.call("call", "anyone", input).unwrap();

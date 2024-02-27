@@ -1,11 +1,12 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::{env, near_bindgen, Gas, Promise, PromiseError};
 
-const FIVE_TGAS: Gas = Gas(5_000_000_000_000);
+const FIVE_TGAS: Gas = Gas::from_tgas(5);
 
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Fib;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -42,15 +43,19 @@ impl Fib {
     /// It begins with the seed, followed by `n` calls to the `accumulate` function.
     pub fn fib(n: u8) -> Promise {
         let account = env::current_account_id();
-        let mut p =
-            Promise::new(account.clone()).function_call("seed".into(), Vec::new(), 0, FIVE_TGAS);
+        let mut p = Promise::new(account.clone()).function_call(
+            "seed".into(),
+            Vec::new(),
+            near_sdk::NearToken::from_near(0),
+            FIVE_TGAS,
+        );
         let mut n = n;
         while n > 0 {
             n -= 1;
             p = p.then(Promise::new(account.clone()).function_call(
                 "accumulate".into(),
                 Vec::new(),
-                0,
+                near_sdk::NearToken::from_near(0),
                 FIVE_TGAS,
             ))
         }

@@ -13,8 +13,7 @@ use aurora_engine_sdk::{
 };
 use aurora_engine_types::{
     account_id::AccountId,
-    borsh::BorshSerialize,
-    format,
+    borsh, format,
     parameters::{engine::SubmitResult, xcc::WithdrawWnearToRouterArgs},
     types::Address,
 };
@@ -116,7 +115,7 @@ pub fn factory_set_wnear_address<I: IO + Copy, E: Env>(
 
 pub fn factory_get_wnear_address<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     let address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
-    let bytes = address.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+    let bytes = borsh::to_vec(&address).map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&bytes);
     Ok(())
 }

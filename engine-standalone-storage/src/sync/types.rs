@@ -12,6 +12,7 @@ use aurora_engine_types::{
     types::{self, Wei},
     H256, U256,
 };
+use serde::Serialize;
 use std::borrow::Cow;
 use strum::EnumString;
 
@@ -68,7 +69,7 @@ impl TransactionMessage {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let borshable: BorshableTransactionMessage = self.into();
-        borshable.try_to_vec().unwrap()
+        borsh::to_vec(&borshable).unwrap()
     }
 
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, std::io::Error> {
@@ -588,59 +589,61 @@ impl TransactionKind {
     pub fn raw_bytes(&self) -> Vec<u8> {
         match self {
             Self::Submit(tx) => tx.into(),
-            Self::SubmitWithArgs(args) => args.try_to_vec().unwrap_or_default(),
-            Self::Call(args) => args.try_to_vec().unwrap_or_default(),
-            Self::PausePrecompiles(args) | Self::ResumePrecompiles(args) => {
-                args.try_to_vec().unwrap_or_default()
-            }
+            Self::SubmitWithArgs(args) => to_borsh(args),
+            Self::Call(args) => to_borsh(args),
+            Self::PausePrecompiles(args) | Self::ResumePrecompiles(args) => to_borsh(args),
             Self::Deploy(bytes) | Self::Deposit(bytes) | Self::FactoryUpdate(bytes) => {
                 bytes.clone()
             }
-            Self::DeployErc20(args) => args.try_to_vec().unwrap_or_default(),
-            Self::FtOnTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::FtTransferCall(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::FinishDeposit(args) => args.try_to_vec().unwrap_or_default(),
-            Self::ResolveTransfer(args, _) => args.try_to_vec().unwrap_or_default(),
-            Self::FtTransfer(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::Withdraw(args) => args.try_to_vec().unwrap_or_default(),
-            Self::StorageDeposit(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::StorageUnregister(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::StorageWithdraw(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::SetOwner(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetUpgradeDelayBlocks(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetPausedFlags(args) => args.try_to_vec().unwrap_or_default(),
+            Self::DeployErc20(args) => to_borsh(args),
+            Self::FtOnTransfer(args) => to_json(args),
+            Self::FtTransferCall(args) => to_json(args),
+            Self::FinishDeposit(args) => to_borsh(args),
+            Self::ResolveTransfer(args, _) => to_borsh(args),
+            Self::FtTransfer(args) => to_json(args),
+            Self::Withdraw(args) => to_borsh(args),
+            Self::StorageDeposit(args) => to_json(args),
+            Self::StorageUnregister(args) => to_json(args),
+            Self::StorageWithdraw(args) => to_json(args),
+            Self::SetOwner(args) => to_borsh(args),
+            Self::SetUpgradeDelayBlocks(args) => to_borsh(args),
+            Self::SetPausedFlags(args) => to_borsh(args),
             Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
                 address.as_bytes().to_vec()
             }
             Self::ExitToNear(maybe_args) => maybe_args
                 .as_ref()
-                .and_then(|args| args.try_to_vec().ok())
+                .and_then(|args| borsh::to_vec(&args).ok())
                 .unwrap_or_default(),
-            Self::NewConnector(args) | Self::SetConnectorData(args) => {
-                args.try_to_vec().unwrap_or_default()
-            }
-            Self::NewEngine(args) => args.try_to_vec().unwrap_or_default(),
-            Self::FactoryUpdateAddressVersion(args) => args.try_to_vec().unwrap_or_default(),
-            Self::FundXccSubAccount(args) => args.try_to_vec().unwrap_or_default(),
-            Self::WithdrawWnearToRouter(args) => args.try_to_vec().unwrap_or_default(),
+            Self::NewConnector(args) | Self::SetConnectorData(args) => to_borsh(args),
+            Self::NewEngine(args) => to_borsh(args),
+            Self::FactoryUpdateAddressVersion(args) => to_borsh(args),
+            Self::FundXccSubAccount(args) => to_borsh(args),
+            Self::WithdrawWnearToRouter(args) => to_borsh(args),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
-            Self::SetKeyManager(args) => args.try_to_vec().unwrap_or_default(),
-            Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => {
-                args.try_to_vec().unwrap_or_default()
-            }
-            Self::StartHashchain(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetErc20Metadata(args) => serde_json::to_vec(args).unwrap_or_default(),
-            Self::SetFixedGas(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetSiloParams(args) => args.try_to_vec().unwrap_or_default(),
+            Self::SetKeyManager(args) => to_borsh(args),
+            Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => to_borsh(args),
+            Self::StartHashchain(args) => to_borsh(args),
+            Self::SetErc20Metadata(args) => to_json(args),
+            Self::SetFixedGas(args) => to_borsh(args),
+            Self::SetSiloParams(args) => to_borsh(args),
             Self::AddEntryToWhitelist(args) | Self::RemoveEntryFromWhitelist(args) => {
-                args.try_to_vec().unwrap_or_default()
+                to_borsh(args)
             }
-            Self::AddEntryToWhitelistBatch(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetWhitelistStatus(args) => args.try_to_vec().unwrap_or_default(),
-            Self::SetEthConnectorContractAccount(args) => args.try_to_vec().unwrap_or_default(),
-            Self::MirrorErc20TokenCallback(args) => args.try_to_vec().unwrap_or_default(),
+            Self::AddEntryToWhitelistBatch(args) => to_borsh(args),
+            Self::SetWhitelistStatus(args) => to_borsh(args),
+            Self::SetEthConnectorContractAccount(args) => to_borsh(args),
+            Self::MirrorErc20TokenCallback(args) => to_borsh(args),
         }
     }
+}
+
+fn to_borsh<T: BorshSerialize>(args: &T) -> Vec<u8> {
+    borsh::to_vec(args).unwrap_or_default()
+}
+
+fn to_json<T: Serialize>(args: &T) -> Vec<u8> {
+    serde_json::to_vec(args).unwrap_or_default()
 }
 
 /// Used to make sure `TransactionKindTag` is kept in sync with `TransactionKind`
@@ -715,6 +718,7 @@ impl From<&TransactionKind> for TransactionKindTag {
 /// For details of what the individual fields mean, see the comments on the main
 /// `TransactionMessage` type.
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 enum BorshableTransactionMessage<'a> {
     V1(BorshableTransactionMessageV1<'a>),
     V2(BorshableTransactionMessageV2<'a>),
@@ -723,6 +727,7 @@ enum BorshableTransactionMessage<'a> {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct BorshableTransactionMessageV1<'a> {
     pub block_hash: [u8; 32],
     pub near_receipt_id: [u8; 32],
@@ -735,6 +740,7 @@ struct BorshableTransactionMessageV1<'a> {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct BorshableTransactionMessageV2<'a> {
     pub block_hash: [u8; 32],
     pub near_receipt_id: [u8; 32],
@@ -748,6 +754,7 @@ struct BorshableTransactionMessageV2<'a> {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct BorshableTransactionMessageV3<'a> {
     pub block_hash: [u8; 32],
     pub near_receipt_id: [u8; 32],
@@ -762,6 +769,7 @@ struct BorshableTransactionMessageV3<'a> {
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct BorshableTransactionMessageV4<'a> {
     pub block_hash: [u8; 32],
     pub near_receipt_id: [u8; 32],
@@ -867,6 +875,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 /// so that this type can be cheaply created from a `TransactionKind` reference.
 /// !!!!! New types of transactions must be added at the end of the enum. !!!!!!
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 enum BorshableTransactionKind<'a> {
     Submit(Cow<'a, Vec<u8>>),
     Call(Cow<'a, parameters::CallArgs>),

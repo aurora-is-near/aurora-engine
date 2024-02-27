@@ -20,13 +20,16 @@ extern crate alloc;
 extern crate core;
 
 mod map;
+
 pub mod parameters {
     pub use aurora_engine_types::parameters::connector::*;
     pub use aurora_engine_types::parameters::engine::*;
 }
+
 pub mod proof {
     pub use aurora_engine_types::parameters::connector::Proof;
 }
+
 pub mod accounting;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod contract_methods;
@@ -87,7 +90,7 @@ mod contract {
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
-    use aurora_engine_types::borsh::BorshSerialize;
+    use aurora_engine_types::borsh;
     use aurora_engine_types::parameters::silo::{
         FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
@@ -248,8 +251,8 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
-    /// 0-bit means not paused.
+    /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
+    /// to that bit is paused and 0-bit means not paused.
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let io = Runtime;
@@ -492,7 +495,7 @@ mod contract {
         let engine: Engine<_, _> =
             Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
-        io.return_output(&result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
+        io.return_output(&borsh::to_vec(&result).sdk_expect(errors::ERR_SERIALIZE));
     }
 
     #[no_mangle]
@@ -645,6 +648,15 @@ mod contract {
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    #[no_mangle]
+    #[cfg(not(feature = "ext-connector"))]
+    pub extern "C" fn ft_balances_of() {
+        let io = Runtime;
+        contract_methods::connector::ft_balances_of(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -852,7 +864,7 @@ mod contract {
     pub extern "C" fn verify_log_entry() {
         sdk::log!("Call from verify_log_entry");
         let mut io = Runtime;
-        let data = true.try_to_vec().unwrap();
+        let data = borsh::to_vec(&true).unwrap();
         io.return_output(&data);
     }
 
@@ -915,7 +927,7 @@ mod contract {
             let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
                 target_account_id: aurora_account_id,
                 method: crate::prelude::String::from("finish_deposit"),
-                args: args.try_to_vec().unwrap(),
+                args: borsh::to_vec(&args).unwrap(),
                 attached_balance: ZERO_ATTACHED_BALANCE,
                 attached_gas: GAS_FOR_FINISH,
             };
@@ -941,7 +953,7 @@ mod contract {
             fixed_gas: silo::get_fixed_gas(&io),
         };
 
-        io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(&borsh::to_vec(&cost).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
     #[no_mangle]
@@ -961,7 +973,11 @@ mod contract {
         let mut io = Runtime;
         let params = silo::get_silo_params(&io);
 
-        io.return_output(&params.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(
+            &borsh::to_vec(&params)
+                .map_err(|e| e.to_string())
+                .sdk_unwrap(),
+        );
     }
 
     #[no_mangle]
@@ -988,8 +1004,7 @@ mod contract {
     pub extern "C" fn get_whitelist_status() {
         let mut io = Runtime;
         let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
-        let status = silo::get_whitelist_status(&io, &args)
-            .try_to_vec()
+        let status = borsh::to_vec(&silo::get_whitelist_status(&io, &args))
             .map_err(|e| e.to_string())
             .sdk_unwrap();
 

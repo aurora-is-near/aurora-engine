@@ -12,7 +12,6 @@ publish.workspace = true
 
 [dependencies]
 base64.workspace = true
-borsh-compat = { workspace = true, optional = true }
 borsh.workspace = true
 bs58.workspace = true
 hex.workspace = true

@@ -11,7 +11,7 @@ use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{self, BorshDeserialize};
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, MirrorErc20TokenArgs, SetErc20MetadataArgs,
 };
@@ -125,10 +125,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
         let address = engine::deploy_erc20_token(args, io, env, handler)?;
 
         io.return_output(
-            &address
-                .as_bytes()
-                .try_to_vec()
-                .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
         );
         Ok(address)
     })
@@ -349,6 +346,12 @@ pub fn ft_balance_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Contrac
     Ok(())
 }
 
+#[cfg(not(feature = "ext-connector"))]
+pub fn ft_balances_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+    internal::ft_balances_of(io)?;
+    Ok(())
+}
+
 pub fn ft_balance_of_eth<I: IO + Copy>(io: I) -> Result<(), ContractError> {
     let args = io.read_input_borsh()?;
     EthConnectorContract::init(io)?.ft_balance_of_eth_on_aurora(&args)?;
@@ -466,10 +469,9 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         PromiseCreateArgs {
             target_account_id: args.contract_id.clone(),
             method: "get_erc20_from_nep141".to_string(),
-            args: GetErc20FromNep141CallArgs {
+            args: borsh::to_vec(&GetErc20FromNep141CallArgs {
                 nep141: args.nep141.clone(),
-            }
-            .try_to_vec()
+            })
             .map_err(|_| crate::errors::ERR_SERIALIZE)?,
             attached_balance: Yocto::new(0),
             attached_gas: READ_PROMISE_ATTACHED_GAS,
@@ -538,10 +540,7 @@ pub fn mirror_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
             engine::mirror_erc20_token(args, erc20_address, erc20_metadata, io, env, handler)?;
 
         io.return_output(
-            &address
-                .as_bytes()
-                .try_to_vec()
-                .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
         );
 
         Ok(())
@@ -567,8 +566,8 @@ fn get_contract_data<T: BorshDeserialize, I: IO>(
 #[cfg(any(not(feature = "ext-connector"), test))]
 #[must_use]
 fn proof_key(proof: &aurora_engine_types::parameters::connector::Proof) -> crate::prelude::String {
-    let mut data = proof.log_index.try_to_vec().unwrap();
-    data.extend(proof.receipt_index.try_to_vec().unwrap());
+    let mut data = borsh::to_vec(&proof.log_index).unwrap();
+    data.extend(borsh::to_vec(&proof.receipt_index).unwrap());
     data.extend(proof.header_data.clone());
     aurora_engine_sdk::sha256(&data)
         .0

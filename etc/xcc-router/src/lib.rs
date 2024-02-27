@@ -2,12 +2,14 @@ use aurora_engine_types::parameters::{
     NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
     SimpleNearPromise,
 };
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LazyOption, LookupMap};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
+use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U64;
+use near_sdk::store::LookupMap;
 use near_sdk::BorshStorageKey;
 use near_sdk::{
-    env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
+    env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex,
+    PromiseResult,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -15,6 +17,7 @@ use near_sdk::{
 mod tests;
 
 #[derive(BorshSerialize, BorshStorageKey)]
+#[borsh(crate = "near_sdk::borsh")]
 enum StorageKey {
     Version,
     Parent,
@@ -23,21 +26,22 @@ enum StorageKey {
 }
 
 const INITIALIZE: &str = "initialize";
-const CURRENT_VERSION: u32 = std::include!("VERSION");
+const CURRENT_VERSION: u32 = include!("VERSION");
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
-const INITIALIZE_GAS: Gas = Gas(15_000_000_000_000);
+const INITIALIZE_GAS: Gas = Gas::from_tgas(15);
 /// Gas cost estimated from mainnet data. Example:
 /// https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM
-const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
+const WNEAR_REGISTER_GAS: Gas = Gas::from_tgas(5);
 /// Registration amount computed from FT token source code, see
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
-const WNEAR_REGISTER_AMOUNT: u128 = 1_250_000_000_000_000_000_000;
-/// Must match arora_engine_precompiles::xcc::state::STORAGE_AMOUNT
-const REFUND_AMOUNT: u128 = 2_000_000_000_000_000_000_000_000;
+const WNEAR_REGISTER_AMOUNT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_000_000_000);
+/// Must match aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT
+const REFUND_AMOUNT: NearToken = NearToken::from_near(2);
 
 #[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct DeployUpgradeParams {
     pub code: Vec<u8>,
     pub initialize_args: Vec<u8>,
@@ -45,6 +49,7 @@ pub struct DeployUpgradeParams {
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Router {
     /// The account id of the Aurora Engine instance that controls this router.
     parent: LazyOption<AccountId>,
@@ -62,6 +67,7 @@ pub struct Router {
 #[near_bindgen]
 impl Router {
     #[init(ignore_state)]
+    #[must_use]
     pub fn initialize(wnear_account: AccountId, must_register: bool) -> Self {
         // The first time this function is called there is no state and the parent is set to be
         // the predecessor account id. In subsequent calls, only the original parent is allowed to
@@ -125,8 +131,8 @@ impl Router {
     pub fn execute(&self, #[serializer(borsh)] promise: PromiseArgs) {
         self.assert_preconditions();
 
-        let promise_id = Router::promise_create(promise);
-        env::promise_return(promise_id)
+        let promise_id = Self::promise_create(promise);
+        env::promise_return(promise_id);
     }
 
     /// Similar security considerations here as for `execute`.
@@ -134,7 +140,7 @@ impl Router {
         self.assert_preconditions();
 
         let nonce = self.nonce.get().unwrap_or_default();
-        self.scheduled_promises.insert(&nonce, &promise);
+        self.scheduled_promises.insert(nonce, promise);
         self.nonce.set(&(nonce + 1));
 
         near_sdk::log!("Promise scheduled at nonce {}", nonce);
@@ -145,13 +151,11 @@ impl Router {
     /// act on promises that were created via `schedule`.
     #[payable]
     pub fn execute_scheduled(&mut self, nonce: U64) {
-        let promise = match self.scheduled_promises.remove(&nonce.0) {
-            Some(promise) => promise,
-            None => env::panic_str("ERR_PROMISE_NOT_FOUND"),
+        let Some(promise) = self.scheduled_promises.remove(&nonce.0) else {
+            env::panic_str("ERR_PROMISE_NOT_FOUND")
         };
-
-        let promise_id = Router::promise_create(promise);
-        env::promise_return(promise_id)
+        let promise_id = Self::promise_create(promise);
+        env::promise_return(promise_id);
     }
 
     /// Allows the parent contract to trigger an update to the logic of this contract
@@ -166,7 +170,7 @@ impl Router {
             promise_id,
             INITIALIZE,
             &args.initialize_args,
-            0,
+            NearToken::default(),
             INITIALIZE_GAS,
         );
         env::promise_return(promise_id);
@@ -220,21 +224,21 @@ impl Router {
 
         env::promise_then(
             base,
-            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.target_account_id.as_ref().parse().unwrap(),
             promise.method.as_str(),
             &promise.args,
-            promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64().into(),
+            NearToken::from_yoctonear(promise.attached_balance.as_u128()),
+            Gas::from_gas(promise.attached_gas.as_u64()),
         )
     }
 
     fn base_promise_create(promise: &PromiseCreateArgs) -> PromiseIndex {
         env::promise_create(
-            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.target_account_id.as_ref().parse().unwrap(),
             promise.method.as_str(),
             &promise.args,
-            promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64().into(),
+            NearToken::from_yoctonear(promise.attached_balance.as_u128()),
+            Gas::from_gas(promise.attached_gas.as_u64()),
         )
     }
 
@@ -243,8 +247,7 @@ impl Router {
             NearPromise::Simple(x) => match x {
                 SimpleNearPromise::Create(call) => Self::base_promise_create(call),
                 SimpleNearPromise::Batch(batch) => {
-                    let target =
-                        near_sdk::AccountId::new_unchecked(batch.target_account_id.to_string());
+                    let target = batch.target_account_id.as_ref().parse().unwrap();
                     let id = env::promise_batch_create(&target);
                     Self::add_batch_actions(id, &batch.actions);
                     id
@@ -255,16 +258,17 @@ impl Router {
                 match callback {
                     SimpleNearPromise::Create(call) => env::promise_then(
                         base_index,
-                        near_sdk::AccountId::new_unchecked(call.target_account_id.to_string()),
+                        call.target_account_id.as_ref().parse().unwrap(),
                         call.method.as_str(),
                         &call.args,
-                        call.attached_balance.as_u128(),
-                        call.attached_gas.as_u64().into(),
+                        NearToken::from_yoctonear(call.attached_balance.as_u128()),
+                        Gas::from_gas(call.attached_gas.as_u64()),
                     ),
                     SimpleNearPromise::Batch(batch) => {
-                        let target =
-                            near_sdk::AccountId::new_unchecked(batch.target_account_id.to_string());
-                        let id = env::promise_batch_then(base_index, &target);
+                        let id = env::promise_batch_then(
+                            base_index,
+                            &batch.target_account_id.as_ref().parse().unwrap(),
+                        );
                         Self::add_batch_actions(id, &batch.actions);
                         id
                     }
@@ -290,9 +294,10 @@ impl Router {
         for action in actions.iter() {
             match action {
                 PromiseAction::CreateAccount => env::promise_batch_action_create_account(id),
-                PromiseAction::Transfer { amount } => {
-                    env::promise_batch_action_transfer(id, amount.as_u128())
-                }
+                PromiseAction::Transfer { amount } => env::promise_batch_action_transfer(
+                    id,
+                    NearToken::from_yoctonear(amount.as_u128()),
+                ),
                 PromiseAction::DeployContract { code } => {
                     env::promise_batch_action_deploy_contract(id, code)
                 }
@@ -305,12 +310,14 @@ impl Router {
                     id,
                     name,
                     args,
-                    attached_yocto.as_u128(),
-                    gas.as_u64().into(),
+                    NearToken::from_yoctonear(attached_yocto.as_u128()),
+                    Gas::from_gas(gas.as_u64()),
                 ),
-                PromiseAction::Stake { amount, public_key } => {
-                    env::promise_batch_action_stake(id, amount.as_u128(), &to_sdk_pk(public_key))
-                }
+                PromiseAction::Stake { amount, public_key } => env::promise_batch_action_stake(
+                    id,
+                    NearToken::from_yoctonear(amount.as_u128()),
+                    &to_sdk_pk(public_key),
+                ),
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
                     env::promise_batch_action_add_key_with_full_access(
                         id,
@@ -325,12 +332,15 @@ impl Router {
                     receiver_id,
                     function_names,
                 } => {
-                    let receiver_id = near_sdk::AccountId::new_unchecked(receiver_id.to_string());
-                    env::promise_batch_action_add_key_with_function_call(
+                    let receiver_id = receiver_id.as_ref().parse().unwrap();
+                    env::promise_batch_action_add_key_allowance_with_function_call(
                         id,
                         &to_sdk_pk(public_key),
                         *nonce,
-                        allowance.as_u128(),
+                        near_sdk::Allowance::limited(NearToken::from_yoctonear(
+                            allowance.as_u128(),
+                        ))
+                        .unwrap(),
                         &receiver_id,
                         function_names,
                     )
@@ -339,8 +349,7 @@ impl Router {
                     env::promise_batch_action_delete_key(id, &to_sdk_pk(public_key))
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
-                    let beneficiary_id =
-                        near_sdk::AccountId::new_unchecked(beneficiary_id.to_string());
+                    let beneficiary_id = beneficiary_id.as_ref().parse().unwrap();
                     env::promise_batch_action_delete_account(id, &beneficiary_id)
                 }
             }
@@ -349,12 +358,12 @@ impl Router {
 }
 
 #[cfg(feature = "all-promise-actions")]
-fn to_sdk_pk(key: &aurora_engine_types::parameters::NearPublicKey) -> near_sdk::PublicKey {
+fn to_sdk_pk(key: &aurora_engine_types::public_key::PublicKey) -> near_sdk::PublicKey {
     let (curve_type, key_bytes): (near_sdk::CurveType, &[u8]) = match key {
-        aurora_engine_types::parameters::NearPublicKey::Ed25519(bytes) => {
+        aurora_engine_types::public_key::PublicKey::Ed25519(bytes) => {
             (near_sdk::CurveType::ED25519, bytes)
         }
-        aurora_engine_types::parameters::NearPublicKey::Secp256k1(bytes) => {
+        aurora_engine_types::public_key::PublicKey::Secp256k1(bytes) => {
             (near_sdk::CurveType::SECP256K1, bytes)
         }
     };
@@ -376,7 +385,7 @@ fn require_caller(caller: &AccountId) -> Result<(), Error> {
 fn require_no_failed_promises() -> Result<(), Error> {
     let num_promises = env::promise_results_count();
     for index in 0..num_promises {
-        if let PromiseResult::Failed | PromiseResult::NotReady = env::promise_result(index) {
+        if env::promise_result(index) == PromiseResult::Failed {
             return Err(Error::CallbackOfFailedPromise);
         }
     }

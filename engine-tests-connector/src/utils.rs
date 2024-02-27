@@ -158,7 +158,7 @@ impl TestContract {
         assert!(res.is_success());
 
         let acc = SetEthConnectorContractAccountArgs {
-            account: eth_connector_contract.id().parse().unwrap(),
+            account: eth_connector_contract.id().as_str().parse().unwrap(),
             withdraw_serialize_type: WithdrawSerializeType::Borsh,
         };
         let res = engine_contract
@@ -293,10 +293,11 @@ impl TestContract {
 
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
         #[derive(BorshSerialize, BorshDeserialize)]
+        #[borsh(crate = "aurora_engine_types::borsh")]
         pub struct BalanceOfEthCallArgs {
             pub address: Address,
         }
-        let args = BalanceOfEthCallArgs { address: *address }.try_to_vec()?;
+        let args = borsh::to_vec(&BalanceOfEthCallArgs { address: *address })?;
         let res = self
             .engine_contract
             .call("ft_balance_of_eth")

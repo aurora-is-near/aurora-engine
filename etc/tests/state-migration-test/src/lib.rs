@@ -29,7 +29,7 @@ pub extern "C" fn state_migration() {
         some_other_numbers: [3, 1, 4, 1, 5, 9, 2],
     };
 
-    io.write_storage(&state_key(), &new_state.try_to_vec().expect("ERR_SER"));
+    io.write_storage(&state_key(), &borsh::to_vec(&new_state).expect("ERR_SER"));
 }
 
 #[no_mangle]
@@ -40,7 +40,7 @@ pub extern "C" fn some_new_fancy_function() {
         .and_then(|bytes| NewFancyState::try_from_slice(&bytes.to_vec()).ok())
         .unwrap();
 
-    io.return_output(&state.some_other_numbers.try_to_vec().unwrap());
+    io.return_output(&borsh::to_vec(&state.some_other_numbers).unwrap());
 }
 
 fn state_key() -> Vec<u8> {
