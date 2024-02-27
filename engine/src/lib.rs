@@ -252,8 +252,8 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
-    /// 0-bit means not paused.
+    /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
+    /// to that bit is paused and 0-bit means not paused.
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let io = Runtime;
@@ -649,6 +649,15 @@ mod contract {
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    #[no_mangle]
+    #[cfg(not(feature = "ext-connector"))]
+    pub extern "C" fn ft_balances_of() {
+        let io = Runtime;
+        contract_methods::connector::ft_balances_of(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
