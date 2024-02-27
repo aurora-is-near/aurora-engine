@@ -393,7 +393,6 @@ pub mod workspace {
         nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
-    #[cfg(feature = "ext-connector")]
     use aurora_engine::proof::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
@@ -407,6 +406,9 @@ pub mod workspace {
     const FT_ACCOUNT: &str = "test_token";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
+    const ETH_CUSTODIAN_ADDRESS: &str = "096de9c2b8a5b8c22cee3289b101f6960d68e51e";
+    #[cfg(not(feature = "ext-connector"))]
+    const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
     #[tokio::test]
     async fn test_ghsa_5c82_x4m4_hcj6_exploit() {
@@ -769,6 +771,49 @@ pub mod workspace {
         );
     }
 
+    #[cfg(not(feature = "ext-connector"))]
+    #[tokio::test]
+    async fn test_ft_balances_of() {
+        use aurora_engine::parameters::FungibleTokenMetadata;
+        use aurora_engine_types::account_id::AccountId;
+        use aurora_engine_types::HashMap;
+
+        let aurora = deploy_engine().await;
+        let metadata = FungibleTokenMetadata::default();
+        aurora
+            .set_eth_connector_contract_data(
+                aurora.id(),
+                ETH_CUSTODIAN_ADDRESS.to_string(),
+                metadata,
+            )
+            .transact()
+            .await
+            .unwrap();
+
+        deposit_balance(&aurora).await;
+
+        let balances: HashMap<AccountId, u128> = HashMap::from([
+            (AccountId::new("account1").unwrap(), 10),
+            (AccountId::new("account2").unwrap(), 20),
+            (AccountId::new("account3").unwrap(), 30),
+        ]);
+
+        for (account_id, amount) in &balances {
+            aurora
+                .ft_transfer(account_id, (*amount).into(), None)
+                .deposit(ONE_YOCTO)
+                .transact()
+                .await
+                .unwrap();
+            let blanace = aurora.ft_balance_of(account_id).await.unwrap().result;
+            assert_eq!(blanace.0, *amount);
+        }
+
+        let accounts = balances.keys().cloned().collect();
+        let result = aurora.ft_balances_of(&accounts).await.unwrap().result;
+        assert_eq!(result, balances);
+    }
+
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
@@ -974,12 +1019,11 @@ pub mod workspace {
         }
     }
 
-    #[cfg(feature = "ext-connector")]
     async fn deposit_balance(aurora: &EngineContract) {
         let proof = create_test_proof(
             INITIAL_ETH_BALANCE,
             aurora.id().as_ref(),
-            "096de9c2b8a5b8c22cee3289b101f6960d68e51e",
+            ETH_CUSTODIAN_ADDRESS,
         );
         let result = aurora.deposit(proof).max_gas().transact().await.unwrap();
         assert!(result.is_success());
@@ -1003,7 +1047,6 @@ pub mod workspace {
         aurora: EngineContract,
     }
 
-    #[cfg(feature = "ext-connector")]
     fn create_test_proof(
         deposit_amount: u64,
         recipient_id: &str,
