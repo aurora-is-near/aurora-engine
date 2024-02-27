@@ -19,6 +19,7 @@ primitive-types.workspace = true
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+bitflags.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

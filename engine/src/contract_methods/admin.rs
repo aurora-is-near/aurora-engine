@@ -17,7 +17,7 @@ use crate::{
     hashchain::with_hashchain,
     pausables::{
         Authorizer, EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker,
-        PausedPrecompilesManager, PrecompileFlags,
+        PausedPrecompilesManager,
     },
     state::{self, EngineState},
 };
@@ -30,6 +30,7 @@ use aurora_engine_sdk::{
     promise::PromiseHandler,
 };
 use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
+use aurora_engine_types::precompiles::PrecompileFlags;
 use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
     borsh::BorshDeserialize,

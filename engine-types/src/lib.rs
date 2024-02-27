@@ -8,6 +8,7 @@
 
 pub mod account_id;
 pub mod parameters;
+pub mod precompiles;
 pub mod public_key;
 pub mod storage;
 pub mod types;

@@ -208,13 +208,14 @@ pub struct ExitToNear<I> {
 }
 
 pub mod exit_to_near {
-    use crate::prelude::types::{make_address, Address};
+    use crate::prelude::types::Address;
+    use aurora_engine_types::precompiles::EXIT_TO_NEAR_ADDRESS;
 
     /// Exit to NEAR precompile address
     ///
     /// Address: `0xe9217bc70b7ed1f598ddd3199e80b093fa71124f`
     /// This address is computed as: `&keccak("exitToNear")[12..]`
-    pub const ADDRESS: Address = make_address(0xe9217bc7, 0x0b7ed1f598ddd3199e80b093fa71124f);
+    pub const ADDRESS: Address = EXIT_TO_NEAR_ADDRESS;
 }
 
 impl<I> ExitToNear<I> {
@@ -528,13 +529,14 @@ pub struct ExitToEthereum<I> {
 }
 
 pub mod exit_to_ethereum {
-    use crate::prelude::types::{make_address, Address};
+    use crate::prelude::types::Address;
+    use aurora_engine_types::precompiles::EXIT_TO_ETHEREUM_ADDRESS;
 
     /// Exit to Ethereum precompile address
     ///
     /// Address: `0xb0bd02f6a392af548bdf1cfaee5dfa0eefcc8eab`
     /// This address is computed as: `&keccak("exitToEthereum")[12..]`
-    pub const ADDRESS: Address = make_address(0xb0bd02f6, 0xa392af548bdf1cfaee5dfa0eefcc8eab);
+    pub const ADDRESS: Address = EXIT_TO_ETHEREUM_ADDRESS;
 }
 
 impl<I> ExitToEthereum<I> {

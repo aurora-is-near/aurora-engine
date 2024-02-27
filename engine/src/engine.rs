@@ -20,9 +20,7 @@ use crate::accounting;
 use crate::contract_methods::connector;
 use crate::contract_methods::silo;
 use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
-use crate::pausables::{
-    EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
-};
+use crate::pausables::{EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker};
 use crate::prelude::parameters::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::xcc::cross_contract_call;
@@ -36,7 +34,7 @@ use crate::prelude::{
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
-use aurora_engine_precompiles::{create_precompiles, PrecompileConstructorContext};
+use aurora_engine_precompiles::create_precompiles;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };

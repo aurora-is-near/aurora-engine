@@ -30,7 +30,6 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
-use crate::prelude::{borsh, borsh::BorshDeserialize, BorshSerialize};
 use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
@@ -40,8 +39,9 @@ use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::{PromiseHandler, ReadOnlyPromiseHandler};
+use aurora_engine_types::precompiles::PrecompileFlags;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
-use bitflags::bitflags;
+use core::marker::PhantomData;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
@@ -50,34 +50,6 @@ use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
-
-bitflags! {
-    /// Wraps unsigned integer where each bit identifies a different precompile.
-    #[derive(BorshSerialize, BorshDeserialize, Default)]
-    pub struct PrecompileFlags: u32 {
-        const EXIT_TO_NEAR        = 0b01;
-        const EXIT_TO_ETHEREUM    = 0b10;
-    }
-}
-
-impl PrecompileFlags {
-    #[must_use]
-    pub fn from_address(address: &Address) -> Option<Self> {
-        Some(if address == &exit_to_ethereum::ADDRESS {
-            Self::EXIT_TO_ETHEREUM
-        } else if address == &exit_to_near::ADDRESS {
-            Self::EXIT_TO_NEAR
-        } else {
-            return None;
-        })
-    }
-
-    /// Checks if the precompile belonging to the `address` is marked as paused.
-    #[must_use]
-    pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
-    }
-}
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
@@ -126,19 +98,14 @@ pub trait HandleBasedPrecompile {
 /// Hard fork marker.
 pub trait HardFork {}
 
-/// Homestead hard fork marker.
-pub struct Homestead;
-
-/// Homestead hard fork marker.
+/// Byzantium hard fork marker.
 pub struct Byzantium;
 
-/// Homestead hard fork marker.
+/// Istanbul hard fork marker.
 pub struct Istanbul;
 
-/// Homestead hard fork marker.
+/// Berlin hard fork marker.
 pub struct Berlin;
-
-impl HardFork for Homestead {}
 
 impl HardFork for Byzantium {}
 
@@ -238,69 +205,6 @@ pub struct PrecompileConstructorContext<'a, I, E, H, M> {
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, H> {
-    #[allow(dead_code)]
-    pub fn new_homestead<M: ModExpAlgorithm + 'static>(
-        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
-    ) -> Self {
-        let addresses = vec![
-            ECRecover::ADDRESS,
-            SHA256::ADDRESS,
-            RIPEMD160::ADDRESS,
-            RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-        ];
-        let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
-            Box::new(SHA256),
-            Box::new(RIPEMD160),
-            Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-        ];
-        let map = addresses
-            .into_iter()
-            .zip(fun)
-            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
-            .collect();
-        Self::with_generic_precompiles(map, ctx)
-    }
-
-    #[allow(dead_code)]
-    pub fn new_byzantium<M: ModExpAlgorithm + 'static>(
-        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
-    ) -> Self {
-        let addresses = vec![
-            ECRecover::ADDRESS,
-            SHA256::ADDRESS,
-            RIPEMD160::ADDRESS,
-            Identity::ADDRESS,
-            ModExp::<Byzantium, M>::ADDRESS,
-            Bn256Add::<Byzantium>::ADDRESS,
-            Bn256Mul::<Byzantium>::ADDRESS,
-            Bn256Pair::<Byzantium>::ADDRESS,
-            RandomSeed::ADDRESS,
-            CurrentAccount::ADDRESS,
-        ];
-        let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
-            Box::new(SHA256),
-            Box::new(RIPEMD160),
-            Box::new(Identity),
-            Box::new(ModExp::<Byzantium, M>::new()),
-            Box::new(Bn256Add::<Byzantium>::new()),
-            Box::new(Bn256Mul::<Byzantium>::new()),
-            Box::new(Bn256Pair::<Byzantium>::new()),
-            Box::new(RandomSeed::new(ctx.random_seed)),
-            Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
-        ];
-        let map = addresses
-            .into_iter()
-            .zip(fun)
-            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
-            .collect();
-
-        Self::with_generic_precompiles(map, ctx)
-    }
-
     pub fn new_istanbul<M: ModExpAlgorithm + 'static>(
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
@@ -480,7 +384,7 @@ pub fn create_precompiles<'env, I: IO + Copy, E: Env, P: PromiseHandler, M: ModE
     io: I,
     env: &'env E,
     current_account_id: AccountId,
-    mod_exp_algorithm: M,
+    mod_exp_algorithm: PhantomData<M>,
     pause_flags: PrecompileFlags,
     handler: &P,
 ) -> Precompiles<'env, I, E, P::ReadOnly> {
