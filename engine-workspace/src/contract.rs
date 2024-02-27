@@ -13,7 +13,7 @@ use crate::operation::{
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
     CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance,
     ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
-    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata,
+    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtBalancesOf, ViewFtMetadata,
     ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
     ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
     ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
@@ -375,6 +375,10 @@ impl EngineContract {
 
     pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf {
         ViewFtBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
+    }
+
+    pub fn ft_balances_of(&self, accounts: &Vec<AccountId>) -> ViewFtBalancesOf {
+        ViewFtBalancesOf::view(&self.contract).args_borsh(accounts)
     }
 
     pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf {
