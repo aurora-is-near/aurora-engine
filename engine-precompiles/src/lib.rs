@@ -30,6 +30,7 @@ use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
+use crate::prelude::{borsh, borsh::BorshDeserialize, BorshSerialize};
 use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
@@ -38,8 +39,9 @@ use crate::xcc::CrossContractCall;
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
-use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
+use aurora_engine_sdk::promise::{PromiseHandler, ReadOnlyPromiseHandler};
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
+use bitflags::bitflags;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
@@ -48,6 +50,34 @@ use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
+
+bitflags! {
+    /// Wraps unsigned integer where each bit identifies a different precompile.
+    #[derive(BorshSerialize, BorshDeserialize, Default)]
+    pub struct PrecompileFlags: u32 {
+        const EXIT_TO_NEAR        = 0b01;
+        const EXIT_TO_ETHEREUM    = 0b10;
+    }
+}
+
+impl PrecompileFlags {
+    #[must_use]
+    pub fn from_address(address: &Address) -> Option<Self> {
+        Some(if address == &exit_to_ethereum::ADDRESS {
+            Self::EXIT_TO_ETHEREUM
+        } else if address == &exit_to_near::ADDRESS {
+            Self::EXIT_TO_NEAR
+        } else {
+            return None;
+        })
+    }
+
+    /// Checks if the precompile belonging to the `address` is marked as paused.
+    #[must_use]
+    pub fn is_paused_by_address(&self, address: &Address) -> bool {
+        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
+    }
+}
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
@@ -444,6 +474,44 @@ const fn make_h256(x: u128, y: u128) -> H256 {
         y_bytes[14],
         y_bytes[15],
     ])
+}
+
+pub fn create_precompiles<'env, I: IO + Copy, E: Env, P: PromiseHandler, M: ModExpAlgorithm>(
+    io: I,
+    env: &'env E,
+    current_account_id: AccountId,
+    mod_exp_algorithm: M,
+    pause_flags: PrecompileFlags,
+    handler: &P,
+) -> Precompiles<'env, I, E, P::ReadOnly> {
+    let random_seed = env.random_seed();
+    let ro_promise_handler = handler.read_only();
+
+    let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+        current_account_id,
+        random_seed,
+        io,
+        env,
+        promise_handler: ro_promise_handler,
+        mod_exp_algorithm,
+    });
+
+    apply_pause_flags_to_precompiles(precompiles, pause_flags)
+}
+
+fn apply_pause_flags_to_precompiles<I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler>(
+    precompiles: Precompiles<I, E, H>,
+    pause_flags: PrecompileFlags,
+) -> Precompiles<I, E, H> {
+    Precompiles {
+        paused_precompiles: precompiles
+            .all_precompiles
+            .keys()
+            .filter(|address| pause_flags.is_paused_by_address(address))
+            .copied()
+            .collect(),
+        all_precompiles: precompiles.all_precompiles,
+    }
 }
 
 #[cfg(test)]

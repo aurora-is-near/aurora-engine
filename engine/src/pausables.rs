@@ -3,35 +3,6 @@ use aurora_engine_precompiles::native::{exit_to_ethereum, exit_to_near};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
-use bitflags::bitflags;
-
-bitflags! {
-    /// Wraps unsigned integer where each bit identifies a different precompile.
-    #[derive(BorshSerialize, BorshDeserialize, Default)]
-    pub struct PrecompileFlags: u32 {
-        const EXIT_TO_NEAR        = 0b01;
-        const EXIT_TO_ETHEREUM    = 0b10;
-    }
-}
-
-impl PrecompileFlags {
-    #[must_use]
-    pub fn from_address(address: &Address) -> Option<Self> {
-        Some(if address == &exit_to_ethereum::ADDRESS {
-            Self::EXIT_TO_ETHEREUM
-        } else if address == &exit_to_near::ADDRESS {
-            Self::EXIT_TO_NEAR
-        } else {
-            return None;
-        })
-    }
-
-    /// Checks if the precompile belonging to the `address` is marked as paused.
-    #[must_use]
-    pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
-    }
-}
 
 /// Can check if given account has a permission to pause precompiles.
 pub trait Authorizer {

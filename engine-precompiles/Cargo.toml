@@ -23,6 +23,7 @@ num.workspace = true
 ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
+bitflags.workspace = true
 
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true

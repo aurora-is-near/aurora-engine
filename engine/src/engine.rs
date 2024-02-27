@@ -36,7 +36,7 @@ use crate::prelude::{
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
-use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_precompiles::{create_precompiles, PrecompileConstructorContext};
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
@@ -495,7 +495,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, handler);
+        let precompiles = create_precompiles(
+            self.io,
+            self.env,
+            self.current_account_id.clone(),
+            self.modexp_algorithm,
+            pause_flags,
+            handler,
+        );
 
         let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
@@ -588,7 +595,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, handler);
+        let precompiles = create_precompiles(
+            self.io,
+            self.env,
+            self.current_account_id.clone(),
+            self.modexp_algorithm,
+            pause_flags,
+            handler,
+        );
 
         let executor_params = StackExecutorParams::new(gas_limit, precompiles);
         let mut executor = executor_params.make_executor(self);
@@ -619,7 +633,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // View calls cannot interact with promises
         let handler = aurora_engine_sdk::promise::Noop;
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
-        let precompiles = self.create_precompiles(pause_flags, &handler);
+        let precompiles = create_precompiles(
+            self.io,
+            self.env,
+            self.current_account_id.clone(),
+            self.modexp_algorithm,
+            pause_flags,
+            &handler,
+        );
 
         let executor_params = StackExecutorParams::new(u64::MAX, precompiles);
         self.view(
@@ -895,44 +916,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             }),
             handler,
         )
-    }
-
-    fn create_precompiles<P: PromiseHandler>(
-        &self,
-        pause_flags: PrecompileFlags,
-        handler: &P,
-    ) -> Precompiles<'env, I, E, P::ReadOnly> {
-        let current_account_id = self.current_account_id.clone();
-        let random_seed = self.env.random_seed();
-        let io = self.io;
-        let env = self.env;
-        let ro_promise_handler = handler.read_only();
-
-        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
-            current_account_id,
-            random_seed,
-            io,
-            env,
-            promise_handler: ro_promise_handler,
-            mod_exp_algorithm: self.modexp_algorithm,
-        });
-
-        Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
-    }
-
-    fn apply_pause_flags_to_precompiles<H: ReadOnlyPromiseHandler>(
-        precompiles: Precompiles<'env, I, E, H>,
-        pause_flags: PrecompileFlags,
-    ) -> Precompiles<'env, I, E, H> {
-        Precompiles {
-            paused_precompiles: precompiles
-                .all_precompiles
-                .keys()
-                .filter(|address| pause_flags.is_paused_by_address(address))
-                .copied()
-                .collect(),
-            all_precompiles: precompiles.all_precompiles,
-        }
     }
 
     fn view_with_selector(
