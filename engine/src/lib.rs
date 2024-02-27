@@ -251,8 +251,8 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
-    /// 0-bit means not paused.
+    /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
+    /// to that bit is paused and 0-bit means not paused.
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let io = Runtime;
