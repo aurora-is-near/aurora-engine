@@ -826,7 +826,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return `nETH` balances for accounts (ETH on NEAR).
-    pub fn ft_balances_of(&mut self, accounts: Vec<AccountId>) {
+    pub fn ft_balances_of(&self, accounts: Vec<AccountId>) {
         let mut balances = aurora_engine_types::HashMap::new();
         for account_id in accounts {
             let balance = self.ft.ft_balance_of(&account_id);
