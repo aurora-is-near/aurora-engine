@@ -1,8 +1,5 @@
 use crate::{types::Address, Vec, H256};
-#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 // NOTE: We start at 0x7 as our initial value as our original storage was not
 // version prefixed and ended as 0x6.
@@ -20,6 +17,7 @@ impl From<VersionPrefix> for u8 {
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+#[borsh(use_discriminant = false)]
 pub enum KeyPrefix {
     Config = 0x0,
     Nonce = 0x1,
@@ -62,6 +60,7 @@ impl From<KeyPrefix> for u8 {
 
 /// Enum used to differentiate different storage keys used by eth-connector
 #[derive(Clone, Copy, BorshSerialize, BorshDeserialize)]
+#[borsh(use_discriminant = false)]
 pub enum EthConnectorStorageId {
     Contract = 0x0,
     FungibleToken = 0x1,

@@ -1,6 +1,6 @@
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
-    borsh::{self, BorshDeserialize, BorshSerialize},
+    borsh::{BorshDeserialize, BorshSerialize},
     types::RawH256,
     Vec,
 };
@@ -10,6 +10,7 @@ use aurora_engine_types::{
 /// Internally, compacts full binary subtrees maintaining only the growing branch.
 /// Space used is O(log n) where n is the number of leaf hashes added. It is usually less.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct StreamCompactMerkleTree {
     /// Complete binary merkle subtrees.
     /// Left subtrees are strictly higher (bigger).
@@ -121,6 +122,7 @@ impl Default for StreamCompactMerkleTree {
 /// For leaves, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 struct CompactMerkleSubtree {
     /// Height of the subtree.
     pub height: u8,

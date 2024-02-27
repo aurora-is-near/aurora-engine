@@ -1,8 +1,5 @@
 use crate::{str, vec, String, Vec, U256};
-#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 
 pub mod address;
 pub mod balance;

@@ -9,7 +9,6 @@ use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, SetErc20MetadataArgs,
 };
@@ -310,7 +309,11 @@ fn test_erc20_get_and_set_metadata_by_owner() {
         new_owner: str_to_account_id(new_owner),
     };
 
-    let result = runner.call("set_owner", &caller, set_owner_args.try_to_vec().unwrap());
+    let result = runner.call(
+        "set_owner",
+        &caller,
+        borsh::to_vec(&set_owner_args).unwrap(),
+    );
     assert!(result.is_ok());
 
     let caller = new_owner;

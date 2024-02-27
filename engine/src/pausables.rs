@@ -1,7 +1,7 @@
 use crate::prelude::{AccountId, Address, BTreeSet, Vec};
 use aurora_engine_precompiles::native::{exit_to_ethereum, exit_to_near};
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 
 /// Can check if given account has a permission to pause precompiles.
@@ -53,6 +53,7 @@ pub trait PausedPrecompilesManager {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EngineAuthorizer {
     /// List of [AccountId]s with the permission to pause precompiles.
     pub acl: BTreeSet<AccountId>,
@@ -68,6 +69,7 @@ impl EngineAuthorizer {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EnginePrecompilesPauser<I: IO> {
     /// Storage to read pause flags from and write into.
     io: I,
