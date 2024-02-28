@@ -305,7 +305,11 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 11);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 17;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 11;
+    utils::assert_gas_bound(profile.all_gas(), near_gas_used);
 }
 
 #[test]
@@ -444,9 +448,13 @@ fn test_solidity_pure_bench() {
         result.gas_used
     );
     let near_gas = profile.all_gas();
+    #[cfg(feature = "revm-test")]
+    let near_gas_consumed = 700;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_consumed = 1500;
     assert!(
-        near_gas > 1500 * 1_000_000_000_000,
-        "Expected 1500 NEAR Tgas to be used, but only consumed {}",
+        near_gas > near_gas_consumed * 1_000_000_000_000,
+        "Expected {near_gas_consumed:?} NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
 

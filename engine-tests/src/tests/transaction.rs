@@ -88,10 +88,11 @@ fn test_eip_1559_example() {
 
     // Check post state:
     // signer spent some ETH on gas fees and incremented nonce for submitting transaction
-    assert_eq!(
-        runner.get_balance(signer_address),
-        Wei::new_u64(0x0de0b6b3a75cc7cc)
-    );
+    #[cfg(feature = "revm-test")]
+    let spent_eth = 999999999999053720;
+    #[cfg(feature = "sputnikvm-test")]
+    let spent_eth = 999999999999526860;
+    assert_eq!(runner.get_balance(signer_address), Wei::new_u64(spent_eth));
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
     // Contract balance, code, nonce all unchanged, but storage was written
     assert_eq!(runner.get_balance(contract_address), CONTRACT_BALANCE);

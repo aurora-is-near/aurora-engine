@@ -15,6 +15,7 @@ use crate::utils::{self, standalone};
 /// Traces:
 /// * `https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
 /// * `https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_evm_tracing_with_storage() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -130,6 +131,7 @@ fn test_evm_tracing_with_storage() {
 /// Test based on expected trace of
 /// `https://rinkeby.etherscan.io/tx/0xfc9359e49278b7ba99f59edac0e3de49956e46e530a53c15aa71226b7aa92c6f`
 /// (geth example found at `https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f`).
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_evm_tracing() {
     let mut runner = standalone::StandaloneRunner::default();

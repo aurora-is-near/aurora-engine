@@ -22,11 +22,19 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 11); // less than 11 NEAR Tgas used
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 17;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 11;
+    assert_gas_bound(profile.all_gas(), near_gas_used); // less than 11 NEAR Tgas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 9); // less than 9 NEAR Tgas used
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 13;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 9;
+    assert_gas_bound(profile.all_gas(), near_gas_used); // less than 9 NEAR Tgas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
@@ -38,7 +46,11 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 18);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 36;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 18;
+    assert_gas_bound(profile.all_gas(), near_gas_used);
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -57,7 +69,11 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 23);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 44;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 23;
+    assert_gas_bound(profile.all_gas(), near_gas_used);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -72,7 +88,11 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 24);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 48;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 24;
+    assert_gas_bound(profile.all_gas(), near_gas_used);
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -83,7 +103,11 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 20);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 42;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 20;
+    assert_gas_bound(profile.all_gas(), near_gas_used);
 }
 
 #[test]

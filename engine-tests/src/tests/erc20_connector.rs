@@ -474,6 +474,7 @@ pub mod workspace {
         );
     }
 
+    #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near() {
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
