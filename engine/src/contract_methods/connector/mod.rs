@@ -346,6 +346,12 @@ pub fn ft_balance_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Contrac
     Ok(())
 }
 
+#[cfg(not(feature = "ext-connector"))]
+pub fn ft_balances_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+    internal::ft_balances_of(io)?;
+    Ok(())
+}
+
 pub fn ft_balance_of_eth<I: IO + Copy>(io: I) -> Result<(), ContractError> {
     let args = io.read_input_borsh()?;
     EthConnectorContract::init(io)?.ft_balance_of_eth_on_aurora(&args)?;
