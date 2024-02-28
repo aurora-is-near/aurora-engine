@@ -697,6 +697,9 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
+    #[cfg(feature = "revm-test")]
+    let expected_number = 2500;
+    #[cfg(feature = "sputnikvm-test")]
     let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
 

@@ -115,9 +115,19 @@ fn profile_erc20_get_balance() {
     assert!(status.is_ok());
 
     // call costs less than 2 Tgas
-    utils::assert_gas_bound(profile.all_gas(), 2);
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 3;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 2;
+    utils::assert_gas_bound(profile.all_gas(), near_gas_used);
     // at least 70% of the cost is spent on wasm computation (as opposed to host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
+    #[cfg(feature = "revm-test")]
+    assert!(
+        (30..=40).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 20% and 30%",
+    );
+    #[cfg(feature = "sputnikvm-test")]
     assert!(
         (20..=30).contains(&wasm_fraction),
         "{wasm_fraction}% is not between 20% and 30%",
