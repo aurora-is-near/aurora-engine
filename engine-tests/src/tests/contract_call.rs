@@ -60,6 +60,7 @@ fn hello_world_solidity() {
     assert_eq!(expected, result);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw() {
     let (mut runner, mut signer, token, tester) = setup_test();
@@ -127,6 +128,7 @@ fn withdraw() {
     }
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw_and_fail() {
     let (mut runner, mut signer, _token, tester) = setup_test();
@@ -165,6 +167,7 @@ fn try_withdraw_and_avoid_fail() {
     }
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn try_withdraw_and_avoid_fail_and_succeed() {
     let (mut runner, mut signer, _token, tester) = setup_test();
@@ -185,6 +188,7 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     }
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw_eth() {
     let (mut runner, mut signer, _token, tester) = setup_test();

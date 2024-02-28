@@ -55,7 +55,9 @@ walrus.workspace = true
 once_cell = "1.19"
 
 [features]
-mainnet-test = ["aurora-engine-workspace/mainnet-test"]
-testnet-test = ["aurora-engine-workspace/testnet-test"]
+mainnet-test = ["aurora-engine-workspace/mainnet-test", "revm-test"]
+testnet-test = ["aurora-engine-workspace/testnet-test", "revm-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
 ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]
+revm-test = []
+sputnikvm-test = []

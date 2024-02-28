@@ -17,6 +17,10 @@ use engine_standalone_storage::json_snapshot;
 #[allow(non_snake_case)]
 #[test]
 fn repro_GdASJ3KESs() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 142;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 116;
     // Note: this snapshot is pruned from the full Engine state on testnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
@@ -26,7 +30,7 @@ fn repro_GdASJ3KESs() {
         block_timestamp: 1_645_717_564_644_206_730,
         input_path: "src/tests/res/input_GdASJ3KESs.hex",
         evm_gas_used: 706_713,
-        near_gas_used: 116,
+        near_gas_used,
     });
 }
 
@@ -42,6 +46,10 @@ fn repro_GdASJ3KESs() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_8ru7VEA() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 246;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 210;
     // Note: this snapshot is pruned from the full Engine state on mainnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
@@ -51,7 +59,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1_648_829_935_343_349_589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1_732_181,
-        near_gas_used: 210,
+        near_gas_used,
     });
 }
 
@@ -65,13 +73,17 @@ fn repro_8ru7VEA() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_FRcorNv() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 180;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 170;
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_FRcorNv.json",
         block_height: 64_328_524,
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 170,
+        near_gas_used,
     });
 }
 
@@ -82,13 +94,17 @@ fn repro_FRcorNv() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_5bEgfRQ() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 219;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 655;
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_5bEgfRQ.json",
         block_height: 64_417_403,
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 655,
+        near_gas_used,
     });
 }
 
@@ -100,13 +116,17 @@ fn repro_5bEgfRQ() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_D98vwmi() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 176;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 172;
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_D98vwmi.json",
         block_height: 64_945_381,
         block_timestamp: 1_651_753_443_421_003_245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
-        near_gas_used: 172,
+        near_gas_used,
     });
 }
 
@@ -119,13 +139,17 @@ fn repro_D98vwmi() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_Emufid2() {
+    #[cfg(feature = "revm-test")]
+    let near_gas_used = 626;
+    #[cfg(feature = "sputnikvm-test")]
+    let near_gas_used = 296;
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_Emufid2.json",
         block_height: 99_197_180,
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 296,
+        near_gas_used,
     });
 }
 

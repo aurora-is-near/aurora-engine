@@ -16,6 +16,7 @@ fn precompile_execution_profile(method: &str) -> ExecutionProfile {
     profile
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_standard_precompiles() {
     let (mut runner, mut signer, contract) = initialize();
@@ -27,54 +28,63 @@ fn test_standard_precompiles() {
     utils::panic_on_fail(outcome.status);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecrecover() {
     let profile = precompile_execution_profile("test_ecrecover");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_sha256() {
     let profile = precompile_execution_profile("test_sha256");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ripemd160() {
     let profile = precompile_execution_profile("test_ripemd160");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_identity() {
     let profile = precompile_execution_profile("test_identity");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_modexp() {
     let profile = precompile_execution_profile("test_modexp");
     utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecadd() {
     let profile = precompile_execution_profile("test_ecadd");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecmul() {
     let profile = precompile_execution_profile("test_ecmul");
     utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecpair() {
     let profile = precompile_execution_profile("test_ecpair");
     utils::assert_gas_bound(profile.all_gas(), 115);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_blake2f() {
     let profile = precompile_execution_profile("test_blake2f");

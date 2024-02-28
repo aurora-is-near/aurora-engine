@@ -3,6 +3,7 @@ use aurora_engine_precompiles::prepaid_gas;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{types::Wei, U256};
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_prepaid_gas_precompile() {
     const EXPECTED_VALUE: u64 = 157_277_246_352_223;

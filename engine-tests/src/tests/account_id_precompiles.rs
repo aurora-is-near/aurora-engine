@@ -1,6 +1,7 @@
 use crate::utils;
 use aurora_engine::parameters::SubmitResult;
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_account_id_precompiles() {
     let mut signer = utils::Signer::random();

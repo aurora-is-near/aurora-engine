@@ -8,6 +8,7 @@ use aurora_engine_types::{
 
 const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_promise_results_precompile() {
     let mut signer = utils::Signer::random();
@@ -38,6 +39,7 @@ fn test_promise_results_precompile() {
     );
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_promise_result_gas_cost() {
     let mut runner = utils::deploy_runner();

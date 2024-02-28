@@ -511,6 +511,7 @@ pub mod workspace {
         );
     }
 
+    #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_wnear_unwrapped() {
         // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
@@ -561,6 +562,7 @@ pub mod workspace {
         );
     }
 
+    #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_wnear() {
         // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
@@ -656,6 +658,7 @@ pub mod workspace {
         );
     }
 
+    #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_eth() {
         // Same test as above, but exit ETH instead of a bridged NEP-141

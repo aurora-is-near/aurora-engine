@@ -3,6 +3,7 @@ use crate::utils::solidity::random::{Random, RandomConstructor};
 use aurora_engine_types::H256;
 use rand::SeedableRng;
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_random_number_precompile() {
     let random_seed = H256::from_slice(vec![7; 32].as_slice());

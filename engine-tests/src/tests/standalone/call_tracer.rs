@@ -14,6 +14,7 @@ use engine_standalone_tracing::{
     types::call_tracer::{self, CallTracer},
 };
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_deploy() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -42,6 +43,7 @@ fn test_trace_contract_deploy() {
     assert_eq!(trace.output, code);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_precompile_direct_call() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -104,6 +106,7 @@ fn test_trace_precompile_direct_call() {
     runner.close();
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_single_call() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -153,6 +156,7 @@ fn test_trace_contract_single_call() {
     runner.close();
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_with_sub_call() {
     use crate::tests::uniswap::UniswapTestContext;
@@ -224,6 +228,7 @@ fn test_trace_contract_with_sub_call() {
     assert_eq!(call.to.unwrap(), a_address);
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_with_precompile_sub_call() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -302,6 +307,7 @@ fn test_contract_create_too_large() {
     );
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[allow(clippy::too_many_lines)]
 #[test]
 fn test_trace_precompiles_with_subcalls() {
