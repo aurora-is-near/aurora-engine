@@ -681,6 +681,7 @@ impl Default for AuroraRunner {
 pub struct ExecutionProfile {
     pub host_breakdown: ProfileDataV3,
     total_gas_cost: u64,
+    pub logs: Vec<String>,
 }
 
 impl ExecutionProfile {
@@ -688,6 +689,7 @@ impl ExecutionProfile {
         Self {
             host_breakdown: outcome.profile.clone(),
             total_gas_cost: outcome.burnt_gas,
+            logs: outcome.logs.clone(),
         }
     }
 
