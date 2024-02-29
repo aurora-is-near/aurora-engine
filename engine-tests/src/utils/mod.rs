@@ -243,7 +243,7 @@ impl AuroraRunner {
             )?;
             self.validate_standalone();
         }
-
+        println!("{:#?}", outcome.logs);
         Ok(outcome)
     }
 

@@ -139,6 +139,7 @@ fn test_total_supply_accounting() {
             Address::try_from_slice(utils::unwrap_success_slice(&submit_result)).unwrap();
         constructor.deployed_at(contract_address)
     };
+    println!("\n contract deployed");
 
     #[cfg(not(feature = "ext-connector"))]
     let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
@@ -164,12 +165,19 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
+
+    println!(
+        "destruct {:?}: benefactor: {benefactor:?}",
+        contract.address
+    );
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
     #[cfg(not(feature = "ext-connector"))]
     assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
     // Self-destruct with self benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
+    println!("Contract: {:?}", contract.address);
+    println!("Balance: {:?}", runner.get_balance(contract.address));
     let _submit_result = runner
         .submit_with_signer(&mut signer, |nonce| {
             contract.call_method_with_args(
@@ -179,6 +187,10 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
+    println!(
+        "balance after destruct: {:?}",
+        runner.get_balance(contract.address)
+    );
     #[cfg(not(feature = "ext-connector"))]
     assert_eq!(
         get_total_supply(&mut runner),

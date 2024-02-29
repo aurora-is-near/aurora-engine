@@ -588,7 +588,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             current_account_id: self.current_account_id.clone(),
             chain_id: self.state.chain_id,
         };
-
         let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = None;
         #[cfg(not(feature = "ext-connector"))]
         let apply_remove_eth_fn: Option<Box<dyn FnOnce(Wei)>> = {
