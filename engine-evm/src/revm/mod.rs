@@ -20,7 +20,7 @@ use revm::{Database, DatabaseCommit, Evm};
 mod accounting;
 mod utility;
 
-pub const EVM_FORK: SpecId = SpecId::LATEST;
+pub const EVM_FORK: SpecId = SpecId::SHANGHAI;
 
 /// REVM handler
 pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
@@ -189,22 +189,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
         let mut writes_counter: usize = 0;
         let mut code_bytes_written: usize = 0;
         let mut accounting = accounting::Accounting::default();
-        aurora_engine_sdk::log(&alloc::format!("Commit count {:?}", evm_state.len()));
         for (address, account) in evm_state {
-            aurora_engine_sdk::log(&alloc::format!("Address: {:?} - {:?}", address, account));
             if !account.is_touched() {
-                aurora_engine_sdk::log("## Untouched");
                 continue;
             }
 
             let old_nonce = get_nonce(&self.io, &address);
             let old_balance = get_balance(&self.io, &address);
-            aurora_engine_sdk::log(&alloc::format!(
-                "{old_balance:?} -> {:?}",
-                account.info.balance
-            ));
+            // NOTE: Since CANCUN hardfork it's unreachable
             if account.is_selfdestructed() {
-                aurora_engine_sdk::log("## selfdestructed");
                 accounting.remove(old_balance);
                 let generation = get_generation(&self.io, &address);
                 remove_account(&mut self.io, &address, generation);
@@ -217,19 +210,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                 old_value: old_balance,
             });
             if old_nonce != account.info.nonce {
-                aurora_engine_sdk::log("## set_nonce");
                 set_nonce(&mut self.io, &address, account.info.nonce);
                 writes_counter += 1;
             }
             if old_balance != account.info.balance {
-                aurora_engine_sdk::log("## set_balance");
                 set_balance(&mut self.io, &address, &account.info.balance);
                 writes_counter += 1;
             }
             if let Some(code) = account.info.code {
                 if !code.is_empty() {
-                    aurora_engine_sdk::log("## set_code");
-                    aurora_engine_sdk::log(&alloc::format!("## set_code {:?}", code.len()));
                     let code_hash = if account.info.code_hash == KECCAK_EMPTY {
                         code.hash_slow()
                     } else {
@@ -258,7 +247,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
             // TODO: it's unknown behavior
             for (index, value) in account.storage {
                 if value.present_value() == U256::default() {
-                    aurora_engine_sdk::log("## 45 - remove_storage");
                     remove_storage(&mut self.io, &address, &index, next_generation);
                 } else {
                     set_storage(
@@ -280,17 +268,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
             if is_account_empty(&self.io, &address)
             // && generation == next_generation
             {
-                aurora_engine_sdk::log("## remove_account");
                 accounting.remove(old_balance);
                 remove_account(&mut self.io, &address, generation);
                 writes_counter += 1;
             }
         }
-        aurora_engine_sdk::log(&alloc::format!("Commit count {:?}", accounting));
         match accounting.net() {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
+            // NOTE: Since CANCUN hardfork it's unreachable
             accounting::Net::Lost(amount) => {
-                aurora_engine_sdk::log("#5 accounting Lost");
                 let _ = amount;
                 aurora_engine_sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // TODO: implement for REVM
@@ -301,11 +287,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                     remove_eth(Wei::new(transformed_amount));
                 }
             }
-            accounting::Net::Zero => {
-                aurora_engine_sdk::log("#5 accounting zero");
-            }
+            accounting::Net::Zero => (),
             accounting::Net::Gained(_) => {
-                aurora_engine_sdk::log("#5 accounting Gained");
                 // It should be impossible to gain ETH using normal EVM operations in production.
                 // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
                 #[cfg(all(not(feature = "integration-test"), feature = "std"))]
