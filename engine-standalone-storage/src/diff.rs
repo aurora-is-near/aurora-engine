@@ -2,10 +2,12 @@ use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use std::collections::{btree_map, BTreeMap};
 
 #[derive(Debug, Default, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 /// Collection of Engine state keys which changed by executing a transaction.
 pub struct Diff(BTreeMap<Vec<u8>, DiffValue>);
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub enum DiffValue {
     Modified(Vec<u8>),
     Deleted,
@@ -30,7 +32,7 @@ impl DiffValue {
     }
 
     pub fn try_to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        self.try_to_vec()
+        borsh::to_vec(&self)
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error> {
@@ -76,7 +78,7 @@ impl Diff {
     }
 
     pub fn try_to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        self.try_to_vec()
+        borsh::to_vec(&self)
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error> {

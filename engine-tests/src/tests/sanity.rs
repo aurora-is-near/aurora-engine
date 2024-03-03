@@ -4,7 +4,7 @@ use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
@@ -390,7 +390,7 @@ fn test_is_contract() {
     assert!(!call_contract(
         Address::from_array([1; 20]),
         &mut runner,
-        &mut signer
+        &mut signer,
     ));
 
     // Should return false for accounts that don't have contract code
@@ -799,7 +799,9 @@ fn test_eth_transfer_incorrect_nonce() {
             utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    assert_eq!(error.kind, EngineErrorKind::IncorrectNonce);
+    assert!(
+        matches!(error.kind, EngineErrorKind::IncorrectNonce(msg) if &msg == "ERR_INCORRECT_NONCE: ac: 0, tx: 1")
+    );
 
     // validate post-state (which is the same as pre-state in this case)
     utils::validate_address_balance_and_nonce(
@@ -1034,7 +1036,7 @@ fn test_block_hash_api() {
         .call(
             "get_block_hash",
             "any.near",
-            block_height.try_to_vec().unwrap(),
+            borsh::to_vec(&block_height).unwrap(),
         )
         .unwrap();
     let block_hash = outcome.return_data.as_value().unwrap();
@@ -1140,7 +1142,7 @@ fn test_set_owner() {
     let result = runner.call(
         "set_owner",
         &aurora_account_id,
-        set_owner_args.try_to_vec().unwrap(),
+        borsh::to_vec(&set_owner_args).unwrap(),
     );
 
     // setting owner from the owner with same owner id should succeed
@@ -1173,7 +1175,7 @@ fn test_set_owner_fail_on_same_owner() {
         .call(
             "set_owner",
             &aurora_account_id,
-            set_owner_args.try_to_vec().unwrap(),
+            borsh::to_vec(&set_owner_args).unwrap(),
         )
         .unwrap_err();
 
@@ -1194,7 +1196,7 @@ fn test_set_upgrade_delay_blocks() {
     let result = runner.call(
         "set_upgrade_delay_blocks",
         &aurora_account_id,
-        set_upgrade_delay_blocks.try_to_vec().unwrap(),
+        borsh::to_vec(&set_upgrade_delay_blocks).unwrap(),
     );
 
     // should succeed

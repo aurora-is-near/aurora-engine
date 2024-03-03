@@ -15,7 +15,7 @@ debug = false
 panic = "abort"
 
 [dependencies]
-near-sdk = "4.1"
+near-sdk = "5"
 serde = "1"
 
 [patch.crates-io]

@@ -17,8 +17,7 @@ sha2.workspace = true
 sha3.workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "sha3/std", "sha2/std", "base64/std" ]
-borsh-compat = ["aurora-engine-types/borsh-compat"]
+std = ["aurora-engine-types/std", "sha3/std", "sha2/std", "base64/std"]
 contract = []
 log = []
 all-promise-actions = []

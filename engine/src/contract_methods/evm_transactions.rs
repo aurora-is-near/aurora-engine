@@ -12,7 +12,7 @@ use aurora_engine_sdk::{
     promise::PromiseHandler,
 };
 use aurora_engine_types::{
-    borsh::BorshSerialize,
+    borsh,
     parameters::engine::{CallArgs, SubmitArgs, SubmitResult},
 };
 use function_name::named;
@@ -36,7 +36,7 @@ pub fn deploy_code<I: IO + Copy, E: Env, H: PromiseHandler>(
             env,
         );
         let result = engine.deploy_code_with_input(input, None, handler)?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
         Ok(result)
     })
@@ -64,7 +64,7 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
             env,
         );
         let result = engine.call_with_args(args, handler)?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
         Ok(result)
     })
@@ -95,7 +95,7 @@ pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
 
         Ok(result)
@@ -123,7 +123,7 @@ pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
 
         Ok(result)

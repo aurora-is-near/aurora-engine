@@ -1,8 +1,5 @@
 use crate::{format, AsBytes, String, H160};
-#[cfg(not(feature = "borsh-compat"))]
-use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{maybestd::io, BorshDeserialize, BorshSerialize};
+use borsh::{io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Base Eth Address type
@@ -81,7 +78,6 @@ impl BorshSerialize for Address {
     }
 }
 
-#[cfg(not(feature = "borsh-compat"))]
 impl BorshDeserialize for Address {
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; 20];
@@ -94,22 +90,6 @@ impl BorshDeserialize for Address {
         }
         maybe_read?;
         let address = Self(H160(buf));
-        Ok(address)
-    }
-}
-
-#[cfg(feature = "borsh-compat")]
-impl BorshDeserialize for Address {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 20 {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("{}", error::AddressError::IncorrectLength),
-            ));
-        }
-        // Guaranty no panics. The length checked early
-        let address = Self(H160::from_slice(&buf[..20]));
-        *buf = &buf[20..];
         Ok(address)
     }
 }
@@ -203,10 +183,10 @@ mod tests {
     fn test_address_serializer() {
         let eth_address = "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E";
         // borsh serialize
-        let serialized_addr =
-            Address::new(H160::from_slice(&hex::decode(eth_address).unwrap()[..]))
-                .try_to_vec()
-                .unwrap();
+        let serialized_addr = borsh::to_vec(&Address::new(H160::from_slice(
+            &hex::decode(eth_address).unwrap()[..],
+        )))
+        .unwrap();
         assert_eq!(serialized_addr.len(), 20);
 
         let addr = Address::try_from_slice(&serialized_addr).unwrap();
@@ -228,8 +208,8 @@ mod tests {
             Address::decode("096DE9C2B8A5B8c22cEe3289B101f6960d68E51E").unwrap();
         assert_eq!(eth_address, aurora_eth_address.as_bytes());
 
-        let serialized_addr = eth_address.try_to_vec().unwrap();
-        let aurora_serialized_addr = aurora_eth_address.try_to_vec().unwrap();
+        let serialized_addr = borsh::to_vec(&eth_address).unwrap();
+        let aurora_serialized_addr = borsh::to_vec(&aurora_eth_address).unwrap();
 
         assert_eq!(serialized_addr.len(), 20);
         assert_eq!(aurora_serialized_addr.len(), 20);

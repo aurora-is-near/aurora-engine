@@ -4,10 +4,7 @@ use crate::{
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
 };
-#[cfg(not(feature = "borsh-compat"))]
-use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
+use borsh::{io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 /// Parameters for the `new` function.
@@ -22,7 +19,7 @@ pub enum NewCallArgs {
 impl NewCallArgs {
     /// Creates a `NewCallArs` from the provided bytes which could be represented
     /// in JSON or Borsh format. Supporting arguments in JSON format starting from V4.
-    pub fn deserialize(bytes: &[u8]) -> Result<Self, borsh::maybestd::io::Error> {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, io::Error> {
         Self::try_from_json(bytes).or_else(|_| {
             Self::try_from_slice(bytes).map_or_else(
                 |_| LegacyNewCallArgs::try_from_slice(bytes).map(Self::V1),
@@ -419,7 +416,7 @@ mod tests {
             amount: [3; 32],
             input: vec![1, 2, 3],
         };
-        let bytes = x.try_to_vec().unwrap();
+        let bytes = borsh::to_vec(&x).unwrap();
         let res = ViewCallArgs::try_from_slice(&bytes).unwrap();
         assert_eq!(x, res);
     }
@@ -440,21 +437,23 @@ mod tests {
         // made for flexibility and extensibility.
 
         // Using new input format (wrapped into call args enum) and data structure with new argument (`value` field).
-        let input_bytes = CallArgs::V2(new_input.clone()).try_to_vec().unwrap();
+        let args = CallArgs::V2(new_input.clone());
+        let input_bytes = borsh::to_vec(&args).unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V2(new_input.clone())));
+        assert_eq!(parsed_data, Some(args));
 
         // Using new input format (wrapped into call args enum) and old data structure with legacy arguments,
         // this is allowed for compatibility reason.
-        let input_bytes = CallArgs::V1(legacy_input.clone()).try_to_vec().unwrap();
+        let args = CallArgs::V1(legacy_input.clone());
+        let input_bytes = borsh::to_vec(&args).unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
-        assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input.clone())));
+        assert_eq!(parsed_data, Some(args));
 
         // Parsing bytes in an old input format - raw data structure (not wrapped into call args enum) with legacy arguments,
         // made for backward compatibility.
 
         // Using old input format (not wrapped into call args enum) - raw data structure with legacy arguments.
-        let input_bytes = legacy_input.try_to_vec().unwrap();
+        let input_bytes = borsh::to_vec(&legacy_input).unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
         assert_eq!(parsed_data, Some(CallArgs::V1(legacy_input)));
 
@@ -462,7 +461,7 @@ mod tests {
         // Data structures with new arguments allowed only in new input format for future extensibility reason.
         // Raw data structure (old input format) allowed only with legacy arguments for backward compatibility reason.
         // Unrecognized input should be handled and result as an exception in a call site.
-        let input_bytes = new_input.try_to_vec().unwrap();
+        let input_bytes = borsh::to_vec(&new_input).unwrap();
         let parsed_data = CallArgs::deserialize(&input_bytes);
         assert_eq!(parsed_data, None);
     }

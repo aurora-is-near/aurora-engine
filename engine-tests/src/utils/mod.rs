@@ -1,7 +1,7 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 #[cfg(feature = "ext-connector")]
@@ -346,11 +346,11 @@ impl AuroraRunner {
                 &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
             );
 
-            trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+            trie.insert(ft_key, borsh::to_vec(&ft_value).unwrap());
             trie.insert(proof_key, vec![0]);
             trie.insert(
                 aurora_balance_key,
-                aurora_balance_value.try_to_vec().unwrap(),
+                borsh::to_vec(&aurora_balance_value).unwrap(),
             );
         }
 
@@ -434,7 +434,7 @@ impl AuroraRunner {
         self.call(
             SUBMIT_WITH_ARGS,
             CALLER_ACCOUNT_ID,
-            args.try_to_vec().unwrap(),
+            borsh::to_vec(&args).unwrap(),
         )
         .map(Self::profile_outcome)
     }
@@ -468,7 +468,7 @@ impl AuroraRunner {
     }
 
     pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
-        let input = args.try_to_vec().unwrap();
+        let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
@@ -483,7 +483,7 @@ impl AuroraRunner {
         &self,
         args: &ViewCallArgs,
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
-        let input = args.try_to_vec().unwrap();
+        let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
 
         runner.context.view_config = Some(ViewConfig {
@@ -525,7 +525,7 @@ impl AuroraRunner {
         };
         let outcome = self
             .one_shot()
-            .call("get_storage_at", "getter", input.try_to_vec().unwrap())
+            .call("get_storage_at", "getter", borsh::to_vec(&input).unwrap())
             .unwrap();
         let output = outcome.return_data.as_value().unwrap();
         let mut result = [0u8; 32];
@@ -681,6 +681,7 @@ impl Default for AuroraRunner {
 pub struct ExecutionProfile {
     pub host_breakdown: ProfileDataV3,
     total_gas_cost: u64,
+    pub logs: Vec<String>,
 }
 
 impl ExecutionProfile {
@@ -688,6 +689,7 @@ impl ExecutionProfile {
         Self {
             host_breakdown: outcome.profile.clone(),
             total_gas_cost: outcome.burnt_gas,
+            logs: outcome.logs.clone(),
         }
     }
 
@@ -712,7 +714,7 @@ pub fn deploy_runner() -> AuroraRunner {
     });
 
     let account_id = runner.aurora_account_id.clone();
-    let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
+    let result = runner.call("new", &account_id, borsh::to_vec(&args).unwrap());
 
     assert!(result.is_ok());
 
@@ -723,7 +725,11 @@ pub fn deploy_runner() -> AuroraRunner {
             eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
             metadata: FungibleTokenMetadata::default(),
         };
-        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap())
+        runner.call(
+            "new_eth_connector",
+            &account_id,
+            borsh::to_vec(&args).unwrap(),
+        )
     };
 
     #[cfg(feature = "ext-connector")]
@@ -736,7 +742,7 @@ pub fn deploy_runner() -> AuroraRunner {
         runner.call(
             "set_eth_connector_contract_account",
             &account_id,
-            args.try_to_vec().unwrap(),
+            borsh::to_vec(&args).unwrap(),
         )
     };
 
@@ -769,7 +775,7 @@ pub fn init_hashchain(
     let result = runner.call(
         "start_hashchain",
         caller_account_id,
-        args.try_to_vec().unwrap(),
+        borsh::to_vec(&args).unwrap(),
     );
     assert!(result.is_ok());
 }
@@ -1037,11 +1043,13 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
-                "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
                 "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
                 "ERR_FIXED_GAS_OVERFLOW" => EngineErrorKind::FixedGasOverflow,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
+                msg if msg.starts_with("ERR_INCORRECT_NONCE") => {
+                    EngineErrorKind::IncorrectNonce(msg.to_string())
+                }
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }
         }
