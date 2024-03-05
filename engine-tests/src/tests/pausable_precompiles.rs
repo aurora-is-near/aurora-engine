@@ -32,6 +32,7 @@ fn test_paused_precompile_is_shown_when_viewing() {
     assert_eq!(expected_paused_precompiles, actual_paused_precompiles);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_executing_paused_precompile_throws_error() {

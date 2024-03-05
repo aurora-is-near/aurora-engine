@@ -214,6 +214,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                 writes_counter += 1;
             }
             if old_balance != account.info.balance {
+                // aurora_engine_sdk::log!(
+                //     "{address:?} balance: {:?}",
+                //     old_balance - account.info.balance
+                // );
                 set_balance(&mut self.io, &address, &account.info.balance);
                 writes_counter += 1;
             }
@@ -303,7 +307,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
         aurora_engine_sdk::log!(
-            "total_writes_count {}\ntotal_written_bytes {}",
+            "total_writes_count {} total_written_bytes {}",
             writes_counter,
             total_bytes
         );
@@ -351,9 +355,9 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .spec_id(EVM_FORK)
             .build();
         let exec_result = evm.transact();
-        aurora_engine_sdk::log!("#PRE");
+        // aurora_engine_sdk::log!("# transact_call");
         if let Ok(ResultAndState { result, state }) = exec_result {
-            aurora_engine_sdk::log!("#1");
+            // aurora_engine_sdk::log!("# success");
             evm.context.evm.db.commit(state);
             let logs = log_to_log(&result.logs());
             let used_gas = result.gas_used();
@@ -363,7 +367,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
                 logs,
             })
         } else {
-            aurora_engine_sdk::log!("#2");
+            // aurora_engine_sdk::log!("# error");
             let (status, fee) = exec_result_to_err(&exec_result.unwrap_err())?;
             let gas_used = fee.map_or(0, |fee| {
                 fee.checked_div(self.block.gas_price).map_or(0, |res| {

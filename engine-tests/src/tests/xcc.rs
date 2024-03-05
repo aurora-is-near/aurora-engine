@@ -22,6 +22,7 @@ const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
 const XCC_ROUTER_BASE_PATH: &str = "../etc/xcc-router";
 const XCC_ROUTER_VERSION_RELATIVE_PATH: &str = "src/VERSION";
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -431,6 +432,7 @@ pub mod workspace {
     const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
     const ONE_NEAR: u128 = NearToken::from_near(1).as_yoctonear();
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_xcc_external_fund() {
@@ -506,12 +508,14 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_xcc_precompile_eager() {
         test_xcc_precompile_common(false).await;
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_xcc_precompile_scheduled() {
@@ -527,6 +531,7 @@ pub mod workspace {
     /// Therefore, we can compute Fibonacci numbers by creating a long chain of callbacks.
     /// For example, to compute the 6th number:
     /// `seed.then(accumulate).then(accumulate).then(accumulate).then(accumulate).then(accumulate)`.
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_xcc_multiple_callbacks() {
@@ -571,6 +576,7 @@ pub mod workspace {
 
     // This test is similar to `test_xcc_multiple_callbacks`, but instead of computing
     // Fibonacci numbers through repeated callbacks, it uses the `And` promise combinator.
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_xcc_and_combinator() {
@@ -637,6 +643,7 @@ pub mod workspace {
         check_fib_result(&output, usize::try_from(n).unwrap());
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[allow(clippy::too_many_lines)]
     #[tokio::test]

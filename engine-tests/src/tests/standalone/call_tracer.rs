@@ -14,7 +14,6 @@ use engine_standalone_tracing::{
     types::call_tracer::{self, CallTracer},
 };
 
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_deploy() {
     let mut runner = standalone::StandaloneRunner::default();
@@ -43,6 +42,7 @@ fn test_trace_contract_deploy() {
     assert_eq!(trace.output, code);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_precompile_direct_call() {
@@ -106,6 +106,7 @@ fn test_trace_precompile_direct_call() {
     runner.close();
 }
 
+// TODO: REVM: can't pass trace
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_single_call() {
@@ -156,6 +157,7 @@ fn test_trace_contract_single_call() {
     runner.close();
 }
 
+// TODO: REVM: can't pass trace
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_with_sub_call() {
@@ -228,6 +230,7 @@ fn test_trace_contract_with_sub_call() {
     assert_eq!(call.to.unwrap(), a_address);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_trace_contract_with_precompile_sub_call() {
@@ -307,6 +310,7 @@ fn test_contract_create_too_large() {
     );
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[allow(clippy::too_many_lines)]
 #[test]

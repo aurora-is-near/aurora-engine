@@ -474,6 +474,7 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near() {
@@ -512,6 +513,7 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_wnear_unwrapped() {
@@ -563,6 +565,7 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_wnear() {
@@ -659,6 +662,7 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
     #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_exit_to_near_eth() {

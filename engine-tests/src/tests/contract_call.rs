@@ -60,6 +60,7 @@ fn hello_world_solidity() {
     assert_eq!(expected, result);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw() {
@@ -128,6 +129,7 @@ fn withdraw() {
     }
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw_and_fail() {
@@ -167,6 +169,7 @@ fn try_withdraw_and_avoid_fail() {
     }
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn try_withdraw_and_avoid_fail_and_succeed() {
@@ -188,6 +191,7 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     }
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn withdraw_eth() {

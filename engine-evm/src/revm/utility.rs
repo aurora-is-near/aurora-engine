@@ -290,7 +290,7 @@ pub fn execution_result_into_result(
             };
             Ok(TransactionStatus::Succeed(data))
         }
-        ExecutionResult::Revert { output, .. } => Ok(TransactionStatus::Succeed(output.to_vec())),
+        ExecutionResult::Revert { output, .. } => Ok(TransactionStatus::Revert(output.to_vec())),
         ExecutionResult::Halt { reason, .. } => match reason {
             HaltReason::OutOfGas(_) => Ok(TransactionStatus::OutOfGas),
             HaltReason::OutOfOffset => Ok(TransactionStatus::OutOfOffset),

@@ -18,6 +18,7 @@ use aurora_engine_workspace::{EngineContract, RawContract};
 const AURORA_VERSION: &str = include_str!("../../../VERSION");
 const TRANSFER_AMOUNT: u128 = 1000;
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[tokio::test]
 #[allow(clippy::too_many_lines)]

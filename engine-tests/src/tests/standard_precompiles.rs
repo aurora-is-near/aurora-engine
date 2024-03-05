@@ -16,6 +16,7 @@ fn precompile_execution_profile(method: &str) -> ExecutionProfile {
     profile
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_standard_precompiles() {
@@ -28,6 +29,7 @@ fn test_standard_precompiles() {
     utils::panic_on_fail(outcome.status);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecrecover() {
@@ -35,6 +37,7 @@ fn profile_ecrecover() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_sha256() {
@@ -42,6 +45,7 @@ fn profile_sha256() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ripemd160() {
@@ -49,6 +53,7 @@ fn profile_ripemd160() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_identity() {
@@ -56,6 +61,7 @@ fn profile_identity() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_modexp() {
@@ -63,6 +69,7 @@ fn profile_modexp() {
     utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecadd() {
@@ -70,6 +77,7 @@ fn profile_ecadd() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecmul() {
@@ -77,6 +85,7 @@ fn profile_ecmul() {
     utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecpair() {
@@ -84,6 +93,7 @@ fn profile_ecpair() {
     utils::assert_gas_bound(profile.all_gas(), 115);
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_blake2f() {

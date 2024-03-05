@@ -104,6 +104,7 @@ pub enum EngineErrorKind {
 impl EngineErrorKind {
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
+        sdk::log!("EngineErrorKind: {:?}", &self);
         match self {
             Self::EvmError(ExitError::StackUnderflow) => errors::ERR_STACK_UNDERFLOW,
             Self::EvmError(ExitError::StackOverflow) => errors::ERR_STACK_OVERFLOW,
@@ -1147,6 +1148,10 @@ pub fn submit_with_alt_modexp<
         // TODO: charge for storage
     };
 
+    // sdk::log!(
+    //     "# Balance after call: {:?}",
+    //     get_balance(&io, &sender).try_into_u128()
+    // );
     // Give refund.
     // sdk::log!("result: {:?}", result);
 
@@ -1301,9 +1306,17 @@ pub fn refund_unused_gas<I: IO>(
             .checked_sub(spent_amount)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
+        sdk::log!(
+            "spent_amount: {spent_amount:?} {:?} {:?} prepaid_amount: {:?}",
+            gas_used,
+            gas_result.effective_gas_price,
+            gas_result.prepaid_amount
+        );
+        sdk::log!("refund: {:?}", refund);
+
         (refund, reward_amount)
     };
-    sdk::log!("refund: {:?}", refund);
+
     if !refund.is_zero() {
         add_balance(io, sender, refund)?;
     }

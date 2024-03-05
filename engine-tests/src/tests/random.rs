@@ -3,6 +3,7 @@ use crate::utils::solidity::random::{Random, RandomConstructor};
 use aurora_engine_types::H256;
 use rand::SeedableRng;
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_random_number_precompile() {

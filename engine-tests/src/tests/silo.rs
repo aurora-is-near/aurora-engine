@@ -121,6 +121,7 @@ fn test_transfer_insufficient_balance() {
         .unwrap();
 }
 
+// NOTE: REVM can't pass as OutOfGas
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_transfer_insufficient_balance_fee() {
@@ -989,6 +990,8 @@ pub mod workspace {
         );
     }
 
+    // TODO: REVM: need precompiles
+    #[cfg(feature = "sputnikvm-test")]
     #[tokio::test]
     async fn test_transfer_nep141_to_whitelisted_address() {
         let SiloTestContext {

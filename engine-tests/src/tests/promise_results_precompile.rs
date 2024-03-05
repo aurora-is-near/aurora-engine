@@ -8,6 +8,7 @@ use aurora_engine_types::{
 
 const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_promise_results_precompile() {
@@ -39,6 +40,7 @@ fn test_promise_results_precompile() {
     );
 }
 
+// TODO: REVM: need precompiles
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_promise_result_gas_cost() {
