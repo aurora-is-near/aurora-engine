@@ -330,7 +330,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
                 logs,
             })
         } else {
-            Err(exec_result_to_err(&exec_result.unwrap_err()))
+            let (status, fee) = exec_result_to_err(&exec_result.unwrap_err())?;
+            let gas_used = fee.map_or(0, |fee| {
+                fee.checked_div(self.block.gas_price)
+                    .map_or(0, |res| res.as_u64())
+            });
+            Ok(TransactResult {
+                submit_result: SubmitResult::new(status, gas_used, Vec::new()),
+                logs: Vec::new(),
+            })
         }
     }
 
@@ -343,7 +351,9 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .spec_id(EVM_FORK)
             .build();
         let exec_result = evm.transact();
+        aurora_engine_sdk::log!("#PRE");
         if let Ok(ResultAndState { result, state }) = exec_result {
+            aurora_engine_sdk::log!("#1");
             evm.context.evm.db.commit(state);
             let logs = log_to_log(&result.logs());
             let used_gas = result.gas_used();
@@ -353,7 +363,18 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
                 logs,
             })
         } else {
-            Err(exec_result_to_err(&exec_result.unwrap_err()))
+            aurora_engine_sdk::log!("#2");
+            let (status, fee) = exec_result_to_err(&exec_result.unwrap_err())?;
+            let gas_used = fee.map_or(0, |fee| {
+                fee.checked_div(self.block.gas_price).map_or(0, |res| {
+                    // TODO: verify it
+                    res.low_u64()
+                })
+            });
+            Ok(TransactResult {
+                submit_result: SubmitResult::new(status, gas_used, Vec::new()),
+                logs: Vec::new(),
+            })
         }
     }
 
@@ -370,7 +391,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             let status = execution_result_into_result(result)?;
             Ok(status)
         } else {
-            Err(exec_result_to_err(&exec_result.unwrap_err()))
+            let (status, _) = exec_result_to_err(&exec_result.unwrap_err())?;
+            Ok(status)
         }
     }
 }

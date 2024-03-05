@@ -78,15 +78,21 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
     let error = outcome.unwrap();
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(error.status, TransactionStatus::OutOfGas);
+    #[cfg(feature = "revm-test")]
+    assert_eq!(error.status, TransactionStatus::LackOfFundForMaxFee);
 
     // Validate post-state
-
+    #[cfg(feature = "revm-test")]
+    let nonce = INITIAL_NONCE + 1;
+    #[cfg(feature = "sputnikvm-test")]
+    let nonce = INITIAL_NONCE + 2;
     utils::validate_address_balance_and_nonce(
         &runner,
         utils::address_from_secret_key(&source_account.secret_key),
         Wei::new_u64(INITIAL_BALANCE - GAS_LIMIT * GAS_PRICE),
-        (INITIAL_NONCE + 2).into(),
+        nonce.into(),
     )
     .unwrap();
     utils::validate_address_balance_and_nonce(
@@ -242,14 +248,21 @@ fn deploy_erc_20_out_of_gas() {
     deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
+    #[cfg(feature = "revm-test")]
+    assert_eq!(error.status, TransactionStatus::CallGasCostMoreThanGasLimit);
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(error.status, TransactionStatus::OutOfGas);
 
     // Validate post-state
+    #[cfg(feature = "revm-test")]
+    let nonce = INITIAL_NONCE;
+    #[cfg(feature = "sputnikvm-test")]
+    let nonce = INITIAL_NONCE + 1;
     utils::validate_address_balance_and_nonce(
         &runner,
         utils::address_from_secret_key(&source_account),
         Wei::new_u64(INITIAL_BALANCE),
-        (INITIAL_NONCE + 1).into(),
+        nonce.into(),
     )
     .unwrap();
 }

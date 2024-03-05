@@ -18,7 +18,7 @@ use engine_standalone_storage::json_snapshot;
 #[test]
 fn repro_GdASJ3KESs() {
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 142;
+    let near_gas_used = 143;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 116;
     // Note: this snapshot is pruned from the full Engine state on testnet at that block height.
@@ -47,7 +47,7 @@ fn repro_GdASJ3KESs() {
 #[test]
 fn repro_8ru7VEA() {
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 246;
+    let near_gas_used = 247;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 210;
     // Note: this snapshot is pruned from the full Engine state on mainnet at that block height.
@@ -74,7 +74,7 @@ fn repro_8ru7VEA() {
 #[test]
 fn repro_FRcorNv() {
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 180;
+    let near_gas_used = 181;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 170;
     repro_common(&ReproContext {
@@ -117,7 +117,7 @@ fn repro_5bEgfRQ() {
 #[test]
 fn repro_D98vwmi() {
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 176;
+    let near_gas_used = 177;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 172;
     repro_common(&ReproContext {

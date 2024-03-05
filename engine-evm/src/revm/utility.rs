@@ -5,7 +5,9 @@ use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::storage::{address_to_key, bytes_to_key, storage_to_key, KeyPrefix};
 use aurora_engine_types::types::{u256_to_arr, Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
-use revm::primitives::{EVMError, ExecutionResult, HaltReason, Output};
+use revm::primitives::{
+    EVMError, ExecutionResult, HaltReason, InvalidHeader, InvalidTransaction, Output,
+};
 
 const BLOCK_HASH_PREFIX: u8 = 0;
 const BLOCK_HASH_PREFIX_SIZE: usize = 1;
@@ -340,8 +342,75 @@ pub fn execution_result_into_result(
     }
 }
 
-pub fn exec_result_to_err(err: &EVMError<()>) -> TransactErrorKind {
-    TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(aurora_engine_types::format!(
-        "{err:?}"
-    ))))
+pub fn exec_result_to_err(
+    err: &EVMError<()>,
+) -> Result<(TransactionStatus, Option<U256>), TransactErrorKind> {
+    match err {
+        EVMError::Transaction(tx) => {
+            let mut gas_fee = None;
+            let tx = match tx {
+                InvalidTransaction::PriorityFeeGreaterThanMaxFee => {
+                    TransactionStatus::PriorityFeeGreaterThanMaxFee
+                }
+                InvalidTransaction::GasPriceLessThanBasefee => {
+                    TransactionStatus::GasPriceLessThanBasefee
+                }
+                InvalidTransaction::CallerGasLimitMoreThanBlock => {
+                    TransactionStatus::CallerGasLimitMoreThanBlock
+                }
+                InvalidTransaction::CallGasCostMoreThanGasLimit => {
+                    TransactionStatus::CallGasCostMoreThanGasLimit
+                }
+                InvalidTransaction::RejectCallerWithCode => TransactionStatus::RejectCallerWithCode,
+                InvalidTransaction::LackOfFundForMaxFee { fee, .. } => {
+                    let raw_fee = fee.to_be_bytes();
+                    gas_fee = Some(U256::from(raw_fee));
+                    TransactionStatus::LackOfFundForMaxFee
+                }
+                InvalidTransaction::OverflowPaymentInTransaction => {
+                    TransactionStatus::OverflowPaymentInTransaction
+                }
+                InvalidTransaction::NonceOverflowInTransaction => {
+                    TransactionStatus::NonceOverflowInTransaction
+                }
+                InvalidTransaction::NonceTooHigh { .. } => TransactionStatus::NonceTooHigh,
+                InvalidTransaction::NonceTooLow { .. } => TransactionStatus::NonceTooLow,
+                InvalidTransaction::CreateInitCodeSizeLimit => {
+                    TransactionStatus::CreateInitCodeSizeLimit
+                }
+                InvalidTransaction::InvalidChainId => TransactionStatus::InvalidChainId,
+                InvalidTransaction::AccessListNotSupported => {
+                    TransactionStatus::AccessListNotSupported
+                }
+                InvalidTransaction::MaxFeePerBlobGasNotSupported => {
+                    TransactionStatus::MaxFeePerBlobGasNotSupported
+                }
+                InvalidTransaction::BlobVersionedHashesNotSupported => {
+                    TransactionStatus::BlobVersionedHashesNotSupported
+                }
+                InvalidTransaction::BlobGasPriceGreaterThanMax => {
+                    TransactionStatus::BlobGasPriceGreaterThanMax
+                }
+                InvalidTransaction::EmptyBlobs => TransactionStatus::EmptyBlobs,
+                InvalidTransaction::BlobCreateTransaction => {
+                    TransactionStatus::BlobCreateTransaction
+                }
+                InvalidTransaction::TooManyBlobs => TransactionStatus::TooManyBlobs,
+                InvalidTransaction::BlobVersionNotSupported => {
+                    TransactionStatus::BlobVersionNotSupported
+                }
+            };
+            Ok((tx, gas_fee))
+        }
+        EVMError::Header(header) => {
+            let h = match header {
+                InvalidHeader::PrevrandaoNotSet => TransactionStatus::PrevrandaoNotSet,
+                InvalidHeader::ExcessBlobGasNotSet => TransactionStatus::ExcessBlobGasNotSet,
+            };
+            Ok((h, None))
+        }
+        _ => Err(TransactErrorKind::EvmFatal(ExitFatal::Other(Cow::from(
+            aurora_engine_types::format!("{err:?}"),
+        )))),
+    }
 }

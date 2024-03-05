@@ -39,7 +39,7 @@ fn test_uniswap_input_multihop() {
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
     #[cfg(feature = "revm-test")]
-    let gas_used = 178;
+    let gas_used = 179;
     #[cfg(feature = "sputnikvm-test")]
     let gas_used = 109;
     assert_eq!(gas_used, profile.all_gas() / 1_000_000_000_000);
@@ -73,7 +73,7 @@ fn test_uniswap_exact_output() {
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
     #[cfg(feature = "revm-test")]
-    let gas_used = 32;
+    let gas_used = 33;
     #[cfg(feature = "sputnikvm-test")]
     let gas_used = 16;
     utils::assert_gas_bound(profile.all_gas(), gas_used);

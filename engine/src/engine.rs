@@ -443,6 +443,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
+        // sdk::log!("CHARGE new_balance: {new_balance:?} prepaid_amount: {prepaid_amount:?}");
         set_balance(&mut self.io, sender, &new_balance);
 
         self.gas_price = effective_gas_price;
@@ -825,6 +826,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
                     gas_used: submit_result.gas_used,
                 }),
+                _ => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::Other(crate::prelude::Cow::from(
+                        crate::prelude::format!("{:?}", submit_result.status),
+                    ))),
+                    gas_used: submit_result.gas_used,
+                }),
             })
             .map_err(|e| {
                 sdk::log!("{:?}", e);
@@ -1103,6 +1110,18 @@ pub fn submit_with_alt_modexp<
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
+
+    // sdk::log!(
+    //     "gas_limit: {:?} fixed_gas: {:?} intrinsic_gas: {:?}",
+    //     transaction.gas_limit,
+    //     fixed_gas,
+    //     transaction.intrinsic_gas()
+    // );
+    // sdk::log!(
+    //     "# Balance before call: {:?}",
+    //     get_balance(&io, &sender).try_into_u128()
+    // );
+
     let result = if let Some(receiver) = transaction.to {
         engine.call(
             &sender,
@@ -1129,6 +1148,8 @@ pub fn submit_with_alt_modexp<
     };
 
     // Give refund.
+    // sdk::log!("result: {:?}", result);
+
     let gas_used = match &result {
         Ok(submit_result) => submit_result.gas_used,
         Err(engine_err) => engine_err.gas_used,
@@ -1146,6 +1167,11 @@ pub fn submit_with_alt_modexp<
         gas_used,
         kind: EngineErrorKind::GasPayment(e),
     })?;
+
+    // sdk::log!(
+    //     "# Balance after refund {:?}",
+    //     get_balance(&io, &sender).try_into_u128()
+    // );
 
     // return result to user
     result
@@ -1277,7 +1303,7 @@ pub fn refund_unused_gas<I: IO>(
 
         (refund, reward_amount)
     };
-
+    sdk::log!("refund: {:?}", refund);
     if !refund.is_zero() {
         add_balance(io, sender, refund)?;
     }

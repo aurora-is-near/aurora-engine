@@ -70,7 +70,7 @@ fn test_1inch_liquidity_protocol() {
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 44;
+    let near_gas_used = 45;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 23;
     assert_gas_bound(profile.all_gas(), near_gas_used);

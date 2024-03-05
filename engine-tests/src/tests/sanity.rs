@@ -774,15 +774,22 @@ fn test_eth_transfer_insufficient_balance() {
             utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
         .unwrap();
+    #[cfg(feature = "revm-test")]
+    assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
+    #[cfg(feature = "revm-test")]
+    let nonce = INITIAL_NONCE;
+    #[cfg(feature = "sputnikvm-test")]
+    let nonce = INITIAL_NONCE + 1;
     utils::validate_address_balance_and_nonce(
         &runner,
         source_address,
         INITIAL_BALANCE,
         // the nonce is still incremented even though the transfer failed
-        (INITIAL_NONCE + 1).into(),
+        nonce.into(),
     )
     .unwrap();
     utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
@@ -1267,12 +1274,19 @@ mod workspace {
             .await
             .unwrap()
             .into_value();
+        #[cfg(feature = "revm-test")]
+        assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
+        #[cfg(feature = "sputnikvm-test")]
         assert_eq!(result.status, TransactionStatus::OutOfFund);
 
         // validate post-state
+        #[cfg(feature = "revm-test")]
+        let nonce = INITIAL_NONCE;
+        #[cfg(feature = "sputnikvm-test")]
+        let nonce = INITIAL_NONCE + 1;
         assert_eq!(
             aurora.get_nonce(address).await.unwrap().result,
-            (INITIAL_NONCE + 1).into(),
+            nonce.into(),
         );
         assert_eq!(
             aurora.get_balance(address).await.unwrap().result,

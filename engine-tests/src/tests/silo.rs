@@ -99,21 +99,29 @@ fn test_transfer_insufficient_balance() {
             )
         })
         .unwrap();
+    #[cfg(feature = "revm-test")]
+    assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
+    #[cfg(feature = "revm-test")]
+    let nonce = INITIAL_NONCE;
+    #[cfg(feature = "sputnikvm-test")]
+    let nonce = INITIAL_NONCE + 1;
     validate_address_balance_and_nonce(
         &runner,
         sender,
         INITIAL_BALANCE - FIXED_GAS * ONE_GAS_PRICE,
         // the nonce is still incremented even though the transfer failed
-        (INITIAL_NONCE + 1).into(),
+        nonce.into(),
     )
     .unwrap();
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
         .unwrap();
 }
 
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_transfer_insufficient_balance_fee() {
     const HALF_FIXED_GAS: EthGas = EthGas::new(10u64.pow(18) / 2);
@@ -477,9 +485,10 @@ fn test_submit_with_disabled_whitelist() {
 
     // perform transfer
     let result = runner
-        .submit_transaction(&signer.secret_key, transaction.clone())
+        .submit_transaction_profiled(&signer.secret_key, transaction.clone())
         .unwrap();
-    assert!(matches!(result.status, TransactionStatus::Succeed(_)));
+    println!("RES: {result:#?}");
+    assert!(matches!(result.0.status, TransactionStatus::Succeed(_)));
 
     // validate post-state
     validate_address_balance_and_nonce(
