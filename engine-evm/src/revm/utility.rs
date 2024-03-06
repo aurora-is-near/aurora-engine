@@ -103,7 +103,7 @@ pub fn get_generation<I: IO>(io: &I, address: &revm::primitives::Address) -> u32
 #[must_use]
 pub fn compute_block_hash(
     chain_id: [u8; 32],
-    block_height: revm::primitives::U256,
+    block_height: u64,
     account_id: &[u8],
 ) -> revm::primitives::B256 {
     debug_assert_eq!(
@@ -114,11 +114,10 @@ pub fn compute_block_hash(
     let mut data = Vec::with_capacity(
         BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
     );
-    let height = block_height.to_be_bytes_vec();
     data.push(BLOCK_HASH_PREFIX);
     data.extend_from_slice(&chain_id);
     data.extend_from_slice(account_id);
-    data.extend_from_slice(&height);
+    data.extend_from_slice(&block_height.to_be_bytes());
 
     let hash = aurora_engine_sdk::sha256(&data).0;
     revm::primitives::B256::new(hash)

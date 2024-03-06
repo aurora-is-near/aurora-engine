@@ -171,9 +171,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> Database for ContractSt
     fn block_hash(&mut self, number: U256) -> Result<B256, Self::Error> {
         let idx = U256::from(self.env.block_height());
         if idx.saturating_sub(U256::from(256)) <= number && number < idx {
+            let number_u64 = aurora_engine_types::U256::from(number.to_be_bytes()).low_u64();
             Ok(compute_block_hash(
                 self.block.chain_id,
-                number,
+                number_u64,
                 self.block.current_account_id.as_bytes(),
             ))
         } else {
