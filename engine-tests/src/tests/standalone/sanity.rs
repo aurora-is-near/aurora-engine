@@ -71,6 +71,7 @@ fn test_deploy_code() {
     assert_eq!(engine::get_generation(&io, &contract_address), 1);
     #[cfg(feature = "sputnikvm-test")]
     assert_eq!(engine::get_code(&io, &contract_address), code_to_deploy);
+    // TODO: REVM: unexprected behavior
     #[cfg(feature = "revm-test")]
     assert_eq!(
         engine::get_code(&io, &contract_address),
