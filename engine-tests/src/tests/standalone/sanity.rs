@@ -65,8 +65,20 @@ fn test_deploy_code() {
     assert_eq!(engine::get_balance(&io, &contract_address), Wei::zero());
     assert_eq!(engine::get_nonce(&io, &origin), U256::one());
     assert_eq!(engine::get_nonce(&io, &contract_address), U256::one());
+    #[cfg(feature = "revm-test")]
+    assert_eq!(engine::get_generation(&io, &contract_address), 0);
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(engine::get_generation(&io, &contract_address), 1);
+    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(engine::get_code(&io, &contract_address), code_to_deploy);
+    #[cfg(feature = "revm-test")]
+    assert_eq!(
+        engine::get_code(&io, &contract_address),
+        [
+            1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+    );
 }
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {

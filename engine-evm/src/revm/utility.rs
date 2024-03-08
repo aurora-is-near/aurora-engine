@@ -364,6 +364,7 @@ pub fn exec_result_to_err(
                 InvalidTransaction::LackOfFundForMaxFee { fee, .. } => {
                     let raw_fee = fee.to_be_bytes();
                     gas_fee = Some(U256::from(raw_fee));
+                    aurora_engine_sdk::log!("LackOfFundForMaxFee {err:?}");
                     TransactionStatus::LackOfFundForMaxFee
                 }
                 InvalidTransaction::OverflowPaymentInTransaction => {

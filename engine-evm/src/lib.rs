@@ -8,6 +8,7 @@
 )]
 
 extern crate alloc;
+extern crate core;
 
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::env::Env;

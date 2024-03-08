@@ -1113,10 +1113,10 @@ pub fn submit_with_alt_modexp<
         .collect();
 
     // sdk::log!(
-    //     "gas_limit: {:?} fixed_gas: {:?} intrinsic_gas: {:?}",
+    //     "gas_limit: {:?} fixed_gas: {:?} gas_price: {:?}",
     //     transaction.gas_limit,
     //     fixed_gas,
-    //     transaction.intrinsic_gas()
+    //     engine.gas_price
     // );
     // sdk::log!(
     //     "# Balance before call: {:?}",

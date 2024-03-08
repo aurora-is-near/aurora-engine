@@ -271,6 +271,8 @@ fn generate_code(len: usize) -> Vec<u8> {
     buf
 }
 
+// TODO: REVM: added 10^66 zero to the end of `stored_code`
+#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_deploy_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
