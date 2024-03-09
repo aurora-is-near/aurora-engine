@@ -6,16 +6,17 @@ use crate::revm::utility::{
 };
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::Vec;
 use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
-    Account, AccountInfo, Address, Bytecode, Env, HashMap, ResultAndState, SpecId, TransactTo,
-    B256, KECCAK_EMPTY, U256,
+    Account, AccountInfo, Address, Bytecode, EVMError, Env, HashMap, ResultAndState, SpecId,
+    TransactTo, B256, KECCAK_EMPTY, U256,
 };
-use revm::{Database, DatabaseCommit, Evm};
+use revm::{Context, Database, DatabaseCommit, Evm};
 
 mod accounting;
 mod utility;
@@ -103,6 +104,30 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
         // env.tx.nonce = get_nonce(origin)
         // env.tx.gas_priority_fee
         env
+    }
+
+    // TODO: do we really need increment nonce and mark_touch (mark_touch affect storage write).
+    #[inline]
+    pub fn deduct_caller<EXT, DB: Database>(
+        context: &mut Context<EXT, DB>,
+    ) -> Result<(), EVMError<DB::Error>> {
+        // load caller's account.
+        let (caller_account, _) = context
+            .evm
+            .journaled_state
+            .load_account(context.evm.env.tx.caller, &mut context.evm.db)
+            .map_err(EVMError::Database)?;
+
+        // bump the nonce for calls. Nonce for CREATE will be bumped in `handle_create`.
+        if matches!(context.evm.env.tx.transact_to, TransactTo::Call(_)) {
+            // Nonce is already checked
+            caller_account.info.nonce = caller_account.info.nonce.saturating_add(1);
+        }
+
+        // touch account so we know it is changed.
+        caller_account.mark_touch();
+
+        Ok(())
     }
 }
 
@@ -355,6 +380,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .modify_env(|e| *e = self.evm_env())
             .spec_id(EVM_FORK)
             .build();
+        // Change handlers
+        evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
+        evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
+        evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
         let exec_result = evm.transact();
         // aurora_engine_sdk::log!("# transact_call");
         if let Ok(ResultAndState { result, state }) = exec_result {

@@ -227,7 +227,7 @@ impl AuroraRunner {
         )
         .unwrap();
 
-        // println!("{:?}", outcome.logs);
+        println!("{:?}", outcome.logs);
         if let Some(error) = outcome.aborted.as_ref() {
             return Err(into_engine_error(outcome.used_gas, error));
         }

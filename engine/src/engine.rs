@@ -444,7 +444,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
-        // sdk::log!("CHARGE new_balance: {new_balance:?} prepaid_amount: {prepaid_amount:?}");
+        sdk::log!("CHARGE new_balance: {new_balance:?} prepaid_amount: {prepaid_amount:?}");
         set_balance(&mut self.io, sender, &new_balance);
 
         self.gas_price = effective_gas_price;
@@ -1112,16 +1112,16 @@ pub fn submit_with_alt_modexp<
         .map(|a| (a.address, a.storage_keys))
         .collect();
 
-    // sdk::log!(
-    //     "gas_limit: {:?} fixed_gas: {:?} gas_price: {:?}",
-    //     transaction.gas_limit,
-    //     fixed_gas,
-    //     engine.gas_price
-    // );
-    // sdk::log!(
-    //     "# Balance before call: {:?}",
-    //     get_balance(&io, &sender).try_into_u128()
-    // );
+    sdk::log!(
+        "gas_limit: {:?} fixed_gas: {:?} gas_price: {:?}",
+        transaction.gas_limit,
+        fixed_gas,
+        engine.gas_price
+    );
+    sdk::log!(
+        "# Balance before call: {:?}",
+        get_balance(&io, &sender).try_into_u128()
+    );
 
     let result = if let Some(receiver) = transaction.to {
         engine.call(
@@ -1148,12 +1148,13 @@ pub fn submit_with_alt_modexp<
         // TODO: charge for storage
     };
 
-    // sdk::log!(
-    //     "# Balance after call: {:?}",
-    //     get_balance(&io, &sender).try_into_u128()
-    // );
+    sdk::log!(
+        "# Balance after call: {:?}",
+        get_balance(&io, &sender).try_into_u128()
+    );
+    sdk::log!("result: {:?}", result);
+
     // Give refund.
-    // sdk::log!("result: {:?}", result);
 
     let gas_used = match &result {
         Ok(submit_result) => submit_result.gas_used,
@@ -1173,10 +1174,10 @@ pub fn submit_with_alt_modexp<
         kind: EngineErrorKind::GasPayment(e),
     })?;
 
-    // sdk::log!(
-    //     "# Balance after refund {:?}",
-    //     get_balance(&io, &sender).try_into_u128()
-    // );
+    sdk::log!(
+        "# Balance after refund {:?}",
+        get_balance(&io, &sender).try_into_u128()
+    );
 
     // return result to user
     result
@@ -1307,7 +1308,7 @@ pub fn refund_unused_gas<I: IO>(
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
         sdk::log!(
-            "spent_amount: {spent_amount:?} {:?} {:?} prepaid_amount: {:?}",
+            "prepaid_amount: {:?} -spent_amount: {spent_amount:?} [{:?} * {:?}]",
             gas_used,
             gas_result.effective_gas_price,
             gas_result.prepaid_amount

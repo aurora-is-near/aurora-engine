@@ -83,14 +83,12 @@ fn test_eip_1559_example() {
     let outcome = runner
         .call(utils::SUBMIT, sender, encode_tx(&signed_tx))
         .unwrap();
-    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    let result =
+        SubmitResult::try_from_slice(&outcome.return_data.clone().as_value().unwrap()).unwrap();
     assert_eq!(result.gas_used, 0xb8d2);
 
     // Check post state:
     // signer spent some ETH on gas fees and incremented nonce for submitting transaction
-    #[cfg(feature = "revm-test")]
-    let spent_eth = 999999999999053720;
-    #[cfg(feature = "sputnikvm-test")]
     let spent_eth = 999999999999526860;
     assert_eq!(runner.get_balance(signer_address), Wei::new_u64(spent_eth));
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
