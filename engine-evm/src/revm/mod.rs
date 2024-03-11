@@ -349,6 +349,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .modify_env(|e| *e = self.evm_env())
             .spec_id(EVM_FORK)
             .build();
+        // Change handlers
+        evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
+        evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
+        evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
         let exec_result = evm.transact();
         if let Ok(ResultAndState { result, state }) = exec_result {
             evm.context.evm.db.commit(state);
@@ -420,6 +424,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .modify_env(|e| *e = self.evm_env())
             .spec_id(EVM_FORK)
             .build();
+        // Change handlers
+        evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
+        evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
+        evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
         let exec_result = evm.transact();
         if let Ok(ResultAndState { result, .. }) = exec_result {
             let status = execution_result_into_result(result)?;

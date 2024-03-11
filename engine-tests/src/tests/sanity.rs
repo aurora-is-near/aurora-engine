@@ -317,7 +317,7 @@ fn test_deploy_largest_contract() {
 
     // Less than 12 NEAR Tgas
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 17;
+    let near_gas_used = 15;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 11;
     utils::assert_gas_bound(profile.all_gas(), near_gas_used);

@@ -23,7 +23,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 17;
+    let near_gas_used = 15;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 11;
     assert_gas_bound(profile.all_gas(), near_gas_used); // less than 11 NEAR Tgas used
@@ -47,7 +47,7 @@ fn test_1inch_liquidity_protocol() {
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 36;
+    let near_gas_used = 34;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 18;
     assert_gas_bound(profile.all_gas(), near_gas_used);
@@ -70,7 +70,7 @@ fn test_1inch_liquidity_protocol() {
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 45;
+    let near_gas_used = 43;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 23;
     assert_gas_bound(profile.all_gas(), near_gas_used);
@@ -89,7 +89,7 @@ fn test_1inch_liquidity_protocol() {
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 48;
+    let near_gas_used = 46;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 24;
     assert_gas_bound(profile.all_gas(), near_gas_used);
@@ -125,7 +125,7 @@ fn test_1_inch_limit_order_deploy() {
     assert!(result.gas_used > 3_500_000);
     // less than 10 NEAR Tgas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 16;
+    let near_gas_used = 14;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 10;
     assert_gas_bound(profile.all_gas(), near_gas_used);

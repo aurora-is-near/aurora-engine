@@ -444,7 +444,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
 
-        sdk::log!("CHARGE new_balance: {new_balance:?} prepaid_amount: {prepaid_amount:?}");
         set_balance(&mut self.io, sender, &new_balance);
 
         self.gas_price = effective_gas_price;
@@ -1112,12 +1111,16 @@ pub fn submit_with_alt_modexp<
         .map(|a| (a.address, a.storage_keys))
         .collect();
 
+    #[cfg(feature = "debug-output")]
     sdk::log!(
         "gas_limit: {:?} fixed_gas: {:?} gas_price: {:?}",
         transaction.gas_limit,
         fixed_gas,
         engine.gas_price
     );
+    #[cfg(feature = "debug-output")]
+    sdk::log!("CHARGE: {prepaid_amount:?}");
+    #[cfg(feature = "debug-output")]
     sdk::log!(
         "# Balance before call: {:?}",
         get_balance(&io, &sender).try_into_u128()
@@ -1148,10 +1151,12 @@ pub fn submit_with_alt_modexp<
         // TODO: charge for storage
     };
 
+    #[cfg(feature = "debug-output")]
     sdk::log!(
         "# Balance after call: {:?}",
         get_balance(&io, &sender).try_into_u128()
     );
+    #[cfg(feature = "debug-output")]
     sdk::log!("result: {:?}", result);
 
     // Give refund.
@@ -1174,6 +1179,7 @@ pub fn submit_with_alt_modexp<
         kind: EngineErrorKind::GasPayment(e),
     })?;
 
+    #[cfg(feature = "debug-output")]
     sdk::log!(
         "# Balance after refund {:?}",
         get_balance(&io, &sender).try_into_u128()
@@ -1307,12 +1313,15 @@ pub fn refund_unused_gas<I: IO>(
             .checked_sub(spent_amount)
             .ok_or(GasPaymentError::EthAmountOverflow)?;
 
+        #[cfg(feature = "debug-output")]
         sdk::log!(
-            "prepaid_amount: {:?} -spent_amount: {spent_amount:?} [{:?} * {:?}]",
+            "prepaid_amount: {:?} - spent_amount: {spent_amount:?} [gas_used: {:?} * gas_price: {:?}]",
+            gas_result.prepaid_amount,
             gas_used,
             gas_result.effective_gas_price,
-            gas_result.prepaid_amount
+
         );
+        #[cfg(feature = "debug-output")]
         sdk::log!("refund: {:?}", refund);
 
         (refund, reward_amount)
