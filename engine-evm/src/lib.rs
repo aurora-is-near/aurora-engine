@@ -35,10 +35,10 @@ pub fn init_evm<'env, I: IO + Copy, E: Env, H: PromiseHandler>(
     env: &'env E,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
-    _precompiles: Precompiles<'env, I, E, H::ReadOnly>,
+    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
-) -> EngineEVM<revm::REVMHandler<'env, I, E>> {
-    let handler = revm::REVMHandler::new(io, env, transaction, block, remove_eth_fn);
+) -> EngineEVM<revm::REVMHandler<'env, I, E, H>> {
+    let handler = revm::REVMHandler::new(io, env, transaction, block, precompiles, remove_eth_fn);
     EngineEVM::new(handler)
 }
 

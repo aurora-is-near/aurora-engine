@@ -7,14 +7,17 @@ use crate::revm::utility::{
 use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use alloc::boxed::Box;
 use alloc::sync::Arc;
+use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::Vec;
+use core::cmp::Ordering;
 use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
-    Account, AccountInfo, Address, Bytecode, EVMError, Env, HashMap, ResultAndState, SpecId,
-    TransactTo, B256, KECCAK_EMPTY, U256,
+    Account, AccountInfo, Address, Bytecode, EVMError, Env, HashMap, InvalidTransaction,
+    ResultAndState, SpecId, TransactTo, B256, KECCAK_EMPTY, U256,
 };
 use revm::{Context, Database, DatabaseCommit, Evm};
 
@@ -24,20 +27,24 @@ mod utility;
 pub const EVM_FORK: SpecId = SpecId::SHANGHAI;
 
 /// REVM handler
-pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env> {
+pub struct REVMHandler<'env, I: IO, E: aurora_engine_sdk::env::Env, H: PromiseHandler> {
     io: I,
     env: &'env E,
+    precompiles: Precompiles<'env, I, E, H::ReadOnly>,
     transaction: &'env TransactionInfo,
     block: &'env BlockInfo,
     remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
 }
 
-impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E> {
+impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
+    REVMHandler<'env, I, E, H>
+{
     pub const fn new(
         io: I,
         env: &'env E,
         transaction: &'env TransactionInfo,
         block: &'env BlockInfo,
+        precompiles: Precompiles<'env, I, E, H::ReadOnly>,
         remove_eth_fn: Option<Box<dyn FnOnce(Wei) + 'env>>,
     ) -> Self {
         Self {
@@ -45,6 +52,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
             env,
             transaction,
             block,
+            precompiles,
             remove_eth_fn,
         }
     }
@@ -127,6 +135,65 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> REVMHandler<'env, I, E>
         // touch account so we know it is changed.
         caller_account.mark_touch();
 
+        Ok(())
+    }
+
+    /// Validates transaction against the state.
+    fn validate_tx_against_state<EXT, DB: Database>(
+        context: &mut Context<EXT, DB>,
+    ) -> Result<(), EVMError<DB::Error>> {
+        // load acc
+        let tx_caller = context.evm.env.tx.caller;
+        let (caller_account, _) = context
+            .evm
+            .journaled_state
+            .load_account(tx_caller, &mut context.evm.db)
+            .map_err(EVMError::Database)?;
+
+        let env = &context.evm.env;
+
+        // EIP-3607: Reject transactions from senders with deployed code
+        // This EIP is introduced after london but there was no collision in past
+        // so we can leave it enabled always
+        if !env.cfg.is_eip3607_disabled() && caller_account.info.code_hash != KECCAK_EMPTY {
+            return Err(InvalidTransaction::RejectCallerWithCode).map_err(EVMError::Transaction);
+        }
+
+        // Check that the transaction's nonce is correct
+        if let Some(tx) = env.tx.nonce {
+            let state = caller_account.info.nonce;
+            match tx.cmp(&state) {
+                Ordering::Greater => {
+                    return Err(InvalidTransaction::NonceTooHigh { tx, state })
+                        .map_err(EVMError::Transaction);
+                }
+                Ordering::Less => {
+                    return Err(InvalidTransaction::NonceTooLow { tx, state })
+                        .map_err(EVMError::Transaction);
+                }
+                _ => {}
+            }
+        }
+
+        let balance_check = U256::from(env.tx.gas_limit)
+            .checked_mul(env.tx.gas_price)
+            .and_then(|gas_cost| gas_cost.checked_add(env.tx.value))
+            .ok_or(InvalidTransaction::OverflowPaymentInTransaction)?;
+
+        // Check if account has enough balance for gas_limit*gas_price and value transfer.
+        // Transfer will be done inside `*_inner` functions.
+        if balance_check > caller_account.info.balance {
+            if env.cfg.is_balance_check_disabled() {
+                // Add transaction cost to balance to ensure execution doesn't fail.
+                caller_account.info.balance = balance_check;
+            } else {
+                return Err(InvalidTransaction::LackOfFundForMaxFee {
+                    fee: Box::new(balance_check),
+                    balance: Box::new(caller_account.info.balance),
+                })
+                .map_err(EVMError::Transaction);
+            }
+        }
         Ok(())
     }
 }
@@ -340,7 +407,9 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
     }
 }
 
-impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHandler<'env, I, E> {
+impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMHandler
+    for REVMHandler<'env, I, E, H>
+{
     fn transact_create(&mut self) -> TransactExecutionResult<TransactResult> {
         let mut state =
             ContractState::new(self.io, self.env, self.block, self.remove_eth_fn.take());
@@ -385,6 +454,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> EVMHandler for REVMHand
             .spec_id(EVM_FORK)
             .build();
         // Change handlers
+        let _ = self.precompiles;
+        evm.handler.validation.tx_against_state = Arc::new(Self::validate_tx_against_state);
         evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
         evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
         evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
