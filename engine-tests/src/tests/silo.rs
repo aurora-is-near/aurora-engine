@@ -33,8 +33,6 @@ const SILO_PARAMS_ARGS: SiloParamsArgs = SiloParamsArgs {
 // https://github.com/aurora-is-near/aurora-engine/blob/master/engine-tests/src/test_utils/mod.rs#L393
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_address_transfer_success() {
     // set up Aurora runner and accounts
@@ -101,14 +99,11 @@ fn test_transfer_insufficient_balance() {
             )
         })
         .unwrap();
-    #[cfg(feature = "revm-test")]
-    assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
-    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
     #[cfg(feature = "revm-test")]
-    let nonce = INITIAL_NONCE;
+    let nonce = INITIAL_NONCE + 1;
     #[cfg(feature = "sputnikvm-test")]
     let nonce = INITIAL_NONCE + 1;
     validate_address_balance_and_nonce(
@@ -123,8 +118,7 @@ fn test_transfer_insufficient_balance() {
         .unwrap();
 }
 
-// NOTE: REVM can't pass as OutOfGas
-#[cfg(feature = "sputnikvm-test")]
+// #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_transfer_insufficient_balance_fee() {
     const HALF_FIXED_GAS: EthGas = EthGas::new(10u64.pow(18) / 2);
@@ -248,8 +242,6 @@ fn test_transfer_with_low_gas_limit() {
         .unwrap();
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_relayer_balance_after_transfer() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
@@ -332,8 +324,6 @@ fn test_admin_access_right() {
     assert!(result.is_ok());
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_submit_access_right() {
     let (mut runner, signer, receiver) = initialize_transfer();
@@ -389,8 +379,6 @@ fn test_submit_access_right() {
         .unwrap();
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_submit_access_right_via_batch() {
     let (mut runner, signer, receiver) = initialize_transfer();
@@ -456,8 +444,6 @@ fn test_submit_access_right_via_batch() {
         .unwrap();
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_submit_with_disabled_whitelist() {
     let (mut runner, signer, receiver) = initialize_transfer();
@@ -521,8 +507,6 @@ fn test_submit_with_disabled_whitelist() {
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_submit_with_removing_entries() {
     let (mut runner, signer, receiver) = initialize_transfer();
@@ -585,8 +569,7 @@ fn test_submit_with_removing_entries() {
         .unwrap();
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
+// TODO: REVM: code size extends on 33 bytes
 #[test]
 fn test_deploy_access_rights() {
     let (mut runner, signer, _) = initialize_transfer();
@@ -631,8 +614,8 @@ fn test_deploy_access_rights() {
     let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
-    let stored_code = runner.get_code(address);
-    assert_eq!(code, stored_code);
+    #[cfg(feature = "sputnikvm-test")]
+    assert_eq!(code, runner.get_code(address));
 
     // Check that the balance and the nonce haven't been changed.
     validate_address_balance_and_nonce(
@@ -644,8 +627,7 @@ fn test_deploy_access_rights() {
     .unwrap();
 }
 
-// TODO: REVM: OutOfGas
-#[cfg(feature = "sputnikvm-test")]
+// TODO: REVM: code size extends on 33 bytes
 #[test]
 fn test_deploy_with_disabled_whitelist() {
     let (mut runner, signer, _) = initialize_transfer();
@@ -689,8 +671,9 @@ fn test_deploy_with_disabled_whitelist() {
     let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
-    let stored_code = runner.get_code(address);
-    assert_eq!(code, stored_code);
+    #[cfg(feature = "sputnikvm-test")]
+    assert_eq!(code, runner.get_code(address));
+    println!("LEN: {:?}", runner.get_code(address).len() - code.len());
 
     // Check that the balance and the nonce haven't been changed.
     validate_address_balance_and_nonce(
@@ -703,7 +686,7 @@ fn test_deploy_with_disabled_whitelist() {
 }
 
 // TODO: REVM: gas charged inside EVM
-#[cfg(feature = "sputnikvm-test")]
+// #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_switch_between_fix_gas() {
     const TRANSFER: Wei = Wei::new_u64(10_000_000);

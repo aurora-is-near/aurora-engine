@@ -78,14 +78,11 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
     let error = outcome.unwrap();
-    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(error.status, TransactionStatus::OutOfGas);
-    #[cfg(feature = "revm-test")]
-    assert_eq!(error.status, TransactionStatus::LackOfFundForMaxFee);
 
     // Validate post-state
     #[cfg(feature = "revm-test")]
-    let nonce = INITIAL_NONCE + 1;
+    let nonce = INITIAL_NONCE + 2;
     #[cfg(feature = "sputnikvm-test")]
     let nonce = INITIAL_NONCE + 2;
     utils::validate_address_balance_and_nonce(

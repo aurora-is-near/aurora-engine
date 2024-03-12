@@ -1,6 +1,7 @@
 use crate::prelude::{Address, U256};
 use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
 use crate::utils::{self, str_to_account_id};
+use aurora_engine::engine;
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
@@ -112,9 +113,15 @@ fn test_returndatacopy() {
         matches!(result.status, TransactionStatus::OutOfOffset),
         "EVM must run out of gas if len > 0 with large memory offset"
     );
+
     #[cfg(feature = "sputnikvm-test")]
     assert!(
         matches!(result.status, TransactionStatus::OutOfGas),
+        "EVM must run out of gas if len > 0 with large memory offset"
+    );
+    #[cfg(feature = "revm-test")]
+    assert!(
+        matches!(result.status, TransactionStatus::OutOfOffset),
         "EVM must run out of gas if len > 0 with large memory offset"
     );
 }
@@ -271,8 +278,7 @@ fn generate_code(len: usize) -> Vec<u8> {
     buf
 }
 
-// TODO: REVM: added 10^66 zero to the end of `stored_code`
-#[cfg(feature = "sputnikvm-test")]
+// TODO: REVM: code size extends on 33 bytes
 #[test]
 fn test_deploy_contract() {
     let (mut runner, mut signer, _) = initialize_transfer();
@@ -288,8 +294,8 @@ fn test_deploy_contract() {
     let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Confirm the code stored at that address is equal to the input code.
-    let stored_code = runner.get_code(address);
-    assert_eq!(code, stored_code);
+    #[cfg(feature = "sputnikvm-test")]
+    assert_eq!(code, runner.get_code(address));
 }
 
 #[test]
@@ -784,14 +790,11 @@ fn test_eth_transfer_insufficient_balance() {
             utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
         .unwrap();
-    #[cfg(feature = "revm-test")]
-    assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
-    #[cfg(feature = "sputnikvm-test")]
     assert_eq!(result.status, TransactionStatus::OutOfFund);
 
     // validate post-state
     #[cfg(feature = "revm-test")]
-    let nonce = INITIAL_NONCE;
+    let nonce = INITIAL_NONCE + 1;
     #[cfg(feature = "sputnikvm-test")]
     let nonce = INITIAL_NONCE + 1;
     utils::validate_address_balance_and_nonce(
@@ -871,8 +874,6 @@ fn test_tx_support_shanghai() {
     assert!(result.status.is_ok());
 }
 
-// TODO: REVM: gas charged inside EVN
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_eth_transfer_not_enough_gas() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
@@ -912,8 +913,6 @@ fn test_eth_transfer_not_enough_gas() {
         .unwrap();
 }
 
-// TODO: REVM: charge gas inside EVM
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_transfer_charging_gas_success() {
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
@@ -1124,8 +1123,6 @@ fn test_ft_metadata() {
 }
 
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
-// REVM: fee charged inside EVM, so tests fails
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_eth_transfer_with_max_gas_price() {
     // set up Aurora runner and accounts
@@ -1290,14 +1287,11 @@ mod workspace {
             .await
             .unwrap()
             .into_value();
-        #[cfg(feature = "revm-test")]
-        assert_eq!(result.status, TransactionStatus::LackOfFundForMaxFee);
-        #[cfg(feature = "sputnikvm-test")]
         assert_eq!(result.status, TransactionStatus::OutOfFund);
 
         // validate post-state
         #[cfg(feature = "revm-test")]
-        let nonce = INITIAL_NONCE;
+        let nonce = INITIAL_NONCE + 1;
         #[cfg(feature = "sputnikvm-test")]
         let nonce = INITIAL_NONCE + 1;
         assert_eq!(

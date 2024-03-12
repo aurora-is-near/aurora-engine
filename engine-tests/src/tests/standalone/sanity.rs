@@ -6,6 +6,7 @@ use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::cell::RefCell;
 
+// TODO: REVM: code size extends on 33 bytes
 #[test]
 fn test_deploy_code() {
     let chain_id: [u8; 32] = {
@@ -71,15 +72,6 @@ fn test_deploy_code() {
     assert_eq!(engine::get_generation(&io, &contract_address), 1);
     #[cfg(feature = "sputnikvm-test")]
     assert_eq!(engine::get_code(&io, &contract_address), code_to_deploy);
-    // TODO: REVM: unexprected behavior
-    #[cfg(feature = "revm-test")]
-    assert_eq!(
-        engine::get_code(&io, &contract_address),
-        [
-            1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-        ]
-    );
 }
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {

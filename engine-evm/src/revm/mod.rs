@@ -174,26 +174,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
                 _ => {}
             }
         }
-
-        let balance_check = U256::from(env.tx.gas_limit)
-            .checked_mul(env.tx.gas_price)
-            .and_then(|gas_cost| gas_cost.checked_add(env.tx.value))
-            .ok_or(InvalidTransaction::OverflowPaymentInTransaction)?;
-
-        // Check if account has enough balance for gas_limit*gas_price and value transfer.
-        // Transfer will be done inside `*_inner` functions.
-        if balance_check > caller_account.info.balance {
-            if env.cfg.is_balance_check_disabled() {
-                // Add transaction cost to balance to ensure execution doesn't fail.
-                caller_account.info.balance = balance_check;
-            } else {
-                return Err(InvalidTransaction::LackOfFundForMaxFee {
-                    fee: Box::new(balance_check),
-                    balance: Box::new(caller_account.info.balance),
-                })
-                .map_err(EVMError::Transaction);
-            }
-        }
         Ok(())
     }
 }
@@ -307,10 +287,6 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                 writes_counter += 1;
             }
             if old_balance != account.info.balance {
-                // aurora_engine_sdk::log!(
-                //     "{address:?} balance: {:?}",
-                //     old_balance - account.info.balance
-                // );
                 set_balance(&mut self.io, &address, &account.info.balance);
                 writes_counter += 1;
             }
@@ -419,6 +395,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
             .spec_id(EVM_FORK)
             .build();
         // Change handlers
+        let _ = self.precompiles;
+        evm.handler.validation.tx_against_state = Arc::new(Self::validate_tx_against_state);
         evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
         evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
         evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
