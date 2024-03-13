@@ -673,7 +673,6 @@ fn test_deploy_with_disabled_whitelist() {
     // Confirm the code stored at that address is equal to the input code.
     #[cfg(feature = "sputnikvm-test")]
     assert_eq!(code, runner.get_code(address));
-    println!("LEN: {:?}", runner.get_code(address).len() - code.len());
 
     // Check that the balance and the nonce haven't been changed.
     validate_address_balance_and_nonce(
@@ -685,8 +684,6 @@ fn test_deploy_with_disabled_whitelist() {
     .unwrap();
 }
 
-// TODO: REVM: gas charged inside EVM
-// #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_switch_between_fix_gas() {
     const TRANSFER: Wei = Wei::new_u64(10_000_000);

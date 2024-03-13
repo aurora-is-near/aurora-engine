@@ -53,6 +53,7 @@ tokio.workspace = true
 walrus.workspace = true
 # To fix REVM dependency issue
 once_cell = "1.19"
+auto_impl = "1.2"
 
 [features]
 mainnet-test = ["aurora-engine-workspace/mainnet-test", "revm-test"]

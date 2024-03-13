@@ -53,11 +53,12 @@ fn profile_ripemd160() {
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_identity() {
     let profile = precompile_execution_profile("test_identity");
+    #[cfg(feature = "error_refund")]
+    utils::assert_gas_bound(profile.all_gas(), 8);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 

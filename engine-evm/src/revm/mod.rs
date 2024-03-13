@@ -14,7 +14,6 @@ use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use aurora_engine_types::types::Wei;
 use aurora_engine_types::Vec;
 use core::cmp::Ordering;
-use revm::handler::LoadPrecompilesHandle;
 use revm::primitives::{
     Account, AccountInfo, Address, Bytecode, EVMError, Env, HashMap, InvalidTransaction,
     ResultAndState, SpecId, TransactTo, B256, KECCAK_EMPTY, U256,
@@ -57,19 +56,8 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
         }
     }
 
-    /// EVM precompiles
-    /// TODO: adjust it
-    pub fn set_precompiles<'a>(
-        precompiles: &LoadPrecompilesHandle<'a>,
-    ) -> LoadPrecompilesHandle<'a> {
-        // TODO: extend precompiles
-        // let c = precompiles();
-        // Arc::new(move || c.clone())
-        precompiles.clone()
-    }
-
     /// REVM Environment
-    fn evm_env(&self) -> Env {
+    fn evm_env(&self) -> Box<Env> {
         let mut env = Env::default();
 
         // Set Config data
@@ -109,12 +97,9 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
             })
             .collect();
         env.tx.gas_price = u256_to_u256(&self.block.gas_price);
-        // env.tx.nonce = get_nonce(origin)
-        // env.tx.gas_priority_fee
-        env
+        Box::new(env)
     }
 
-    // TODO: do we really need increment nonce and mark_touch (mark_touch affect storage write).
     #[inline]
     pub fn deduct_caller<EXT, DB: Database>(
         context: &mut Context<EXT, DB>,
@@ -122,12 +107,12 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
         // load caller's account.
         let (caller_account, _) = context
             .evm
+            .inner
             .journaled_state
-            .load_account(context.evm.env.tx.caller, &mut context.evm.db)
-            .map_err(EVMError::Database)?;
+            .load_account(context.evm.inner.env.tx.caller, &mut context.evm.inner.db)?;
 
         // bump the nonce for calls. Nonce for CREATE will be bumped in `handle_create`.
-        if matches!(context.evm.env.tx.transact_to, TransactTo::Call(_)) {
+        if matches!(context.evm.inner.env.tx.transact_to, TransactTo::Call(_)) {
             // Nonce is already checked
             caller_account.info.nonce = caller_account.info.nonce.saturating_add(1);
         }
@@ -146,11 +131,11 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
         let tx_caller = context.evm.env.tx.caller;
         let (caller_account, _) = context
             .evm
+            .inner
             .journaled_state
-            .load_account(tx_caller, &mut context.evm.db)
-            .map_err(EVMError::Database)?;
+            .load_account(tx_caller, &mut context.evm.inner.db)?;
 
-        let env = &context.evm.env;
+        let env = &context.evm.inner.env;
 
         // EIP-3607: Reject transactions from senders with deployed code
         // This EIP is introduced after london but there was no collision in past
@@ -392,7 +377,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         let mut evm = Evm::builder()
             .with_db(&mut state)
             .modify_env(|e| *e = self.evm_env())
-            .spec_id(EVM_FORK)
+            .with_spec_id(EVM_FORK)
             .build();
         // Change handlers
         let _ = self.precompiles;
@@ -429,7 +414,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         let mut evm = Evm::builder()
             .with_db(&mut state)
             .modify_env(|e| *e = self.evm_env())
-            .spec_id(EVM_FORK)
+            .with_spec_id(EVM_FORK)
             .build();
         // Change handlers
         let _ = self.precompiles;
@@ -438,9 +423,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
         evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));
         let exec_result = evm.transact();
-        // aurora_engine_sdk::log!("# transact_call");
         if let Ok(ResultAndState { result, state }) = exec_result {
-            // aurora_engine_sdk::log!("# success");
             evm.context.evm.db.commit(state);
             let logs = log_to_log(&result.logs());
             let used_gas = result.gas_used();
@@ -450,13 +433,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
                 logs,
             })
         } else {
-            // aurora_engine_sdk::log!("# error");
             let (status, fee) = exec_result_to_err(&exec_result.unwrap_err())?;
             let gas_used = fee.map_or(0, |fee| {
-                fee.checked_div(self.block.gas_price).map_or(0, |res| {
-                    // TODO: verify it
-                    res.low_u64()
-                })
+                fee.checked_div(self.block.gas_price)
+                    .map_or(0, |res| res.low_u64())
             });
             Ok(TransactResult {
                 submit_result: SubmitResult::new(status, gas_used, Vec::new()),
@@ -471,9 +451,10 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         let mut evm = Evm::builder()
             .with_db(&mut state)
             .modify_env(|e| *e = self.evm_env())
-            .spec_id(EVM_FORK)
+            .with_spec_id(EVM_FORK)
             .build();
         // Change handlers
+        evm.handler.validation.tx_against_state = Arc::new(Self::validate_tx_against_state);
         evm.handler.pre_execution.deduct_caller = Arc::new(Self::deduct_caller);
         evm.handler.post_execution.reimburse_caller = Arc::new(|_context, _gas| Ok(()));
         evm.handler.post_execution.reward_beneficiary = Arc::new(|_context, _gas| Ok(()));

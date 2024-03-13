@@ -18,7 +18,7 @@ aurora-engine-types.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 evm = { workspace = true, features = [ "create-fixed" ], optional = true }
-revm = { git = "https://github.com/bluealloy/revm", rev = "fecb507", default-features = false, optional = true }
+revm = { git = "https://github.com/bluealloy/revm", tag = "v32", default-features = false, optional = true }
 
 [features]
 default = ["evm-revm", "log"]
