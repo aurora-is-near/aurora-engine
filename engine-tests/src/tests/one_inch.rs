@@ -2,7 +2,7 @@ use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Wei, U256};
 use crate::utils::one_inch::liquidity_protocol;
 use crate::utils::{self, assert_gas_bound};
-use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::{borsh::BorshDeserialize, types::Address};
 use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
 use std::sync::Once;
@@ -99,8 +99,8 @@ fn test_1_inch_limit_order_deploy() {
 
     // more than 3.5 million Ethereum gas used
     assert!(result.gas_used > 3_500_000);
-    // less than 10 NEAR Tgas used
-    assert_gas_bound(profile.all_gas(), 10);
+    // less than 11 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 11);
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
@@ -121,15 +121,10 @@ fn deploy_1_inch_limit_order_contract(
     let constructor =
         utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
+    let weth = Address::from_array([0; 20]);
     let nonce = signer.use_nonce();
-    let deploy_tx = crate::prelude::transactions::legacy::TransactionLegacy {
-        nonce: nonce.into(),
-        gas_price: U256::default(),
-        gas_limit: u64::MAX.into(),
-        to: None,
-        value: Wei::default(),
-        data: constructor.code,
-    };
+    let deploy_tx =
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Address(weth.raw())]);
     let tx = utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
     let outcome = runner.call(utils::SUBMIT, "any_account.near", rlp::encode(&tx).to_vec());
 
