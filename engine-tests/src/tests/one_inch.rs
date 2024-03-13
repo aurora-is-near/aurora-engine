@@ -47,7 +47,7 @@ fn test_1inch_liquidity_protocol() {
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 36;
+    let near_gas_used = 34;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 18;
     assert_gas_bound(profile.all_gas(), near_gas_used);
@@ -104,7 +104,7 @@ fn test_1inch_liquidity_protocol() {
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
     #[cfg(feature = "revm-test")]
-    let near_gas_used = 42;
+    let near_gas_used = 40;
     #[cfg(feature = "sputnikvm-test")]
     let near_gas_used = 20;
     assert_gas_bound(profile.all_gas(), near_gas_used);

@@ -288,6 +288,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
                     set_code(&mut self.io, &address, code.bytes());
                     writes_counter += 1;
                     code_bytes_written = code.len();
+                    #[cfg(feature = "debug-commit")]
                     aurora_engine_sdk::log!(
                         "code_write_at_address {:?} {}",
                         address,
@@ -336,6 +337,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
             // NOTE: Since CANCUN hardfork it's unreachable
             accounting::Net::Lost(amount) => {
                 let _ = amount;
+                #[cfg(feature = "debug-commit")]
                 aurora_engine_sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
                 // TODO: implement for REVM
                 // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
@@ -360,6 +362,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env> DatabaseCommit
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
+        #[cfg(feature = "debug-commit")]
         aurora_engine_sdk::log!(
             "total_writes_count {} total_written_bytes {}",
             writes_counter,

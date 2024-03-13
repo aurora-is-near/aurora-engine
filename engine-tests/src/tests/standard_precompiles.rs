@@ -16,8 +16,6 @@ fn precompile_execution_profile(method: &str) -> ExecutionProfile {
     profile
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn test_standard_precompiles() {
     let (mut runner, mut signer, contract) = initialize();
@@ -29,76 +27,86 @@ fn test_standard_precompiles() {
     utils::panic_on_fail(outcome.status);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecrecover() {
     let profile = precompile_execution_profile("test_ecrecover");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 22);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_sha256() {
     let profile = precompile_execution_profile("test_sha256");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 8);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ripemd160() {
     let profile = precompile_execution_profile("test_ripemd160");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 8);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
 #[test]
 fn profile_identity() {
     let profile = precompile_execution_profile("test_identity");
-    #[cfg(feature = "error_refund")]
+    #[cfg(feature = "revm-test")]
     utils::assert_gas_bound(profile.all_gas(), 8);
     #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_modexp() {
     let profile = precompile_execution_profile("test_modexp");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 10);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecadd() {
     let profile = precompile_execution_profile("test_ecadd");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 8);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecmul() {
     let profile = precompile_execution_profile("test_ecmul");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 11);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
-// TODO: REVM: need precompiles
+// TODO: REVM: FunctionCallError - HostError(GasLimitExceeded
 #[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_ecpair() {
     let profile = precompile_execution_profile("test_ecpair");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 117);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 115);
 }
 
-// TODO: REVM: need precompiles
-#[cfg(feature = "sputnikvm-test")]
 #[test]
 fn profile_blake2f() {
     let profile = precompile_execution_profile("test_blake2f");
+    #[cfg(feature = "revm-test")]
+    utils::assert_gas_bound(profile.all_gas(), 8);
+    #[cfg(feature = "sputnikvm-test")]
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 

@@ -504,6 +504,7 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
  "aurora-engine-types",
+ "auto_impl",
  "ethabi",
  "evm",
  "hex",
