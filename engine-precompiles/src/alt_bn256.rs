@@ -2,6 +2,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
+use aurora_engine_types::vec;
 use bn::Group;
 use core::num::{NonZeroU64, NonZeroUsize};
 use evm::{Context, ExitError};
@@ -482,7 +483,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
             }
         };
 
-        let mut res = crate::vec![0u8; 32];
+        let mut res = vec![0u8; 32];
         output
             .to_big_endian(&mut res[0..32])
             .map_err(|_e| consts::ERR_BIG_ENDIAN)?;

@@ -511,6 +511,7 @@ dependencies = [
  "libsecp256k1",
  "num",
  "rand 0.8.5",
+ "revm",
  "ripemd",
  "serde",
  "serde_json",

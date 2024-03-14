@@ -16,7 +16,8 @@ aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
 bn.workspace = true
 ethabi.workspace = true
-evm.workspace = true
+evm = { workspace = true, optional = true }
+revm = { workspace = true, optional = true }
 hex.workspace = true
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 num.workspace = true
@@ -33,8 +34,10 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
-contract = ["aurora-engine-sdk/contract"]
+std = ["precompiles-revm", "aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+contract = ["precompiles-revm", "aurora-engine-sdk/contract"]
 log = []
 error_refund = []
 ext-connector = []
+precompiles-sputnikvm = ["evm"]
+precompiles-revm = ["revm"]

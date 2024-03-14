@@ -36,6 +36,7 @@ evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1"
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std"] }
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
+revm = { git = "https://github.com/bluealloy/revm", tag = "v32", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.18"
