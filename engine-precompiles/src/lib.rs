@@ -7,6 +7,8 @@
     clippy::missing_errors_doc,
     clippy::unreadable_literal
 )]
+extern crate alloc;
+
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod account_ids;
 #[cfg(feature = "precompiles-sputnikvm")]
@@ -28,14 +30,19 @@ pub mod prepaid_gas;
 pub mod promise_result;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod random;
+#[cfg(feature = "precompiles-revm")]
+mod revm;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod secp256k1;
 #[cfg(feature = "precompiles-sputnikvm")]
 mod sputnikvm;
+pub mod types;
 #[cfg(feature = "precompiles-sputnikvm")]
 mod utils;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod xcc;
 
+#[cfg(feature = "precompiles-revm")]
+pub use revm::*;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub use sputnikvm::*;

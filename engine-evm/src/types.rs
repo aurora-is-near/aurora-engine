@@ -1,4 +1,4 @@
-use alloc::borrow::Cow;
+use crate::{ExitError, ExitFatal, Log};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::types::Wei;
@@ -25,13 +25,6 @@ pub struct BlockInfo {
 pub struct TransactResult {
     pub submit_result: SubmitResult,
     pub logs: Vec<Log>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Log {
-    pub address: H160,
-    pub topics: Vec<H256>,
-    pub data: Vec<u8>,
 }
 
 /// EVM Runtime configuration.
@@ -140,37 +133,6 @@ pub struct Config {
 
 /// Transact execution result
 pub type TransactExecutionResult<T> = Result<T, TransactErrorKind>;
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
-pub enum ExitError {
-    StackUnderflow,
-    StackOverflow,
-    InvalidJump,
-    InvalidRange,
-    DesignatedInvalid,
-    CallTooDeep,
-    CreateCollision,
-    CreateContractLimit,
-    OutOfOffset,
-    OutOfGas,
-    OutOfFund,
-    #[allow(clippy::upper_case_acronyms)]
-    PCUnderflow,
-    CreateEmpty,
-    Other(Cow<'static, str>),
-    MaxNonce,
-    InvalidCode,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
-pub enum ExitFatal {
-    NotSupported,
-    UnhandledInterrupt,
-    CallErrorAsFatal(ExitError),
-    Other(Cow<'static, str>),
-}
 
 /// Errors with the EVM transact.
 #[derive(Debug, Clone, Eq, PartialEq)]

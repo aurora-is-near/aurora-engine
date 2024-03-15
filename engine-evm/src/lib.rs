@@ -22,9 +22,9 @@ mod revm;
 mod sputnikvm;
 mod types;
 
+pub use aurora_engine_precompiles::types::{ExitError, ExitFatal, Log};
 pub use types::{
-    BlockInfo, Config, ExitError, ExitFatal, Log, TransactErrorKind, TransactExecutionResult,
-    TransactResult, TransactionInfo,
+    BlockInfo, Config, TransactErrorKind, TransactExecutionResult, TransactResult, TransactionInfo,
 };
 
 #[cfg(feature = "evm-revm")]

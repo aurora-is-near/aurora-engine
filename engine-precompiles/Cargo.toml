@@ -34,10 +34,11 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["precompiles-revm", "aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
-contract = ["precompiles-revm", "aurora-engine-sdk/contract"]
+std = ["precompiles-sputnikvm", "aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+contract = ["precompiles-sputnikvm", "aurora-engine-sdk/contract"]
 log = []
 error_refund = []
 ext-connector = []
+impl-serde = []
 precompiles-sputnikvm = ["evm"]
 precompiles-revm = ["revm"]

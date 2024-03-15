@@ -56,8 +56,8 @@ once_cell = "1.19"
 auto_impl = "1.2"
 
 [features]
-mainnet-test = ["aurora-engine-workspace/mainnet-test", "revm-test"]
-testnet-test = ["aurora-engine-workspace/testnet-test", "revm-test"]
+mainnet-test = ["aurora-engine-workspace/mainnet-test", "sputnikvm-test"]
+testnet-test = ["aurora-engine-workspace/testnet-test", "sputnikvm-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
 ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]
 revm-test = ["aurora-engine-precompiles/precompiles-revm"]

@@ -165,7 +165,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     }
 }
 
-pub struct StackExecutorParams<'env, I, E, H> {
+pub struct §StackExecutorParams<'env, I, E, H> {
     precompiles: &'env Precompiles<'env, I, E, H>,
     gas_limit: u64,
 }
@@ -190,7 +190,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
         let state = executor::stack::MemoryStackState::new(metadata, contract_state);
-        executor::stack::StackExecutor::new_with_precompiles(state, CONFIG, self.precompiles)
+        executor::stack::StackExecutor::new_withprecompiles(state, CONFIG, self.precompiles)
     }
 }
 
@@ -516,16 +516,6 @@ impl<'env, J: IO + Copy, E: Env> ApplyBackend for ContractState<'env, J, E> {
             writes_counter,
             total_bytes
         );
-    }
-}
-
-impl From<Log> for crate::Log {
-    fn from(value: Log) -> Self {
-        Self {
-            address: value.address,
-            topics: value.topics,
-            data: value.data,
-        }
     }
 }
 
