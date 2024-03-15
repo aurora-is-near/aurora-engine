@@ -42,6 +42,8 @@ pub enum StoragePrefix {
     Engine = 0x05,
     BlockMetadata = 0x06,
     EngineAccountId = 0x07,
+    /// Prefix used for storing arbitrary data from the outside of the crate.
+    CustomData = 0x8,
 }
 
 impl From<StoragePrefix> for u8 {
@@ -55,6 +57,7 @@ impl From<StoragePrefix> for u8 {
             StoragePrefix::Engine => 0x05,
             StoragePrefix::BlockMetadata => 0x06,
             StoragePrefix::EngineAccountId => 0x07,
+            StoragePrefix::CustomData => 0x08,
         }
     }
 }
@@ -76,7 +79,7 @@ impl Storage {
         self.db.put(key, id.as_bytes())
     }
 
-    pub fn get_engine_account_id(&self) -> Result<AccountId, error::Error> {
+    pub fn get_engine_account_id(&self) -> Result<AccountId, Error> {
         let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
         let slice = self
             .db
@@ -87,15 +90,15 @@ impl Storage {
         Ok(account_id)
     }
 
-    pub fn get_latest_block(&self) -> Result<(H256, u64), error::Error> {
+    pub fn get_latest_block(&self) -> Result<(H256, u64), Error> {
         self.block_read(rocksdb::IteratorMode::End)
     }
 
-    pub fn get_earliest_block(&self) -> Result<(H256, u64), error::Error> {
+    pub fn get_earliest_block(&self) -> Result<(H256, u64), Error> {
         self.block_read(rocksdb::IteratorMode::Start)
     }
 
-    fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), error::Error> {
+    fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), Error> {
         let upper_bound = construct_storage_key(StoragePrefix::BlockHash, &u64::MAX.to_be_bytes());
         let lower_bound = construct_storage_key(StoragePrefix::BlockHash, &[]);
         let prefix_len = lower_bound.len();
@@ -104,7 +107,7 @@ impl Storage {
         opt.set_iterate_lower_bound(lower_bound);
 
         let mut iter = self.db.iterator_opt(mode, opt);
-        let (key, value) = iter.next().ok_or(error::Error::NoBlockAtHeight(0))??;
+        let (key, value) = iter.next().ok_or(Error::NoBlockAtHeight(0))??;
         let block_height = {
             let mut buf = [0u8; 8];
             buf.copy_from_slice(&key[prefix_len..]);
@@ -114,16 +117,16 @@ impl Storage {
         Ok((block_hash, block_height))
     }
 
-    pub fn get_block_hash_by_height(&self, block_height: u64) -> Result<H256, error::Error> {
+    pub fn get_block_hash_by_height(&self, block_height: u64) -> Result<H256, Error> {
         let storage_key =
             construct_storage_key(StoragePrefix::BlockHash, &block_height.to_be_bytes());
         self.db
             .get_pinned(storage_key)?
             .map(|slice| H256::from_slice(slice.as_ref()))
-            .ok_or(error::Error::NoBlockAtHeight(block_height))
+            .ok_or(Error::NoBlockAtHeight(block_height))
     }
 
-    pub fn get_block_height_by_hash(&self, block_hash: H256) -> Result<u64, error::Error> {
+    pub fn get_block_height_by_hash(&self, block_hash: H256) -> Result<u64, Error> {
         let storage_key = construct_storage_key(StoragePrefix::BlockHeight, block_hash.as_ref());
         self.db
             .get_pinned(storage_key)?
@@ -132,10 +135,10 @@ impl Storage {
                 buf.copy_from_slice(slice.as_ref());
                 u64::from_be_bytes(buf)
             })
-            .ok_or(error::Error::BlockNotFound(block_hash))
+            .ok_or(Error::BlockNotFound(block_hash))
     }
 
-    pub fn get_block_metadata(&self, block_hash: H256) -> Result<BlockMetadata, error::Error> {
+    pub fn get_block_metadata(&self, block_hash: H256) -> Result<BlockMetadata, Error> {
         let storage_key = construct_storage_key(StoragePrefix::BlockMetadata, block_hash.as_ref());
         self.db
             .get_pinned(storage_key)?
@@ -144,7 +147,7 @@ impl Storage {
                 buf.copy_from_slice(slice.as_ref());
                 BlockMetadata::from_bytes(buf)
             })
-            .ok_or(error::Error::BlockNotFound(block_hash))
+            .ok_or(Error::BlockNotFound(block_hash))
     }
 
     pub fn set_block_data(
@@ -169,15 +172,12 @@ impl Storage {
         self.db.write(batch)
     }
 
-    pub fn get_transaction_data(
-        &self,
-        tx_hash: H256,
-    ) -> Result<sync::types::TransactionMessage, error::Error> {
+    pub fn get_transaction_data(&self, tx_hash: H256) -> Result<TransactionMessage, Error> {
         let storage_key = construct_storage_key(StoragePrefix::TransactionData, tx_hash.as_ref());
         let bytes = self
             .db
             .get_pinned(storage_key)?
-            .ok_or(error::Error::TransactionHashNotFound(tx_hash))?;
+            .ok_or(Error::TransactionHashNotFound(tx_hash))?;
         let message = TransactionMessage::try_from_slice(bytes.as_ref())?;
         Ok(message)
     }
@@ -185,24 +185,21 @@ impl Storage {
     pub fn get_transaction_by_position(
         &self,
         tx_included: TransactionIncluded,
-    ) -> Result<H256, error::Error> {
+    ) -> Result<H256, Error> {
         let storage_key =
             construct_storage_key(StoragePrefix::TransactionHash, &tx_included.to_bytes());
         self.db
             .get_pinned(storage_key)?
             .map(|slice| H256::from_slice(slice.as_ref()))
-            .ok_or(error::Error::TransactionNotFound(tx_included))
+            .ok_or(Error::TransactionNotFound(tx_included))
     }
 
-    pub fn get_transaction_diff(
-        &self,
-        tx_included: TransactionIncluded,
-    ) -> Result<Diff, error::Error> {
+    pub fn get_transaction_diff(&self, tx_included: TransactionIncluded) -> Result<Diff, Error> {
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included.to_bytes());
         self.db
             .get_pinned(storage_key)?
             .map(|slice| Diff::try_from_bytes(slice.as_ref()).unwrap())
-            .ok_or(error::Error::TransactionNotFound(tx_included))
+            .ok_or(Error::TransactionNotFound(tx_included))
     }
 
     pub fn set_transaction_included(
@@ -210,7 +207,7 @@ impl Storage {
         tx_hash: H256,
         tx_included: &TransactionMessage,
         diff: &Diff,
-    ) -> Result<(), error::Error> {
+    ) -> Result<(), Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, value| {
             batch.put(key, value);
@@ -222,7 +219,7 @@ impl Storage {
         tx_hash: H256,
         tx_included: &TransactionMessage,
         diff: &Diff,
-    ) -> Result<(), error::Error> {
+    ) -> Result<(), Error> {
         let batch = rocksdb::WriteBatch::default();
         self.process_transaction(tx_hash, tx_included, diff, batch, |batch, key, _value| {
             batch.delete(key);
@@ -236,7 +233,7 @@ impl Storage {
         diff: &Diff,
         mut batch: rocksdb::WriteBatch,
         action: F,
-    ) -> Result<(), error::Error> {
+    ) -> Result<(), Error> {
         let tx_included = TransactionIncluded {
             block_hash: tx_msg.block_hash,
             position: tx_msg.position,
@@ -268,7 +265,7 @@ impl Storage {
     pub fn track_engine_key(
         &self,
         engine_key: &[u8],
-    ) -> Result<Vec<(u64, H256, DiffValue)>, error::Error> {
+    ) -> Result<Vec<(u64, H256, DiffValue)>, Error> {
         let db_key_prefix = construct_storage_key(StoragePrefix::Engine, engine_key);
         let n = db_key_prefix.len();
         let iter = self.db.prefix_iterator(&db_key_prefix);
@@ -409,6 +406,20 @@ impl Storage {
             engine_output,
             diff,
         }
+    }
+
+    /// Retrieve data for a key with `CustomData` prefix. A helper method which allows getting
+    /// arbitrary data from outside the crate.
+    pub fn get_custom_data(&self, key: &[u8]) -> Result<Option<Vec<u8>>, rocksdb::Error> {
+        let key = construct_storage_key(StoragePrefix::CustomData, key);
+        self.db.get(key)
+    }
+
+    /// Save data for a key with `CustomData` prefix. A helper method which allows saving
+    /// arbitrary data from outside the crate.
+    pub fn set_custom_data(&self, key: &[u8], value: &[u8]) -> Result<(), rocksdb::Error> {
+        let key = construct_storage_key(StoragePrefix::CustomData, key);
+        self.db.put(key, value)
     }
 }
 
