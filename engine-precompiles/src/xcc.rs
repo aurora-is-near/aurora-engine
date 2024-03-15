@@ -80,7 +80,7 @@ pub mod cross_contract_call {
         H256,
     };
 
-    /// Exit to Ethereum precompile address
+    /// NEAR Cross Contract Call precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
