@@ -332,7 +332,7 @@ yarn test
 condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
 category = "Test"
 command = "${CARGO}"
-dependencies = ["build-test"]
+dependencies = ["build-test", "build-aurora-eth-connector"]
 args = [
     "test",
     "--workspace",
@@ -345,7 +345,6 @@ args = [
 [tasks.test-connector]
 condition = { profiles = ["mainnet-silo", "testnet-silo"] }
 category = "Test"
-dependencies = ["build-aurora-eth-connector"]
 command = "${CARGO}"
 args = [
     "test",
