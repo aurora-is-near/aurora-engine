@@ -121,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn test_curent_account_precompile_id() {
+    fn test_current_account_precompile_id() {
         assert_eq!(
             CurrentAccount::ADDRESS,
             near_account_to_evm_address(b"currentAccountId")
