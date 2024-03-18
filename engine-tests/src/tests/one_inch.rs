@@ -2,7 +2,7 @@ use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Wei, U256};
 use crate::utils::one_inch::liquidity_protocol;
 use crate::utils::{self, assert_gas_bound};
-use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::{borsh::BorshDeserialize, types::Address};
 use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
 use std::sync::Once;
@@ -149,15 +149,10 @@ fn deploy_1_inch_limit_order_contract(
     let constructor =
         utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
+    let weth = Address::from_array([0; 20]);
     let nonce = signer.use_nonce();
-    let deploy_tx = crate::prelude::transactions::legacy::TransactionLegacy {
-        nonce: nonce.into(),
-        gas_price: U256::default(),
-        gas_limit: u64::MAX.into(),
-        to: None,
-        value: Wei::default(),
-        data: constructor.code,
-    };
+    let deploy_tx =
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Address(weth.raw())]);
     let tx = utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
     let outcome = runner.call(utils::SUBMIT, "any_account.near", rlp::encode(&tx).to_vec());
 
