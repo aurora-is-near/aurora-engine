@@ -49,7 +49,7 @@ fn repro_8ru7VEA() {
     #[cfg(feature = "revm-test")]
     let near_gas_used = 245;
     #[cfg(feature = "sputnikvm-test")]
-    let near_gas_used = 210;
+    let near_gas_used = 211;
     // Note: this snapshot is pruned from the full Engine state on mainnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.

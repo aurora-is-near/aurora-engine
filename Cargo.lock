@@ -576,7 +576,6 @@ dependencies = [
  "near-primitives-core",
  "near-sdk",
  "near-vm-runner",
- "once_cell",
  "rand 0.8.5",
  "reqwest",
  "rlp",

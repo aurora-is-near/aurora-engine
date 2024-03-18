@@ -936,7 +936,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             mod_exp_algorithm: self.modexp_algorithm,
         });
 
-        Self::apply_pause_flags_eto_precompiles(precompiles, pause_flags)
+        Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
     }
 
     fn apply_pause_flags_to_precompiles<H: ReadOnlyPromiseHandler>(

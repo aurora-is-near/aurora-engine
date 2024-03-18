@@ -43,7 +43,7 @@ impl PrecompileOutput {
     }
 }
 
-pub(crate) type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
+pub type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -383,7 +383,8 @@ pub enum AllPrecompiles<'a, I, E, H> {
     Generic(Box<dyn Precompile>),
 }
 
-pub(crate) const fn make_h256(x: u128, y: u128) -> H256 {
+#[must_use]
+pub const fn make_h256(x: u128, y: u128) -> H256 {
     let x_bytes = x.to_be_bytes();
     let y_bytes = y.to_be_bytes();
     H256([
@@ -481,7 +482,7 @@ mod tests {
                 _context: &Context,
                 _is_static: bool,
             ) -> crate::EvmPrecompileResult {
-                Ok(PrecompileOutput::default())
+                Ok(super::PrecompileOutput::default())
             }
         }
 

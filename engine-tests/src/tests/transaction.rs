@@ -83,8 +83,7 @@ fn test_eip_1559_example() {
     let outcome = runner
         .call(utils::SUBMIT, sender, encode_tx(&signed_tx))
         .unwrap();
-    let result =
-        SubmitResult::try_from_slice(&outcome.return_data.clone().as_value().unwrap()).unwrap();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert_eq!(result.gas_used, 0xb8d2);
 
     // Check post state:
