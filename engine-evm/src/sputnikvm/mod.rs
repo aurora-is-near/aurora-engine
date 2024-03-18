@@ -1,10 +1,9 @@
-use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
-
 use crate::sputnikvm::utility::{
     compute_block_hash, exit_reason_into_result, get_balance, get_code, get_generation, get_nonce,
     get_storage, is_account_empty, remove_account, remove_all_storage, remove_storage, set_balance,
     set_code, set_nonce, set_storage,
 };
+use crate::{BlockInfo, EVMHandler, TransactExecutionResult, TransactResult, TransactionInfo};
 use aurora_engine_precompiles::Precompiles;
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
@@ -165,7 +164,7 @@ impl<'env, I: IO + Copy, E: Env, H: PromiseHandler> EVMHandler for SputnikVMHand
     }
 }
 
-pub struct §StackExecutorParams<'env, I, E, H> {
+pub struct StackExecutorParams<'env, I, E, H> {
     precompiles: &'env Precompiles<'env, I, E, H>,
     gas_limit: u64,
 }

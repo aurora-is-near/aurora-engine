@@ -36,7 +36,6 @@ mod revm;
 pub mod secp256k1;
 #[cfg(feature = "precompiles-sputnikvm")]
 mod sputnikvm;
-pub mod types;
 #[cfg(feature = "precompiles-sputnikvm")]
 mod utils;
 #[cfg(feature = "precompiles-sputnikvm")]

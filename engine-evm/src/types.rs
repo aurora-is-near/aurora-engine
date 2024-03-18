@@ -1,4 +1,4 @@
-use crate::{ExitError, ExitFatal, Log};
+use alloc::borrow::Cow;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_engine_types::types::Wei;
@@ -153,4 +153,42 @@ impl From<ExitFatal> for TransactErrorKind {
     fn from(e: ExitFatal) -> Self {
         Self::EvmFatal(e)
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Log {
+    pub address: H160,
+    pub topics: Vec<H256>,
+    pub data: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
+pub enum ExitError {
+    StackUnderflow,
+    StackOverflow,
+    InvalidJump,
+    InvalidRange,
+    DesignatedInvalid,
+    CallTooDeep,
+    CreateCollision,
+    CreateContractLimit,
+    OutOfOffset,
+    OutOfGas,
+    OutOfFund,
+    #[allow(clippy::upper_case_acronyms)]
+    PCUnderflow,
+    CreateEmpty,
+    Other(Cow<'static, str>),
+    MaxNonce,
+    InvalidCode,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
+pub enum ExitFatal {
+    NotSupported,
+    UnhandledInterrupt,
+    CallErrorAsFatal(ExitError),
+    Other(Cow<'static, str>),
 }

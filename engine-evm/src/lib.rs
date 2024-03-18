@@ -22,7 +22,7 @@ mod revm;
 mod sputnikvm;
 mod types;
 
-pub use aurora_engine_precompiles::types::{ExitError, ExitFatal, Log};
+pub use crate::types::{ExitError, ExitFatal, Log};
 pub use types::{
     BlockInfo, Config, TransactErrorKind, TransactExecutionResult, TransactResult, TransactionInfo,
 };
