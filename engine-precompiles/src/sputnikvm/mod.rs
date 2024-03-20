@@ -1,3 +1,5 @@
+mod identity;
+
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
@@ -17,13 +19,16 @@ use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
+use aurora_engine_types::{
+    account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Borrowed, Box,
+};
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
 use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
+use revm::precompile::PrecompileError;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
@@ -39,6 +44,40 @@ impl PrecompileOutput {
             cost,
             output,
             logs: Vec::new(),
+        }
+    }
+}
+
+impl From<crate::PrecompileError> for ExitError {
+    fn from(value: crate::PrecompileError) -> Self {
+        match value {
+            crate::PrecompileError::OutOfGas => Self::OutOfGas,
+            crate::PrecompileError::Blake2WrongLength => Self::Other(Borrowed("Blake2WrongLength")),
+            crate::PrecompileError::Blake2WrongFinalIndicatorFlag => {
+                Self::Other(Borrowed("Blake2WrongFinalIndicatorFlag"))
+            }
+            crate::PrecompileError::ModexpExpOverflow => Self::Other(Borrowed("ModexpExpOverflow")),
+            crate::PrecompileError::ModexpBaseOverflow => {
+                Self::Other(Borrowed("ModexpBaseOverflow"))
+            }
+            crate::PrecompileError::ModexpModOverflow => Self::Other(Borrowed("ModexpModOverflow")),
+            crate::PrecompileError::Bn128FieldPointNotAMember => {
+                Self::Other(Borrowed("Bn128FieldPointNotAMember"))
+            }
+            crate::PrecompileError::Bn128AffineGFailedToCreate => {
+                Self::Other(Borrowed("Bn128AffineGFailedToCreate"))
+            }
+            crate::PrecompileError::Bn128PairLength => Self::Other(Borrowed("Bn128PairLength")),
+            crate::PrecompileError::BlobInvalidInputLength => {
+                Self::Other(Borrowed("BlobInvalidInputLength"))
+            }
+            crate::PrecompileError::BlobMismatchedVersion => {
+                Self::Other(Borrowed("BlobMismatchedVersion"))
+            }
+            crate::PrecompileError::BlobVerifyKzgProofFailed => {
+                Self::Other(Borrowed("BlobVerifyKzgProofFailed"))
+            }
+            crate::PrecompileError::Other(err) => Self::Other(err),
         }
     }
 }

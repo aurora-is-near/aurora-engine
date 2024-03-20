@@ -24,7 +24,7 @@ num.workspace = true
 ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-auto_impl = "1.2"
+once_cell = { version = "1.19.0", optional = true }
 
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
@@ -34,11 +34,11 @@ serde_json.workspace = true
 
 [features]
 default = ["std"]
-std = ["precompiles-sputnikvm", "aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
-contract = ["precompiles-sputnikvm", "aurora-engine-sdk/contract"]
+std = ["precompiles-revm", "aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+contract = ["precompiles-revm", "aurora-engine-sdk/contract"]
 log = []
 error_refund = []
 ext-connector = []
 impl-serde = []
 precompiles-sputnikvm = ["evm"]
-precompiles-revm = ["revm"]
+precompiles-revm = ["revm", "once_cell"]

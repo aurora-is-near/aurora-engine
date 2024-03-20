@@ -18,6 +18,7 @@ use evm::{executor, Config, CreateScheme};
 
 mod accounting;
 pub mod errors;
+mod identity;
 mod utility;
 
 pub const CONFIG: &Config = &Config::shanghai();

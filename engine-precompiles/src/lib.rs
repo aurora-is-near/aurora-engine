@@ -17,12 +17,12 @@ pub mod alt_bn256;
 pub mod blake2;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod hash;
-#[cfg(feature = "precompiles-sputnikvm")]
 pub mod identity;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod modexp;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod native;
+#[cfg(feature = "precompiles-sputnikvm")]
 mod prelude;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod prepaid_gas;
@@ -40,8 +40,48 @@ mod sputnikvm;
 mod utils;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub mod xcc;
-
+use aurora_engine_types::{Borrowed, Cow, Vec};
+use core::num::TryFromIntError;
 #[cfg(feature = "precompiles-revm")]
 pub use revm::*;
 #[cfg(feature = "precompiles-sputnikvm")]
 pub use sputnikvm::*;
+
+pub type PrecompileResult = Result<(u64, Vec<u8>), PrecompileError>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum PrecompileError {
+    /// out of gas is the main error. Others are here just for completeness
+    OutOfGas,
+    // Blake2 errors
+    Blake2WrongLength,
+    Blake2WrongFinalIndicatorFlag,
+    // Modexp errors
+    ModexpExpOverflow,
+    ModexpBaseOverflow,
+    ModexpModOverflow,
+    // Bn128 errors
+    Bn128FieldPointNotAMember,
+    Bn128AffineGFailedToCreate,
+    Bn128PairLength,
+    // Blob errors
+    /// The input length is not exactly 192 bytes.
+    BlobInvalidInputLength,
+    /// The commitment does not match the versioned hash.
+    BlobMismatchedVersion,
+    /// The proof verification failed.
+    BlobVerifyKzgProofFailed,
+    /// Catch-all variant for other errors.
+    Other(Cow<'static, str>),
+}
+
+//===========================
+// Utils
+
+pub const fn calc_linear_cost_u32(len: u64, base: u64, word: u64) -> u64 {
+    (len + 32 - 1) / 32 * word + base
+}
+
+pub const fn err_usize_conv(_e: TryFromIntError) -> PrecompileError {
+    PrecompileError::Other(Borrowed("ERR_USIZE_CONVERSION"))
+}
