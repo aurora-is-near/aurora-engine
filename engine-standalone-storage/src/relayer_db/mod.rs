@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
@@ -69,9 +71,9 @@ pub fn initialize_transactions<I>(
 where
     I: FallibleIterator<Item = types::TransactionRow, Error = postgres::Error>,
 {
-    let signer_account_id = "relayer.aurora".parse().unwrap();
-    let predecessor_account_id: AccountId = "relayer.aurora".parse().unwrap();
-    let current_account_id = "aurora".parse().unwrap();
+    let signer_account_id = AccountId::from_str("relayer.aurora").expect("valid account_id");
+    let predecessor_account_id = AccountId::from_str("relayer.aurora").expect("valid account_id");
+    let current_account_id = AccountId::from_str("aurora").expect("valid account_id");
     let relayer_address =
         aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let mut env = env::Fixed {

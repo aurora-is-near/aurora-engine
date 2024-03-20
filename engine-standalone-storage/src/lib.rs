@@ -198,7 +198,9 @@ impl Storage {
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included.to_bytes());
         self.db
             .get_pinned(storage_key)?
-            .map(|slice| Diff::try_from_bytes(slice.as_ref()).unwrap())
+            .map(|slice| {
+                Diff::try_from_bytes(slice.as_ref()).expect("transaction_diff should be valid")
+            })
             .ok_or(Error::TransactionNotFound(tx_included))
     }
 
@@ -249,12 +251,12 @@ impl Storage {
         action(&mut batch, &storage_key, &msg_bytes);
 
         let storage_key = construct_storage_key(StoragePrefix::Diff, &tx_included_bytes);
-        let diff_bytes = diff.try_to_bytes().unwrap();
+        let diff_bytes = diff.try_to_bytes().expect("diff should be valid");
         action(&mut batch, &storage_key, &diff_bytes);
 
         for (key, value) in diff {
             let storage_key = construct_engine_key(key, block_height, tx_included.position);
-            let value_bytes = value.try_to_bytes().unwrap();
+            let value_bytes = value.try_to_bytes().expect("value should be valid");
             action(&mut batch, &storage_key, &value_bytes);
         }
 
@@ -275,7 +277,7 @@ impl Storage {
             if k.len() < n || k[0..n] != db_key_prefix {
                 break;
             }
-            let value = DiffValue::try_from_bytes(v.as_ref()).unwrap();
+            let value = DiffValue::try_from_bytes(v.as_ref()).expect("diff should be valid");
             let block_height = {
                 let mut buf = [0u8; 8];
                 buf.copy_from_slice(&k[n..(n + 8)]);
@@ -314,7 +316,7 @@ impl Storage {
 
         while iter.valid() {
             // unwrap is safe because the iterator is valid
-            let db_key = iter.key().unwrap().to_vec();
+            let db_key = iter.key().expect("iterator should be valid").to_vec();
             if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
                 break;
             }
@@ -335,7 +337,7 @@ impl Storage {
                 iter.seek_for_prev(&desired_db_key);
 
                 let value = if iter.valid() {
-                    let bytes = iter.value().unwrap();
+                    let bytes = iter.value().expect("iterator should be valid");
                     DiffValue::try_from_bytes(bytes).unwrap_or_else(|e| {
                         panic!(
                             "Could not deserialize key={} value={} error={:?}",

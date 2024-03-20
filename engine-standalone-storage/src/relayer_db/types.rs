@@ -183,7 +183,7 @@ impl TryFrom<postgres::Row> for TransactionRow {
             near_hash,
             near_receipt_hash,
             from,
-            to: to.map(|arr| Address::try_from_slice(arr).unwrap()),
+            to: to.map(|arr| Address::try_from_slice(arr).expect("address should be valid")),
             nonce,
             gas_price,
             gas_limit,
@@ -221,7 +221,7 @@ impl From<TransactionRow> for EthTransactionKind {
 
 fn get_numeric(row: &postgres::Row, field: &str) -> U256 {
     let value: PostgresNumeric = row.get(field);
-    U256::try_from(value).unwrap()
+    U256::try_from(value).expect("postgres numeric should be valid")
 }
 
 fn get_hash(row: &postgres::Row, field: &str) -> H256 {
@@ -231,7 +231,7 @@ fn get_hash(row: &postgres::Row, field: &str) -> H256 {
 
 fn get_address(row: &postgres::Row, field: &str) -> Address {
     let value: &[u8] = row.get(field);
-    Address::try_from_slice(value).unwrap()
+    Address::try_from_slice(value).expect("address should be valid")
 }
 
 fn get_timestamp(row: &postgres::Row, field: &str) -> Option<u64> {
