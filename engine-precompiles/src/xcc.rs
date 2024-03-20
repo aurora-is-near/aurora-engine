@@ -1,7 +1,6 @@
 //! Cross contract call precompile.
 //!
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
-//! TODO: How they work (low level explanation with examples)
 
 use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
