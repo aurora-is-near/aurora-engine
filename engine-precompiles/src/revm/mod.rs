@@ -83,3 +83,10 @@ pub fn cancun() -> &'static revm::precompile::Precompiles {
 pub fn latest() -> &'static revm::precompile::Precompiles {
     cancun()
 }
+
+#[must_use]
+pub(crate) const fn to_address(
+    address: aurora_engine_types::types::Address,
+) -> revm::primitives::Address {
+    revm::primitives::Address::new(address.raw().0)
+}

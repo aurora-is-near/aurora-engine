@@ -21,8 +21,8 @@ evm = { workspace = true, features = [ "create-fixed" ], optional = true }
 revm = { workspace = true, optional = true }
 
 [features]
-default = ["evm-revm", "log"]
-std = ["revm/std"]
+default = ["evm-sputnikvm", "log"]
+std = ["evm/std"]
 evm-sputnikvm = ["evm", "aurora-engine-precompiles/precompiles-sputnikvm"]
 evm-revm = ["revm", "aurora-engine-precompiles/precompiles-revm"]
 integration-test = []

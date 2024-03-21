@@ -4,7 +4,6 @@ use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
 use crate::hash::{RIPEMD160, SHA256};
-use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
 use crate::prelude::types::EthGas;
@@ -28,7 +27,8 @@ use evm::executor::{
 };
 use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
-use revm::precompile::PrecompileError;
+
+pub use identity::Identity;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
@@ -473,7 +473,7 @@ mod tests {
         assert_eq!(crate::secp256k1::ECRecover::ADDRESS, u8_to_address(1));
         assert_eq!(crate::hash::SHA256::ADDRESS, u8_to_address(2));
         assert_eq!(crate::hash::RIPEMD160::ADDRESS, u8_to_address(3));
-        assert_eq!(crate::identity::Identity::ADDRESS, u8_to_address(4));
+        assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));
         assert_eq!(super::ModExp::<crate::Byzantium>::ADDRESS, u8_to_address(5));
         assert_eq!(
             super::Bn256Add::<crate::Istanbul>::ADDRESS,

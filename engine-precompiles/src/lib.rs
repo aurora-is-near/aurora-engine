@@ -78,10 +78,12 @@ pub enum PrecompileError {
 //===========================
 // Utils
 
+#[must_use]
 pub const fn calc_linear_cost_u32(len: u64, base: u64, word: u64) -> u64 {
     (len + 32 - 1) / 32 * word + base
 }
 
+#[must_use]
 pub const fn err_usize_conv(_e: TryFromIntError) -> PrecompileError {
     PrecompileError::Other(Borrowed("ERR_USIZE_CONVERSION"))
 }

@@ -1,6 +1,7 @@
-use crate::utils::calc_linear_cost_u32;
-use crate::PrecompileError;
-use evm::ExitError;
+use crate::{calc_linear_cost_u32, PrecompileError};
+use aurora_engine_types::types::{make_address, Address};
+
+pub const ADDRESS: Address = make_address(0, 4);
 
 /// The base cost of the operation.
 const IDENTITY_BASE: u64 = 15;
@@ -8,8 +9,8 @@ const IDENTITY_BASE: u64 = 15;
 /// The cost per word.
 const IDENTITY_PER_WORD: u64 = 3;
 
-pub fn required_gas(input: &[u8]) -> Result<u64, ExitError> {
-    let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
+pub fn required_gas(input: &[u8]) -> Result<u64, PrecompileError> {
+    let input_len = u64::try_from(input.len()).map_err(crate::err_usize_conv)?;
     Ok(calc_linear_cost_u32(
         input_len,
         IDENTITY_BASE,

@@ -61,15 +61,14 @@ fn test_trace_precompile_direct_call() {
             caller: H160::default(),
             apparent_value: U256::zero(),
         };
-        let result =
-            aurora_engine_precompiles::identity::Identity.run(&input, None, &context, false);
+        let result = aurora_engine_precompiles::Identity.run(&input, None, &context, false);
         result.unwrap().cost.as_u64()
     };
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: u64::MAX.into(),
-        to: Some(aurora_engine_precompiles::identity::Identity::ADDRESS),
+        to: Some(aurora_engine_precompiles::Identity::ADDRESS),
         value: Wei::zero(),
         data: input.clone(),
     };
@@ -93,7 +92,7 @@ fn test_trace_precompile_direct_call() {
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
         from: utils::address_from_secret_key(&signer.secret_key),
-        to: Some(aurora_engine_precompiles::identity::Identity::ADDRESS),
+        to: Some(aurora_engine_precompiles::Identity::ADDRESS),
         value: U256::zero(),
         gas: u64::MAX,
         gas_used: intrinsic_cost + precompile_cost,
