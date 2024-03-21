@@ -80,9 +80,10 @@ impl FtTransferMessageData {
             }
         })?;
 
-        // Parse the fee from the message slice. It should contain 32 bytes,
-        // but after that, it will be parsed to u128.
-        // This logic is for compatibility.
+        // Parse the fee from the message slice.
+        // The fee is expected to be represented as a 32-byte value in the message.
+        // However, it will be parsed and converted to a u128 for further processing.
+        // This parsing logic is implemented to ensure compatibility
         let fee_u128: u128 = U256::from_little_endian(&data[..32])
             .try_into()
             .map_err(|_| errors::ParseOnTransferMessageError::OverflowNumber)?;
