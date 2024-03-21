@@ -69,7 +69,7 @@ impl TransactionMessage {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         let borshable: BorshableTransactionMessage = self.into();
-        borsh::to_vec(&borshable).unwrap()
+        borsh::to_vec(&borshable).expect("self to be valid")
     }
 
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, std::io::Error> {
