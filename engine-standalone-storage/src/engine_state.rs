@@ -102,7 +102,7 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
         let value = iter.next().and_then(|maybe_elem| {
             maybe_elem
                 .ok()
-                .map(|(_, value)| DiffValue::try_from_bytes(&value).expect("value should be valid"))
+                .map(|(_, value)| DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
         })?;
         value.take_value().map(EngineStorageValue::Vec)
     }
