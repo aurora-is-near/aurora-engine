@@ -6,6 +6,7 @@
     clippy::missing_panics_doc,
     clippy::missing_errors_doc
 )]
+#![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};

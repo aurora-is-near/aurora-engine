@@ -1,7 +1,6 @@
 //! Cross contract call precompile.
 //!
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
-//! TODO: How they work (low level explanation with examples)
 
 use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
@@ -80,7 +79,7 @@ pub mod cross_contract_call {
         H256,
     };
 
-    /// Exit to Ethereum precompile address
+    /// NEAR Cross Contract Call precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`

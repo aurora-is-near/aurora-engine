@@ -7,6 +7,7 @@
     clippy::missing_errors_doc,
     clippy::unreadable_literal
 )]
+#![forbid(unsafe_code)]
 extern crate alloc;
 
 #[cfg(feature = "precompiles-sputnikvm")]
