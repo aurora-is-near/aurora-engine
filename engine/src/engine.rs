@@ -10,7 +10,7 @@ use crate::{errors, state};
 use aurora_engine_sdk::caching::FullCache;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
+use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 
 #[cfg(not(feature = "ext-connector"))]
 use crate::contract_methods::connector;
@@ -927,31 +927,17 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let env = self.env;
         let ro_promise_handler = handler.read_only();
 
-        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
-            current_account_id,
-            random_seed,
-            io,
-            env,
-            promise_handler: ro_promise_handler,
-            mod_exp_algorithm: self.modexp_algorithm,
-        });
-
-        Self::apply_pause_flags_to_precompiles(precompiles, pause_flags)
-    }
-
-    fn apply_pause_flags_to_precompiles<H: ReadOnlyPromiseHandler>(
-        precompiles: Precompiles<'env, I, E, H>,
-        pause_flags: PrecompileFlags,
-    ) -> Precompiles<'env, I, E, H> {
-        Precompiles {
-            paused_precompiles: precompiles
-                .all_precompiles
-                .keys()
-                .filter(|address| pause_flags.is_paused_by_address(address))
-                .copied()
-                .collect(),
-            all_precompiles: precompiles.all_precompiles,
-        }
+        Precompiles::new(
+            PrecompileConstructorContext {
+                current_account_id,
+                random_seed,
+                io,
+                env,
+                promise_handler: ro_promise_handler,
+                mod_exp_algorithm: self.modexp_algorithm,
+            },
+            |address| pause_flags.is_paused_by_address(address),
+        )
     }
 
     fn view_with_selector(

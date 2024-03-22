@@ -48,6 +48,21 @@ impl PrecompileOutput {
     }
 }
 
+// fn apply_pause_flags_to_precompiles<H: ReadOnlyPromiseHandler>(
+//     precompiles: Precompiles<'env, I, E, H>,
+//     pause_flags: PrecompileFlags,
+// ) -> Precompiles<'env, I, E, H> {
+//     Precompiles {
+//         paused_precompiles: precompiles
+//             .all_precompiles
+//             .keys()
+//             .filter(|address| pause_flags.is_paused_by_address(address))
+//             .copied()
+//             .collect(),
+//         all_precompiles: precompiles.all_precompiles,
+//     }
+// }
+
 impl From<crate::PrecompileError> for ExitError {
     fn from(value: crate::PrecompileError) -> Self {
         match value {
@@ -223,6 +238,25 @@ pub struct PrecompileConstructorContext<'a, I, E, H, M> {
 }
 
 impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, H> {
+    pub fn new<M, F>(ctx: PrecompileConstructorContext<'a, I, E, H, M>, fn_is_paused: F) -> Self
+    where
+        M: ModExpAlgorithm + 'static,
+        F: Fn(&Address) -> bool,
+    {
+        // Default HF
+        let precompiles = Self::new_london(ctx);
+        // Set paused precompiles
+        Precompiles {
+            paused_precompiles: precompiles
+                .all_precompiles
+                .keys()
+                .filter(|address| fn_is_paused(address))
+                .copied()
+                .collect(),
+            all_precompiles: precompiles.all_precompiles,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn new_homestead<M: ModExpAlgorithm + 'static>(
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
