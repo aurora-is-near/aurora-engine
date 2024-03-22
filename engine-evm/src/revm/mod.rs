@@ -49,15 +49,15 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
         Self {
             io,
             env,
+            precompiles,
             transaction,
             block,
-            precompiles,
             remove_eth_fn,
         }
     }
 
     /// REVM Environment
-    fn evm_env(&self) -> Box<Env> {
+    fn evm_env(&self) -> Env {
         let mut env = Env::default();
 
         // Set Config data
@@ -97,7 +97,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
             })
             .collect();
         env.tx.gas_price = u256_to_u256(&self.block.gas_price);
-        Box::new(env)
+        env
     }
 
     #[inline]
@@ -141,7 +141,9 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
         // This EIP is introduced after london but there was no collision in past
         // so we can leave it enabled always
         if !env.cfg.is_eip3607_disabled() && caller_account.info.code_hash != KECCAK_EMPTY {
-            return Err(InvalidTransaction::RejectCallerWithCode).map_err(EVMError::Transaction);
+            return Err(EVMError::Transaction(
+                InvalidTransaction::RejectCallerWithCode,
+            ));
         }
 
         // Check that the transaction's nonce is correct
@@ -149,14 +151,18 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler>
             let state = caller_account.info.nonce;
             match tx.cmp(&state) {
                 Ordering::Greater => {
-                    return Err(InvalidTransaction::NonceTooHigh { tx, state })
-                        .map_err(EVMError::Transaction);
+                    return Err(EVMError::Transaction(InvalidTransaction::NonceTooHigh {
+                        tx,
+                        state,
+                    }));
                 }
                 Ordering::Less => {
-                    return Err(InvalidTransaction::NonceTooLow { tx, state })
-                        .map_err(EVMError::Transaction);
+                    return Err(EVMError::Transaction(InvalidTransaction::NonceTooLow {
+                        tx,
+                        state,
+                    }));
                 }
-                _ => {}
+                Ordering::Equal => {}
             }
         }
         Ok(())
@@ -379,7 +385,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
             ContractState::new(self.io, self.env, self.block, self.remove_eth_fn.take());
         let mut evm = Evm::builder()
             .with_db(&mut state)
-            .modify_env(|e| *e = self.evm_env())
+            .modify_env(|e| **e = self.evm_env())
             .with_spec_id(EVM_FORK)
             .build();
         // Change handlers
@@ -391,7 +397,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         let exec_result = evm.transact();
         if let Ok(ResultAndState { result, state }) = exec_result {
             evm.context.evm.db.commit(state);
-            let logs = log_to_log(&result.logs());
+            let logs = log_to_log(result.logs());
             let used_gas = result.gas_used();
             let status = execution_result_into_result(result)?;
             Ok(TransactResult {
@@ -416,7 +422,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
             ContractState::new(self.io, self.env, self.block, self.remove_eth_fn.take());
         let mut evm = Evm::builder()
             .with_db(&mut state)
-            .modify_env(|e| *e = self.evm_env())
+            .modify_env(|e| **e = self.evm_env())
             .with_spec_id(EVM_FORK)
             .build();
         // Change handlers
@@ -428,7 +434,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
         let exec_result = evm.transact();
         if let Ok(ResultAndState { result, state }) = exec_result {
             evm.context.evm.db.commit(state);
-            let logs = log_to_log(&result.logs());
+            let logs = log_to_log(result.logs());
             let used_gas = result.gas_used();
             let status = execution_result_into_result(result)?;
             Ok(TransactResult {
@@ -453,7 +459,7 @@ impl<'env, I: IO + Copy, E: aurora_engine_sdk::env::Env, H: PromiseHandler> EVMH
             ContractState::new(self.io, self.env, self.block, self.remove_eth_fn.take());
         let mut evm = Evm::builder()
             .with_db(&mut state)
-            .modify_env(|e| *e = self.evm_env())
+            .modify_env(|e| **e = self.evm_env())
             .with_spec_id(EVM_FORK)
             .build();
         // Change handlers

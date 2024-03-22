@@ -1,4 +1,5 @@
 mod identity;
+mod secp256k1;
 
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
@@ -11,7 +12,6 @@ use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::promise_result::PromiseResult;
 use crate::random::RandomSeed;
-use crate::secp256k1::ECRecover;
 use crate::xcc::{cross_contract_call, CrossContractCall};
 use crate::{prelude, prepaid_gas, promise_result};
 use aurora_engine_modexp::ModExpAlgorithm;
@@ -262,14 +262,14 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let addresses = vec![
-            ECRecover::ADDRESS,
+            secp256k1::ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
+            Box::new(secp256k1::ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(RandomSeed::new(ctx.random_seed)),
@@ -288,7 +288,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let addresses = vec![
-            ECRecover::ADDRESS,
+            secp256k1::ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
@@ -300,7 +300,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             CurrentAccount::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
+            Box::new(secp256k1::ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
@@ -324,7 +324,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let addresses = vec![
-            ECRecover::ADDRESS,
+            secp256k1::ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
@@ -337,7 +337,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             CurrentAccount::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
+            Box::new(secp256k1::ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
@@ -362,7 +362,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let addresses = vec![
-            ECRecover::ADDRESS,
+            secp256k1::ECRecover::ADDRESS,
             SHA256::ADDRESS,
             RIPEMD160::ADDRESS,
             Identity::ADDRESS,
@@ -375,7 +375,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             CurrentAccount::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
-            Box::new(ECRecover),
+            Box::new(secp256k1::ECRecover),
             Box::new(SHA256),
             Box::new(RIPEMD160),
             Box::new(Identity),
@@ -504,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_precompile_addresses() {
-        assert_eq!(crate::secp256k1::ECRecover::ADDRESS, u8_to_address(1));
+        assert_eq!(super::secp256k1::ECRecover::ADDRESS, u8_to_address(1));
         assert_eq!(crate::hash::SHA256::ADDRESS, u8_to_address(2));
         assert_eq!(crate::hash::RIPEMD160::ADDRESS, u8_to_address(3));
         assert_eq!(super::identity::Identity::ADDRESS, u8_to_address(4));

@@ -1,4 +1,5 @@
 mod identity;
+mod secp256k1;
 
 use aurora_engine_types::{Box, PhantomData};
 use once_cell::race::OnceBox;
@@ -35,7 +36,7 @@ pub fn homestead() -> &'static revm::precompile::Precompiles {
     static INSTANCE: OnceBox<revm::precompile::Precompiles> = OnceBox::new();
     INSTANCE.get_or_init(|| {
         let mut precompiles = revm::precompile::Precompiles::default();
-        precompiles.extend([identity::FUN]);
+        precompiles.extend([secp256k1::ECRECOVER, identity::FUN]);
         Box::new(precompiles)
     })
 }
@@ -80,13 +81,12 @@ pub fn cancun() -> &'static revm::precompile::Precompiles {
 }
 
 /// Returns the precompiles for the latest spec.
+#[must_use]
 pub fn latest() -> &'static revm::precompile::Precompiles {
     cancun()
 }
 
 #[must_use]
-pub(crate) const fn to_address(
-    address: aurora_engine_types::types::Address,
-) -> revm::primitives::Address {
+pub const fn to_address(address: aurora_engine_types::types::Address) -> revm::primitives::Address {
     revm::primitives::Address::new(address.raw().0)
 }

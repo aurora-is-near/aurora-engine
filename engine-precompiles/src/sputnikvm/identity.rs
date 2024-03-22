@@ -23,11 +23,11 @@ impl Precompile for Identity {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let gas_limit = target_gas.unwrap_or(EthGas::new(u64::MAX));
-        let (gas_used, input_data) =
+        let (gas_used, output_data) =
             crate::identity::run(input, gas_limit.as_u64()).map_err(Into::<ExitError>::into)?;
         Ok(PrecompileOutput::without_logs(
             EthGas::new(gas_used),
-            input_data,
+            output_data,
         ))
     }
 }

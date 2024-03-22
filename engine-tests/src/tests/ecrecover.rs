@@ -1,8 +1,7 @@
 use super::sanity::initialize_transfer;
+use crate::prelude::Wei;
 use crate::prelude::{make_address, Address, U256};
-use crate::prelude::{Wei, H160};
 use crate::utils::{self, AuroraRunner, Signer};
-use aurora_engine_precompiles::Precompile;
 
 const ECRECOVER_ADDRESS: Address = make_address(0, 1);
 
@@ -48,17 +47,10 @@ fn test_ecrecover_standalone() {
     let sig = hex::decode("32573a0b258f251971a4ec35511c018a7e7bf75a5886534b48d12e47263048a2fe6e03543955255e235388b224704555fd036a954d3ee6dd030d9d1fea1830d71c").unwrap();
 
     let input = construct_input(&hash, &sig);
+    let (_, standalone_result) =
+        aurora_engine_precompiles::secp256k1::run(&input, u64::MAX).unwrap();
 
-    let ctx = evm::Context {
-        address: H160::default(),
-        caller: H160::default(),
-        apparent_value: U256::zero(),
-    };
-    let standalone_result = aurora_engine_precompiles::secp256k1::ECRecover
-        .run(&input, None, &ctx, false)
-        .unwrap();
-
-    check_wasm_ecrecover(&mut runner, &mut signer, input, &standalone_result.output);
+    check_wasm_ecrecover(&mut runner, &mut signer, input, &standalone_result);
 }
 
 fn check_wasm_ecrecover(

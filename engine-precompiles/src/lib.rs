@@ -33,7 +33,6 @@ pub mod promise_result;
 pub mod random;
 #[cfg(feature = "precompiles-revm")]
 mod revm;
-#[cfg(feature = "precompiles-sputnikvm")]
 pub mod secp256k1;
 #[cfg(feature = "precompiles-sputnikvm")]
 mod sputnikvm;
