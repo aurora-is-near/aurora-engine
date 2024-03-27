@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.2] 2024-03-27
+
+### Additions
+
+- Added a new view transaction `ft_balances_of` for getting balances for multiple accounts by [@karim-en]. ([#905])
+
+### Changes
+
+- The `ft_resolve_transfer` callback doesn't require running the contract to finish the `ft_transfer_call` correctly
+  by [@aleksuss]. ([#906])
+- Borsh has been bumped to 1.3 what allows to get rid of additional feature `borsh-compat` by [@aleksuss]. ([#907])
+- The `ExecutionProfile` has been extended with logs for tests by [@mrLSD]. ([#910])
+- The interface of the engine standalone storage has been extended with a couple of methods for allowing set/get
+  arbitrary data outside the crate by [@aleksuss]. ([#913])
+
+### Fixes
+
+- Minor improvements and fixes by [@raventid]. ([#916])
+
+[#905]: https://github.com/aurora-is-near/aurora-engine/pull/905
+[#906]: https://github.com/aurora-is-near/aurora-engine/pull/906
+[#907]: https://github.com/aurora-is-near/aurora-engine/pull/907
+[#910]: https://github.com/aurora-is-near/aurora-engine/pull/910
+[#913]: https://github.com/aurora-is-near/aurora-engine/pull/913
+[#916]: https://github.com/aurora-is-near/aurora-engine/pull/916 
+
 ## [3.6.1] 2024-02-15
 
 ### Changes
@@ -617,7 +643,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...develop
+[3.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.1...3.6.2
 [3.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.0...3.6.1
 [3.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.6.0
 [3.5.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.4.0...3.5.0
@@ -679,5 +706,6 @@ struct SubmitResult {
 [@mfornet]: https://github.com/mfornet
 [@mrLSD]: https://github.com/mrLSD
 [@olonho]: https://github.com/olonho
+[@raventid]: https://github.com/raventid
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
