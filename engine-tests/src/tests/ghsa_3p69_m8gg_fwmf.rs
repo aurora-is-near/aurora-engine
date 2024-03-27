@@ -1,5 +1,4 @@
 use crate::utils;
-use aurora_engine_types::borsh::BorshSerialize;
 
 #[test]
 fn test_exploit_fix() {
@@ -40,7 +39,7 @@ fn test_exploit_fix() {
     let tx = contract.call_method_with_args("echo", &[ethabi::Token::Bytes(payload)], nonce.into());
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let view_call_args = utils::as_view_call(tx, sender);
-    let input = view_call_args.try_to_vec().unwrap();
+    let input = borsh::to_vec(&view_call_args).unwrap();
     let error = runner.one_shot().call("view", "viewer", input).unwrap_err();
 
     assert!(

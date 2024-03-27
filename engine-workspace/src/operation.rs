@@ -5,7 +5,7 @@ use aurora_engine_types::parameters::connector::{
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
 use aurora_engine_types::parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistStatusArgs};
 use aurora_engine_types::types::Address;
-use aurora_engine_types::{H256, U256};
+use aurora_engine_types::{HashMap, H256, U256};
 use near_sdk::json_types::U128;
 use near_sdk::PromiseOrValue;
 
@@ -77,6 +77,7 @@ impl_call_return![
 impl_view_return![
     (ViewFtTotalSupply => U128, View::FtTotalSupply, json),
     (ViewFtBalanceOf => U128, View::FtBalanceOf, json),
+    (ViewFtBalancesOf => HashMap<AccountId, u128>, View::FtBalancesOf, borsh),
     (ViewStorageBalanceOf => StorageBalance, View::StorageBalanceOf, json),
     (ViewFtMetadata => FungibleTokenMetadata, View::FtMetadata, json),
     (ViewVersion => String, View::Version, borsh),
@@ -226,6 +227,7 @@ pub enum View {
     IsUsedProof,
     FtTotalSupply,
     FtBalanceOf,
+    FtBalancesOf,
     FtBalanceOfEth,
     FtTotalEthSupplyOnAurora,
     FtTotalEthSupplyOnNear,
@@ -261,6 +263,7 @@ impl AsRef<str> for View {
             View::IsUsedProof => "is_used_proof",
             View::FtTotalSupply => "ft_total_supply",
             View::FtBalanceOf => "ft_balance_of",
+            View::FtBalancesOf => "ft_balances_of",
             View::FtBalanceOfEth => "ft_balance_of_eth",
             View::FtTotalEthSupplyOnAurora => "ft_total_eth_supply_on_aurora",
             View::FtTotalEthSupplyOnNear => "ft_total_eth_supply_on_near",

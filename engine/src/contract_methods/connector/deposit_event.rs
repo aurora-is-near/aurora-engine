@@ -4,7 +4,6 @@ use crate::prelude::{
     format, vec, Address, BorshDeserialize, BorshSerialize, Fee, NEP141Wei, String, ToString, Vec,
     U256,
 };
-use aurora_engine_types::borsh;
 use aurora_engine_types::parameters::connector::LogEntry;
 use aurora_engine_types::types::address::error::AddressError;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog};
@@ -16,6 +15,7 @@ pub type EventParams = Vec<EventParam>;
 /// On-transfer message. Used for `ft_transfer_call` and  `ft_on_transfer` functions.
 /// Message parsed from input args with `parse_on_transfer_message`.
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferMessageData {
     pub recipient: Address,
@@ -24,6 +24,7 @@ pub struct FtTransferMessageData {
 }
 
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub struct FtTransferFee {
     pub relayer: AccountId,
@@ -79,9 +80,10 @@ impl FtTransferMessageData {
             }
         })?;
 
-        // Parse the fee from the message slice. It should contain 32 bytes,
-        // but after that, it will be parsed to u128.
-        // This logic is for compatibility.
+        // Parse the fee from the message slice.
+        // The fee is expected to be represented as a 32-byte value in the message.
+        // However, it will be parsed and converted to a u128 for further processing.
+        // This parsing logic is implemented to ensure compatibility
         let fee_u128: u128 = U256::from_little_endian(&data[..32])
             .try_into()
             .map_err(|_| errors::ParseOnTransferMessageError::OverflowNumber)?;
@@ -151,6 +153,7 @@ impl FtTransferMessageData {
 /// The message parsed from event `recipient` field - `log_entry_data`
 /// after fetching proof `log_entry_data`
 #[derive(BorshSerialize, BorshDeserialize)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
 pub enum TokenMessageData {
     /// Deposit no NEAR account

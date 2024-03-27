@@ -1,6 +1,5 @@
 use crate::utils;
 use aurora_engine::parameters::SetUpgradeDelayBlocksArgs;
-use aurora_engine_types::borsh::BorshSerialize;
 
 #[test]
 fn test_pause_contract_require_owner() {
@@ -66,10 +65,9 @@ fn test_resume_contract_require_paused() {
 fn test_pause_contract() {
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
-    let set = SetUpgradeDelayBlocksArgs {
+    let set = borsh::to_vec(&SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,
-    }
-    .try_to_vec()
+    })
     .unwrap();
 
     // contract is running by default, gets and sets should work
@@ -99,10 +97,9 @@ fn test_pause_contract() {
 fn test_resume_contract() {
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
-    let set = SetUpgradeDelayBlocksArgs {
+    let set = borsh::to_vec(&SetUpgradeDelayBlocksArgs {
         upgrade_delay_blocks: 2,
-    }
-    .try_to_vec()
+    })
     .unwrap();
 
     // pause contract

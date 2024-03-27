@@ -1,13 +1,12 @@
 //! Cross contract call precompile.
 //!
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
-//! TODO: How they work (low level explanation with examples)
 
 use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
-    borsh::{BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
@@ -80,7 +79,7 @@ pub mod cross_contract_call {
         H256,
     };
 
-    /// Exit to Ethereum precompile address
+    /// NEAR Cross Contract Call precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
@@ -147,8 +146,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_EXEC_NAME.into(),
-                    args: call
-                        .try_to_vec()
+                    args: borsh::to_vec(&call)
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
                     attached_gas: router_exec_cost.saturating_add(call_gas),
@@ -160,8 +158,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_SCHEDULE_NAME.into(),
-                    args: call
-                        .try_to_vec()
+                    args: borsh::to_vec(&call)
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
                     // We don't need to add any gas to the amount need for the schedule call
@@ -205,13 +202,13 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                     return Err(PrecompileFailure::Revert {
                         exit_status: r,
                         output: return_value,
-                    })
+                    });
                 }
                 evm::ExitReason::Error(e) => {
-                    return Err(PrecompileFailure::Error { exit_status: e })
+                    return Err(PrecompileFailure::Error { exit_status: e });
                 }
                 evm::ExitReason::Fatal(f) => {
-                    return Err(PrecompileFailure::Fatal { exit_status: f })
+                    return Err(PrecompileFailure::Fatal { exit_status: f });
                 }
             };
         }
@@ -226,8 +223,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let promise_log = Log {
             address: cross_contract_call::ADDRESS.raw(),
             topics,
-            data: promise
-                .try_to_vec()
+            data: borsh::to_vec(&promise)
                 .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
         };
 
