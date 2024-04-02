@@ -31,6 +31,8 @@ pub const UNPAUSE_ALL: PausedMask = 0;
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
 /// Admin control flow flag indicates that withdrawal is paused.
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+/// Admin control flow flag indicates that ft transfers are paused.
+pub const PAUSE_FT: PausedMask = 1 << 2;
 
 pub struct TestContract {
     pub engine_contract: Contract,
