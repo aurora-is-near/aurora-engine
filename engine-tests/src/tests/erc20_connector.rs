@@ -821,6 +821,8 @@ pub mod workspace {
         use aurora_engine::parameters::FungibleTokenMetadata;
         use aurora_engine_types::account_id::AccountId;
 
+        use crate::utils::workspace::storage_deposit_nep141;
+
         let aurora = deploy_engine().await;
         let metadata = FungibleTokenMetadata::default();
         aurora
@@ -840,13 +842,19 @@ pub mod workspace {
 
         // Pause ft transfers
         aurora.set_paused_flags(PAUSE_FT).transact().await.unwrap();
+        // Verify that the storage deposit is paused
+        let result = storage_deposit_nep141(&aurora.id(), &aurora.root(), recipient_id.as_ref())
+            .await
+            .unwrap()
+            .into_result();
+        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
         // Try to transfer tokens
         let result = aurora
             .ft_transfer(&recipient_id, transfer_amount.into(), None)
             .deposit(ONE_YOCTO)
             .transact()
             .await;
-        assert!(result.unwrap_err().to_string().contains("ERR_PAUSED"));
+        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
         // Verify that no tokens were transferred
         let blanace = aurora.ft_balance_of(&recipient_id).await.unwrap().result;
         assert_eq!(blanace.0, 0);
@@ -914,12 +922,11 @@ pub mod workspace {
             aurora.id().as_ref(),
             transfer_amount,
             transfer_call_msg,
-            false,
         )
         .await
         .unwrap()
         .into_result();
-        assert!(result.unwrap_err().to_string().contains("ERR_PAUSED"));
+        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
         let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
         assert_eq!(blanace.0, transfer_amount);
 
@@ -936,7 +943,6 @@ pub mod workspace {
             aurora.id().as_ref(),
             transfer_amount,
             transfer_call_msg,
-            false,
         )
         .await
         .unwrap()

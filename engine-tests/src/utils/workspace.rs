@@ -239,26 +239,30 @@ pub async fn transfer_nep_141(
 }
 
 #[cfg(not(feature = "ext-connector"))]
+pub async fn storage_deposit_nep141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+) -> anyhow::Result<ExecutionFinalResult> {
+    source
+        .call(nep_141, "storage_deposit")
+        .args_json(json!({
+            "account_id": dest,
+        }))
+        .deposit(STORAGE_AMOUNT)
+        .max_gas()
+        .transact()
+        .await
+}
+
+#[cfg(not(feature = "ext-connector"))]
 pub async fn transfer_call_nep_141(
     nep_141: &AccountId,
     source: &Account,
     dest: &str,
     amount: u128,
     msg: &str,
-    storage_deposit: bool,
 ) -> anyhow::Result<ExecutionFinalResult> {
-    if storage_deposit {
-        let _ = source
-            .call(nep_141, "storage_deposit")
-            .args_json(json!({
-                "account_id": dest,
-            }))
-            .deposit(STORAGE_AMOUNT)
-            .max_gas()
-            .transact()
-            .await?;
-    }
-
     source
         .call(nep_141, "ft_transfer_call")
         .args_json(json!({
