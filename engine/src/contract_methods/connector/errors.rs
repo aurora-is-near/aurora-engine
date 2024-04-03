@@ -119,7 +119,7 @@ impl AsRef<[u8]> for FtTransferCallError {
             Self::InsufficientAmountForFee => errors::ERR_NOT_ENOUGH_BALANCE_FOR_FEE,
             Self::Transfer(e) => e.as_ref(),
             Self::BalanceOverflow(e) => e.as_ref(),
-            Self::Paused => errors::ERR_PAUSED,
+            Self::Paused => errors::ERR_FT_PAUSED,
         }
     }
 }
@@ -216,7 +216,7 @@ impl AsRef<[u8]> for TransferError {
             Self::SelfTransfer => errors::ERR_SENDER_EQUALS_RECEIVER,
             Self::Deposit(e) => e.as_ref(),
             Self::Withdraw(e) => e.as_ref(),
-            Self::Paused => errors::ERR_PAUSED,
+            Self::Paused => errors::ERR_FT_PAUSED,
         }
     }
 }
@@ -255,7 +255,7 @@ impl AsRef<[u8]> for StorageFundingError {
             Self::UnRegisterPositiveBalance => {
                 errors::ERR_FAILED_UNREGISTER_ACCOUNT_POSITIVE_BALANCE
             }
-            Self::Paused => errors::ERR_PAUSED,
+            Self::Paused => errors::ERR_FT_PAUSED,
         }
     }
 }
