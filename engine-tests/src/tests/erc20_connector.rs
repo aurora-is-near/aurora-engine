@@ -911,7 +911,7 @@ pub mod workspace {
         let result = transfer_call_nep_141(
             &aurora.id(),
             &ft_owner,
-            &aurora.id().to_string(),
+            aurora.id().as_ref(),
             transfer_amount,
             transfer_call_msg,
             false,
@@ -933,7 +933,7 @@ pub mod workspace {
         transfer_call_nep_141(
             &aurora.id(),
             &ft_owner,
-            &aurora.id().to_string(),
+            aurora.id().as_ref(),
             transfer_amount,
             transfer_call_msg,
             false,
