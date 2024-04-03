@@ -10,9 +10,9 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Withdraw
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{
-    types::ExecutionFinalResult, types::NearToken, EngineContract, RawContract,
-};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_workspace::types::ExecutionFinalResult;
+use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
 use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
