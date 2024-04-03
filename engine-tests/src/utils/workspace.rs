@@ -238,6 +238,7 @@ pub async fn transfer_nep_141(
     Ok(())
 }
 
+#[cfg(not(feature = "ext-connector"))]
 pub async fn transfer_call_nep_141(
     nep_141: &AccountId,
     source: &Account,
