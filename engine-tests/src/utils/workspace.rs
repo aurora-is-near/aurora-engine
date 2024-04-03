@@ -10,7 +10,9 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Withdraw
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
+use aurora_engine_workspace::{
+    types::ExecutionFinalResult, types::NearToken, EngineContract, RawContract,
+};
 use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
@@ -234,6 +236,40 @@ pub async fn transfer_nep_141(
     assert!(result.is_success());
 
     Ok(())
+}
+
+pub async fn transfer_call_nep_141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+    amount: u128,
+    msg: &str,
+    storage_deposit: bool,
+) -> anyhow::Result<ExecutionFinalResult> {
+    if storage_deposit {
+        let _ = source
+            .call(nep_141, "storage_deposit")
+            .args_json(json!({
+                "account_id": dest,
+            }))
+            .deposit(STORAGE_AMOUNT)
+            .max_gas()
+            .transact()
+            .await?;
+    }
+
+    source
+        .call(nep_141, "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": dest,
+            "amount": amount.to_string(),
+            "memo": "null",
+            "msg": msg,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await
 }
 
 #[cfg(feature = "ext-connector")]

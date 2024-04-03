@@ -814,6 +814,139 @@ pub mod workspace {
         assert_eq!(result, balances);
     }
 
+    #[cfg(not(feature = "ext-connector"))]
+    #[tokio::test]
+    async fn test_pause_ft_transfer() {
+        use aurora_engine::contract_methods::connector::internal::{PAUSE_FT, UNPAUSE_ALL};
+        use aurora_engine::parameters::FungibleTokenMetadata;
+        use aurora_engine_types::account_id::AccountId;
+
+        let aurora = deploy_engine().await;
+        let metadata = FungibleTokenMetadata::default();
+        aurora
+            .set_eth_connector_contract_data(
+                aurora.id(),
+                ETH_CUSTODIAN_ADDRESS.to_string(),
+                metadata,
+            )
+            .transact()
+            .await
+            .unwrap();
+
+        deposit_balance(&aurora).await;
+
+        let recipient_id = AccountId::new("account1").unwrap();
+        let transfer_amount = 10;
+
+        // Pause ft transfers
+        aurora.set_paused_flags(PAUSE_FT).transact().await.unwrap();
+        // Try to transfer tokens
+        let result = aurora
+            .ft_transfer(&recipient_id, transfer_amount.into(), None)
+            .deposit(ONE_YOCTO)
+            .transact()
+            .await;
+        assert!(result.unwrap_err().to_string().contains("ERR_PAUSED"));
+        // Verify that no tokens were transferred
+        let blanace = aurora.ft_balance_of(&recipient_id).await.unwrap().result;
+        assert_eq!(blanace.0, 0);
+
+        // Unpause ft transfers
+        aurora
+            .set_paused_flags(UNPAUSE_ALL)
+            .transact()
+            .await
+            .unwrap();
+        // Transfer tokens
+        aurora
+            .ft_transfer(&recipient_id, transfer_amount.into(), None)
+            .deposit(ONE_YOCTO)
+            .transact()
+            .await
+            .unwrap();
+        // Verify that the tokens has been transferred
+        let blanace = aurora.ft_balance_of(&recipient_id).await.unwrap().result;
+        assert_eq!(blanace.0, transfer_amount);
+    }
+
+    #[cfg(not(feature = "ext-connector"))]
+    #[tokio::test]
+    async fn test_pause_ft_transfer_call() {
+        use crate::utils::workspace::transfer_call_nep_141;
+        use aurora_engine::contract_methods::connector::internal::{PAUSE_FT, UNPAUSE_ALL};
+        use aurora_engine::parameters::FungibleTokenMetadata;
+
+        let aurora = deploy_engine().await;
+        let metadata = FungibleTokenMetadata::default();
+        aurora
+            .set_eth_connector_contract_data(
+                aurora.id(),
+                ETH_CUSTODIAN_ADDRESS.to_string(),
+                metadata,
+            )
+            .transact()
+            .await
+            .unwrap();
+
+        deposit_balance(&aurora).await;
+
+        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", BALANCE)
+            .await
+            .unwrap();
+        let transfer_amount = 10;
+        // Transfer tokens to the `ft_owner` account
+        aurora
+            .ft_transfer(&ft_owner.id(), transfer_amount.into(), None)
+            .deposit(ONE_YOCTO)
+            .transact()
+            .await
+            .unwrap();
+        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
+        assert_eq!(blanace.0, transfer_amount);
+
+        // Pause ft transfers
+        aurora.set_paused_flags(PAUSE_FT).transact().await.unwrap();
+        // Try to transfer tokens from `ft_owner` to `aurora` contract by `ft_transfer_call`
+        let transfer_call_msg = "000000000000000000000000000000000000dead";
+        let result = transfer_call_nep_141(
+            &aurora.id(),
+            &ft_owner,
+            &aurora.id().to_string(),
+            transfer_amount,
+            transfer_call_msg,
+            false,
+        )
+        .await
+        .unwrap()
+        .into_result();
+        assert!(result.unwrap_err().to_string().contains("ERR_PAUSED"));
+        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
+        assert_eq!(blanace.0, transfer_amount);
+
+        // Unpause ft transfers
+        aurora
+            .set_paused_flags(UNPAUSE_ALL)
+            .transact()
+            .await
+            .unwrap();
+        // Transfer tokens from `ft_owner` to `aurora` contract by `ft_transfer_call`
+        transfer_call_nep_141(
+            &aurora.id(),
+            &ft_owner,
+            &aurora.id().to_string(),
+            transfer_amount,
+            transfer_call_msg,
+            false,
+        )
+        .await
+        .unwrap()
+        .into_result()
+        .unwrap();
+        // Verify that the tokens has been transferred
+        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
+        assert_eq!(blanace.0, 0);
+    }
+
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
         let aurora = deploy_engine().await;
         let chain_id = aurora.get_chain_id().await?.result.as_u64();
