@@ -118,7 +118,7 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
             Self::EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
             Self::EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
-            Self::EvmError(ExitError::InvalidCode(_)) => errors::ERR_INVALID_OPCODE,
+            Self::EvmError(ExitError::InvalidCode(opcode)) => errors::ERR_INVALID_OPCODE,
             Self::EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
             Self::EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
             Self::EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
@@ -396,7 +396,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::shanghai();
+pub(crate) const CONFIG: &Config = &Config::cancun();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -1917,6 +1917,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     /// are written to storage until after the transaction is complete.
     fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
         Some(self.storage(address, index))
+    }
+
+    fn blob_gasprice(&self) -> Option<u128> {
+        Some(1)
+    }
+
+    fn get_blob_hash(&self, _index: usize) -> Result<U256, ExitError> {
+        Ok(U256::default())
     }
 }
 

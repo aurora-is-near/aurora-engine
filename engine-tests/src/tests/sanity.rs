@@ -180,10 +180,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     #[cfg(not(feature = "ext-connector"))]
-    assert_eq!(
-        get_total_supply(&mut runner),
-        INITIAL_BALANCE - TRANSFER_AMOUNT
-    );
+    // For CANCUN hard fork `total_supply` can't change
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 }
 
 #[test]

@@ -1723,9 +1723,9 @@ dependencies = [
 
 [[package]]
 name = "ethereum"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a89fb87a9e103f71b903b80b670200b54cc67a07578f070681f1fffb7396fb7"
+checksum = "2e04d24d20b8ff2235cffbf242d5092de3aa45f77c5270ddbfadd2778ca13fea"
 dependencies = [
  "bytes",
  "ethereum-types",
@@ -1736,7 +1736,7 @@ dependencies = [
  "scale-info",
  "serde",
  "sha3",
- "triehash",
+ "trie-root",
 ]
 
 [[package]]
@@ -1757,8 +1757,8 @@ dependencies = [
 
 [[package]]
 name = "evm"
-version = "0.39.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.39.1#0334a09d6b6e83ff3a8da992e33f29ba95e0c9fe"
+version = "0.41.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=22b8129#22b8129a7a0de800e327888934ed20e98888733d"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -1777,8 +1777,8 @@ dependencies = [
 
 [[package]]
 name = "evm-core"
-version = "0.39.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.39.1#0334a09d6b6e83ff3a8da992e33f29ba95e0c9fe"
+version = "0.41.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=22b8129#22b8129a7a0de800e327888934ed20e98888733d"
 dependencies = [
  "parity-scale-codec",
  "primitive-types 0.12.2",
@@ -1788,8 +1788,8 @@ dependencies = [
 
 [[package]]
 name = "evm-gasometer"
-version = "0.39.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.39.1#0334a09d6b6e83ff3a8da992e33f29ba95e0c9fe"
+version = "0.41.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=22b8129#22b8129a7a0de800e327888934ed20e98888733d"
 dependencies = [
  "environmental",
  "evm-core",
@@ -1799,8 +1799,8 @@ dependencies = [
 
 [[package]]
 name = "evm-runtime"
-version = "0.39.1"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.39.1#0334a09d6b6e83ff3a8da992e33f29ba95e0c9fe"
+version = "0.41.0"
+source = "git+https://github.com/aurora-is-near/sputnikvm.git?rev=22b8129#22b8129a7a0de800e327888934ed20e98888733d"
 dependencies = [
  "auto_impl",
  "environmental",
@@ -2192,9 +2192,9 @@ dependencies = [
 
 [[package]]
 name = "hash-db"
-version = "0.15.2"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d23bd4e7b5eda0d0f3a307e8b381fdc8ba9000f26fbe912250c0a4cc3956364a"
+checksum = "8e7d7786361d7425ae2fe4f9e407eb0efaa0840f5212d109cc018c40c35c6ab4"
 
 [[package]]
 name = "hash256-std-hasher"
@@ -5778,13 +5778,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "triehash"
-version = "0.8.4"
+name = "trie-root"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1631b201eb031b563d2e85ca18ec8092508e262a3196ce9bd10a67ec87b9f5c"
+checksum = "d4ed310ef5ab98f5fa467900ed906cb9232dd5376597e00fd4cba2a449d06c0b"
 dependencies = [
  "hash-db",
- "rlp",
 ]
 
 [[package]]

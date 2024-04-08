@@ -191,7 +191,7 @@ where
             &source_mount_arg,
             "-v",
             &output_mount_arg,
-            "ethereum/solc:0.8.24", // TODO: 0.8.25 introduces support of the Dencun hard fork.
+            "ethereum/solc:0.8.25", // TODO: 0.8.25 introduces support of the Dencun hard fork.
             "--allow-paths",
             "/contracts/",
             "-o",
