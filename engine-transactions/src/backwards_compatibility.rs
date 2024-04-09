@@ -49,6 +49,11 @@ impl EthTransactionKindAdapter {
                         tx.transaction.to = None;
                     }
                 }
+                EthTransactionKind::Eip4844(tx) => {
+                    if tx.transaction.to == ZERO_ADDRESS {
+                        tx.transaction.to = None;
+                    }
+                }
             }
         }
 

@@ -8,6 +8,9 @@
 )]
 #![forbid(unsafe_code)]
 
+extern crate alloc;
+
+use crate::EthTransactionKind::Eip4844;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
@@ -16,6 +19,7 @@ use rlp::{Decodable, DecoderError, Rlp};
 pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
+pub mod eip_4844;
 pub mod legacy;
 
 /// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
@@ -24,6 +28,7 @@ pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
     Eip2930(eip_2930::SignedTransaction2930),
     Eip1559(eip_1559::SignedTransaction1559),
+    Eip4844(eip_4844::SignedTransaction4844),
 }
 
 impl TryFrom<&[u8]> for EthTransactionKind {
@@ -38,6 +43,10 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             )?))
         } else if bytes[0] == eip_1559::TYPE_BYTE {
             Ok(Self::Eip1559(eip_1559::SignedTransaction1559::decode(
+                &Rlp::new(&bytes[1..]),
+            )?))
+        } else if bytes[0] == eip_4844::BLOB_TX_TYPE {
+            Ok(Self::Eip4844(eip_4844::SignedTransaction4844::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
         } else if bytes[0] <= 0x7f {
@@ -64,6 +73,10 @@ impl From<&EthTransactionKind> for Vec<u8> {
             }
             EthTransactionKind::Eip2930(tx) => {
                 stream.append(&eip_2930::TYPE_BYTE);
+                stream.append(tx);
+            }
+            EthTransactionKind::Eip4844(≠tx) => {
+                stream.append(&eip_4844::BLOB_TX_TYPE);
                 stream.append(tx);
             }
         }
@@ -117,6 +130,18 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
             },
             Eip1559(tx) => Self {
+                address: tx.sender()?,
+                chain_id: Some(tx.transaction.chain_id),
+                nonce: tx.transaction.nonce,
+                gas_limit: tx.transaction.gas_limit,
+                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                to: tx.transaction.to,
+                value: tx.transaction.value,
+                data: tx.transaction.data,
+                access_list: tx.transaction.access_list,
+            },
+            Eip4844(tx) => Self {
                 address: tx.sender()?,
                 chain_id: Some(tx.transaction.chain_id),
                 nonce: tx.transaction.nonce,
