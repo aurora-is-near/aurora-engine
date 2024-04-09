@@ -75,7 +75,7 @@ impl From<&EthTransactionKind> for Vec<u8> {
                 stream.append(&eip_2930::TYPE_BYTE);
                 stream.append(tx);
             }
-            EthTransactionKind::Eip4844(≠tx) => {
+            EthTransactionKind::Eip4844(tx) => {
                 stream.append(&eip_4844::BLOB_TX_TYPE);
                 stream.append(tx);
             }
