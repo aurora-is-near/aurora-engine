@@ -57,6 +57,8 @@ pub const UNPAUSE_ALL: PausedMask = 0;
 pub const PAUSE_DEPOSIT: PausedMask = 1 << 0;
 /// Admin control flow flag indicates that withdrawal is paused.
 pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
+/// Admin control flow flag indicates that ft transfers are paused.
+pub const PAUSE_FT: PausedMask = 1 << 2;
 
 #[named]
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -854,6 +856,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         predecessor_account_id: &AccountId,
         args: &TransferCallArgs,
     ) -> Result<(), errors::TransferError> {
+        self.assert_not_paused(PAUSE_FT, false)
+            .map_err(|_| errors::TransferError::Paused)?;
+
         self.ft.internal_transfer_eth_on_near(
             predecessor_account_id,
             &args.receiver_id,
@@ -904,6 +909,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         args: TransferCallCallArgs,
         prepaid_gas: NearGas,
     ) -> Result<PromiseWithCallbackArgs, errors::FtTransferCallError> {
+        self.assert_not_paused(PAUSE_FT, false)
+            .map_err(|_| errors::FtTransferCallError::Paused)?;
+
         sdk::log!(
             "Transfer call to {} amount {}",
             args.receiver_id,
@@ -963,6 +971,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         amount: Yocto,
         args: StorageDepositCallArgs,
     ) -> Result<Option<PromiseBatchAction>, errors::StorageFundingError> {
+        self.assert_not_paused(PAUSE_FT, false)
+            .map_err(|_| errors::StorageFundingError::Paused)?;
+
         let account_id = args
             .account_id
             .unwrap_or_else(|| predecessor_account_id.clone());
@@ -983,6 +994,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
         account_id: AccountId,
         force: Option<bool>,
     ) -> Result<Option<PromiseBatchAction>, errors::StorageFundingError> {
+        self.assert_not_paused(PAUSE_FT, false)
+            .map_err(|_| errors::StorageFundingError::Paused)?;
+
         let promise = match self.ft.internal_storage_unregister(account_id, force) {
             Ok((_, p)) => {
                 self.io.return_output(b"true");

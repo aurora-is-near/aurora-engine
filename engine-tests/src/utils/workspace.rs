@@ -10,6 +10,8 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Withdraw
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_workspace::types::ExecutionFinalResult;
 use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
 use serde_json::json;
 
@@ -234,6 +236,45 @@ pub async fn transfer_nep_141(
     assert!(result.is_success());
 
     Ok(())
+}
+
+#[cfg(not(feature = "ext-connector"))]
+pub async fn storage_deposit_nep141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+) -> anyhow::Result<ExecutionFinalResult> {
+    source
+        .call(nep_141, "storage_deposit")
+        .args_json(json!({
+            "account_id": dest,
+        }))
+        .deposit(STORAGE_AMOUNT)
+        .max_gas()
+        .transact()
+        .await
+}
+
+#[cfg(not(feature = "ext-connector"))]
+pub async fn transfer_call_nep_141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+    amount: u128,
+    msg: &str,
+) -> anyhow::Result<ExecutionFinalResult> {
+    source
+        .call(nep_141, "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": dest,
+            "amount": amount.to_string(),
+            "memo": "null",
+            "msg": msg,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await
 }
 
 #[cfg(feature = "ext-connector")]
