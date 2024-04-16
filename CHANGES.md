@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.3] 2024-04-16
+
+### Additions
+
+- Added a possibility to pause FT transfers for the internal eth connector by [@karim-en]. ([#922])
+
+[#922]: https://github.com/aurora-is-near/aurora-engine/pull/922
+
 ## [3.6.2] 2024-03-27
 
 ### Additions
@@ -643,7 +651,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...develop
+[3.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...3.6.3
 [3.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.1...3.6.2
 [3.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.0...3.6.1
 [3.6.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.5.0...3.6.0
