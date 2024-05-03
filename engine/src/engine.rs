@@ -104,6 +104,7 @@ pub enum EngineErrorKind {
     NotOwner,
     NonExistedKey,
     Erc20FromNep141,
+    RejectCallerWithCode,
 }
 
 impl EngineErrorKind {
@@ -143,6 +144,7 @@ impl EngineErrorKind {
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
+            Self::RejectCallerWithCode => errors::ERR_REJECT_CALL_WITH_CODE,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -1032,6 +1034,10 @@ pub fn submit_with_alt_modexp<
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
+    // Retrieve the signer of the transaction:
+    let sender = transaction.address;
+    // EIP-3706
+    check_empty_code(&io, &sender)?;
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
@@ -1044,9 +1050,6 @@ pub fn submit_with_alt_modexp<
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
-
-    // Retrieve the signer of the transaction:
-    let sender = transaction.address;
 
     sdk::log!("signer_address {:?}", sender);
 
@@ -1443,6 +1446,16 @@ pub fn check_nonce<I: IO>(
     }
 
     Ok(())
+}
+
+/// According to [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607)
+/// call with non-empty code should be rejected.
+#[inline]
+pub fn check_empty_code<I: IO>(io: &I, address: &Address) -> Result<(), EngineErrorKind> {
+    if get_code_size(io, address) == 0 {
+        return Ok(());
+    }
+    Err(EngineErrorKind::RejectCallerWithCode)
 }
 
 pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
@@ -2660,6 +2673,28 @@ mod tests {
         let actual_refund = get_balance(&io, &relayer);
         let expected_refund = Wei::new_u64(7000 * 2);
         assert_eq!(expected_refund, actual_refund);
+    }
+
+    #[test]
+    fn test_empty_code_succeeds() {
+        let origin = Address::zero();
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+
+        check_empty_code(&io, &origin).unwrap();
+    }
+
+    #[test]
+    fn test_empty_code_fails() {
+        let origin = Address::zero();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        set_code(&mut io, &origin, &[1, 2, 3, 4, 5]);
+        let actual_error_kind = check_empty_code(&io, &origin);
+        assert_eq!(
+            actual_error_kind,
+            Err(EngineErrorKind::RejectCallerWithCode)
+        );
     }
 
     #[test]
