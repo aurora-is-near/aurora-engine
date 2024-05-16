@@ -1036,8 +1036,6 @@ pub fn submit_with_alt_modexp<
     };
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
-    // EIP-3706
-    check_empty_code(&io, &sender)?;
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
@@ -1078,6 +1076,10 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
+    // EIP-3607
+    if !engine.code(sender.raw()).is_empty() {
+        return Err(EngineErrorKind::RejectCallerWithCode.into());
+    }
     let max_gas_price = args.max_gas_price.map(Into::into);
     let prepaid_amount = match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas) {
         Ok(gas_result) => gas_result,
@@ -1446,16 +1448,6 @@ pub fn check_nonce<I: IO>(
     }
 
     Ok(())
-}
-
-/// According to [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607)
-/// call with non-empty code should be rejected.
-#[inline]
-pub fn check_empty_code<I: IO>(io: &I, address: &Address) -> Result<(), EngineErrorKind> {
-    if get_code_size(io, address) == 0 {
-        return Ok(());
-    }
-    Err(EngineErrorKind::RejectCallerWithCode)
 }
 
 pub fn get_nonce<I: IO>(io: &I, address: &Address) -> U256 {
@@ -2673,28 +2665,6 @@ mod tests {
         let actual_refund = get_balance(&io, &relayer);
         let expected_refund = Wei::new_u64(7000 * 2);
         assert_eq!(expected_refund, actual_refund);
-    }
-
-    #[test]
-    fn test_empty_code_succeeds() {
-        let origin = Address::zero();
-        let storage = RefCell::new(Storage::default());
-        let io = StoragePointer(&storage);
-
-        check_empty_code(&io, &origin).unwrap();
-    }
-
-    #[test]
-    fn test_empty_code_fails() {
-        let origin = Address::zero();
-        let storage = RefCell::new(Storage::default());
-        let mut io = StoragePointer(&storage);
-        set_code(&mut io, &origin, &[1, 2, 3, 4, 5]);
-        let actual_error_kind = check_empty_code(&io, &origin);
-        assert_eq!(
-            actual_error_kind,
-            Err(EngineErrorKind::RejectCallerWithCode)
-        );
     }
 
     #[test]
