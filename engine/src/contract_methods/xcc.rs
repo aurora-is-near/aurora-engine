@@ -129,12 +129,19 @@ pub fn fund_xcc_sub_account<I: IO + Copy, E: Env, H: PromiseHandler>(
     with_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
-        // This method can only be called by the owner because it allows specifying the
-        // account ID of the wNEAR account. This information must be accurate for the
-        // sub-account to work properly, therefore this method can only be called by
-        // a trusted user.
-        require_owner_only(&state, &env.predecessor_account_id())?;
+
         let args: xcc::FundXccArgs = io.read_input_borsh()?;
+
+        // If a specific wNEAR account is specified then this transaction must
+        // come from a trusted user. The wNEAR account must be accurate for the
+        // XCC sub-account to work properly.
+        // This method can be public when `args.wnear_account_id.is_none()`
+        // because then the Engine figures out the correct wNEAR account on
+        // its own.
+        if args.wnear_account_id.is_some() {
+            require_owner_only(&state, &env.predecessor_account_id())?;
+        }
+
         xcc::fund_xcc_sub_account(&io, handler, env, args)?;
         Ok(())
     })
