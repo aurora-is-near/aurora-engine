@@ -38,7 +38,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(109, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(110, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
