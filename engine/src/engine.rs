@@ -104,6 +104,7 @@ pub enum EngineErrorKind {
     NotOwner,
     NonExistedKey,
     Erc20FromNep141,
+    RejectCallerWithCode,
 }
 
 impl EngineErrorKind {
@@ -143,6 +144,7 @@ impl EngineErrorKind {
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
+            Self::RejectCallerWithCode => errors::ERR_REJECT_CALL_WITH_CODE,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -1032,6 +1034,8 @@ pub fn submit_with_alt_modexp<
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
+    // Retrieve the signer of the transaction:
+    let sender = transaction.address;
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
@@ -1044,9 +1048,6 @@ pub fn submit_with_alt_modexp<
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
-
-    // Retrieve the signer of the transaction:
-    let sender = transaction.address;
 
     sdk::log!("signer_address {:?}", sender);
 
@@ -1075,6 +1076,10 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
+    // EIP-3607
+    if !engine.code(sender.raw()).is_empty() {
+        return Err(EngineErrorKind::RejectCallerWithCode.into());
+    }
     let max_gas_price = args.max_gas_price.map(Into::into);
     let prepaid_amount = match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas) {
         Ok(gas_result) => gas_result,
