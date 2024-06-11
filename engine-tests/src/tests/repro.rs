@@ -88,7 +88,7 @@ fn repro_5bEgfRQ() {
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 655,
+        near_gas_used: 656,
     });
 }
 
