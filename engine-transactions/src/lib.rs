@@ -10,7 +10,6 @@
 
 extern crate alloc;
 
-use crate::EthTransactionKind::Eip4844;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
@@ -45,7 +44,7 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             Ok(Self::Eip1559(eip_1559::SignedTransaction1559::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
-        } else if bytes[0] == eip_4844::BLOB_TX_TYPE {
+        } else if bytes[0] == eip_4844::TYPE_BYTE {
             Ok(Self::Eip4844(eip_4844::SignedTransaction4844::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
@@ -76,7 +75,7 @@ impl From<&EthTransactionKind> for Vec<u8> {
                 stream.append(tx);
             }
             EthTransactionKind::Eip4844(tx) => {
-                stream.append(&eip_4844::BLOB_TX_TYPE);
+                stream.append(&eip_4844::TYPE_BYTE);
                 stream.append(tx);
             }
         }
@@ -103,7 +102,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
-        use EthTransactionKind::{Eip1559, Eip2930, Legacy};
+        use EthTransactionKind::{Eip1559, Eip2930, Eip4844, Legacy};
         Ok(match kind {
             Legacy(tx) => Self {
                 address: tx.sender()?,
@@ -148,7 +147,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 gas_limit: tx.transaction.gas_limit,
                 max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
                 max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: tx.transaction.to,
+                to: Some(tx.transaction.to),
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,

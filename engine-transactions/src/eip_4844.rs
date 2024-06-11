@@ -3,12 +3,12 @@ use crate::Error;
 use alloc::vec::Vec;
 use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{H256, U256};
+use aurora_engine_types::{H160, H256, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
 /// Type indicator (per EIP-2718) for access list transactions
 /// [EIP-4844 Specification](https://eips.ethereum.org/EIPS/eip-4844#specification)
-pub const BLOB_TX_TYPE: u8 = 0x03;
+pub const TYPE_BYTE: u8 = 0x03;
 
 const UNSIGNED_FIELDS: usize = 11;
 const SIGNED_FIELDS: usize = 14;
@@ -31,8 +31,8 @@ pub struct Transaction4844 {
     pub max_fee_per_gas: U256,
     /// The maximum amount of gas the sender is willing to consume on a transaction.
     pub gas_limit: U256,
-    /// The receiving address (`None` for the zero address)
-    pub to: Option<Address>,
+    /// The receiving address. NOTE: according to EIP-4844 it shouldn't be nil
+    pub to: Address,
     /// The amount of ETH to transfer.
     pub value: Wei,
     /// Arbitrary binary data for a contract call invocation
@@ -64,10 +64,7 @@ impl Transaction4844 {
         s.append(&self.max_priority_fee_per_gas);
         s.append(&self.max_fee_per_gas);
         s.append(&self.gas_limit);
-        match self.to.as_ref() {
-            None => s.append(&""),
-            Some(address) => s.append(&address.raw()),
-        };
+        s.append(&self.to.raw());
         s.append(&self.value.raw());
         s.append(&self.data);
         s.begin_list(self.access_list.len());
@@ -99,7 +96,7 @@ pub struct SignedTransaction4844 {
 impl SignedTransaction4844 {
     pub fn sender(&self) -> Result<Address, Error> {
         let mut rlp_stream = RlpStream::new();
-        rlp_stream.append(&BLOB_TX_TYPE);
+        rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);
         let message_hash = aurora_engine_sdk::keccak(rlp_stream.as_raw());
         ecrecover(
@@ -129,7 +126,8 @@ impl Decodable for SignedTransaction4844 {
         let max_priority_fee_per_gas = rlp.val_at(2)?;
         let max_fee_per_gas = rlp.val_at(3)?;
         let gas_limit = rlp.val_at(4)?;
-        let to = super::rlp_extract_to(rlp, 5)?;
+        let raw_address: H160 = rlp.val_at(5)?;
+        let to = Address::new(raw_address);
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
         let access_list = rlp.list_at(8)?;

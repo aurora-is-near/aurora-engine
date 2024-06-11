@@ -1924,12 +1924,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
         Some(self.storage(address, index))
     }
 
-    fn blob_gasprice(&self) -> Option<u128> {
-        Some(1)
+    fn get_blob_hash(&self, _index: usize) -> Option<U256> {
+        None
     }
 
-    fn get_blob_hash(&self, _index: usize) -> Result<U256, ExitError> {
-        Ok(U256::default())
+    fn blob_gas_price(&self) -> Option<u128> {
+        None
     }
 }
 
