@@ -49,7 +49,6 @@ impl EthTransactionKindAdapter {
                         tx.transaction.to = None;
                     }
                 }
-                EthTransactionKind::Eip4844(_) => (),
             }
         }
 

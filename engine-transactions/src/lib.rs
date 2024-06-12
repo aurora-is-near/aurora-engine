@@ -8,8 +8,6 @@
 )]
 #![forbid(unsafe_code)]
 
-extern crate alloc;
-
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
 use eip_2930::AccessTuple;
@@ -27,7 +25,6 @@ pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
     Eip2930(eip_2930::SignedTransaction2930),
     Eip1559(eip_1559::SignedTransaction1559),
-    Eip4844(eip_4844::SignedTransaction4844),
 }
 
 impl TryFrom<&[u8]> for EthTransactionKind {
@@ -45,9 +42,7 @@ impl TryFrom<&[u8]> for EthTransactionKind {
                 &Rlp::new(&bytes[1..]),
             )?))
         } else if bytes[0] == eip_4844::TYPE_BYTE {
-            Ok(Self::Eip4844(eip_4844::SignedTransaction4844::decode(
-                &Rlp::new(&bytes[1..]),
-            )?))
+            Err(Error::UnsupportedTransactionEip4844)
         } else if bytes[0] <= 0x7f {
             Err(Error::UnknownTransactionType)
         } else if bytes[0] == 0xff {
@@ -74,10 +69,6 @@ impl From<&EthTransactionKind> for Vec<u8> {
                 stream.append(&eip_2930::TYPE_BYTE);
                 stream.append(tx);
             }
-            EthTransactionKind::Eip4844(tx) => {
-                stream.append(&eip_4844::TYPE_BYTE);
-                stream.append(tx);
-            }
         }
         stream.out().to_vec()
     }
@@ -102,7 +93,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
-        use EthTransactionKind::{Eip1559, Eip2930, Eip4844, Legacy};
+        use EthTransactionKind::{Eip1559, Eip2930, Legacy};
         Ok(match kind {
             Legacy(tx) => Self {
                 address: tx.sender()?,
@@ -136,18 +127,6 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
                 max_fee_per_gas: tx.transaction.max_fee_per_gas,
                 to: tx.transaction.to,
-                value: tx.transaction.value,
-                data: tx.transaction.data,
-                access_list: tx.transaction.access_list,
-            },
-            Eip4844(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: Some(tx.transaction.to),
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
@@ -236,6 +215,7 @@ pub enum Error {
     IntegerConversion,
     #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
+    UnsupportedTransactionEip4844,
 }
 
 #[cfg(feature = "serde")]
@@ -255,6 +235,7 @@ impl Error {
             Self::GasOverflow => "ERR_GAS_OVERFLOW",
             Self::IntegerConversion => "ERR_INTEGER_CONVERSION",
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
+            Self::UnsupportedTransactionEip4844 => "ERR_UNSUPPORTED_TX_EIP4844",
         }
     }
 }
