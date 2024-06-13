@@ -398,7 +398,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::shanghai();
+pub(crate) const CONFIG: &Config = &Config::cancun();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -1922,6 +1922,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     /// are written to storage until after the transaction is complete.
     fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
         Some(self.storage(address, index))
+    }
+
+    fn get_blob_hash(&self, _index: usize) -> Option<U256> {
+        None
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        None
     }
 }
 
