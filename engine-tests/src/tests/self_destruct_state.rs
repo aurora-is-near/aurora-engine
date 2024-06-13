@@ -5,6 +5,8 @@ use crate::utils::solidity::self_destruct::{
 
 /// Check that account state should be properly removed after calling selfdestruct
 #[test]
+// For CANCUN hard fork SELFDESCTRUCT disabled
+#[ignore]
 fn test_self_destruct_reset_state() {
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
@@ -29,7 +31,7 @@ fn test_self_destruct_reset_state() {
     assert_eq!(counter_value, Some(1));
     sd.finish(&mut runner);
     let counter_value = sd.counter(&mut runner, &mut signer);
-    assert!(counter_value.is_none());
+    assert!(counter_value.is_some());
 
     let sd_contract_addr1 = sd_factory.deploy(&mut runner, &mut signer);
     assert_eq!(sd_contract_addr, sd_contract_addr1);
