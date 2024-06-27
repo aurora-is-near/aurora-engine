@@ -10,7 +10,7 @@ impl<K: Ord, V> FullCache<K, V> {
     pub fn get_or_insert_with<F: FnOnce() -> V>(&mut self, k: K, f: F) -> &mut V {
         self.inner.entry(k).or_insert_with(f)
     }
-    pub fn contains_key(&self, k: K) -> bool {
-        self.inner.contains_key(&k)
+    pub fn contains_key(&self, k: &K) -> bool {
+        self.inner.contains_key(k)
     }
 }
