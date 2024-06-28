@@ -11,7 +11,7 @@ impl<K: Ord, V> FullCache<K, V> {
         self.inner.entry(k).or_insert_with(f)
     }
 
-    pub fn contains_key(&self, k: K) -> bool {
-        self.inner.contains_key(&k)
+    pub fn contains_key(&self, k: &K) -> bool {
+        self.inner.contains_key(k)
     }
 }

@@ -150,7 +150,7 @@ impl<'a> OneShotAuroraRunner<'a> {
             &[],
             Some(&self.base.cache),
         )
-            .unwrap();
+        .unwrap();
 
         if let Some(aborted) = outcome.aborted.as_ref() {
             Err(into_engine_error(outcome.used_gas, aborted))
@@ -226,7 +226,7 @@ impl AuroraRunner {
             &vm_promise_results,
             Some(&self.cache),
         )
-            .unwrap();
+        .unwrap();
 
         if let Some(error) = outcome.aborted.as_ref() {
             return Err(into_engine_error(outcome.used_gas, error));
@@ -331,7 +331,7 @@ impl AuroraRunner {
                 ft_key.as_slice(),
                 self.context.current_account_id.as_bytes(),
             ]
-                .concat();
+            .concat();
             let aurora_balance_value = {
                 let mut current_balance: u128 = trie
                     .get(&aurora_balance_key)
@@ -414,7 +414,7 @@ impl AuroraRunner {
             max_gas_price,
             gas_token_address,
         )
-            .map(|(result, _)| result)
+        .map(|(result, _)| result)
     }
 
     pub fn submit_transaction_with_args_profiled(
@@ -436,7 +436,7 @@ impl AuroraRunner {
             CALLER_ACCOUNT_ID,
             borsh::to_vec(&args).unwrap(),
         )
-            .map(Self::profile_outcome)
+        .map(Self::profile_outcome)
     }
 
     fn profile_outcome(outcome: VMOutcome) -> (SubmitResult, ExecutionProfile) {
@@ -719,7 +719,7 @@ pub fn deploy_runner() -> AuroraRunner {
     assert!(result.is_ok());
 
     #[cfg(not(feature = "ext-connector"))]
-        let result = {
+    let result = {
         let args = InitCallArgs {
             prover_account: str_to_account_id("prover.near"),
             eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
@@ -733,7 +733,7 @@ pub fn deploy_runner() -> AuroraRunner {
     };
 
     #[cfg(feature = "ext-connector")]
-        let result = {
+    let result = {
         let args = SetEthConnectorContractAccountArgs {
             account: AccountId::new("aurora_eth_connector.root").unwrap(),
             withdraw_serialize_type: WithdrawSerializeType::Borsh,
@@ -1029,6 +1029,7 @@ pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
 
 /// Returns true if `abs(a - b) / max(a, b) <= x / 100`. The implementation is written differently than
 /// this simpler formula to avoid floating point arithmetic.
+#[allow(clippy::cast_precision_loss, clippy::as_conversions)]
 pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
     (100. / x as f64) * (larger as f64 - smaller as f64) <= larger as f64

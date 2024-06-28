@@ -1012,17 +1012,17 @@ pub fn submit_with_alt_modexp<
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
-        let transaction = NormalizedEthTransaction::try_from(
+    let transaction = NormalizedEthTransaction::try_from(
         EthTransactionKind::try_from(args.tx_data.as_slice())
             .map_err(EngineErrorKind::FailedTransactionParse)?,
     )
-        .map_err(|_e| EngineErrorKind::InvalidSignature)?;
+    .map_err(|_e| EngineErrorKind::InvalidSignature)?;
 
     #[cfg(not(feature = "contract"))]
-        // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
-        // but the contract itself does not need to make such checks because it never executes historical
-        // transactions.
-        let transaction: NormalizedEthTransaction = {
+    // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
+    // but the contract itself does not need to make such checks because it never executes historical
+    // transactions.
+    let transaction: NormalizedEthTransaction = {
         let adapter =
             aurora_engine_transactions::backwards_compatibility::EthTransactionKindAdapter::new(
                 ZERO_ADDRESS_FIX_HEIGHT,
@@ -1135,10 +1135,10 @@ pub fn submit_with_alt_modexp<
         &relayer_address,
         fixed_gas,
     )
-        .map_err(|e| EngineError {
-            gas_used,
-            kind: EngineErrorKind::GasPayment(e),
-        })?;
+    .map_err(|e| EngineError {
+        gas_used,
+        kind: EngineErrorKind::GasPayment(e),
+    })?;
 
     // return result to user
     result
@@ -1302,9 +1302,9 @@ pub fn setup_deploy_erc20_input(
     erc20_metadata: Option<Erc20Metadata>,
 ) -> Vec<u8> {
     #[cfg(feature = "error_refund")]
-        let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20V2.bin");
     #[cfg(not(feature = "error_refund"))]
-        let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
+    let erc20_contract = include_bytes!("../../etc/eth-contracts/res/EvmErc20.bin");
 
     let erc20_admin_address = current_address(current_account_id);
     let erc20_metadata = erc20_metadata.unwrap_or_default();
@@ -1336,7 +1336,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         io,
         env,
     )
-        .map_err(DeployErc20Error::State)?;
+    .map_err(DeployErc20Error::State)?;
 
     let address = match engine.deploy_code_with_input(input, None, handler) {
         Ok(result) => match result.status {
@@ -1375,7 +1375,7 @@ pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         io,
         env,
     )
-        .map_err(DeployErc20Error::State)?;
+    .map_err(DeployErc20Error::State)?;
 
     let address = match engine.deploy_code_with_input(input, Some(erc20_address), handler) {
         Ok(result) => match result.status {
@@ -1553,7 +1553,7 @@ pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
     get_balance(io, address).is_zero()
         && get_nonce(io, address).is_zero()
         && get_code_size(io, address) == 0
-        && !storage_has_key(io, address, &H256::zero(), get_generation(io, &address))
+        && !storage_has_key(io, address, &H256::zero(), get_generation(io, address))
 }
 
 /// Increments storage generation for a given address.
@@ -1615,10 +1615,10 @@ fn filter_promises_from_logs<I, T, P>(
     logs: T,
     current_account_id: &AccountId,
 ) -> Vec<ResultLog>
-    where
-        T: IntoIterator<Item=Log>,
-        P: PromiseHandler,
-        I: IO + Copy,
+where
+    T: IntoIterator<Item = Log>,
+    P: PromiseHandler,
+    I: IO + Copy,
 {
     let mut previous_promise: Option<PromiseId> = None;
     logs.into_iter()
@@ -1937,7 +1937,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
         if self
             .contract_storage_cache
             .borrow()
-            .contains_key((address, index)) {
+            .contains_key(&(address, index))
+        {
             return false;
         }
         !storage_has_key(&self.io, &address, &index, generation)
@@ -1963,10 +1964,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
 
 impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
-        where
-            A: IntoIterator<Item=Apply<I>>,
-            I: IntoIterator<Item=(H256, H256)>,
-            L: IntoIterator<Item=Log>,
+    where
+        A: IntoIterator<Item = Apply<I>>,
+        I: IntoIterator<Item = (H256, H256)>,
+        L: IntoIterator<Item = Log>,
     {
         let mut writes_counter: usize = 0;
         let mut code_bytes_written: usize = 0;
@@ -2074,7 +2075,7 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
         // These variable are only used if logging feature is enabled.
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
-            let total_bytes = 32 * writes_counter + code_bytes_written;
+        let total_bytes = 32 * writes_counter + code_bytes_written;
         #[allow(unused_assignments)]
         if code_bytes_written > 0 {
             writes_counter += 1;
@@ -2770,8 +2771,8 @@ mod tests {
         let public_key = serde_json::from_str::<RelayerKeyArgs>(
             r#"{"public_key":"ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847"}"#,
         )
-            .map(|args| args.public_key)
-            .unwrap();
+        .map(|args| args.public_key)
+        .unwrap();
 
         let result = remove_function_call_key(&mut io, &public_key);
         assert!(result.is_err()); // should fail because the key doesn't exist yet.

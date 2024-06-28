@@ -338,7 +338,7 @@ mod tests {
         let amount = U256::from_big_endian(&amount);
 
         #[allow(deprecated)]
-            let transfer_from_function = ethabi::Function {
+        let transfer_from_function = ethabi::Function {
             name: "transferFrom".into(),
             inputs: vec![
                 ethabi::Param {
