@@ -1029,10 +1029,9 @@ pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
 
 /// Returns true if `abs(a - b) / max(a, b) <= x / 100`. The implementation is written differently than
 /// this simpler formula to avoid floating point arithmetic.
-#[allow(clippy::cast_precision_loss, clippy::as_conversions)]
-pub fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
+pub const fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
-    (100. / x as f64) * (larger as f64 - smaller as f64) <= larger as f64
+    100 * (larger - smaller) <= larger * x
 }
 
 fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError {
