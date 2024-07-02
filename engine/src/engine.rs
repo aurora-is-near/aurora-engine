@@ -1921,8 +1921,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
         result
     }
 
-    /// Check is storage empty for address
-    /// EIP-7610: non-empty storGE
+    /// Check is storage empty for the address
+    /// EIP-7610: non-empty storage
     fn is_empty_storage(&self, address: H160) -> bool {
         let address = Address::new(address);
         // As we can't read all storage data for account we assuming that if storage exists
