@@ -33,7 +33,7 @@ pub mod costs {
     pub const CROSS_CONTRACT_CALL_BASE: EthGas = EthGas::new(343_650);
     /// Additional EVM gas cost per bytes of input given.
     /// See `CROSS_CONTRACT_CALL_BASE` for estimation methodology.
-    pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(3);
+    pub const CROSS_CONTRACT_CALL_BYTE: EthGas = EthGas::new(4);
     /// EVM gas cost per NEAR gas attached to the created promise.
     /// This value is derived from the gas report `https://hackmd.io/@birchmd/Sy4piXQ29`
     /// The units on this quantity are `NEAR Gas / EVM Gas`.
