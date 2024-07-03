@@ -51,7 +51,7 @@ fn repro_8ru7VEA() {
         block_timestamp: 1_648_829_935_343_349_589,
         input_path: "src/tests/res/input_8ru7VEA.hex",
         evm_gas_used: 1_732_181,
-        near_gas_used: 212,
+        near_gas_used: 211,
     });
 }
 
@@ -71,7 +71,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 172,
+        near_gas_used: 171,
     });
 }
 
