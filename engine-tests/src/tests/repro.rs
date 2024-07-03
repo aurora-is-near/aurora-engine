@@ -88,7 +88,7 @@ fn repro_5bEgfRQ() {
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 655,
+        near_gas_used: 658,
     });
 }
 
@@ -125,7 +125,7 @@ fn repro_Emufid2() {
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
         evm_gas_used: 1_156_364,
-        near_gas_used: 296,
+        near_gas_used: 297,
     });
 }
 

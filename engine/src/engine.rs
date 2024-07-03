@@ -1544,6 +1544,11 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
         .unwrap_or_default()
 }
 
+pub fn is_empty_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> bool {
+    io.read_storage(storage_to_key(address, key, generation).as_ref())
+        .is_none()
+}
+
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
     get_balance(io, address).is_zero()
         && get_nonce(io, address).is_zero()
@@ -1913,6 +1918,23 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
                 get_storage(&self.io, &address, &index, generation)
             });
         result
+    }
+
+    fn is_empty_storage(&self, address: H160) -> bool {
+        let address = Address::new(address);
+        if self
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(address, H256::zero()))
+        {
+            return true;
+        }
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
+        is_empty_storage(&self.io, &address, &H256::zero(), generation)
     }
 
     /// Get original storage value of address at index, if available.
