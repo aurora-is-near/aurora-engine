@@ -177,14 +177,17 @@ trait ExitIntoResult {
 }
 
 impl ExitIntoResult for ExitReason {
+    /// We should be aligned to Ethereum's gas charging:
+    /// - Success| Revert
+    /// - ExitError - Execution errors should charge gas from users
+    /// - ExitFatal - shouldn't charge user gas
+    /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
             Self::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
             Self::Revert(_) => Ok(TransactionStatus::Revert(data)),
-            Self::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
-            Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
-            Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-            Self::Error(e) => Err(e.into()),
+            // To be compatible with Ethereum behaviour we should charge gas for Execution errors
+            Self::Error(err) => Ok(err.into()),
             Self::Fatal(e) => Err(e.into()),
         }
     }
