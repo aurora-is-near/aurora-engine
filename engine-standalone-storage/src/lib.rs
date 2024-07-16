@@ -227,7 +227,7 @@ impl Storage {
     }
 
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
-        &mut self,
+        &self,
         tx_hash: H256,
         tx_msg: &TransactionMessage,
         diff: &Diff,

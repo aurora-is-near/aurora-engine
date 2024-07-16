@@ -7,8 +7,6 @@ mod erc20_connector;
 mod erc20_mirror;
 mod ghsa_3p69_m8gg_fwmf;
 mod hashchain;
-#[cfg(feature = "meta-call")]
-mod meta_parsing;
 pub mod modexp;
 mod multisender;
 mod one_inch;

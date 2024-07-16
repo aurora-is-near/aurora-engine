@@ -206,7 +206,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
-    /// Overflow in gas * gas_price calculation
+    /// Overflow in `gas * gas_price` calculation
     EthAmountOverflow,
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
@@ -816,10 +816,9 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     gas_used: submit_result.gas_used,
                 }),
             })
-            .map_err(|e| {
-                sdk::log!("{:?}", e);
+            .inspect_err(|_e| {
+                sdk::log!("{:?}", _e);
                 self.io.return_output(output_on_fail);
-                e
             })?;
 
         // Everything succeed so return "0"

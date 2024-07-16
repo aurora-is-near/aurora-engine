@@ -813,7 +813,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
+        .args_borsh(contract.get_proof(PROOF_DATA_ETH))
         .max_gas()
         .transact()
         .await?;
@@ -824,7 +824,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
 
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
+        .args_borsh(contract.get_proof(PROOF_DATA_NEAR))
         .max_gas()
         .transact()
         .await?;
@@ -860,7 +860,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
+        .args_borsh(contract.get_proof(PROOF_DATA_ETH))
         .max_gas()
         .transact()
         .await?;
@@ -880,7 +880,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
     let res = contract
         .engine_contract
         .call("deposit")
-        .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
+        .args_borsh(contract.get_proof(PROOF_DATA_ETH))
         .max_gas()
         .transact()
         .await?;

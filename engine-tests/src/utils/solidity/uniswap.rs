@@ -399,7 +399,7 @@ fn uniswap_root_path() -> PathBuf {
 fn download_uniswap_artifacts() {
     DOWNLOAD_ONCE.call_once(|| {
         let output = Command::new("/usr/bin/env")
-            .current_dir(&uniswap_root_path())
+            .current_dir(uniswap_root_path())
             .args(["yarn", "install"])
             .output()
             .unwrap();
