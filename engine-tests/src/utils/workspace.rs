@@ -85,6 +85,15 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
         .await?;
     assert!(result.is_success());
 
+    // By default, the contract is paused. So we need to unpause it.
+    let result = contract
+        .call("pa_unpause_feature")
+        .args_json(json!({ "key": "ALL" }))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
     let result = aurora
         .set_eth_connector_contract_account(contract_account.id(), WithdrawSerializeType::Borsh)
         .transact()
