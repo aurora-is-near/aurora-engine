@@ -12,13 +12,13 @@ publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { workspace = true, features = ["borsh-compat", "impl-serde", "std"] }
+aurora-engine-types = { workspace = true, features = ["impl-serde", "std"] }
 anyhow.workspace = true
+near-gas.workspace = true
 near-sdk.workspace = true
-near-units.workspace = true
+near-workspaces.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-workspaces.workspace = true
 tokio = { workspace = true, features = [ "time" ] }
 
 [dev-dependencies]

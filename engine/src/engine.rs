@@ -29,10 +29,10 @@ use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
-    address_to_key, bytes_to_key, sdk, storage_to_key, u256_to_arr, vec, AccountId, Address,
-    BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, Vec, Wei, Yocto,
-    ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR,
-    ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
+    Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
+    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
@@ -41,6 +41,7 @@ use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
+use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
 
@@ -59,29 +60,6 @@ pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;
 #[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {
     aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
-}
-
-macro_rules! unwrap_res_or_finish {
-    ($e:expr, $output:expr, $io:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(_e) => {
-                #[cfg(feature = "log")]
-                sdk::log(crate::prelude::format!("{:?}", _e).as_str());
-                $io.return_output($output);
-                return;
-            }
-        }
-    };
-}
-
-macro_rules! assert_or_finish {
-    ($e:expr, $output:expr, $io:expr) => {
-        if !$e {
-            $io.return_output($output);
-            return;
-        }
-    };
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -112,7 +90,7 @@ pub enum EngineErrorKind {
     /// Fatal EVM errors.
     EvmFatal(ExitFatal),
     /// Incorrect nonce.
-    IncorrectNonce,
+    IncorrectNonce(String),
     FailedTransactionParse(crate::prelude::transactions::Error),
     InvalidChainId,
     InvalidSignature,
@@ -120,11 +98,13 @@ pub enum EngineErrorKind {
     MaxPriorityGasFeeTooLarge,
     GasPayment(GasPaymentError),
     GasOverflow,
+    FixedGasOverflow,
     NotAllowed,
     SameOwner,
     NotOwner,
     NonExistedKey,
     Erc20FromNep141,
+    RejectCallerWithCode,
 }
 
 impl EngineErrorKind {
@@ -150,7 +130,7 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::Other(m)) | Self::EvmFatal(ExitFatal::Other(m)) => {
                 m.as_bytes()
             }
-            Self::IncorrectNonce => errors::ERR_INCORRECT_NONCE,
+            Self::IncorrectNonce(msg) => msg.as_bytes(),
             Self::FailedTransactionParse(e) => e.as_ref(),
             Self::InvalidChainId => errors::ERR_INVALID_CHAIN_ID,
             Self::InvalidSignature => errors::ERR_INVALID_ECDSA_SIGNATURE,
@@ -158,11 +138,13 @@ impl EngineErrorKind {
             Self::MaxPriorityGasFeeTooLarge => errors::ERR_MAX_PRIORITY_FEE_GREATER,
             Self::GasPayment(e) => e.as_ref(),
             Self::GasOverflow => errors::ERR_GAS_OVERFLOW,
+            Self::FixedGasOverflow => errors::ERR_FIXED_GAS_OVERFLOW,
             Self::NotAllowed => errors::ERR_NOT_ALLOWED,
             Self::SameOwner => errors::ERR_SAME_OWNER,
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
+            Self::RejectCallerWithCode => errors::ERR_REJECT_CALL_WITH_CODE,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
     }
@@ -416,7 +398,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::shanghai();
+pub(crate) const CONFIG: &Config = &Config::cancun();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -456,31 +438,26 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         sender: &Address,
         transaction: &NormalizedEthTransaction,
         max_gas_price: Option<U256>,
-        fixed_gas_cost: Option<Wei>,
+        fixed_gas: Option<EthGas>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() && fixed_gas_cost.is_none() {
+        if transaction.max_fee_per_gas.is_zero() && fixed_gas.is_none() {
             return Ok(GasPaymentResult::default());
         }
 
-        let (prepaid_amount, effective_gas_price, priority_fee_per_gas) =
-            if let Some(cost) = fixed_gas_cost {
-                (cost, cost.raw(), cost.raw())
-            } else {
-                let priority_fee_per_gas = transaction
-                    .max_priority_fee_per_gas
-                    .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
-                let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
-                    price.min(priority_fee_per_gas)
-                });
-                let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
-                let prepaid_amount = transaction
-                    .gas_limit
-                    .checked_mul(effective_gas_price)
-                    .map(Wei::new)
-                    .ok_or(GasPaymentError::EthAmountOverflow)?;
-
-                (prepaid_amount, effective_gas_price, priority_fee_per_gas)
-            };
+        let priority_fee_per_gas = transaction
+            .max_priority_fee_per_gas
+            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+        let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
+            price.min(priority_fee_per_gas)
+        });
+        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+        // First we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
+        // less than the `gas_limit`. It allows to avoid refund unused gas to the sender later.
+        let prepaid_amount = fixed_gas
+            .map_or(transaction.gas_limit, EthGas::as_u256)
+            .checked_mul(effective_gas_price)
+            .map(Wei::new)
+            .ok_or(GasPaymentError::EthAmountOverflow)?;
 
         let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
@@ -753,24 +730,34 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         args: &NEP141FtOnTransferArgs,
         current_account_id: &AccountId,
         handler: &mut P,
-    ) {
+    ) -> Result<SubmitResult, EngineError> {
+        const INVALID_MESSAGE: &str = "receive_erc20_tokens invalid message";
+        const UNKNOWN_NEP_141: &str = "receive_erc20_tokens unknown NEP-141";
+
         let str_amount = crate::prelude::format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
+        let mut local_io = self.io;
+        let mut engine_err = |msg: &'static str| {
+            sdk::log!("{}", msg);
+            local_io.return_output(output_on_fail);
+            EngineError {
+                kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(msg))),
+                gas_used: 0,
+            }
+        };
 
         // Parse message to determine recipient
         let mut recipient = {
             // Message format:
             //      Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
-            assert_or_finish!(message.len() >= 40, output_on_fail, self.io);
-
-            Address::new(H160(unwrap_res_or_finish!(
-                unwrap_res_or_finish!(hex::decode(&message[..40]), output_on_fail, self.io)
-                    .as_slice()
-                    .try_into(),
-                output_on_fail,
-                self.io
-            )))
+            if message.len() < 40 {
+                return Err(engine_err(INVALID_MESSAGE));
+            }
+            let mut address_bytes = [0; 20];
+            hex::decode_to_slice(&message[..40], &mut address_bytes)
+                .map_err(|_| engine_err(INVALID_MESSAGE))?;
+            Address::from_array(address_bytes)
         };
 
         if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
@@ -779,21 +766,17 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             }
         };
 
-        let erc20_token = Address::from_array(unwrap_res_or_finish!(
-            unwrap_res_or_finish!(
-                get_erc20_from_nep141(&self.io, token),
-                output_on_fail,
-                self.io
-            )
-            .as_slice()
-            .try_into(),
-            output_on_fail,
-            self.io
-        ));
+        let erc20_token = {
+            let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
+                .ok()
+                .and_then(|bytes| bytes.as_slice().try_into().ok())
+                .ok_or_else(|| engine_err(UNKNOWN_NEP_141))?;
+            Address::from_array(address_bytes)
+        };
 
         let erc20_admin_address = current_address(current_account_id);
-        unwrap_res_or_finish!(
-            self.call(
+        let result = self
+            .call(
                 &erc20_admin_address,
                 &erc20_token,
                 Wei::zero(),
@@ -802,46 +785,49 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
-            .and_then(|submit_result| {
-                match submit_result.status {
-                    TransactionStatus::Succeed(_) => Ok(()),
-                    TransactionStatus::Revert(bytes) => {
-                        let error_message = crate::prelude::format!(
-                            "Reverted with message: {}",
-                            crate::prelude::String::from_utf8_lossy(&bytes)
-                        );
-                        Err(EngineError {
-                            kind: EngineErrorKind::EvmError(ExitError::Other(
-                                crate::prelude::Cow::from(error_message),
-                            )),
-                            gas_used: submit_result.gas_used,
-                        })
-                    }
-                    TransactionStatus::OutOfFund => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+            .and_then(|submit_result| match submit_result.status {
+                TransactionStatus::Succeed(_) => Ok(submit_result),
+                TransactionStatus::Revert(bytes) => {
+                    let error_message = crate::prelude::format!(
+                        "Reverted with message: {}",
+                        crate::prelude::String::from_utf8_lossy(&bytes)
+                    );
+                    Err(EngineError {
+                        kind: EngineErrorKind::EvmError(ExitError::Other(
+                            crate::prelude::Cow::from(error_message),
+                        )),
                         gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::OutOfOffset => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
-                        gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::OutOfGas => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
-                        gas_used: submit_result.gas_used,
-                    }),
-                    TransactionStatus::CallTooDeep => Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
-                        gas_used: submit_result.gas_used,
-                    }),
+                    })
                 }
-            }),
-            output_on_fail,
-            self.io
-        );
+                TransactionStatus::OutOfFund => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfOffset => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfGas => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::CallTooDeep => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
+                    gas_used: submit_result.gas_used,
+                }),
+            })
+            .map_err(|e| {
+                sdk::log!("{:?}", e);
+                self.io.return_output(output_on_fail);
+                e
+            })?;
 
-        // TODO(marX)
         // Everything succeed so return "0"
         self.io.return_output(b"\"0\"");
+
+        // Return SubmitResult so that it can be accessed in standalone engine.
+        // This is used to help with the indexing of bridge transactions.
+        Ok(result)
     }
 
     /// Read metadata of ERC-20 contract.
@@ -1048,21 +1034,13 @@ pub fn submit_with_alt_modexp<
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
+    // Retrieve the signer of the transaction:
+    let sender = transaction.address;
 
-    let fixed_gas_cost = silo::get_fixed_gas_cost(&io);
-    let transaction = if fixed_gas_cost.is_some() {
-        let mut tx = transaction;
-        // In the case of SILO, we don't care about gas value because the price is fixed.
-        // So we can change `gas_limit` to the max value for EVM. It excludes the ERR_INTRINSIC_GAS
-        // error if a user sets a gas limit value lower than needed for transaction execution.
-        tx.gas_limit = u64::MAX.into();
-        tx
-    } else {
-        transaction
-    };
+    let fixed_gas = silo::get_fixed_gas(&io);
 
     // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, &fixed_gas_cost, &transaction)?;
+    assert_access(&io, env, &fixed_gas, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
@@ -1071,23 +1049,23 @@ pub fn submit_with_alt_modexp<
         }
     }
 
-    // Retrieve the signer of the transaction:
-    let sender = transaction.address;
-
     sdk::log!("signer_address {:?}", sender);
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    if fixed_gas_cost.is_none() {
-        // Check intrinsic gas is covered by transaction gas limit
-        match transaction.intrinsic_gas(CONFIG) {
-            Err(_e) => {
-                return Err(EngineErrorKind::GasOverflow.into());
-            }
-            Ok(intrinsic_gas) => {
-                if transaction.gas_limit < intrinsic_gas.into() {
-                    return Err(EngineErrorKind::IntrinsicGasNotMet.into());
-                }
+    // Check that fixed gas is not greater than gasLimit from the transaction.
+    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
+        return Err(EngineErrorKind::FixedGasOverflow.into());
+    }
+
+    // Check intrinsic gas is covered by transaction gas limit
+    match transaction.intrinsic_gas(CONFIG) {
+        Err(_e) => {
+            return Err(EngineErrorKind::GasOverflow.into());
+        }
+        Ok(intrinsic_gas) => {
+            if transaction.gas_limit < intrinsic_gas.into() {
+                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
             }
         }
     }
@@ -1098,14 +1076,17 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
+    // EIP-3607
+    if !engine.code(sender.raw()).is_empty() {
+        return Err(EngineErrorKind::RejectCallerWithCode.into());
+    }
     let max_gas_price = args.max_gas_price.map(Into::into);
-    let prepaid_amount =
-        match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas_cost) {
-            Ok(gas_result) => gas_result,
-            Err(err) => {
-                return Err(EngineErrorKind::GasPayment(err).into());
-            }
-        };
+    let prepaid_amount = match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas) {
+        Ok(gas_result) => gas_result,
+        Err(err) => {
+            return Err(EngineErrorKind::GasPayment(err).into());
+        }
+    };
     let gas_limit = transaction
         .gas_limit
         .try_into()
@@ -1152,7 +1133,7 @@ pub fn submit_with_alt_modexp<
         gas_used,
         &prepaid_amount,
         &relayer_address,
-        fixed_gas_cost,
+        fixed_gas,
     )
     .map_err(|e| EngineError {
         gas_used,
@@ -1264,17 +1245,16 @@ pub fn refund_unused_gas<I: IO>(
     gas_used: u64,
     gas_result: &GasPaymentResult,
     relayer: &Address,
-    fixed_gas_cost: Option<Wei>,
+    fixed_gas: Option<EthGas>,
 ) -> Result<(), GasPaymentError> {
     if gas_result.effective_gas_price.is_zero() {
         return Ok(());
     }
 
-    let (refund, relayer_reward) = if let Some(fixed_cost) = fixed_gas_cost {
-        (Wei::zero(), fixed_cost)
-    } else {
+    let (refund, relayer_reward) = {
         let gas_to_wei = |price: U256| {
-            U256::from(gas_used)
+            fixed_gas
+                .map_or_else(|| gas_used.into(), EthGas::as_u256)
                 .checked_mul(price)
                 .map(Wei::new)
                 .ok_or(GasPaymentError::EthAmountOverflow)
@@ -1462,7 +1442,9 @@ pub fn check_nonce<I: IO>(
     let account_nonce = get_nonce(io, address);
 
     if transaction_nonce != &account_nonce {
-        return Err(EngineErrorKind::IncorrectNonce);
+        return Err(EngineErrorKind::IncorrectNonce(format!(
+            "ERR_INCORRECT_NONCE: ac: {account_nonce}, tx: {transaction_nonce}"
+        )));
     }
 
     Ok(())
@@ -1632,6 +1614,7 @@ where
     P: PromiseHandler,
     I: IO + Copy,
 {
+    let mut previous_promise: Option<PromiseId> = None;
     logs.into_iter()
         .filter_map(|log| {
             if log.address == exit_to_near::ADDRESS.raw()
@@ -1644,15 +1627,33 @@ where
                                 // Safety: this promise creation is safe because it does not come from
                                 // users directly. The exit precompiles only create promises which we
                                 // are able to execute without violating any security invariants.
-                                unsafe { schedule_promise(handler, &promise) }
+                                let id = unsafe {
+                                    match previous_promise {
+                                        Some(base_id) => {
+                                            schedule_promise_callback(handler, base_id, &promise)
+                                        }
+                                        None => schedule_promise(handler, &promise),
+                                    }
+                                };
+                                previous_promise = Some(id);
                             }
                             PromiseArgs::Callback(promise) => {
                                 // Safety: This is safe because the promise data comes from our own
                                 // exit precompiles. See note above.
-                                unsafe {
-                                    let base_id = schedule_promise(handler, &promise.base);
+                                let base_id = unsafe {
+                                    match previous_promise {
+                                        Some(base_id) => schedule_promise_callback(
+                                            handler,
+                                            base_id,
+                                            &promise.base,
+                                        ),
+                                        None => schedule_promise(handler, &promise.base),
+                                    }
+                                };
+                                let id = unsafe {
                                     schedule_promise_callback(handler, base_id, &promise.callback)
-                                }
+                                };
+                                previous_promise = Some(id);
                             }
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
@@ -1675,13 +1676,15 @@ where
                     let required_near =
                         Yocto::new(U256::from_big_endian(log.topics[1].as_bytes()).low_u128());
                     if let Ok(promise) = PromiseCreateArgs::try_from_slice(&log.data) {
-                        crate::xcc::handle_precompile_promise(
+                        let id = crate::xcc::handle_precompile_promise(
                             io,
                             handler,
+                            previous_promise,
                             &promise,
                             required_near,
                             current_account_id,
                         );
+                        previous_promise = Some(id);
                     }
                 }
                 // do not pass on these "internal logs" to caller
@@ -1734,10 +1737,10 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas_cost: &Option<Wei>,
+    fixed_gas: &Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
-    if fixed_gas_cost.is_some() {
+    if fixed_gas.is_some() {
         let allowed = if transaction.to.is_some() {
             silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
         } else {
@@ -1919,6 +1922,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     /// are written to storage until after the transaction is complete.
     fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
         Some(self.storage(address, index))
+    }
+
+    fn get_blob_hash(&self, _index: usize) -> Option<U256> {
+        None
+    }
+
+    fn blob_gas_price(&self) -> Option<u128> {
+        None
     }
 }
 
@@ -2300,7 +2311,9 @@ mod tests {
         engine
             .register_token(erc20_token, nep141_token.clone())
             .unwrap();
-        engine.receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler);
+        engine
+            .receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler)
+            .unwrap();
 
         let storage = storage.borrow();
         let actual_output = storage.output.as_slice();
@@ -2425,6 +2438,18 @@ mod tests {
 
         let expected_result = GasPaymentResult {
             prepaid_amount: Wei::new_u64(67_000 * 10),
+            effective_gas_price: 10.into(),
+            priority_fee_per_gas: 10.into(),
+        };
+
+        assert_eq!(expected_result, actual_result);
+
+        let actual_result = engine
+            .charge_gas(&origin, &transaction, None, Some(EthGas::new(50_000)))
+            .unwrap();
+
+        let expected_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(50_000 * 10),
             effective_gas_price: 10.into(),
             priority_fee_per_gas: 10.into(),
         };
@@ -2624,6 +2649,33 @@ mod tests {
     }
 
     #[test]
+    fn test_refund_fixed_gas_pays_expected_amount() {
+        let origin = Address::zero();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let expected_state = EngineState::default();
+        state::set_state(&mut io, &expected_state).unwrap();
+        let relayer = make_address(1, 1);
+        let gas_result = GasPaymentResult {
+            prepaid_amount: Wei::new_u64(8000),
+            effective_gas_price: 1.into(),
+            priority_fee_per_gas: 2.into(),
+        };
+        let gas_used = 4000;
+        let fixed_gas = Some(EthGas::new(7000));
+
+        refund_unused_gas(&mut io, &origin, gas_used, &gas_result, &relayer, fixed_gas).unwrap();
+
+        let actual_refund = get_balance(&io, &origin);
+        let expected_refund = Wei::new_u64(1000);
+        assert_eq!(expected_refund, actual_refund);
+
+        let actual_refund = get_balance(&io, &relayer);
+        let expected_refund = Wei::new_u64(7000 * 2);
+        assert_eq!(expected_refund, actual_refund);
+    }
+
+    #[test]
     fn test_check_nonce_with_increment_succeeds() {
         let origin = Address::zero();
         let storage = RefCell::new(Storage::default());
@@ -2642,7 +2694,10 @@ mod tests {
         increment_nonce(&mut io, &origin);
         let actual_error_kind = check_nonce(&io, &origin, &U256::from(0u64)).unwrap_err();
 
-        assert_eq!(actual_error_kind.as_bytes(), errors::ERR_INCORRECT_NONCE);
+        assert_eq!(
+            actual_error_kind.as_bytes(),
+            b"ERR_INCORRECT_NONCE: ac: 1, tx: 0"
+        );
     }
 
     #[test]

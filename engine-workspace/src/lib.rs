@@ -2,11 +2,11 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::types::address::Address;
 use aurora_engine_types::U256;
+use near_workspaces::types::NearToken;
 
 use crate::node::Node;
 
 pub use crate::contract::{EngineContract, RawContract};
-pub use near_units::parse_near;
 
 pub mod account;
 pub mod contract;
@@ -17,15 +17,15 @@ pub mod result;
 pub mod transaction;
 
 pub mod types {
-    pub use workspaces::result::{ExecutionFinalResult, ExecutionOutcome};
-    pub use workspaces::types::{KeyType, SecretKey};
+    pub use near_workspaces::result::{ExecutionFinalResult, ExecutionOutcome};
+    pub use near_workspaces::types::{KeyType, NearToken, SecretKey};
 }
 
 const AURORA_LOCAL_CHAIN_ID: u64 = 1313161556;
 const OWNER_ACCOUNT_ID: &str = "aurora.root";
 const PROVER_ACCOUNT_ID: &str = "prover.root";
-const ROOT_BALANCE: u128 = parse_near!("400 N");
-const CONTRACT_BALANCE: u128 = parse_near!("200 N");
+const ROOT_BALANCE: NearToken = NearToken::from_near(400);
+const CONTRACT_BALANCE: NearToken = NearToken::from_near(200);
 
 #[derive(Debug)]
 pub struct EngineContractBuilder {
@@ -35,8 +35,8 @@ pub struct EngineContractBuilder {
     prover_id: AccountId,
     custodian_address: Address,
     upgrade_delay_blocks: u64,
-    root_balance: u128,
-    contract_balance: u128,
+    root_balance: NearToken,
+    contract_balance: NearToken,
     ft_metadata: FungibleTokenMetadata,
 }
 
@@ -94,12 +94,12 @@ impl EngineContractBuilder {
         self
     }
 
-    pub fn with_root_balance(mut self, balance: u128) -> Self {
+    pub fn with_root_balance(mut self, balance: NearToken) -> Self {
         self.root_balance = balance;
         self
     }
 
-    pub fn with_contract_balance(mut self, balance: u128) -> Self {
+    pub fn with_contract_balance(mut self, balance: NearToken) -> Self {
         self.contract_balance = balance;
         self
     }

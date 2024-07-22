@@ -29,7 +29,8 @@ use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
-use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
+use aurora_engine_types::parameters::engine::{FullAccessKeyArgs, UpgradeParams};
+use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
     borsh::BorshDeserialize,
     parameters::{
@@ -41,12 +42,13 @@ use aurora_engine_types::{
     },
     storage::{self, KeyPrefix},
     types::{Address, Yocto},
-    vec,
+    vec, ToString,
 };
 use function_name::named;
 
 const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
+const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(50_000_000_000_000);
 
 #[named]
 pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
@@ -176,6 +178,45 @@ pub fn stage_upgrade<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Contrac
         );
         Ok(())
     })
+}
+
+pub fn upgrade<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+    require_running(&state)?;
+    require_owner_only(&state, &env.predecessor_account_id())?;
+
+    let input = io.read_input().to_vec();
+    let (code, state_migration_gas) = match UpgradeParams::try_from_slice(&input) {
+        Ok(args) => (
+            args.code,
+            args.state_migration_gas
+                .map_or(GAS_FOR_STATE_MIGRATION, NearGas::new),
+        ),
+        Err(_) => (input, GAS_FOR_STATE_MIGRATION), // Backward compatibility
+    };
+
+    let target_account_id = env.current_account_id();
+    let batch = PromiseBatchAction {
+        target_account_id,
+        actions: vec![
+            PromiseAction::DeployContract { code },
+            PromiseAction::FunctionCall {
+                name: "state_migration".to_string(),
+                args: vec![],
+                attached_yocto: ZERO_YOCTO,
+                gas: state_migration_gas,
+            },
+        ],
+    };
+    let promise_id = unsafe { handler.promise_create_batch(&batch) };
+
+    handler.promise_return(promise_id);
+
+    Ok(())
 }
 
 #[named]

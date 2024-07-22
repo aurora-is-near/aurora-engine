@@ -17,4 +17,4 @@ panic = "abort"
 [dependencies]
 aurora-engine-modexp = { path = "../../../engine-modexp", default-features = false, features = ["bench", "std"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
-near-sdk = "4.1"
+near-sdk = "5"

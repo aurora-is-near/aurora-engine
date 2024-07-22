@@ -1,16 +1,67 @@
 use crate::{
-    contract_methods::{require_owner_only, require_running, ContractError},
+    contract_methods::{predecessor_address, require_owner_only, require_running, ContractError},
+    engine::Engine,
     errors,
-    hashchain::with_hashchain,
+    hashchain::{with_hashchain, with_logs_hashchain},
     state, xcc,
 };
+use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::{
     env::Env,
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
-use aurora_engine_types::{borsh::BorshSerialize, types::Address};
+use aurora_engine_types::{
+    account_id::AccountId,
+    borsh, format,
+    parameters::{engine::SubmitResult, xcc::WithdrawWnearToRouterArgs},
+    types::Address,
+};
 use function_name::named;
+
+#[named]
+pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<SubmitResult, ContractError> {
+    with_logs_hashchain(io, env, function_name!(), |io| {
+        let state = state::get_state(&io)?;
+        require_running(&state)?;
+        env.assert_private_call()?;
+        if matches!(handler.promise_result_check(), Some(false)) {
+            return Err(b"ERR_CALLBACK_OF_FAILED_PROMISE".into());
+        }
+        let args: WithdrawWnearToRouterArgs = io.read_input_borsh()?;
+        let current_account_id = env.current_account_id();
+        let recipient = AccountId::new(&format!(
+            "{}.{}",
+            args.target.encode(),
+            current_account_id.as_ref()
+        ))?;
+        let wnear_address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
+        let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
+            state,
+            predecessor_address(&current_account_id),
+            current_account_id,
+            io,
+            env,
+        );
+        let (result, ids) = xcc::withdraw_wnear_to_router(
+            &recipient,
+            args.amount,
+            wnear_address,
+            &mut engine,
+            handler,
+        )?;
+        if !result.status.is_ok() {
+            return Err(b"ERR_WITHDRAW_FAILED".into());
+        }
+        let id = ids.last().ok_or(b"ERR_NO_PROMISE_CREATED")?;
+        handler.promise_return(*id);
+        Ok(result)
+    })
+}
 
 #[named]
 pub fn factory_update<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -64,7 +115,7 @@ pub fn factory_set_wnear_address<I: IO + Copy, E: Env>(
 
 pub fn factory_get_wnear_address<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     let address = aurora_engine_precompiles::xcc::state::get_wnear_address(&io);
-    let bytes = address.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+    let bytes = borsh::to_vec(&address).map_err(|_| errors::ERR_SERIALIZE)?;
     io.return_output(&bytes);
     Ok(())
 }
@@ -78,12 +129,19 @@ pub fn fund_xcc_sub_account<I: IO + Copy, E: Env, H: PromiseHandler>(
     with_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
-        // This method can only be called by the owner because it allows specifying the
-        // account ID of the wNEAR account. This information must be accurate for the
-        // sub-account to work properly, therefore this method can only be called by
-        // a trusted user.
-        require_owner_only(&state, &env.predecessor_account_id())?;
+
         let args: xcc::FundXccArgs = io.read_input_borsh()?;
+
+        // If a specific wNEAR account is specified then this transaction must
+        // come from a trusted user. The wNEAR account must be accurate for the
+        // XCC sub-account to work properly.
+        // This method can be public when `args.wnear_account_id.is_none()`
+        // because then the Engine figures out the correct wNEAR account on
+        // its own.
+        if args.wnear_account_id.is_some() {
+            require_owner_only(&state, &env.predecessor_account_id())?;
+        }
+
         xcc::fund_xcc_sub_account(&io, handler, env, args)?;
         Ok(())
     })

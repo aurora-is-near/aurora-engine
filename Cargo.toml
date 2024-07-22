@@ -24,34 +24,33 @@ anyhow = "1"
 base64 = { version = "0.21", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
-borsh = { version = "0.10", default-features = false }
-borsh-compat = { version = "0.9", package = "borsh", default-features = false }
+borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
 digest = "0.10"
 ethabi = { version = "18", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.39.1", default-features = false, features = ["std", "tracing"] }
-fixed-hash = { version = "0.8.0", default-features = false}
-function_name = "0.3.0"
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.42.0-aurora", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.42.0-aurora", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.42.0-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.42.0-aurora", default-features = false, features = ["std", "tracing"] }
+fixed-hash = { version = "0.8", default-features = false }
+function_name = "0.3"
 git2 = "0.18"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
-impl-serde = { version = "0.4", default-features = false}
+impl-serde = { version = "0.4", default-features = false }
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.17"
-near-primitives = "0.17"
-near-primitives-core = "0.17"
-near-sdk = "4"
-near-vm-errors = "0.17"
-near-vm-logic = "0.17"
-near-vm-runner = { version = "0.17", default-features = false, features = [ "wasmer2_vm", "wasmtime_vm" ] }
-near-units = "0.2"
+near-crypto = "0.20"
+near-gas = "0.2"
+near-parameters = "0.20"
+near-primitives = "0.20"
+near-primitives-core = "0.20"
+near-sdk = "5"
+near-vm-runner = { version = "0.20", features = ["wasmtime_vm", "wasmer2_vm"] }
+near-workspaces = "0.10"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -64,13 +63,12 @@ serde = { version = "1", default-features = false, features = ["alloc", "derive"
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
-strum = { version = "0.25", features = ["derive"] }
+strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.20"
 wee_alloc = { version = "0.4", default-features = false }
-workspaces = "0.7"
 
 [workspace]
 resolver = "2"
@@ -128,3 +126,11 @@ rpath = false
 # it to actually happen when running tests with --release
 lto = true
 opt-level = 3
+
+# The profile is needed for faster linking in case we need to run locally a small amount of tests or just test
+# business logic rather than test gas cost. E.g. of using the profile with the cargo:
+# `cargo test --profile fast-link --features mainnet-test name_of_test_we_want_execute`
+[profile.fast-link]
+inherits = "dev"
+opt-level = 0
+lto = false

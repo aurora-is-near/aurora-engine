@@ -3,7 +3,7 @@ use aurora_engine::contract_methods::connector::deposit_event::TokenMessageData;
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 #[cfg(not(feature = "ext-connector"))]
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::types::{Address, Balance, Wei};
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::types::{Fee, NEP141Wei};
@@ -50,7 +50,7 @@ fn test_consume_deposit_message() {
     let recipient_address = Address::new(H160([22u8; 20]));
     let deposit_amount = Wei::new_u64(123_456_789);
     let proof = mock_proof(recipient_address, deposit_amount);
-    let tx_kind = sync::types::TransactionKind::Deposit(proof.try_to_vec().unwrap());
+    let tx_kind = sync::types::TransactionKind::Deposit(borsh::to_vec(&proof).unwrap());
     let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
@@ -64,6 +64,7 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -100,8 +101,9 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         // Need to pass the result of calling the proof verifier
         // (which is `true` because the proof is valid in this case).
-        promise_data: vec![Some(true.try_to_vec().unwrap())],
+        promise_data: vec![Some(borsh::to_vec(&true).unwrap())],
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -136,6 +138,7 @@ fn test_consume_deposit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -170,6 +173,7 @@ fn test_consume_deploy_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -187,7 +191,7 @@ fn test_consume_deploy_message() {
         })
         .unwrap();
     let mut deployed_address = Address::zero();
-    for (key, value) in diff.iter() {
+    for (key, value) in &diff {
         match value.value() {
             Some(bytes) if bytes == code.as_slice() => {
                 deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
@@ -226,6 +230,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
@@ -268,6 +273,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
@@ -334,6 +340,7 @@ fn test_consume_ft_on_transfer_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -382,6 +389,7 @@ fn test_consume_call_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -436,6 +444,7 @@ fn test_consume_submit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         raw_input,
+        action_hash: H256::default(),
     };
 
     let outcome = sync::consume_message::<AuroraModExp>(
@@ -463,8 +472,7 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     let fee = Fee::new(NEP141Wei::new(0));
     let message = ["aurora", ":", recipient_address.encode().as_str()].concat();
     let token_message_data: TokenMessageData =
-        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-            .unwrap();
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
     let deposit_event = DepositedEvent {
         eth_custodian_address,

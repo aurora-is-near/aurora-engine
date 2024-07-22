@@ -1,11 +1,8 @@
 use crate::fmt::Formatter;
 use crate::types::balance::error;
-use crate::types::Fee;
-use crate::{format, Add, Display, Sub, SubAssign, ToString, U256};
-#[cfg(not(feature = "borsh-compat"))]
-use borsh::{maybestd::io, BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, maybestd::io, BorshDeserialize, BorshSerialize};
+use crate::types::{EthGas, Fee};
+use crate::{format, Add, Display, Mul, Sub, SubAssign, ToString, U256};
+use borsh::{io, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
@@ -188,6 +185,14 @@ impl Sub for Wei {
     }
 }
 
+impl Mul<EthGas> for Wei {
+    type Output = Self;
+
+    fn mul(self, rhs: EthGas) -> Self::Output {
+        Self(self.0 * rhs.as_u256())
+    }
+}
+
 /// Type casting from Wei compatible Borsh-encoded raw value into the Wei value, to attach an ETH balance to the transaction
 impl From<WeiU256> for Wei {
     fn from(value: WeiU256) -> Self {
@@ -221,25 +226,6 @@ impl BorshSerialize for Wei {
     }
 }
 
-#[cfg(feature = "borsh-compat")]
-impl BorshDeserialize for Wei {
-    fn deserialize(buf: &mut &[u8]) -> io::Result<Self> {
-        if buf.len() < 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid length of the input",
-            ));
-        }
-
-        let mut buffer = [0; 32];
-        buffer.copy_from_slice(&buf[..32]);
-        *buf = &buf[32..];
-
-        Ok(Self::from(buffer))
-    }
-}
-
-#[cfg(not(feature = "borsh-compat"))]
 impl BorshDeserialize for Wei {
     fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; 32];

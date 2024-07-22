@@ -23,7 +23,7 @@ macro_rules! impl_view_return  {
 
         impl<'a> std::future::IntoFuture for $name<'a> {
             type Output = anyhow::Result<ViewResult<$return>>;
-            type IntoFuture = workspaces::rpc::BoxFuture<'a, Self::Output>;
+            type IntoFuture = near_workspaces::rpc::BoxFuture<'a, Self::Output>;
 
             fn into_future(self) -> Self::IntoFuture {
                 Box::pin(async { ViewResult::$deserialize_fn(self.0.await?) }.into_future())
@@ -35,9 +35,9 @@ macro_rules! impl_view_return  {
 #[macro_export]
 macro_rules! impl_call_return  {
     ($(($name:ident => $return:ty, $fn_name:expr, $deserialize_fn:ident)),* $(,)?) => {
-        $(pub struct $name<'a>(CallTransaction<'a>);
-        impl<'a> $name<'a> {
-            pub(crate) fn call(contract: &'a RawContract) -> Self {
+        $(pub struct $name(CallTransaction);
+        impl $name {
+            pub(crate) fn call(contract: &RawContract) -> Self {
                 Self(contract.call(&$fn_name))
             }
             pub fn gas(mut self, gas: u64) -> Self {
@@ -48,7 +48,7 @@ macro_rules! impl_call_return  {
                 self.0 = self.0.max_gas();
                 self
             }
-            pub fn deposit(mut self, deposit: u128) -> Self {
+            pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }
@@ -70,9 +70,9 @@ macro_rules! impl_call_return  {
         })*
     };
     ($(($name:ident, $fn_name:expr)),* $(,)?) => {
-        $(pub struct $name<'a>(CallTransaction<'a>);
-        impl<'a> $name<'a> {
-            pub(crate) fn call(contract: &'a RawContract) -> Self {
+        $(pub struct $name(CallTransaction);
+        impl $name {
+            pub(crate) fn call(contract: &RawContract) -> Self {
                 Self(contract.call(&$fn_name))
             }
             pub fn gas(mut self, gas: u64) -> Self {
@@ -83,7 +83,7 @@ macro_rules! impl_call_return  {
                 self.0 = self.0.max_gas();
                 self
             }
-            pub fn deposit(mut self, deposit: u128) -> Self {
+            pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }

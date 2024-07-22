@@ -1,8 +1,7 @@
-use crate::prelude::H256;
+use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -50,13 +49,32 @@ fn test_trace_precompile_direct_call() {
 
     runner.init_evm();
 
+    let input = hex::decode("0000ca110000").unwrap();
+    let precompile_cost = {
+        use aurora_engine_precompiles::Precompile;
+        let context = evm::Context {
+            address: H160::default(),
+            caller: H160::default(),
+            apparent_value: U256::zero(),
+        };
+        let result =
+            aurora_engine_precompiles::identity::Identity.run(&input, None, &context, false);
+        result.unwrap().cost.as_u64()
+    };
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
         gas_limit: u64::MAX.into(),
-        to: Some(aurora_engine_precompiles::random::RandomSeed::ADDRESS),
+        to: Some(aurora_engine_precompiles::identity::Identity::ADDRESS),
         value: Wei::zero(),
-        data: Vec::new(),
+        data: input.clone(),
+    };
+    let intrinsic_cost = {
+        let signed_tx =
+            utils::sign_transaction(tx.clone(), Some(runner.chain_id), &signer.secret_key);
+        let kind = aurora_engine_transactions::EthTransactionKind::Legacy(signed_tx);
+        let norm_tx = aurora_engine_transactions::NormalizedEthTransaction::try_from(kind).unwrap();
+        norm_tx.intrinsic_gas(&evm::Config::shanghai()).unwrap()
     };
 
     let mut listener = CallTracer::default();
@@ -71,12 +89,12 @@ fn test_trace_precompile_direct_call() {
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
         from: utils::address_from_secret_key(&signer.secret_key),
-        to: Some(aurora_engine_precompiles::random::RandomSeed::ADDRESS),
+        to: Some(aurora_engine_precompiles::identity::Identity::ADDRESS),
         value: U256::zero(),
         gas: u64::MAX,
-        gas_used: 21000_u64,
-        input: Vec::new(),
-        output: [0u8; 32].to_vec(),
+        gas_used: intrinsic_cost + precompile_cost,
+        input: input.clone(),
+        output: input,
         error: None,
         calls: Vec::new(),
     };
@@ -406,7 +424,7 @@ fn test_trace_precompiles_with_subcalls() {
         gas_limit: u64::MAX.into(),
         to: Some(xcc_address),
         value: Wei::zero(),
-        data: xcc_args.try_to_vec().unwrap(),
+        data: borsh::to_vec(&xcc_args).unwrap(),
     };
     let mut listener = CallTracer::default();
     let standalone_result = sputnik::traced_call(&mut listener, || {

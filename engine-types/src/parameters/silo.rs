@@ -1,15 +1,20 @@
 use crate::account_id::AccountId;
 use crate::borsh::{self, BorshDeserialize, BorshSerialize};
-use crate::types::{Address, Wei};
+use crate::types::{Address, EthGas};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub struct FixedGasCostArgs {
-    pub cost: Option<Wei>,
+pub struct FixedGasArgs {
+    pub fixed_gas: Option<EthGas>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SiloParamsArgs {
-    pub fixed_gas_cost: Wei,
+    /// Fixed amount of gas per transaction.
+    pub fixed_gas: EthGas,
+    /// EVM address, which is used for withdrawing ERC-20 base tokens in case
+    /// a recipient of the tokens is not in the silo white list.
+    /// Note: the logic described above works only if the fallback address
+    /// is set by `set_silo_params` function. In other words, in Silo mode.
     pub erc20_fallback_address: Address,
 }
 
@@ -51,6 +56,7 @@ pub struct WhitelistKindArgs {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
+#[borsh(use_discriminant = false)]
 pub enum WhitelistKind {
     /// The whitelist of this type is for storing NEAR accounts. Accounts stored in this whitelist
     /// have an admin role. The admin role allows to add new admins and add new entities
@@ -85,7 +91,7 @@ fn test_account_whitelist_serialize() {
         account_id: "aurora".parse().unwrap(),
         kind: WhitelistKind::Admin,
     });
-    let bytes = args.try_to_vec().unwrap();
+    let bytes = borsh::to_vec(&args).unwrap();
     let args = WhitelistArgs::try_from_slice(&bytes).unwrap();
 
     assert_eq!(
@@ -104,7 +110,7 @@ fn test_address_whitelist_serialize() {
         address,
         kind: WhitelistKind::EvmAdmin,
     });
-    let bytes = args.try_to_vec().unwrap();
+    let bytes = borsh::to_vec(&args).unwrap();
     let args = WhitelistArgs::try_from_slice(&bytes).unwrap();
 
     assert_eq!(

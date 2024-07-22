@@ -12,7 +12,7 @@ use aurora_engine_sdk::{
     promise::PromiseHandler,
 };
 use aurora_engine_types::{
-    borsh::BorshSerialize,
+    borsh,
     parameters::engine::{CallArgs, SubmitArgs, SubmitResult},
 };
 use function_name::named;
@@ -36,7 +36,7 @@ pub fn deploy_code<I: IO + Copy, E: Env, H: PromiseHandler>(
             env,
         );
         let result = engine.deploy_code_with_input(input, None, handler)?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
         Ok(result)
     })
@@ -56,17 +56,6 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
         let current_account_id = env.current_account_id();
         let predecessor_account_id = env.predecessor_account_id();
 
-        // During the XCC flow the Engine will call itself to move wNEAR
-        // to the user's sub-account. We do not want this move to happen
-        // if prior promises in the flow have failed.
-        if current_account_id == predecessor_account_id {
-            let check_promise: Result<(), &[u8]> = match handler.promise_result_check() {
-                Some(true) | None => Ok(()),
-                Some(false) => Err(b"ERR_CALLBACK_OF_FAILED_PROMISE"),
-            };
-            check_promise?;
-        }
-
         let mut engine: Engine<_, E, AuroraModExp> = Engine::new_with_state(
             state,
             predecessor_address(&predecessor_account_id),
@@ -75,7 +64,7 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
             env,
         );
         let result = engine.call_with_args(args, handler)?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
         Ok(result)
     })
@@ -106,7 +95,7 @@ pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
 
         Ok(result)
@@ -134,7 +123,7 @@ pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = result.try_to_vec().map_err(|_| errors::ERR_SERIALIZE)?;
+        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
 
         Ok(result)

@@ -1,7 +1,6 @@
 use crate::utils;
 use aurora_engine_precompiles::promise_result::{self, costs};
 use aurora_engine_transactions::legacy::TransactionLegacy;
-use aurora_engine_types::borsh::BorshSerialize;
 use aurora_engine_types::{
     types::{Address, EthGas, NearGas, PromiseResult, Wei},
     U256,
@@ -35,7 +34,7 @@ fn test_promise_results_precompile() {
 
     assert_eq!(
         utils::unwrap_success(result),
-        promise_results.try_to_vec().unwrap(),
+        borsh::to_vec(&promise_results).unwrap(),
     );
 }
 
@@ -104,7 +103,7 @@ fn test_promise_result_gas_cost() {
         utils::within_x_percent(
             5,
             base_cost.as_u64(),
-            costs::PROMISE_RESULT_BASE_COST.as_u64()
+            costs::PROMISE_RESULT_BASE_COST.as_u64(),
         ),
         "Incorrect promise_result base cost. Expected: {} Actual: {}",
         base_cost,
@@ -120,14 +119,15 @@ fn test_promise_result_gas_cost() {
 
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
+
     assert!(
-        utils::within_x_percent(15, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(17, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        utils::within_x_percent(15, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(17, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

@@ -8,14 +8,14 @@ use crate::operation::{
     CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
     CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
     CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
-    CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGasCost,
+    CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
     CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
-    CallStorageWithdraw, CallSubmit, CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash,
-    ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress,
-    ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtMetadata, ViewFtTotalEthSupplyOnAurora,
-    ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewGetErc20Metadata,
-    ViewGetEthConnectorContractAccount, ViewGetFixedGasCost, ViewGetSiloParams,
+    CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance,
+    ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
+    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtBalancesOf, ViewFtMetadata,
+    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
     ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
     ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
     ViewVersion, ViewView,
@@ -31,14 +31,14 @@ use aurora_engine_types::parameters::engine::{
     RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
-    FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+    FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
+use near_workspaces::types::SecretKey;
 use serde_json::json;
-use workspaces::types::SecretKey;
 
 #[derive(Debug, Clone)]
 pub struct EngineContract {
@@ -60,7 +60,7 @@ impl EngineContract {
     }
 
     pub fn create_account(&self, account_id: &AccountId, secret_key: SecretKey) -> Account {
-        let inner = workspaces::Account::from_secret_key(
+        let inner = near_workspaces::Account::from_secret_key(
             account_id.as_ref().parse().unwrap(),
             secret_key,
             self.node.worker(),
@@ -267,6 +267,10 @@ impl EngineContract {
         CallFactorySetWNearAddress::call(&self.contract).args_borsh(address)
     }
 
+    pub fn upgrade(&self, bytes: Vec<u8>) -> CallUpgrade {
+        CallUpgrade::call(&self.contract).args(bytes)
+    }
+
     pub fn stage_upgrade(&self, bytes: Vec<u8>) -> CallStageUpgrade {
         CallStageUpgrade::call(&self.contract).args(bytes)
     }
@@ -320,8 +324,8 @@ impl EngineContract {
         CallResumeContract::call(&self.contract)
     }
 
-    pub fn set_fixed_gas_cost(&self, cost: FixedGasCostArgs) -> CallSetFixedGasCost {
-        CallSetFixedGasCost::call(&self.contract).args_borsh(cost)
+    pub fn set_fixed_gas(&self, cost: FixedGasArgs) -> CallSetFixedGas {
+        CallSetFixedGas::call(&self.contract).args_borsh(cost)
     }
 
     pub fn set_silo_params(&self, params: Option<SiloParamsArgs>) -> CallSetSiloParams {
@@ -371,6 +375,10 @@ impl EngineContract {
 
     pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf {
         ViewFtBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
+    }
+
+    pub fn ft_balances_of(&self, accounts: &Vec<AccountId>) -> ViewFtBalancesOf {
+        ViewFtBalancesOf::view(&self.contract).args_borsh(accounts)
     }
 
     pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf {
@@ -474,8 +482,8 @@ impl EngineContract {
         ViewGetEthConnectorContractAccount::view(&self.contract)
     }
 
-    pub fn get_fixed_gas_cost(&self) -> ViewGetFixedGasCost {
-        ViewGetFixedGasCost::view(&self.contract)
+    pub fn get_fixed_gas(&self) -> ViewGetFixedGas {
+        ViewGetFixedGas::view(&self.contract)
     }
 
     pub fn get_silo_params(&self) -> ViewGetSiloParams {
@@ -497,11 +505,11 @@ impl EngineContract {
 
 #[derive(Debug, Clone)]
 pub struct RawContract {
-    inner: workspaces::Contract,
+    inner: near_workspaces::Contract,
 }
 
 impl RawContract {
-    pub fn from_contract(contract: workspaces::Contract) -> Self {
+    pub fn from_contract(contract: near_workspaces::Contract) -> Self {
         Self { inner: contract }
     }
 

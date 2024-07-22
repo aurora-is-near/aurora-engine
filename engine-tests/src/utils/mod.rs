@@ -1,7 +1,7 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 #[cfg(feature = "ext-connector")]
@@ -9,21 +9,19 @@ use aurora_engine_types::parameters::connector::{
     SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
-use aurora_engine_types::parameters::silo::FixedGasCostArgs;
-use aurora_engine_types::types::PromiseResult;
+use aurora_engine_types::parameters::silo::FixedGasArgs;
+use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
-use near_primitives::runtime::config_store::RuntimeConfigStore;
+use near_parameters::vm::VMKind;
+use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
-use near_primitives_core::config::VMConfig;
-use near_primitives_core::contract::ContractCode;
-use near_primitives_core::profile::ProfileDataV3;
-use near_primitives_core::runtime::fees::RuntimeFeesConfig;
-use near_vm_errors::{FunctionCallError, HostError};
-use near_vm_logic::mocks::mock_external::MockedExternal;
-use near_vm_logic::types::ReturnData;
-use near_vm_logic::{VMContext, VMOutcome, ViewConfig};
-use near_vm_runner::MockCompiledContractCache;
+use near_primitives_core::config::ViewConfig;
+use near_vm_runner::logic::errors::FunctionCallError;
+use near_vm_runner::logic::mocks::mock_external::MockedExternal;
+use near_vm_runner::logic::types::ReturnData;
+use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
+use near_vm_runner::{ContractCode, MockCompiledContractCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
 
@@ -88,7 +86,7 @@ pub struct AuroraRunner {
     pub cache: MockCompiledContractCache,
     pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
-    pub wasm_config: VMConfig,
+    pub wasm_config: Config,
     pub fees_config: RuntimeFeesConfig,
     pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
@@ -98,6 +96,12 @@ pub struct AuroraRunner {
     // Empty by default. Can be set in tests if the transaction should be
     // executed as if it was a callback.
     pub promise_results: Vec<PromiseResult>,
+    // None by default. Can be set if the transaction requires randomness
+    // from the Near runtime.
+    // Note: this only sets the random value for the block, the random
+    // value available in the runtime is derived from this value and
+    // another hash that depends on the transaction itself.
+    pub block_random_value: Option<H256>,
 }
 
 /// Same as `AuroraRunner`, but consumes `self` on execution (thus preventing building on
@@ -144,7 +148,6 @@ impl<'a> OneShotAuroraRunner<'a> {
             &self.base.wasm_config,
             &self.base.fees_config,
             &[],
-            self.base.current_protocol_version,
             Some(&self.base.cache),
         )
         .unwrap();
@@ -206,10 +209,10 @@ impl AuroraRunner {
             .promise_results
             .iter()
             .map(|p| match p {
-                PromiseResult::Failed => near_vm_logic::types::PromiseResult::Failed,
-                PromiseResult::NotReady => near_vm_logic::types::PromiseResult::NotReady,
+                PromiseResult::Failed => near_vm_runner::logic::types::PromiseResult::Failed,
+                PromiseResult::NotReady => near_vm_runner::logic::types::PromiseResult::NotReady,
                 PromiseResult::Successful(bytes) => {
-                    near_vm_logic::types::PromiseResult::Successful(bytes.clone())
+                    near_vm_runner::logic::types::PromiseResult::Successful(bytes.clone())
                 }
             })
             .collect();
@@ -221,7 +224,6 @@ impl AuroraRunner {
             &self.wasm_config,
             &self.fees_config,
             &vm_promise_results,
-            self.current_protocol_version,
             Some(&self.cache),
         )
         .unwrap();
@@ -234,7 +236,12 @@ impl AuroraRunner {
         self.previous_logs = outcome.logs.clone();
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.submit_raw(method_name, &self.context, &self.promise_results)?;
+            standalone_runner.submit_raw(
+                method_name,
+                &self.context,
+                &self.promise_results,
+                self.block_random_value,
+            )?;
             self.validate_standalone();
         }
 
@@ -322,7 +329,7 @@ impl AuroraRunner {
 
             let aurora_balance_key = [
                 ft_key.as_slice(),
-                self.context.current_account_id.as_ref().as_bytes(),
+                self.context.current_account_id.as_bytes(),
             ]
             .concat();
             let aurora_balance_value = {
@@ -339,11 +346,11 @@ impl AuroraRunner {
                 &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
             );
 
-            trie.insert(ft_key, ft_value.try_to_vec().unwrap());
+            trie.insert(ft_key, borsh::to_vec(&ft_value).unwrap());
             trie.insert(proof_key, vec![0]);
             trie.insert(
                 aurora_balance_key,
-                aurora_balance_value.try_to_vec().unwrap(),
+                borsh::to_vec(&aurora_balance_value).unwrap(),
             );
         }
 
@@ -427,7 +434,7 @@ impl AuroraRunner {
         self.call(
             SUBMIT_WITH_ARGS,
             CALLER_ACCOUNT_ID,
-            args.try_to_vec().unwrap(),
+            borsh::to_vec(&args).unwrap(),
         )
         .map(Self::profile_outcome)
     }
@@ -461,7 +468,7 @@ impl AuroraRunner {
     }
 
     pub fn view_call(&self, args: &ViewCallArgs) -> Result<TransactionStatus, EngineError> {
-        let input = args.try_to_vec().unwrap();
+        let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
@@ -476,11 +483,13 @@ impl AuroraRunner {
         &self,
         args: &ViewCallArgs,
     ) -> Result<(TransactionStatus, ExecutionProfile), EngineError> {
-        let input = args.try_to_vec().unwrap();
+        let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
+
         runner.context.view_config = Some(ViewConfig {
             max_gas_burnt: u64::MAX,
         });
+
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
         let status =
             TransactionStatus::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
@@ -500,13 +509,13 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
-    pub fn get_fixed_gas_cost(&mut self) -> Option<Wei> {
+    pub fn get_fixed_gas(&mut self) -> Option<EthGas> {
         let outcome = self
             .one_shot()
-            .call("get_fixed_gas_cost", "getter", vec![])
+            .call("get_fixed_gas", "getter", vec![])
             .unwrap();
         let val = outcome.return_data.as_value()?;
-        FixedGasCostArgs::try_from_slice(&val).unwrap().cost
+        FixedGasArgs::try_from_slice(&val).unwrap().fixed_gas
     }
 
     pub fn get_storage(&self, address: Address, key: H256) -> H256 {
@@ -516,7 +525,7 @@ impl AuroraRunner {
         };
         let outcome = self
             .one_shot()
-            .call("get_storage_at", "getter", input.try_to_vec().unwrap())
+            .call("get_storage_at", "getter", borsh::to_vec(&input).unwrap())
             .unwrap();
         let output = outcome.return_data.as_value().unwrap();
         let mut result = [0u8; 32];
@@ -539,8 +548,8 @@ impl AuroraRunner {
         outcome.return_data.as_value().unwrap()
     }
 
-    pub fn with_random_seed(mut self, random_seed: H256) -> Self {
-        self.context.random_seed = random_seed.as_bytes().to_vec();
+    pub const fn with_block_random_value(mut self, random_seed: H256) -> Self {
+        self.block_random_value = Some(random_seed);
         self
     }
 
@@ -569,7 +578,7 @@ impl AuroraRunner {
                 panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
 
-            for (key, value) in standalone_state.iter() {
+            for (key, value) in standalone_state {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(
@@ -600,6 +609,15 @@ impl AuroraRunner {
         std::fs::read(path).unwrap()
     }
 
+    pub fn get_engine_v331_code() -> Vec<u8> {
+        let path = if cfg!(feature = "ext-connector") {
+            "src/tests/res/aurora_silo_v3.3.1.wasm"
+        } else {
+            "src/tests/res/aurora_v3.3.1.wasm"
+        };
+        std::fs::read(path).unwrap()
+    }
+
     pub const fn get_default_chain_id() -> u64 {
         DEFAULT_CHAIN_ID
     }
@@ -609,9 +627,16 @@ impl Default for AuroraRunner {
     fn default() -> Self {
         let evm_wasm_bytes = Self::get_engine_code();
         // Fetch config (mainly costs) for the latest protocol version.
-        let runtime_config_store = RuntimeConfigStore::new(None);
+        let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
-        let wasm_config = runtime_config.wasm_config.clone();
+        let mut wasm_config = runtime_config.wasm_config.clone();
+
+        if cfg!(not(target_arch = "x86_64")) {
+            wasm_config.vm_kind = VMKind::Wasmtime;
+        } else {
+            wasm_config.vm_kind = VMKind::Wasmer2;
+        }
+
         let origin_account_id: near_primitives::types::AccountId =
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
 
@@ -636,8 +661,8 @@ impl Default for AuroraRunner {
                 attached_deposit: 0,
                 prepaid_gas: 10u64.pow(18),
                 random_seed: vec![],
-                view_config: None,
                 output_data_receivers: vec![],
+                view_config: None,
             },
             wasm_config,
             fees_config: RuntimeFeesConfig::test(),
@@ -645,6 +670,7 @@ impl Default for AuroraRunner {
             previous_logs: Vec::new(),
             standalone_runner: Some(standalone::StandaloneRunner::default()),
             promise_results: Vec::new(),
+            block_random_value: None,
         }
     }
 }
@@ -655,6 +681,7 @@ impl Default for AuroraRunner {
 pub struct ExecutionProfile {
     pub host_breakdown: ProfileDataV3,
     total_gas_cost: u64,
+    pub logs: Vec<String>,
 }
 
 impl ExecutionProfile {
@@ -662,6 +689,7 @@ impl ExecutionProfile {
         Self {
             host_breakdown: outcome.profile.clone(),
             total_gas_cost: outcome.burnt_gas,
+            logs: outcome.logs.clone(),
         }
     }
 
@@ -686,7 +714,7 @@ pub fn deploy_runner() -> AuroraRunner {
     });
 
     let account_id = runner.aurora_account_id.clone();
-    let result = runner.call("new", &account_id, args.try_to_vec().unwrap());
+    let result = runner.call("new", &account_id, borsh::to_vec(&args).unwrap());
 
     assert!(result.is_ok());
 
@@ -697,7 +725,11 @@ pub fn deploy_runner() -> AuroraRunner {
             eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
             metadata: FungibleTokenMetadata::default(),
         };
-        runner.call("new_eth_connector", &account_id, args.try_to_vec().unwrap())
+        runner.call(
+            "new_eth_connector",
+            &account_id,
+            borsh::to_vec(&args).unwrap(),
+        )
     };
 
     #[cfg(feature = "ext-connector")]
@@ -710,7 +742,7 @@ pub fn deploy_runner() -> AuroraRunner {
         runner.call(
             "set_eth_connector_contract_account",
             &account_id,
-            args.try_to_vec().unwrap(),
+            borsh::to_vec(&args).unwrap(),
         )
     };
 
@@ -743,15 +775,24 @@ pub fn init_hashchain(
     let result = runner.call(
         "start_hashchain",
         caller_account_id,
-        args.try_to_vec().unwrap(),
+        borsh::to_vec(&args).unwrap(),
     );
     assert!(result.is_ok());
 }
 
 pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
+    transfer_with_price(to, amount, nonce, U256::zero())
+}
+
+pub fn transfer_with_price(
+    to: Address,
+    amount: Wei,
+    nonce: U256,
+    gas_price: U256,
+) -> TransactionLegacy {
     TransactionLegacy {
         nonce,
-        gas_price: U256::default(),
+        gas_price,
         gas_limit: u64::MAX.into(),
         to: Some(to),
         value: amount,
@@ -760,6 +801,14 @@ pub fn transfer(to: Address, amount: Wei, nonce: U256) -> TransactionLegacy {
 }
 
 pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> TransactionLegacy {
+    create_deploy_transaction_with_price(contract_bytes, nonce, U256::zero())
+}
+
+pub fn create_deploy_transaction_with_price(
+    contract_bytes: Vec<u8>,
+    nonce: U256,
+    gas_price: U256,
+) -> TransactionLegacy {
     let len = u16::try_from(contract_bytes.len())
         .unwrap_or_else(|_| panic!("Cannot deploy a contract with that many bytes!"));
     // This bit of EVM byte code essentially says:
@@ -778,7 +827,7 @@ pub fn create_deploy_transaction(contract_bytes: Vec<u8>, nonce: U256) -> Transa
 
     TransactionLegacy {
         nonce,
-        gas_price: U256::default(),
+        gas_price,
         gas_limit: u64::MAX.into(),
         to: None,
         value: Wei::zero(),
@@ -903,9 +952,22 @@ pub fn validate_address_balance_and_nonce(
     address: Address,
     expected_balance: Wei,
     expected_nonce: U256,
-) {
-    assert_eq!(runner.get_balance(address), expected_balance, "balance");
-    assert_eq!(runner.get_nonce(address), expected_nonce, "nonce");
+) -> anyhow::Result<()> {
+    let actual_balance = runner.get_balance(address);
+
+    if actual_balance != expected_balance {
+        anyhow::bail!(
+            "Expected and actual balance mismatch: {expected_balance} vs {actual_balance}"
+        );
+    }
+
+    let actual_nonce = runner.get_nonce(address);
+
+    if actual_nonce != expected_nonce {
+        anyhow::bail!("Expected and actual nonce mismatch: {expected_nonce} vs {actual_nonce}");
+    }
+
+    Ok(())
 }
 
 pub fn address_from_hex(address: &str) -> Address {
@@ -981,10 +1043,13 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
                 "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
-                "ERR_INCORRECT_NONCE" => EngineErrorKind::IncorrectNonce,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,
                 "ERR_SAME_OWNER" => EngineErrorKind::SameOwner,
+                "ERR_FIXED_GAS_OVERFLOW" => EngineErrorKind::FixedGasOverflow,
                 "ERR_PAUSED" => EngineErrorKind::EvmFatal(ExitFatal::Other("ERR_PAUSED".into())),
+                msg if msg.starts_with("ERR_INCORRECT_NONCE") => {
+                    EngineErrorKind::IncorrectNonce(msg.to_string())
+                }
                 msg => EngineErrorKind::EvmFatal(ExitFatal::Other(Cow::Owned(msg.into()))),
             }
         }

@@ -1,13 +1,12 @@
 //! Cross contract call precompile.
 //!
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
-//! TODO: How they work (low level explanation with examples)
 
 use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
     account_id::AccountId,
-    borsh::{BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
@@ -52,6 +51,7 @@ mod consts {
     pub(super) const ERR_SERIALIZE: &str = "ERR_XCC_CALL_SERIALIZE";
     pub(super) const ERR_STATIC: &str = "ERR_INVALID_IN_STATIC";
     pub(super) const ERR_DELEGATE: &str = "ERR_INVALID_IN_DELEGATE";
+    pub(super) const ERR_XCC_ACCOUNT_ID: &str = "ERR_FAILED_TO_CREATE_XCC_ACCOUNT_ID";
     pub(super) const ROUTER_EXEC_NAME: &str = "execute";
     pub(super) const ROUTER_SCHEDULE_NAME: &str = "schedule";
     /// Solidity selector for the ERC-20 transferFrom function
@@ -79,7 +79,7 @@ pub mod cross_contract_call {
         H256,
     };
 
-    /// Exit to Ethereum precompile address
+    /// NEAR Cross Contract Call precompile address
     ///
     /// Address: `0x516cded1d16af10cad47d6d49128e2eb7d27b372`
     /// This address is computed as: `&keccak("nearCrossContractCall")[12..]`
@@ -130,24 +130,26 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         }
 
         let sender = context.caller;
-        let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref());
+        let target_account_id = create_target_account_id(sender, self.engine_account_id.as_ref())?;
         let args = CrossContractCallArgs::try_from_slice(input)
             .map_err(|_| ExitError::Other(Cow::from(consts::ERR_INVALID_INPUT)))?;
         let (promise, attached_near) = match args {
             CrossContractCallArgs::Eager(call) => {
                 let call_gas = call.total_gas();
                 let attached_near = call.total_near();
-                let callback_count = call.promise_count() - 1;
+                let callback_count = call
+                    .promise_count()
+                    .checked_sub(1)
+                    .ok_or_else(|| ExitError::Other(Cow::from(consts::ERR_INVALID_INPUT)))?;
                 let router_exec_cost = costs::ROUTER_EXEC_BASE
                     + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_EXEC_NAME.into(),
-                    args: call
-                        .try_to_vec()
+                    args: borsh::to_vec(&call)
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
-                    attached_gas: router_exec_cost + call_gas,
+                    attached_gas: router_exec_cost.saturating_add(call_gas),
                 };
                 (promise, attached_near)
             }
@@ -156,8 +158,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 let promise = PromiseCreateArgs {
                     target_account_id,
                     method: consts::ROUTER_SCHEDULE_NAME.into(),
-                    args: call
-                        .try_to_vec()
+                    args: borsh::to_vec(&call)
                         .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
                     attached_balance: ZERO_YOCTO,
                     // We don't need to add any gas to the amount need for the schedule call
@@ -201,13 +202,13 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                     return Err(PrecompileFailure::Revert {
                         exit_status: r,
                         output: return_value,
-                    })
+                    });
                 }
                 evm::ExitReason::Error(e) => {
-                    return Err(PrecompileFailure::Error { exit_status: e })
+                    return Err(PrecompileFailure::Error { exit_status: e });
                 }
                 evm::ExitReason::Fatal(f) => {
-                    return Err(PrecompileFailure::Fatal { exit_status: f })
+                    return Err(PrecompileFailure::Fatal { exit_status: f });
                 }
             };
         }
@@ -222,8 +223,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let promise_log = Log {
             address: cross_contract_call::ADDRESS.raw(),
             topics,
-            data: promise
-                .try_to_vec()
+            data: borsh::to_vec(&promise)
                 .map_err(|_| ExitError::Other(Cow::from(consts::ERR_SERIALIZE)))?,
         };
 
@@ -295,10 +295,13 @@ fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
     [&consts::TRANSFER_FROM_SELECTOR, args.as_slice()].concat()
 }
 
-fn create_target_account_id(sender: H160, engine_account_id: &str) -> AccountId {
+fn create_target_account_id(
+    sender: H160,
+    engine_account_id: &str,
+) -> Result<AccountId, PrecompileFailure> {
     format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
         .parse()
-        .unwrap_or_default()
+        .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {

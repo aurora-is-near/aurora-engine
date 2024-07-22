@@ -40,7 +40,7 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: cargo make -V || cargo install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
       - name: Build main contract
@@ -82,7 +82,7 @@ jobs:
             target/
           key: ${{ matrix.profile }}-cargo-modexp-test
       - name: Install dependencies
-        run: cargo make -V || cargo install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
       - name: Test ${{ matrix.profile }} bench-modexp

@@ -7,6 +7,7 @@
     clippy::missing_errors_doc,
     clippy::unreadable_literal
 )]
+#![forbid(unsafe_code)]
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;

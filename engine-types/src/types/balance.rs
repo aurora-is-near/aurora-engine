@@ -1,9 +1,6 @@
 use crate::fmt::Formatter;
 use crate::{format, Add, Display, Sub, ToString};
-#[cfg(not(feature = "borsh-compat"))]
 use borsh::{BorshDeserialize, BorshSerialize};
-#[cfg(feature = "borsh-compat")]
-use borsh_compat::{self as borsh, BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
@@ -90,6 +87,11 @@ impl Yocto {
     #[must_use]
     pub const fn as_u128(self) -> u128 {
         self.0
+    }
+
+    #[must_use]
+    pub const fn saturating_add(self, rhs: Self) -> Self {
+        Self(self.0.saturating_add(rhs.0))
     }
 }
 

@@ -1,22 +1,22 @@
 use aurora_engine_types::account_id::AccountId;
+use near_workspaces::network::{NetworkClient, Sandbox};
+use near_workspaces::types::{KeyType, NearToken, SecretKey};
+use near_workspaces::Worker;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::Instant;
-use workspaces::network::{NetworkClient, Sandbox};
-use workspaces::types::{KeyType, SecretKey};
-use workspaces::Worker;
 
 use crate::account::Account;
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    root: workspaces::Account,
+    root: near_workspaces::Account,
     worker: Worker<Sandbox>,
 }
 
 impl Node {
-    pub async fn new(root: &str, root_balance: u128) -> anyhow::Result<Self> {
-        let worker = workspaces::sandbox().await?;
+    pub async fn new(root: &str, root_balance: NearToken) -> anyhow::Result<Self> {
+        let worker = near_workspaces::sandbox().await?;
         let root = Self::create_root_account(&worker, root, root_balance).await?;
 
         Ok(Self { root, worker })
@@ -31,21 +31,21 @@ impl Node {
     }
 
     pub async fn get_balance(&self, account_id: &AccountId) -> anyhow::Result<u128> {
-        let account_id = workspaces::AccountId::from_str(account_id.as_ref())?;
+        let account_id = near_workspaces::AccountId::from_str(account_id.as_ref())?;
 
         self.worker
             .view_account(&account_id)
             .await
-            .map(|d| d.balance)
+            .map(|d| d.balance.as_yoctonear())
             .map_err(Into::into)
     }
 
     async fn create_root_account(
         worker: &Worker<Sandbox>,
         root_acc_name: &str,
-        balance: u128,
-    ) -> anyhow::Result<workspaces::Account> {
-        use workspaces::AccessKey;
+        balance: NearToken,
+    ) -> anyhow::Result<near_workspaces::Account> {
+        use near_workspaces::AccessKey;
 
         if root_acc_name == "test.near" {
             return Ok(worker.root_account()?);
@@ -57,7 +57,7 @@ impl Node {
                 .transact()
                 .await?
         } else {
-            let testnet = workspaces::testnet()
+            let testnet = near_workspaces::testnet()
                 .await
                 .map_err(|err| anyhow::anyhow!("Failed init testnet: {:?}", err))?;
             let registrar = "registrar".parse()?;
@@ -81,13 +81,13 @@ impl Node {
             .await?
             .into_result()?;
 
-        Ok(workspaces::Account::from_secret_key(root, sk, worker))
+        Ok(near_workspaces::Account::from_secret_key(root, sk, worker))
     }
 
     /// Waiting for the account creation
     async fn waiting_account_creation<T: NetworkClient + ?Sized>(
         worker: &Worker<T>,
-        account_id: &workspaces::AccountId,
+        account_id: &near_workspaces::AccountId,
     ) -> anyhow::Result<()> {
         let timer = Instant::now();
         // Try to get account within 30 secs

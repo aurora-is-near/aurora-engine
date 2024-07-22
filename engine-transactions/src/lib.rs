@@ -6,6 +6,7 @@
     clippy::missing_panics_doc,
     clippy::missing_errors_doc
 )]
+#![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
@@ -15,6 +16,7 @@ use rlp::{Decodable, DecoderError, Rlp};
 pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
+pub mod eip_4844;
 pub mod legacy;
 
 /// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
@@ -39,6 +41,8 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             Ok(Self::Eip1559(eip_1559::SignedTransaction1559::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
+        } else if bytes[0] == eip_4844::TYPE_BYTE {
+            Err(Error::UnsupportedTransactionEip4844)
         } else if bytes[0] <= 0x7f {
             Err(Error::UnknownTransactionType)
         } else if bytes[0] == 0xff {
@@ -211,6 +215,7 @@ pub enum Error {
     IntegerConversion,
     #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
+    UnsupportedTransactionEip4844,
 }
 
 #[cfg(feature = "serde")]
@@ -230,6 +235,7 @@ impl Error {
             Self::GasOverflow => "ERR_GAS_OVERFLOW",
             Self::IntegerConversion => "ERR_INTEGER_CONVERSION",
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
+            Self::UnsupportedTransactionEip4844 => "ERR_UNSUPPORTED_TX_EIP4844",
         }
     }
 }

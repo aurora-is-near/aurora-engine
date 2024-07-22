@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "3.1.0"
+version = "3.6.4"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -22,7 +22,7 @@ aurora-engine-types.workspace = true
 aurora-engine-sdk.workspace = true
 bitflags.workspace = true
 ethabi.workspace = true
-evm = { workspace = true, features = [ "create-fixed" ] }
+evm = { workspace = true, features = ["create-fixed"] }
 function_name.workspace = true
 hex.workspace = true
 rlp.workspace = true
@@ -41,8 +41,6 @@ test-case.workspace = true
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-hashchain/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
-borsh-compat = ["aurora-engine-types/borsh-compat", "aurora-engine-hashchain/borsh-compat", "aurora-engine-sdk/borsh-compat", "aurora-engine-precompiles/borsh-compat"]
-evm_bully = []
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
 tracing = ["evm/tracing"]
 error_refund = ["aurora-engine-precompiles/error_refund"]

@@ -7,7 +7,7 @@ use crate::prelude::{
     storage::{bytes_to_key, KeyPrefix},
     str,
     types::{Address, Yocto},
-    vec, BorshSerialize, Cow, ToString, Vec, U256,
+    vec, Cow, ToString, Vec, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{parameters::RefundCallArgs, types};
@@ -18,6 +18,7 @@ use aurora_engine_types::parameters::WithdrawCallArgs;
 use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::{
     account_id::AccountId,
+    borsh,
     parameters::{
         ExitToNearPrecompileCallbackCallArgs, PromiseWithCallbackArgs, TransferNearCallArgs,
     },
@@ -349,7 +350,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         // First byte of the input is a flag, selecting the behavior to be triggered:
         //      0x0 -> Eth transfer
         //      0x1 -> Erc20 transfer
-        let flag = input[0];
+        let flag = input.first().copied().unwrap_or_default();
         #[cfg(feature = "error_refund")]
         let (refund_address, mut input) = parse_input(input)?;
         #[cfg(not(feature = "error_refund"))]
@@ -494,7 +495,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 callback: PromiseCreateArgs {
                     target_account_id: self.current_account_id.clone(),
                     method: "exit_to_near_precompile_callback".to_string(),
-                    args: callback_args.try_to_vec().unwrap(),
+                    args: borsh::to_vec(&callback_args).unwrap(),
                     attached_balance: Yocto::new(0),
                     attached_gas: costs::EXIT_TO_NEAR_CALLBACK_GAS,
                 },
@@ -503,7 +504,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let promise_log = Log {
             address: exit_to_near::ADDRESS.raw(),
             topics: Vec::new(),
-            data: promise.try_to_vec().unwrap(),
+            data: borsh::to_vec(&promise).unwrap(),
         };
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
@@ -690,7 +691,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             attached_gas: costs::WITHDRAWAL_GAS,
         };
 
-        let promise = PromiseArgs::Create(withdraw_promise).try_to_vec().unwrap();
+        let promise = borsh::to_vec(&PromiseArgs::Create(withdraw_promise)).unwrap();
         let promise_log = Log {
             address: exit_to_ethereum::ADDRESS.raw(),
             topics: Vec::new(),
@@ -722,11 +723,10 @@ fn json_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
 }
 
 fn borsh_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
-    WithdrawCallArgs {
+    borsh::to_vec(&WithdrawCallArgs {
         recipient_address: address,
         amount: NEP141Wei::new(amount.as_u128()),
-    }
-    .try_to_vec()
+    })
     .map_err(|_| ExitError::Other(Cow::from("ERR_BORSH_SERIALIZE")))
 }
 
@@ -808,7 +808,7 @@ mod tests {
             parse_recipient(b"test.near").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: None
+                message: None,
             }
         );
 
@@ -816,7 +816,7 @@ mod tests {
             parse_recipient(b"test.near:unwrap").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("unwrap")
+                message: Some("unwrap"),
             }
         );
 
@@ -824,7 +824,7 @@ mod tests {
             parse_recipient(b"test.near:some_msg:with_extra_colon").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("some_msg:with_extra_colon")
+                message: Some("some_msg:with_extra_colon"),
             }
         );
 
@@ -832,7 +832,7 @@ mod tests {
             parse_recipient(b"test.near:").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("")
+                message: Some(""),
             }
         );
     }

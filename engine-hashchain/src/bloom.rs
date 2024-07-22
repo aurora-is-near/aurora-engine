@@ -2,13 +2,10 @@
 //! Link: <https://github.com/paritytech/parity-common/blob/master/ethbloom/src/lib.rs>
 //!
 //! Reimplemented here since there is a large mismatch in types and dependencies.
-#![allow(
-    clippy::expl_impl_clone_on_copy,
-// TODO: rust-2023-08-24 clippy::incorrect_clone_impl_on_copy_type
-)]
+#![allow(clippy::expl_impl_clone_on_copy, clippy::non_canonical_clone_impl)]
 
 use aurora_engine_sdk::keccak;
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::engine::ResultLog;
 use fixed_hash::construct_fixed_hash;
 use impl_serde::impl_fixed_hash_serde;
@@ -19,6 +16,7 @@ const BLOOM_BITS: u32 = 3;
 construct_fixed_hash! {
     /// Bloom hash type with 256 bytes (2048 bits) size.
     #[derive(BorshSerialize, BorshDeserialize)]
+    #[borsh(crate = "aurora_engine_types::borsh")]
     pub struct Bloom(BLOOM_SIZE);
 }
 

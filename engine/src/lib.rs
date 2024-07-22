@@ -20,13 +20,16 @@ extern crate alloc;
 extern crate core;
 
 mod map;
+
 pub mod parameters {
     pub use aurora_engine_types::parameters::connector::*;
     pub use aurora_engine_types::parameters::engine::*;
 }
+
 pub mod proof {
     pub use aurora_engine_types::parameters::connector::Proof;
 }
+
 pub mod accounting;
 #[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod contract_methods;
@@ -76,8 +79,6 @@ pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::{self, Engine};
-    #[cfg(feature = "evm_bully")]
-    use crate::parameters::{BeginBlockArgs, BeginChainArgs};
     use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
@@ -89,19 +90,16 @@ mod contract {
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
-    use aurora_engine_types::borsh::BorshSerialize;
+    use aurora_engine_types::borsh;
     use aurora_engine_types::parameters::silo::{
-        FixedGasCostArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// ADMINISTRATIVE METHODS
-    ///
-
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
     #[no_mangle]
@@ -184,6 +182,18 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Upgrade the contract with the provided code bytes.
+    #[no_mangle]
+    pub extern "C" fn upgrade() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+
+        contract_methods::admin::upgrade(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Stage new code for deployment.
     #[no_mangle]
     pub extern "C" fn stage_upgrade() {
@@ -241,8 +251,8 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Returns an unsigned integer where each 1-bit means that a precompile corresponding to that bit is paused and
-    /// 0-bit means not paused.
+    /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
+    /// to that bit is paused and 0-bit means not paused.
     #[no_mangle]
     pub extern "C" fn paused_precompiles() {
         let io = Runtime;
@@ -272,10 +282,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// MUTATIVE METHODS
-    ///
-
     /// Deploy code into the EVM.
     #[no_mangle]
     pub extern "C" fn deploy_code() {
@@ -388,6 +395,19 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// A private function (only callable by the contract itself) used as part of the XCC flow.
+    /// This function uses the exit to Near precompile to move wNear from Aurora to a user's
+    /// XCC account.
+    #[no_mangle]
+    pub extern "C" fn withdraw_wnear_to_router() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::xcc::withdraw_wnear_to_router(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Mirror existing ERC-20 token on the main Aurora contract.
     /// Notice: It works if the SILO mode is on.
     #[no_mangle]
@@ -475,7 +495,7 @@ mod contract {
         let engine: Engine<_, _> =
             Engine::new(args.sender, current_account_id, io, &env).sdk_unwrap();
         let result = Engine::view_with_args(&engine, args).sdk_unwrap();
-        io.return_output(&result.try_to_vec().sdk_expect(errors::ERR_SERIALIZE));
+        io.return_output(&borsh::to_vec(&result).sdk_expect(errors::ERR_SERIALIZE));
     }
 
     #[no_mangle]
@@ -540,45 +560,6 @@ mod contract {
         contract_methods::connector::get_erc20_metadata(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
-    }
-
-    ///
-    /// BENCHMARKING METHODS
-    ///
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_chain() {
-        use crate::prelude::U256;
-        let mut io = Runtime;
-        let mut state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let args: BeginChainArgs = io.read_input_borsh().sdk_unwrap();
-        state.chain_id = args.chain_id;
-        state::set_state(&mut io, &state).sdk_unwrap();
-        // set genesis block balances
-        for account_balance in args.genesis_alloc {
-            engine::set_balance(
-                &mut io,
-                &account_balance.address,
-                &crate::prelude::Wei::new(U256::from(account_balance.balance)),
-            );
-        }
-        // return new chain ID
-        io.return_output(&state::get_state(&io).sdk_unwrap().chain_id);
-    }
-
-    #[cfg(feature = "evm_bully")]
-    #[no_mangle]
-    pub extern "C" fn begin_block() {
-        let io = Runtime;
-        let state = state::get_state(&io).sdk_unwrap();
-        if state.owner_id != io.predecessor_account_id() {
-            sdk::panic_utf8(errors::ERR_NOT_ALLOWED);
-        }
-        let _args: BeginBlockArgs = io.read_input_borsh().sdk_unwrap();
-        // TODO: https://github.com/aurora-is-near/aurora-engine/issues/2
     }
 
     ///
@@ -672,6 +653,15 @@ mod contract {
     }
 
     #[no_mangle]
+    #[cfg(not(feature = "ext-connector"))]
+    pub extern "C" fn ft_balances_of() {
+        let io = Runtime;
+        contract_methods::connector::ft_balances_of(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    #[no_mangle]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of_eth(io)
@@ -708,11 +698,14 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Allow receiving NEP141 tokens to the EVM contract.
+    /// Allows receiving NEP141 tokens in the EVM contract.
     ///
-    /// This function returns the amount of tokens to return to the sender.
-    /// Either all tokens are transferred and tokens are returned
-    /// in case of an error, or no token is returned if the transaction was successful.
+    /// This function is called when NEP141 tokens are transferred to the contract.
+    /// It returns the amount of tokens that should be returned to the sender.
+    ///
+    /// There are two possible outcomes:
+    /// 1. If an error occurs during the token transfer, all the transferred tokens are returned to the sender.
+    /// 2. If the token transfer is successful, no tokens are returned, and the contract keeps the transferred tokens.
     #[no_mangle]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;
@@ -874,7 +867,7 @@ mod contract {
     pub extern "C" fn verify_log_entry() {
         sdk::log!("Call from verify_log_entry");
         let mut io = Runtime;
-        let data = true.try_to_vec().unwrap();
+        let data = borsh::to_vec(&true).unwrap();
         io.return_output(&data);
     }
 
@@ -937,7 +930,7 @@ mod contract {
             let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
                 target_account_id: aurora_account_id,
                 method: crate::prelude::String::from("finish_deposit"),
-                args: args.try_to_vec().unwrap(),
+                args: borsh::to_vec(&args).unwrap(),
                 attached_balance: ZERO_ATTACHED_BALANCE,
                 attached_gas: GAS_FOR_FINISH,
             };
@@ -957,25 +950,25 @@ mod contract {
     /// Silo
     ///
     #[no_mangle]
-    pub extern "C" fn get_fixed_gas_cost() {
+    pub extern "C" fn get_fixed_gas() {
         let mut io = Runtime;
-        let cost = FixedGasCostArgs {
-            cost: silo::get_fixed_gas_cost(&io),
+        let cost = FixedGasArgs {
+            fixed_gas: silo::get_fixed_gas(&io),
         };
 
-        io.return_output(&cost.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(&borsh::to_vec(&cost).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
     #[no_mangle]
-    pub extern "C" fn set_fixed_gas_cost() {
+    pub extern "C" fn set_fixed_gas() {
         let mut io = Runtime;
         require_running(&state::get_state(&io).sdk_unwrap());
         silo::assert_admin(&io).sdk_unwrap();
 
-        let args: FixedGasCostArgs = io.read_input_borsh().sdk_unwrap();
-        args.cost.sdk_expect("FIXED_GAS_COST_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
+        let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
+        args.fixed_gas.sdk_expect("FIXED_GAS_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
         silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
-        silo::set_fixed_gas_cost(&mut io, args.cost);
+        silo::set_fixed_gas(&mut io, args.fixed_gas);
     }
 
     #[no_mangle]
@@ -983,7 +976,11 @@ mod contract {
         let mut io = Runtime;
         let params = silo::get_silo_params(&io);
 
-        io.return_output(&params.try_to_vec().map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(
+            &borsh::to_vec(&params)
+                .map_err(|e| e.to_string())
+                .sdk_unwrap(),
+        );
     }
 
     #[no_mangle]
@@ -1010,8 +1007,7 @@ mod contract {
     pub extern "C" fn get_whitelist_status() {
         let mut io = Runtime;
         let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
-        let status = silo::get_whitelist_status(&io, &args)
-            .try_to_vec()
+        let status = borsh::to_vec(&silo::get_whitelist_status(&io, &args))
             .map_err(|e| e.to_string())
             .sdk_unwrap();
 
@@ -1049,10 +1045,7 @@ mod contract {
     }
 
     // TODO: rust-2023-08-24#[allow(clippy::empty_line_after_doc_comments)]
-    ///
     /// Utility methods.
-    ///
-
     fn internal_get_upgrade_index() -> u64 {
         let io = Runtime;
         match io.read_u64(&bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {

@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-near-sdk = "4.1"
-near-contract-standards = "4.1"
+near-sdk = "5"
+near-contract-standards = "5"

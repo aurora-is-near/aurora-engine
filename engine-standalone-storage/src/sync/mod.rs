@@ -189,6 +189,10 @@ pub fn parse_transaction_kind(
             })?;
             TransactionKind::FactorySetWNearAddress(address)
         }
+        TransactionKindTag::WithdrawWnearToRouter => {
+            let args = xcc::WithdrawWnearToRouterArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::WithdrawWnearToRouter(args)
+        }
         TransactionKindTag::SetUpgradeDelayBlocks => {
             let args = parameters::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetUpgradeDelayBlocks(args)
@@ -225,9 +229,9 @@ pub fn parse_transaction_kind(
                 })?;
             TransactionKind::SetErc20Metadata(args)
         }
-        TransactionKindTag::SetFixedGasCost => {
-            let args = silo_params::FixedGasCostArgs::try_from_slice(&bytes).map_err(f)?;
-            TransactionKind::SetFixedGasCost(args)
+        TransactionKindTag::SetFixedGas => {
+            let args = silo_params::FixedGasArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetFixedGas(args)
         }
         TransactionKindTag::SetSiloParams => {
             let args: Option<silo_params::SiloParamsArgs> =
@@ -384,6 +388,10 @@ where
     let predecessor_account_id = transaction_message.caller.clone();
     let near_receipt_id = transaction_message.near_receipt_id;
     let current_account_id = engine_account_id;
+    let random_seed = compute_random_seed(
+        &transaction_message.action_hash,
+        &block_metadata.random_seed,
+    );
     let env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -391,7 +399,7 @@ where
         block_height,
         block_timestamp: block_metadata.timestamp,
         attached_deposit: transaction_message.attached_near,
-        random_seed: block_metadata.random_seed,
+        random_seed,
         prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
@@ -435,6 +443,16 @@ where
     (tx_hash, diff, result)
 }
 
+/// Based on nearcore implementation:
+/// <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295>
+fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
+    const BYTES_LEN: usize = 32 + 32;
+    let mut bytes: Vec<u8> = Vec::with_capacity(BYTES_LEN);
+    bytes.extend_from_slice(action_hash.as_bytes());
+    bytes.extend_from_slice(block_random_value.as_bytes());
+    aurora_engine_sdk::sha256(&bytes)
+}
+
 /// Handles all transaction kinds other than `submit`.
 /// The `submit` transaction kind is special because it is the only one where the transaction hash
 /// differs from the NEAR receipt hash.
@@ -475,9 +493,9 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::FtOnTransfer(_) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
+            let maybe_output = contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
 
-            None
+            maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::FtTransferCall(_) => {
             #[cfg(feature = "ext-connector")]
@@ -630,6 +648,12 @@ fn non_submit_execute<I: IO + Copy>(
 
             None
         }
+        TransactionKind::WithdrawWnearToRouter(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
+
+            Some(TransactionExecutionResult::Submit(Ok(result)))
+        }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
@@ -691,8 +715,8 @@ fn non_submit_execute<I: IO + Copy>(
 
             None
         }
-        TransactionKind::SetFixedGasCost(args) => {
-            silo::set_fixed_gas_cost(&mut io, args.cost);
+        TransactionKind::SetFixedGas(args) => {
+            silo::set_fixed_gas(&mut io, args.fixed_gas);
             None
         }
         TransactionKind::SetSiloParams(args) => {

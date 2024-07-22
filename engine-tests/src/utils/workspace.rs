@@ -10,11 +10,13 @@ use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, Withdraw
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{parse_near, EngineContract, RawContract};
+#[cfg(not(feature = "ext-connector"))]
+use aurora_engine_workspace::types::ExecutionFinalResult;
+use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
 use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
-const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
+const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
 #[cfg(feature = "ext-connector")]
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
@@ -27,16 +29,23 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .with_code(code)
         .with_custodian_address("d045f7e19B2488924B97F9c145b5E51D0D895A65")
         .unwrap()
-        .with_root_balance(parse_near!("10000 N"))
-        .with_contract_balance(parse_near!("1000 N"))
+        .with_root_balance(NearToken::from_near(10000))
+        .with_contract_balance(NearToken::from_near(1000))
         .deploy_and_init()
         .await
         .unwrap()
 }
 
-#[allow(clippy::let_and_return)]
 pub async fn deploy_engine() -> EngineContract {
-    let code = AuroraRunner::get_engine_code();
+    inner_deploy_engine(AuroraRunner::get_engine_code()).await
+}
+
+pub async fn deploy_engine_v331() -> EngineContract {
+    inner_deploy_engine(AuroraRunner::get_engine_v331_code()).await
+}
+
+#[allow(clippy::let_and_return)]
+async fn inner_deploy_engine(code: Vec<u8>) -> EngineContract {
     let contract = deploy_engine_with_code(code).await;
 
     #[cfg(feature = "ext-connector")]
@@ -51,7 +60,10 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     let contract_bytes = get_aurora_eth_connector_contract();
     let contract_account = aurora
         .root()
-        .create_subaccount(AURORA_ETH_CONNECTOR, 15 * STORAGE_AMOUNT)
+        .create_subaccount(
+            AURORA_ETH_CONNECTOR,
+            STORAGE_AMOUNT.checked_mul(15).unwrap(),
+        )
         .await
         .unwrap();
     let contract = contract_account.deploy(&contract_bytes).await.unwrap();
@@ -61,12 +73,22 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
         "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E",
         "metadata": metadata,
         "account_with_access_right": aurora.id(),
-        "owner_id": aurora.id()
+        "owner_id": aurora.id(),
+        "min_proof_acceptance_height": 0
     });
 
     let result = contract
         .call("new")
         .args_json(init_args)
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(result.is_success());
+
+    // By default, the contract is paused. So we need to unpause it.
+    let result = contract
+        .call("pa_unpause_feature")
+        .args_json(json!({ "key": "ALL" }))
         .max_gas()
         .transact()
         .await?;
@@ -81,10 +103,20 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub async fn get_xcc_router_version(aurora: &EngineContract, xcc_account: &AccountId) -> u32 {
+    aurora
+        .root()
+        .view(xcc_account, "get_version")
+        .await
+        .unwrap()
+        .json::<u32>()
+        .unwrap()
+}
+
 pub async fn create_sub_account(
     master_account: &Account,
     account: &str,
-    balance: u128,
+    balance: NearToken,
 ) -> anyhow::Result<Account> {
     master_account.create_subaccount(account, balance).await
 }
@@ -121,7 +153,7 @@ pub async fn transfer_nep_141_to_erc_20(
             "amount": amount.to_string(),
             "memo": "null",
         }))
-        .deposit(1)
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?;
     assert!(result.is_success(), "{result:?}");
@@ -207,12 +239,51 @@ pub async fn transfer_nep_141(
             "amount": amount.to_string(),
             "memo": "null",
         }))
-        .deposit(1)
+        .deposit(NearToken::from_yoctonear(1))
         .transact()
         .await?;
     assert!(result.is_success());
 
     Ok(())
+}
+
+#[cfg(not(feature = "ext-connector"))]
+pub async fn storage_deposit_nep141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+) -> anyhow::Result<ExecutionFinalResult> {
+    source
+        .call(nep_141, "storage_deposit")
+        .args_json(json!({
+            "account_id": dest,
+        }))
+        .deposit(STORAGE_AMOUNT)
+        .max_gas()
+        .transact()
+        .await
+}
+
+#[cfg(not(feature = "ext-connector"))]
+pub async fn transfer_call_nep_141(
+    nep_141: &AccountId,
+    source: &Account,
+    dest: &str,
+    amount: u128,
+    msg: &str,
+) -> anyhow::Result<ExecutionFinalResult> {
+    source
+        .call(nep_141, "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": dest,
+            "amount": amount.to_string(),
+            "memo": "null",
+            "msg": msg,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await
 }
 
 #[cfg(feature = "ext-connector")]

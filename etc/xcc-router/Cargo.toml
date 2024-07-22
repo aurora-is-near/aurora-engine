@@ -15,8 +15,11 @@ debug = false
 panic = "abort"
 
 [dependencies]
-aurora-engine-types = { path = "../../engine-types", default-features = false, features = ["borsh-compat"] }
-near-sdk = "4.1"
+aurora-engine-types = { path = "../../engine-types", default-features = false }
+near-sdk = { version = "5", default-features = false, features = ["legacy", "unit-testing"] }
+
+[dev-dependencies]
+near-primitives = "0.20"
 
 [features]
 default = []

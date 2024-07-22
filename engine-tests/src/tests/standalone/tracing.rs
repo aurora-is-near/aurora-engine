@@ -37,7 +37,7 @@ fn test_evm_tracing_with_storage() {
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
-    for (key, value) in runner.get_current_state().iter() {
+    for (key, value) in runner.get_current_state() {
         if key.len() >= 22 && &key[2..22] == contract_address.as_bytes() {
             let mut new_key = key.clone();
             new_key[2..22].copy_from_slice(weth_address.as_bytes());
@@ -73,6 +73,7 @@ fn test_evm_tracing_with_storage() {
             transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
             promise_data: Vec::new(),
             raw_input: Vec::new(),
+            action_hash: H256::default(),
         },
         diff,
         maybe_result: Ok(None),
@@ -212,7 +213,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_tr
     };
 
     assert_eq!(trace.logs().0.len(), expected_trace.len());
-    for (log, step) in trace.logs().0.iter().zip(expected_trace.into_iter()) {
+    for (log, step) in trace.logs().0.iter().zip(expected_trace) {
         assert_eq!(
             log.program_counter.0, step.pc,
             "Program counters should match"

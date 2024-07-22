@@ -155,6 +155,7 @@ where
             transaction: crate::sync::types::TransactionKind::Submit(tx),
             promise_data: Vec::new(),
             raw_input: transaction_bytes,
+            action_hash: H256::default(),
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -268,6 +269,7 @@ mod test {
                         transaction: TransactionKind::Unknown,
                         promise_data: Vec::new(),
                         raw_input: Vec::new(),
+                        action_hash: H256::default(),
                     },
                     &diff,
                 )

@@ -9,9 +9,12 @@ use aurora_engine_types::{
 };
 use byte_slice_cast::AsByteSlice;
 use near_sdk::serde_json::json;
-use near_sdk::{json_types::U128, serde, ONE_YOCTO};
+use near_sdk::{json_types::U128, serde};
+use near_workspaces::types::NearToken;
+use near_workspaces::AccountId;
 use std::str::FromStr;
-use workspaces::AccountId;
+
+const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
 fn dummy_ft_receiver_bytes() -> Vec<u8> {
@@ -31,7 +34,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .engine_contract
         .call("deposit")
         .args_borsh(proof)
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -48,7 +51,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -103,7 +106,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -135,7 +138,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -219,15 +222,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     );
 
     let transfer_amount: U128 = 50.into();
-    let fee: u128 = 30;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(
-        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
-            .as_bytes()
-            .to_vec(),
-    );
-
-    let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
+    let message = ft_transfer_msg(CONTRACT_ACC, 30, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
@@ -237,11 +232,69 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
             "memo": memo,
             "msg": message,
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_success());
+
+    assert_eq!(
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
+        DEPOSITED_AMOUNT - transfer_amount.0,
+    );
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(contract.engine_contract.id())
+            .await?
+            .0,
+        transfer_amount.0,
+    );
+    assert_eq!(
+        contract
+            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS),)
+            .await?,
+        transfer_amount.0,
+    );
+    assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_ft_transfer_call_without_fee() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let user_acc = contract
+        .create_sub_account(DEPOSITED_RECIPIENT_NAME)
+        .await?;
+    assert_eq!(
+        contract.get_eth_on_near_balance(user_acc.id()).await?.0,
+        DEPOSITED_AMOUNT,
+    );
+    assert_eq!(
+        contract
+            .get_eth_on_near_balance(contract.engine_contract.id())
+            .await?
+            .0,
+        0,
+    );
+
+    let transfer_amount: U128 = 50.into();
+    let message = ft_transfer_msg("relayer.root", 0, RECIPIENT_ETH_ADDRESS);
+    let memo: Option<String> = None;
+    let res = user_acc
+        .call(contract.engine_contract.id(), "ft_transfer_call")
+        .args_json(json!({
+            "receiver_id": contract.engine_contract.id(),
+            "amount": transfer_amount,
+            "memo": memo,
+            "msg": message,
+        }))
+        .max_gas()
+        .deposit(ONE_YOCTO)
+        .transact()
+        .await?;
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -293,7 +346,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
 
     let transfer_amount: U128 = 50.into();
     let memo: Option<String> = None;
-    // Send to Aurora contract with wrong message should failed
+    // Send to Aurora contract with wrong message should fail
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
         .args_json(json!({
@@ -302,7 +355,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
             "memo": &memo,
             "msg": "",
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -338,7 +391,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
             "memo": &memo,
             "msg": ""
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -381,7 +434,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
             "memo": &memo,
             "msg": ""
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -435,8 +488,7 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     let message = [CONTRACT_ACC, ":", "0x", &recipient_address_encoded].concat();
     let fee: Fee = Fee::new(NEP141Wei::new(0));
     let token_message_data =
-        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message, fee)
-            .unwrap();
+        TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
 
     let deposit_event = DepositedEvent {
         eth_custodian_address,
@@ -532,14 +584,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     );
 
     let transfer_amount: U128 = 50.into();
-    let fee: u128 = 30;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    let recipient_address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
-    msg.append(&mut recipient_address.as_bytes().to_vec());
-
-    let relayer_id = "relayer.root";
-    let message = [relayer_id, hex::encode(msg).as_str()].join(":");
-
+    let message = ft_transfer_msg("relayer.root", 30, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
@@ -549,7 +594,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
             "memo": memo,
             "msg": message,
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -564,7 +609,9 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
         transfer_amount.0
     );
     assert_eq!(
-        contract.get_eth_balance(&recipient_address).await?,
+        contract
+            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
+            .await?,
         transfer_amount.0
     );
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
@@ -577,15 +624,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let transfer_amount: U128 = 10.into();
-    let fee: u128 = 12;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(
-        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
-            .as_bytes()
-            .to_vec(),
-    );
-    let relayer_id = "relayer.root";
-    let message = [relayer_id, hex::encode(msg).as_str()].join(":");
+    let message = ft_transfer_msg("relayer.root", 12, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
@@ -598,7 +637,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
             "memo": memo,
             "msg": message,
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -627,22 +666,21 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
-    let contract = TestContract::new().await?;
+    let contract = TestContract::new_with_owner("owner.root".parse().unwrap()).await?;
     let user_acc = contract.create_sub_account("some-user").await?;
+    let owner = contract.create_sub_account("owner").await?;
+    let args = json!({"key": "deposit"});
     let res = user_acc
-        .call(contract.eth_connector_contract.id(), "set_paused_flags")
-        .args_borsh(PAUSE_DEPOSIT)
-        .gas(DEFAULT_GAS)
+        .call(contract.eth_connector_contract.id(), "pa_pause_feature")
+        .args_json(&args)
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
+    assert!(contract.check_error_message(res, "Insufficient permissions for method"));
 
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
-        .args_borsh(PAUSE_DEPOSIT)
-        .gas(DEFAULT_GAS)
+    let res = owner
+        .call(contract.eth_connector_contract.id(), "pa_pause_feature")
+        .args_json(args)
         .transact()
         .await?;
     assert!(res.is_success());
@@ -651,8 +689,9 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_access_right() -> anyhow::Result<()> {
-    let acc_name = "some_user.root".parse().unwrap();
-    let contract = TestContract::new_with_owner(acc_name).await?;
+    let owner = "owner.root".parse().unwrap();
+    let contract = TestContract::new_with_owner(owner).await?;
+    let owner_acc = contract.create_sub_account("owner").await?;
     contract.call_deposit_eth_to_near().await?;
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
@@ -660,7 +699,7 @@ async fn test_access_right() -> anyhow::Result<()> {
 
     let res = contract
         .eth_connector_contract
-        .call("get_account_with_access_right")
+        .call("get_aurora_engine_account_id")
         .view()
         .await?
         .json::<AccountId>()
@@ -672,25 +711,28 @@ async fn test_access_right() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "engine_withdraw")
         .args_borsh((user_acc.id(), recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_ACCESS_RIGHT"));
+    assert!(contract.check_error_message(res, "Method can be called only by aurora engine"));
 
-    let res = contract
-        .eth_connector_contract
-        .call("set_access_right")
-        .args_json((user_acc.id(),))
-        .gas(DEFAULT_GAS)
+    let res = owner_acc
+        .call(
+            contract.eth_connector_contract.id(),
+            "set_aurora_engine_account_id",
+        )
+        .args_json(json!({
+            "new_aurora_engine_account_id": user_acc.id()
+        }))
+        .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_success());
 
     let res = contract
         .eth_connector_contract
-        .call("get_account_with_access_right")
+        .call("get_aurora_engine_account_id")
         .view()
         .await?
         .json::<AccountId>()
@@ -700,7 +742,6 @@ async fn test_access_right() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "engine_withdraw")
         .args_borsh((user_acc.id(), recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -729,50 +770,41 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
     let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
     let contract = TestContract::new_with_owner(acc_name).await?;
     let user_acc = contract.create_sub_account("some_user").await?;
+    let args = json!({"key": "deposit"});
 
     // Pause deposit
     let res = user_acc
-        .call(contract.eth_connector_contract.id(), "set_paused_flags")
-        .args_borsh(PAUSE_DEPOSIT)
-        .gas(DEFAULT_GAS)
+        .call(contract.eth_connector_contract.id(), "pa_pause_feature")
+        .args_json(args)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
 
-    // Check is flag DEPOSIT_PAUSE
-    let res = contract
-        .eth_connector_contract
-        .call("get_paused_flags")
-        .view()
-        .await?
-        .borsh::<i8>()
-        .unwrap();
-    assert_eq!(res, 1);
-
-    // 2nd deposit call - should fail.
-    // Becasue `owner_id` check related to `predecessor_acount_id`
+    // 1st deposit call - should fail.
+    // Because `owner_id` check related to `predecessor_account_id`
     let res = contract
         .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
 
     let res = contract
         .engine_contract
         .call("deposit")
         .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
 
     assert_eq!(contract.total_supply().await?, 0);
 
     let res = user_acc
         .call(contract.eth_connector_contract.id(), "deposit")
         .args_borsh(&contract.get_proof(PROOF_DATA_NEAR))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -783,53 +815,42 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_deposit_pausability() -> anyhow::Result<()> {
-    let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
-    let contract = TestContract::new_with_owner(acc_name).await?;
+    let contract = TestContract::new_with_owner("owner.root".parse()?).await?;
     let user_acc = contract.create_sub_account("some_user").await?;
-
+    let owner_acc = contract.create_sub_account("owner").await?;
+    let args = json!({"key": "deposit"});
     // Pause deposit
-    let res = user_acc
-        .call(contract.eth_connector_contract.id(), "set_paused_flags")
-        .args_borsh(PAUSE_DEPOSIT)
-        .gas(DEFAULT_GAS)
+    let res = owner_acc
+        .call(contract.eth_connector_contract.id(), "pa_pause_feature")
+        .args_json(&args)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
 
-    // Check is flag DEPOSIT_PAUSE
-    let res = contract
-        .eth_connector_contract
-        .call("get_paused_flags")
-        .view()
-        .await?
-        .borsh::<i8>()
-        .unwrap();
-    assert_eq!(res, 1);
-
-    // 2nd deposit call - should fail.
-    // Becasue `owner_id` check related to `predecessor_acount_id`
+    // 1st deposit call - should fail.
+    // Because `owner_id` check related to `predecessor_account_id`
     let res = contract
         .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
 
     let res = contract
         .engine_contract
         .call("deposit")
         .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_PAUSED"));
+    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
 
     // Unpause all
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
-        .args_borsh(UNPAUSE_ALL)
-        .gas(DEFAULT_GAS)
+    let res = owner_acc
+        .call(contract.eth_connector_contract.id(), "pa_unpause_feature")
+        .args_json(args)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -839,7 +860,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .engine_contract
         .call("deposit")
         .args_borsh(&contract.get_proof(PROOF_DATA_ETH))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -864,11 +885,13 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
-    let acc_name = AccountId::try_from(DEPOSITED_RECIPIENT.to_string()).unwrap();
-    let contract = TestContract::new_with_owner(acc_name).await?;
+    let owner = "owner.root".parse().unwrap();
+    let contract = TestContract::new_with_owner(owner).await?;
+    let owner_acc = contract.create_sub_account("owner").await?;
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
         .await?;
+    let args = json!({"key": "engine_withdraw"});
 
     contract.call_deposit_eth_to_near().await?;
 
@@ -878,7 +901,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -891,11 +914,10 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert_eq!(data.eth_custodian_address, custodian_addr);
 
     // Pause withdraw
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
-        .args_borsh(PAUSE_WITHDRAW)
-        .gas(DEFAULT_GAS)
+    let res = owner_acc
+        .call(contract.eth_connector_contract.id(), "pa_pause_feature")
+        .args_json(&args)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -904,12 +926,12 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "WithdrawErrorPaused"));
+    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
 
     // Direct call to eth-connector from owner should be success
     let res = user_acc
@@ -928,11 +950,10 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     assert_eq!(data.eth_custodian_address, custodian_addr);
 
     // Unpause all
-    let res = contract
-        .eth_connector_contract
-        .call("set_paused_flags")
-        .args_borsh(UNPAUSE_ALL)
-        .gas(DEFAULT_GAS)
+    let res = owner_acc
+        .call(contract.eth_connector_contract.id(), "pa_unpause_feature")
+        .args_json(args)
+        .max_gas()
         .transact()
         .await?;
     assert!(res.is_success());
@@ -940,7 +961,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1103,7 +1124,7 @@ async fn test_ft_transfer_max_value() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1129,7 +1150,6 @@ async fn test_ft_transfer_empty_value() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1153,7 +1173,6 @@ async fn test_ft_transfer_wrong_u128_json_type() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1179,7 +1198,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
             "amount": transfer_amount,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1203,7 +1222,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
             "amount": transfer_amount2,
             "memo": "transfer memo"
         }))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1232,7 +1251,7 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
         .args_borsh((recipient_addr, withdraw_amount))
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
@@ -1276,7 +1295,7 @@ async fn test_ft_metadata() -> anyhow::Result<()> {
     let metadata = contract
         .engine_contract
         .call("ft_metadata")
-        .gas(DEFAULT_GAS)
+        .max_gas()
         .transact()
         .await?
         .into_result()
@@ -1296,4 +1315,12 @@ async fn test_ft_metadata() -> anyhow::Result<()> {
     assert_eq!(metadata.reference_hash, reference_hash);
     assert_eq!(metadata.symbol, m.symbol);
     Ok(())
+}
+
+fn ft_transfer_msg(relayer_id: &str, fee: u128, recipient: &str) -> String {
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    let recipient_address = validate_eth_address(recipient);
+
+    msg.extend(recipient_address.as_bytes());
+    [relayer_id, hex::encode(msg).as_str()].join(":")
 }

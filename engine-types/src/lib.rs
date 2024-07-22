@@ -29,16 +29,12 @@ mod v0 {
         vec,
         vec::Vec,
     };
+    pub use borsh;
     pub use core::{
         cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::AddAssign, ops::Div,
         ops::Mul, ops::Sub, ops::SubAssign,
     };
     pub use primitive_types::{H160, H256, U256};
-
-    #[cfg(not(feature = "borsh-compat"))]
-    pub use borsh;
-    #[cfg(feature = "borsh-compat")]
-    pub use borsh_compat::{self as borsh};
 }
 
 pub use v0::*;

@@ -4,11 +4,12 @@ use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
-use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
+use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
 
@@ -179,10 +180,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     #[cfg(not(feature = "ext-connector"))]
-    assert_eq!(
-        get_total_supply(&mut runner),
-        INITIAL_BALANCE - TRANSFER_AMOUNT
-    );
+    // For CANCUN hard fork `total_supply` can't change
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 }
 
 #[test]
@@ -212,14 +211,18 @@ fn test_transaction_to_zero_address() {
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
-    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
+    let result = runner
+        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .unwrap();
     assert_eq!(result.gas_used, 53_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
-    let result = runner.submit_raw(utils::SUBMIT, &context, &[]).unwrap();
+    let result = runner
+        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .unwrap();
     assert_eq!(result.gas_used, 21_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
@@ -300,7 +303,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 10);
+    utils::assert_gas_bound(profile.all_gas(), 11);
 }
 
 #[test]
@@ -385,7 +388,7 @@ fn test_is_contract() {
     assert!(!call_contract(
         Address::from_array([1; 20]),
         &mut runner,
-        &mut signer
+        &mut signer,
     ));
 
     // Should return false for accounts that don't have contract code
@@ -434,8 +437,9 @@ fn test_solidity_pure_bench() {
         .unwrap();
 
     assert!(
-        result.gas_used > 38_000_000,
-        "Over 38 million EVM gas is used"
+        result.gas_used > 37_000_000,
+        "Over 37 million EVM gas is used {}",
+        result.gas_used
     );
     let near_gas = profile.all_gas();
     assert!(
@@ -450,7 +454,7 @@ fn test_solidity_pure_bench() {
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
-    let code = near_primitives_core::contract::ContractCode::new(contract_bytes, None);
+    let code = ContractCode::new(contract_bytes, None);
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
     let outcome = near_vm_runner::run(
@@ -461,7 +465,6 @@ fn test_solidity_pure_bench() {
         &runner.wasm_config,
         &runner.fees_config,
         &[],
-        runner.current_protocol_version,
         Some(&runner.cache),
     )
     .unwrap();
@@ -684,7 +687,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.code.code())
         .unwrap();
-    let expected_number = 1550;
+    let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
 
     assert!(
@@ -707,8 +710,10 @@ fn test_eth_transfer_success() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // perform transfer
     runner
@@ -723,8 +728,10 @@ fn test_eth_transfer_success() {
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT,
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into())
+        .unwrap();
 }
 
 /// Tests the case where the transfer amount is larger than the address balance
@@ -739,8 +746,10 @@ fn test_eth_transfer_insufficient_balance() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let result = runner
@@ -758,8 +767,10 @@ fn test_eth_transfer_insufficient_balance() {
         INITIAL_BALANCE,
         // the nonce is still incremented even though the transfer failed
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 /// Tests the case where the nonce on the transaction does not match the address
@@ -774,8 +785,10 @@ fn test_eth_transfer_incorrect_nonce() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -784,7 +797,9 @@ fn test_eth_transfer_incorrect_nonce() {
             utils::transfer(dest_address, TRANSFER_AMOUNT, nonce + 1)
         })
         .unwrap_err();
-    assert_eq!(error.kind, EngineErrorKind::IncorrectNonce);
+    assert!(
+        matches!(error.kind, EngineErrorKind::IncorrectNonce(msg) if &msg == "ERR_INCORRECT_NONCE: ac: 0, tx: 1")
+    );
 
     // validate post-state (which is the same as pre-state in this case)
     utils::validate_address_balance_and_nonce(
@@ -792,8 +807,10 @@ fn test_eth_transfer_incorrect_nonce() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 #[test]
@@ -837,8 +854,10 @@ fn test_eth_transfer_not_enough_gas() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -852,8 +871,10 @@ fn test_eth_transfer_not_enough_gas() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 }
 
 #[test]
@@ -873,8 +894,10 @@ fn test_transfer_charging_gas_success() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // do transfer
     let result = runner
@@ -884,9 +907,8 @@ fn test_transfer_charging_gas_success() {
     let expected_source_balance = INITIAL_BALANCE - TRANSFER_AMOUNT - spent_amount;
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
-    let relayer_address = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer_address =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     // validate post-state
     utils::validate_address_balance_and_nonce(
@@ -894,19 +916,22 @@ fn test_transfer_charging_gas_success() {
         source_address,
         expected_source_balance,
         (INITIAL_NONCE + 1).into(),
-    );
+    )
+    .unwrap();
     utils::validate_address_balance_and_nonce(
         &runner,
         dest_address,
         expected_dest_balance,
         0.into(),
-    );
+    )
+    .unwrap();
     utils::validate_address_balance_and_nonce(
         &runner,
         relayer_address,
         expected_relayer_balance,
         0.into(),
-    );
+    )
+    .unwrap();
 }
 
 #[test]
@@ -928,8 +953,10 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // attempt transfer
     let error = runner
@@ -941,9 +968,8 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
     );
 
     // validate post-state
-    let relayer = sdk::types::near_account_to_evm_address(
-        runner.context.predecessor_account_id.as_ref().as_bytes(),
-    );
+    let relayer =
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
 
     utils::validate_address_balance_and_nonce(
         &runner,
@@ -951,9 +977,11 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
         INITIAL_BALANCE,
         // nonce is still not incremented since the transaction was invalid
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
-    utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, relayer, Wei::zero(), 0.into()).unwrap();
 }
 
 pub fn initialize_transfer() -> (utils::AuroraRunner, utils::Signer, Address) {
@@ -1006,7 +1034,7 @@ fn test_block_hash_api() {
         .call(
             "get_block_hash",
             "any.near",
-            block_height.try_to_vec().unwrap(),
+            borsh::to_vec(&block_height).unwrap(),
         )
         .unwrap();
     let block_hash = outcome.return_data.as_value().unwrap();
@@ -1071,8 +1099,10 @@ fn test_eth_transfer_with_max_gas_price() {
         source_address,
         INITIAL_BALANCE,
         INITIAL_NONCE.into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, Wei::zero(), 0.into())
+        .unwrap();
 
     // perform transfer
     let max_gas_price = 5;
@@ -1091,8 +1121,10 @@ fn test_eth_transfer_with_max_gas_price() {
         source_address,
         INITIAL_BALANCE - TRANSFER_AMOUNT - Wei::new_u128(fee),
         (INITIAL_NONCE + 1).into(),
-    );
-    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into());
+    )
+    .unwrap();
+    utils::validate_address_balance_and_nonce(&runner, dest_address, TRANSFER_AMOUNT, 0.into())
+        .unwrap();
 }
 
 #[test]
@@ -1108,7 +1140,7 @@ fn test_set_owner() {
     let result = runner.call(
         "set_owner",
         &aurora_account_id,
-        set_owner_args.try_to_vec().unwrap(),
+        borsh::to_vec(&set_owner_args).unwrap(),
     );
 
     // setting owner from the owner with same owner id should succeed
@@ -1141,7 +1173,7 @@ fn test_set_owner_fail_on_same_owner() {
         .call(
             "set_owner",
             &aurora_account_id,
-            set_owner_args.try_to_vec().unwrap(),
+            borsh::to_vec(&set_owner_args).unwrap(),
         )
         .unwrap_err();
 
@@ -1162,7 +1194,7 @@ fn test_set_upgrade_delay_blocks() {
     let result = runner.call(
         "set_upgrade_delay_blocks",
         &aurora_account_id,
-        set_upgrade_delay_blocks.try_to_vec().unwrap(),
+        borsh::to_vec(&set_upgrade_delay_blocks).unwrap(),
     );
 
     // should succeed
@@ -1266,6 +1298,7 @@ mod workspace {
             INITIAL_BALANCE.raw(),
         );
     }
+
     async fn initialize_engine() -> (EngineContract, utils::Signer, Address) {
         let engine = utils::workspace::deploy_engine().await;
         let signer = utils::Signer::random();

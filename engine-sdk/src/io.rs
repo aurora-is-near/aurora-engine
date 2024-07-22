@@ -1,7 +1,7 @@
 use crate::error;
 use crate::prelude::{vec, Vec};
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::U256;
+use aurora_engine_types::{borsh, U256};
 
 /// The purpose of this trait is to represent a reference to a value that
 /// could be obtained by IO, but without eagerly loading it into memory.
@@ -161,7 +161,7 @@ pub trait IO {
         key: &[u8],
         value: &T,
     ) -> Option<Self::StorageValue> {
-        let bytes = value.try_to_vec().ok()?;
+        let bytes = borsh::to_vec(&value).ok()?;
         self.write_storage(key, &bytes)
     }
 }
