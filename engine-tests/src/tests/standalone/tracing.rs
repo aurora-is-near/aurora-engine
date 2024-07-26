@@ -1,4 +1,4 @@
-#![allow(clippy::doc_lazy_continuation)]
+// For the future: #![allow(clippy::doc_lazy_continuation)]
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};

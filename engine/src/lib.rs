@@ -1,5 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+#![cfg_attr(
+    all(feature = "log", target_arch = "wasm32"),
+    feature(panic_info_message)
+)]
 #![deny(clippy::pedantic, clippy::nursery)]
 #![allow(
     clippy::missing_errors_doc,
@@ -50,18 +54,18 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     {
         use prelude::ToString;
 
-        let msg = info.message();
-        let msg = if let Some(log) = info.location() {
-            prelude::format!("{} [{}]", msg, log)
-        } else {
-            msg.to_string()
-        };
-        prelude::sdk::panic_utf8(msg.as_bytes());
+        if let Some(msg) = info.message() {
+            let msg = if let Some(log) = info.location() {
+                prelude::format!("{} [{}]", msg, log)
+            } else {
+                msg.to_string()
+            };
+            prelude::sdk::panic_utf8(msg.as_bytes());
+        } else if let Some(log) = info.location() {
+            prelude::sdk::panic_utf8(log.to_string().as_bytes());
+        }
     }
-    #[cfg(not(feature = "log"))]
-    {
-        ::core::arch::wasm32::unreachable();
-    }
+    ::core::arch::wasm32::unreachable();
 }
 
 #[cfg(target_arch = "wasm32")]
