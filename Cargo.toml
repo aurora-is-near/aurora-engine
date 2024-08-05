@@ -21,7 +21,7 @@ engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 
 anyhow = "1"
-base64 = { version = "0.21", default-features = false, features = ["alloc"] }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
@@ -37,7 +37,7 @@ evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag =
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.42.0-aurora", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
-git2 = "0.18"
+git2 = "0.19"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.4", default-features = false }
@@ -55,7 +55,7 @@ num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
-reqwest = "0.11"
+reqwest = "0.12"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.5", default-features = false }
 rocksdb = { version = "0.21", default-features = false }
@@ -67,7 +67,7 @@ strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
-walrus = "0.20"
+walrus = "0.21"
 wee_alloc = { version = "0.4", default-features = false }
 
 [workspace]
