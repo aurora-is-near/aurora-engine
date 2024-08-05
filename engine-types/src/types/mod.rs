@@ -1,4 +1,4 @@
-use crate::{str, vec, String, Vec, U256};
+use crate::{str, vec, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
 
 pub mod address;
@@ -96,19 +96,6 @@ pub struct FtResolveTransferResult {
     pub refund_amount: Balance,
 }
 
-const HEX_ALPHABET: &[u8; 16] = b"0123456789abcdef";
-
-#[allow(dead_code)]
-#[must_use]
-pub fn bytes_to_hex(v: &[u8]) -> String {
-    let mut result = String::new();
-    for x in v {
-        result.push(char::from(HEX_ALPHABET[usize::from(x / 16)]));
-        result.push(char::from(HEX_ALPHABET[usize::from(x % 16)]));
-    }
-    result
-}
-
 #[derive(Default)]
 pub struct Stack<T> {
     stack: Vec<T>,
@@ -156,14 +143,6 @@ pub fn str_from_slice(inp: &[u8]) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_hex() {
-        assert_eq!(
-            bytes_to_hex(&[0u8, 1u8, 255u8, 16u8]),
-            "0001ff10".to_string()
-        );
-    }
 
     /// Build view of the stack. Intervals between None values are scopes.
     fn view_stack(stack: &Stack<i32>) -> Vec<Option<i32>> {
