@@ -388,7 +388,8 @@ else
   cd $AURORA_ETH_CONNECTOR_REPO_NAME
 fi
 RUST_VERSION=$(cat rust-toolchain | grep channel | cut -d'"' -f 2)
-rustup toolchain install $RUST_VERSION
+rustup toolchain add $RUST_VERSION
+rustup target add wasm32-unknown-unknown --toolchain $RUST_VERSION
 cargo +$RUST_VERSION make --profile mainnet build-test
 '''
 
