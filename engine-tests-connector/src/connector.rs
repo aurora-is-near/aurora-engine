@@ -222,15 +222,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
     );
 
     let transfer_amount: U128 = 50.into();
-    let fee: u128 = 30;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(
-        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
-            .as_bytes()
-            .to_vec(),
-    );
-
-    let message = [CONTRACT_ACC, hex::encode(msg).as_str()].join(":");
+    let message = ft_transfer_msg(CONTRACT_ACC, 30, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
@@ -288,7 +280,7 @@ async fn test_ft_transfer_call_without_fee() -> anyhow::Result<()> {
     );
 
     let transfer_amount: U128 = 50.into();
-    let message = RECIPIENT_ETH_ADDRESS;
+    let message = ft_transfer_msg("relayer.root", 0, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
@@ -302,7 +294,7 @@ async fn test_ft_transfer_call_without_fee() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -592,14 +584,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
     );
 
     let transfer_amount: U128 = 50.into();
-    let fee: u128 = 30;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    let recipient_address = validate_eth_address(RECIPIENT_ETH_ADDRESS);
-    msg.append(&mut recipient_address.as_bytes().to_vec());
-
-    let relayer_id = "relayer.root";
-    let message = [relayer_id, hex::encode(msg).as_str()].join(":");
-
+    let message = ft_transfer_msg("relayer.root", 30, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
@@ -624,7 +609,9 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
         transfer_amount.0
     );
     assert_eq!(
-        contract.get_eth_balance(&recipient_address).await?,
+        contract
+            .get_eth_balance(&validate_eth_address(RECIPIENT_ETH_ADDRESS))
+            .await?,
         transfer_amount.0
     );
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
@@ -637,15 +624,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let transfer_amount: U128 = 10.into();
-    let fee: u128 = 12;
-    let mut msg = U256::from(fee).as_byte_slice().to_vec();
-    msg.append(
-        &mut validate_eth_address(RECIPIENT_ETH_ADDRESS)
-            .as_bytes()
-            .to_vec(),
-    );
-    let relayer_id = "relayer.root";
-    let message = [relayer_id, hex::encode(msg).as_str()].join(":");
+    let message = ft_transfer_msg("relayer.root", 12, RECIPIENT_ETH_ADDRESS);
     let memo: Option<String> = None;
     let user_acc = contract
         .create_sub_account(DEPOSITED_RECIPIENT_NAME)
@@ -1336,4 +1315,12 @@ async fn test_ft_metadata() -> anyhow::Result<()> {
     assert_eq!(metadata.reference_hash, reference_hash);
     assert_eq!(metadata.symbol, m.symbol);
     Ok(())
+}
+
+fn ft_transfer_msg(relayer_id: &str, fee: u128, recipient: &str) -> String {
+    let mut msg = U256::from(fee).as_byte_slice().to_vec();
+    let recipient_address = validate_eth_address(recipient);
+
+    msg.extend(recipient_address.as_bytes());
+    [relayer_id, hex::encode(msg).as_str()].join(":")
 }

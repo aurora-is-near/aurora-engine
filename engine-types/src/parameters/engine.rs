@@ -339,6 +339,15 @@ pub struct RelayerKeyArgs {
 
 pub type FullAccessKeyArgs = RelayerKeyArgs;
 
+/// Parameters for upgrading the contract.
+#[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct UpgradeParams {
+    /// Code for upgrading.
+    pub code: Vec<u8>,
+    /// Amount of gas for the state migration.
+    pub state_migration_gas: Option<u64>,
+}
+
 mod chain_id_deserialize {
     use crate::types::{u256_to_arr, RawU256};
     use primitive_types::U256;

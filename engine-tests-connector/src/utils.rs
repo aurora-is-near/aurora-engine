@@ -41,7 +41,7 @@ pub struct TestContract {
 }
 
 impl TestContract {
-    pub async fn deploy_aurora_contract() -> anyhow::Result<(Contract, Contract, Account)> {
+    async fn deploy_aurora_contract() -> anyhow::Result<(Contract, Contract, Account)> {
         use near_workspaces::{
             types::{KeyType, SecretKey},
             AccessKey,
@@ -140,6 +140,14 @@ impl TestContract {
             .transact()
             .await?;
         assert!(res.is_success());
+
+        let result = eth_connector_contract
+            .call("pa_unpause_feature")
+            .args_json(json!({ "key": "ALL" }))
+            .max_gas()
+            .transact()
+            .await?;
+        assert!(result.is_success(), "{result:#?}");
 
         let chain_id = [0u8; 32];
         let res = engine_contract
