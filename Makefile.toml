@@ -375,7 +375,7 @@ script = '''
 AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
 AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
 AURORA_ETH_CONNECTOR_REPO_NAME="aurora-eth-connector"
-AURORA_ETH_CONNECTOR_REPO="https://github.com/aurora-is-near/"$AURORA_ETH_CONNECTOR_REPO_NAME
+AURORA_ETH_CONNECTOR_REPO="https://github.com/Near-One/$AURORA_ETH_CONNECTOR_REPO_NAME"
 if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
   cd $AURORA_ETH_CONNECTOR_DIR
   echo "Pull Aurora Eth-Connector repo"
@@ -387,7 +387,10 @@ else
   git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
   cd $AURORA_ETH_CONNECTOR_REPO_NAME
 fi
-cargo make --profile mainnet build-test
+RUST_VERSION=$(cat rust-toolchain | grep channel | cut -d'"' -f 2)
+rustup toolchain add $RUST_VERSION
+rustup target add wasm32-unknown-unknown --toolchain $RUST_VERSION
+cargo +$RUST_VERSION make --profile mainnet build-test
 '''
 
 [tasks.test-flow]

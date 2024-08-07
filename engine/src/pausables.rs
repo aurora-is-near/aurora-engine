@@ -85,7 +85,7 @@ pub trait PausedPrecompilesManager {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Default, Clone)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 pub struct EngineAuthorizer {
-    /// List of [AccountId]s with the permission to pause precompiles.
+    /// List of [`AccountId`]s with the permission to pause precompiles.
     pub acl: BTreeSet<AccountId>,
 }
 
@@ -138,7 +138,7 @@ impl<I: IO> EnginePrecompilesPauser<I> {
 
 impl Authorizer for EngineAuthorizer {
     fn is_authorized(&self, account: &AccountId) -> bool {
-        self.acl.get(account).is_some()
+        self.acl.contains(account)
     }
 }
 

@@ -93,7 +93,7 @@ impl Tester {
     fn submit_result_to_success_or_revert(result: SubmitResult) -> Result<SubmitResult, Revert> {
         match result.status {
             aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
-            aurora_engine::parameters::TransactionStatus::Revert(bytes) => Err(Revert(bytes)),
+            aurora_engine::parameters::TransactionStatus::Revert(_bytes) => Err(Revert),
             other => panic!("Unexpected status {other:?}"),
         }
     }
@@ -222,4 +222,4 @@ impl Tester {
 }
 
 #[derive(Debug)]
-pub struct Revert(Vec<u8>);
+pub struct Revert;

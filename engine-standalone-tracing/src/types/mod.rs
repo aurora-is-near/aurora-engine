@@ -263,7 +263,7 @@ pub struct TransactionTrace {
 impl TransactionTrace {
     /// Constructs a new `TransactionTrace` with a given gas, return, and logs.
     #[must_use]
-    pub fn new(gas: EthGas, failed: bool, return_value: Vec<u8>, struct_logs: Logs) -> Self {
+    pub const fn new(gas: EthGas, failed: bool, return_value: Vec<u8>, struct_logs: Logs) -> Self {
         Self {
             gas,
             failed,

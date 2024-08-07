@@ -242,7 +242,7 @@ impl SubmitResult {
     const VERSION: u8 = 7;
 
     #[must_use]
-    pub fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
+    pub const fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
         Self {
             version: Self::VERSION,
             status,
