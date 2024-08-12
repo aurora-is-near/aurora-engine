@@ -60,8 +60,8 @@ pub struct TransactionMessage {
     /// This quantity is used together with the block random seed
     /// to generate the random value available to the transaction.
     /// nearcore references:
-    /// - https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L261
-    /// - https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295
+    /// - <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L261>
+    /// - <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295>
     pub action_hash: H256,
 }
 
@@ -108,13 +108,13 @@ pub enum TransactionKind {
     /// Bytes here will be parsed into `aurora_engine::proof::Proof`
     Deposit(Vec<u8>),
     /// This can change balances on aurora in the case that `receiver_id == aurora`.
-    /// Example: https://explorer.mainnet.near.org/transactions/DH6iNvXCt5n5GZBZPV1A6sLmMf1EsKcxXE4uqk1cShzj
+    /// Example: <https://explorer.mainnet.near.org/transactions/DH6iNvXCt5n5GZBZPV1A6sLmMf1EsKcxXE4uqk1cShzj>
     FtTransferCall(parameters::TransferCallCallArgs),
     /// FinishDeposit-type receipts are created by calls to `deposit`
     FinishDeposit(parameters::FinishDepositCallArgs),
-    /// ResolveTransfer-type receipts are created by calls to ft_on_transfer
+    /// ResolveTransfer-type receipts are created by calls to `ft_on_transfer`
     ResolveTransfer(parameters::ResolveTransferCallArgs, types::PromiseResult),
-    /// ft_transfer (related to eth-connector)
+    /// `ft_transfer` (related to eth-connector)
     FtTransfer(parameters::TransferCallArgs),
     /// Function to take ETH out of Aurora
     Withdraw(aurora_engine_types::parameters::WithdrawCallArgs),
@@ -132,7 +132,7 @@ pub enum TransactionKind {
     SetPausedFlags(parameters::PauseEthConnectorCallArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
-    /// Callback called by ExitToNear precompile, also can refund on fail
+    /// Callback called by `ExitToNear` precompile, also can refund on fail
     ExitToNear(Option<aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs>),
     /// Update eth-connector config
     SetConnectorData(parameters::SetContractDataCallArgs),
