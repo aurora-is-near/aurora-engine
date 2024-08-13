@@ -242,7 +242,7 @@ impl SubmitResult {
     const VERSION: u8 = 7;
 
     #[must_use]
-    pub fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
+    pub const fn new(status: TransactionStatus, gas_used: u64, logs: Vec<ResultLog>) -> Self {
         Self {
             version: Self::VERSION,
             status,
@@ -338,6 +338,15 @@ pub struct RelayerKeyArgs {
 }
 
 pub type FullAccessKeyArgs = RelayerKeyArgs;
+
+/// Parameters for upgrading the contract.
+#[derive(Debug, Clone, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub struct UpgradeParams {
+    /// Code for upgrading.
+    pub code: Vec<u8>,
+    /// Amount of gas for the state migration.
+    pub state_migration_gas: Option<u64>,
+}
 
 mod chain_id_deserialize {
     use crate::types::{u256_to_arr, RawU256};

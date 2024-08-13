@@ -88,7 +88,6 @@ pub struct AuroraRunner {
     pub context: VMContext,
     pub wasm_config: Config,
     pub fees_config: RuntimeFeesConfig,
-    pub current_protocol_version: u32,
     pub previous_logs: Vec<String>,
     // Use the standalone in parallel if set. This allows checking both
     // implementations give the same results.
@@ -233,7 +232,7 @@ impl AuroraRunner {
         }
 
         self.context.storage_usage = outcome.storage_usage;
-        self.previous_logs = outcome.logs.clone();
+        self.previous_logs.clone_from(&outcome.logs);
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.submit_raw(
@@ -509,7 +508,7 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
-    pub fn get_fixed_gas(&mut self) -> Option<EthGas> {
+    pub fn get_fixed_gas(&self) -> Option<EthGas> {
         let outcome = self
             .one_shot()
             .call("get_fixed_gas", "getter", vec![])
@@ -666,7 +665,6 @@ impl Default for AuroraRunner {
             },
             wasm_config,
             fees_config: RuntimeFeesConfig::test(),
-            current_protocol_version: u32::MAX,
             previous_logs: Vec::new(),
             standalone_runner: Some(standalone::StandaloneRunner::default()),
             promise_results: Vec::new(),
@@ -681,7 +679,6 @@ impl Default for AuroraRunner {
 pub struct ExecutionProfile {
     pub host_breakdown: ProfileDataV3,
     total_gas_cost: u64,
-    pub logs: Vec<String>,
 }
 
 impl ExecutionProfile {
@@ -689,7 +686,6 @@ impl ExecutionProfile {
         Self {
             host_breakdown: outcome.profile.clone(),
             total_gas_cost: outcome.burnt_gas,
-            logs: outcome.logs.clone(),
         }
     }
 

@@ -29,7 +29,7 @@ use aurora_engine_sdk::{
     io::{StorageIntermediate, IO},
     promise::PromiseHandler,
 };
-use aurora_engine_types::parameters::engine::FullAccessKeyArgs;
+use aurora_engine_types::parameters::engine::{FullAccessKeyArgs, UpgradeParams};
 use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
     borsh::BorshDeserialize,
@@ -38,7 +38,7 @@ use aurora_engine_types::{
             NewCallArgs, PausePrecompilesCallArgs, RelayerKeyArgs, RelayerKeyManagerArgs,
             SetOwnerArgs, SetUpgradeDelayBlocksArgs, StartHashchainArgs,
         },
-        promise::{PromiseAction, PromiseBatchAction, PromiseCreateArgs},
+        promise::{PromiseAction, PromiseBatchAction},
     },
     storage::{self, KeyPrefix},
     types::{Address, Yocto},
@@ -48,7 +48,7 @@ use function_name::named;
 
 const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
-const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(100_000_000_000_000);
+const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(50_000_000_000_000);
 
 #[named]
 pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
@@ -189,23 +189,30 @@ pub fn upgrade<I: IO + Copy, E: Env, H: PromiseHandler>(
     require_running(&state)?;
     require_owner_only(&state, &env.predecessor_account_id())?;
 
-    let code = io.read_input().to_vec();
-    let current_account_id = env.current_account_id();
+    let input = io.read_input().to_vec();
+    let (code, state_migration_gas) = match UpgradeParams::try_from_slice(&input) {
+        Ok(args) => (
+            args.code,
+            args.state_migration_gas
+                .map_or(GAS_FOR_STATE_MIGRATION, NearGas::new),
+        ),
+        Err(_) => (input, GAS_FOR_STATE_MIGRATION), // Backward compatibility
+    };
+
+    let target_account_id = env.current_account_id();
     let batch = PromiseBatchAction {
-        target_account_id: current_account_id.clone(),
-        actions: vec![PromiseAction::DeployContract { code }],
+        target_account_id,
+        actions: vec![
+            PromiseAction::DeployContract { code },
+            PromiseAction::FunctionCall {
+                name: "state_migration".to_string(),
+                args: vec![],
+                attached_yocto: ZERO_YOCTO,
+                gas: state_migration_gas,
+            },
+        ],
     };
-    let state_migration_callback = PromiseCreateArgs {
-        target_account_id: current_account_id,
-        method: "state_migration".to_string(),
-        args: vec![],
-        attached_balance: ZERO_YOCTO,
-        attached_gas: GAS_FOR_STATE_MIGRATION,
-    };
-    let promise_id = unsafe {
-        let base_id = handler.promise_create_batch(&batch);
-        handler.promise_attach_callback(base_id, &state_migration_callback)
-    };
+    let promise_id = unsafe { handler.promise_create_batch(&batch) };
 
     handler.promise_return(promise_id);
 

@@ -27,7 +27,7 @@ fn test_promise_results_precompile() {
         data: Vec::new(),
     };
 
-    runner.promise_results = promise_results.clone();
+    runner.promise_results.clone_from(&promise_results);
     let result = runner
         .submit_transaction(&signer.secret_key, transaction)
         .unwrap();

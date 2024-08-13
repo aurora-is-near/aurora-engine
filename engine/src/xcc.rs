@@ -47,7 +47,7 @@ pub struct RouterCode<'a>(pub Cow<'a, [u8]>);
 
 impl<'a> RouterCode<'a> {
     #[must_use]
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub const fn new(bytes: Vec<u8>) -> Self {
         Self(Cow::Owned(bytes))
     }
 

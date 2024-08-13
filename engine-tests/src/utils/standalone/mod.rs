@@ -276,7 +276,7 @@ impl StandaloneRunner {
         &self.cumulative_diff
     }
 
-    pub fn get_balance(&mut self, address: &Address) -> Wei {
+    pub fn get_balance(&self, address: &Address) -> Wei {
         self.storage
             .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
                 engine::get_balance(&io, address)
@@ -284,7 +284,7 @@ impl StandaloneRunner {
             .result
     }
 
-    pub fn get_nonce(&mut self, address: &Address) -> U256 {
+    pub fn get_nonce(&self, address: &Address) -> U256 {
         self.storage
             .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
                 engine::get_nonce(&io, address)
@@ -292,7 +292,7 @@ impl StandaloneRunner {
             .result
     }
 
-    pub fn get_code(&mut self, address: &Address) -> Vec<u8> {
+    pub fn get_code(&self, address: &Address) -> Vec<u8> {
         self.storage
             .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
                 engine::get_code(&io, address)

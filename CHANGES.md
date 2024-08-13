@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.4] 2024-07-22
+
+### Additions
+
+- Added a possibility to provide amount of gas for the `state_migration` callback in the `upgrade`
+  transaction by [@aleksuss]. ([#937])
+
+[#937]: https://github.com/aurora-is-near/aurora-engine/pull/937
+
 ## [3.6.3] 2024-04-16
 
 ### Additions
@@ -651,7 +660,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...develop
+[3.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...3.6.4
 [3.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...3.6.3
 [3.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.1...3.6.2
 [3.6.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.0...3.6.1
