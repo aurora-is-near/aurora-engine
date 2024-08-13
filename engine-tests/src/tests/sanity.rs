@@ -770,7 +770,7 @@ fn test_eth_transfer_insufficient_balance() {
         .unwrap();
     assert_eq!(
         result.status,
-        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund)
     );
 
     // validate post-state
@@ -1266,7 +1266,9 @@ mod workspace {
             .submit(rlp::encode(&signed_tx).to_vec())
             .transact()
             .await;
-        println!("RES: {:?}", res);
+        if let Err(err) = res {
+            println!("ERROR: {:#?}", err);
+        }
 
         let result = aurora
             .submit(rlp::encode(&signed_tx).to_vec())
