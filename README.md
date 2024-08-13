@@ -126,7 +126,7 @@ The following tasks are available to run lints and checks:
 
 For example, the following command will run the checks. `profile` is not required
 here:
-```
+```sh
 cargo make check
 ```
 
@@ -145,7 +145,7 @@ Additionally, there is also but not included in the `clean` task:
 
 For example, the following command will clean everything. `profile` is not 
 required:
-```
+```sh
 cargo make clean
 ```
 
