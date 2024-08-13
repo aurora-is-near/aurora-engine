@@ -296,10 +296,8 @@ fn test_contract_create_too_large() {
     let standalone_result = sputnik::traced_call(&mut listener, || {
         runner.submit_transaction(&signer.secret_key, tx)
     });
-    // assert!(
-    //     standalone_result.is_err(),
-    //     "Expected contract too large error"
-    // );
+    // As we charge users for the EVM errors, we should charge them for
+    // the gas used to deploy the large contract.
     assert!(standalone_result.is_ok());
 }
 
