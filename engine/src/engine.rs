@@ -186,6 +186,7 @@ impl From<EvmErrorKind> for EngineErrorKind {
             EvmErrorKind::PCUnderflow => ExitError::PCUnderflow.into(),
             EvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
             EvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
+            EvmErrorKind::UsizeOverflow => ExitError::UsizeOverflow.into(),
             EvmErrorKind::Other(msg) => ExitError::Other(msg).into(),
         }
     }
@@ -227,6 +228,7 @@ impl ExitIntoResult for ExitReason {
                     ExitError::PCUnderflow => EvmErrorKind::PCUnderflow,
                     ExitError::CreateEmpty => EvmErrorKind::CreateEmpty,
                     ExitError::MaxNonce => EvmErrorKind::MaxNonce,
+                    ExitError::UsizeOverflow => EvmErrorKind::UsizeOverflow,
                     ExitError::Other(msg) => EvmErrorKind::Other(msg),
                 };
                 Ok(TransactionStatus::Error(error_status))

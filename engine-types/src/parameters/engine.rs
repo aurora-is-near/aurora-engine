@@ -215,6 +215,8 @@ pub enum EvmErrorKind {
     Other(crate::Cow<'static, str>),
     /// Nonce reached maximum value of 2^64-1
     MaxNonce,
+    /// `usize` casting overflow
+    UsizeOverflow,
 }
 
 impl AsRef<[u8]> for EvmErrorKind {
@@ -235,6 +237,7 @@ impl AsRef<[u8]> for EvmErrorKind {
             Self::PCUnderflow => b"PC_UNDERFLOW",
             Self::CreateEmpty => b"CREATE_EMPTY",
             Self::MaxNonce => b"MAX_NONCE",
+            Self::UsizeOverflow => b"USIZE_OVERFLOW",
             Self::Other(e) => e.as_bytes(),
         }
     }
