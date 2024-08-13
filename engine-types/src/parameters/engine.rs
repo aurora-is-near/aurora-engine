@@ -180,7 +180,7 @@ pub struct ResultLog {
 /// EVM error king of transaction status
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
-pub enum TransactionStatusEvmErrorKind {
+pub enum EvmErrorKind {
     /// Trying to pop from an empty stack.
     StackUnderflow,
     /// Trying to push into a stack over stack limit.
@@ -217,7 +217,7 @@ pub enum TransactionStatusEvmErrorKind {
     MaxNonce,
 }
 
-impl AsRef<[u8]> for TransactionStatusEvmErrorKind {
+impl AsRef<[u8]> for EvmErrorKind {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::StackUnderflow => b"STACK_UNDERFLOW",
@@ -246,7 +246,7 @@ impl AsRef<[u8]> for TransactionStatusEvmErrorKind {
 pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
-    Error(TransactionStatusEvmErrorKind),
+    Error(EvmErrorKind),
 }
 
 impl TransactionStatus {

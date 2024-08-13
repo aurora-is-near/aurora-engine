@@ -12,7 +12,7 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, SetErc20MetadataArgs,
 };
-use aurora_engine_types::parameters::engine::{SetOwnerArgs, TransactionStatusEvmErrorKind};
+use aurora_engine_types::parameters::engine::{EvmErrorKind, SetOwnerArgs};
 use bstr::ByteSlice;
 
 use libsecp256k1::SecretKey;
@@ -81,7 +81,7 @@ fn erc20_mint_out_of_gas() {
     let error = outcome.unwrap();
     assert_eq!(
         error.status,
-        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        TransactionStatus::Error(EvmErrorKind::OutOfGas)
     );
 
     // Validate post-state
@@ -238,7 +238,7 @@ fn deploy_erc_20_out_of_gas() {
     let error = outcome.unwrap();
     assert_eq!(
         error.status,
-        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        TransactionStatus::Error(EvmErrorKind::OutOfGas)
     );
 
     // Validate post-state

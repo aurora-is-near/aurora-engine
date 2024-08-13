@@ -25,7 +25,7 @@ fn test_standard_precompiles() {
         .unwrap();
 
     let res = utils::panic_on_fail(outcome.status);
-    assert!(res.is_none(), "Status: {:?}", res);
+    assert!(res.is_none(), "Status: {res:?}");
 }
 
 #[test]

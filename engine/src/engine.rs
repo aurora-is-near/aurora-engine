@@ -40,7 +40,7 @@ use aurora_engine_precompiles::PrecompileConstructorContext;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
-use aurora_engine_types::parameters::engine::{FunctionCallArgsV2, TransactionStatusEvmErrorKind};
+use aurora_engine_types::parameters::engine::{EvmErrorKind, FunctionCallArgsV2};
 use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
@@ -168,29 +168,25 @@ impl From<ExitFatal> for EngineErrorKind {
     }
 }
 
-impl From<TransactionStatusEvmErrorKind> for EngineErrorKind {
-    fn from(kind: TransactionStatusEvmErrorKind) -> Self {
+impl From<EvmErrorKind> for EngineErrorKind {
+    fn from(kind: EvmErrorKind) -> Self {
         match kind {
-            TransactionStatusEvmErrorKind::StackUnderflow => ExitError::StackUnderflow.into(),
-            TransactionStatusEvmErrorKind::StackOverflow => ExitError::StackOverflow.into(),
-            TransactionStatusEvmErrorKind::InvalidJump => ExitError::InvalidJump.into(),
-            TransactionStatusEvmErrorKind::InvalidRange => ExitError::InvalidRange.into(),
-            TransactionStatusEvmErrorKind::DesignatedInvalid => ExitError::DesignatedInvalid.into(),
-            TransactionStatusEvmErrorKind::CallTooDeep => ExitError::CallTooDeep.into(),
-            TransactionStatusEvmErrorKind::CreateCollision => ExitError::CreateCollision.into(),
-            TransactionStatusEvmErrorKind::CreateContractLimit => {
-                ExitError::CreateContractLimit.into()
-            }
-            TransactionStatusEvmErrorKind::InvalidCode(opcode) => {
-                ExitError::InvalidCode(evm::Opcode(opcode)).into()
-            }
-            TransactionStatusEvmErrorKind::OutOfOffset => ExitError::OutOfOffset.into(),
-            TransactionStatusEvmErrorKind::OutOfGas => ExitError::OutOfGas.into(),
-            TransactionStatusEvmErrorKind::OutOfFund => ExitError::OutOfFund.into(),
-            TransactionStatusEvmErrorKind::PCUnderflow => ExitError::PCUnderflow.into(),
-            TransactionStatusEvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
-            TransactionStatusEvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
-            TransactionStatusEvmErrorKind::Other(msg) => ExitError::Other(msg).into(),
+            EvmErrorKind::StackUnderflow => ExitError::StackUnderflow.into(),
+            EvmErrorKind::StackOverflow => ExitError::StackOverflow.into(),
+            EvmErrorKind::InvalidJump => ExitError::InvalidJump.into(),
+            EvmErrorKind::InvalidRange => ExitError::InvalidRange.into(),
+            EvmErrorKind::DesignatedInvalid => ExitError::DesignatedInvalid.into(),
+            EvmErrorKind::CallTooDeep => ExitError::CallTooDeep.into(),
+            EvmErrorKind::CreateCollision => ExitError::CreateCollision.into(),
+            EvmErrorKind::CreateContractLimit => ExitError::CreateContractLimit.into(),
+            EvmErrorKind::InvalidCode(opcode) => ExitError::InvalidCode(evm::Opcode(opcode)).into(),
+            EvmErrorKind::OutOfOffset => ExitError::OutOfOffset.into(),
+            EvmErrorKind::OutOfGas => ExitError::OutOfGas.into(),
+            EvmErrorKind::OutOfFund => ExitError::OutOfFund.into(),
+            EvmErrorKind::PCUnderflow => ExitError::PCUnderflow.into(),
+            EvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
+            EvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
+            EvmErrorKind::Other(msg) => ExitError::Other(msg).into(),
         }
     }
 }
@@ -216,28 +212,22 @@ impl ExitIntoResult for ExitReason {
             // To be compatible with Ethereum behaviour we should charge gas for Execution errors
             Self::Error(err) => {
                 let error_status = match err {
-                    ExitError::StackUnderflow => TransactionStatusEvmErrorKind::StackUnderflow,
-                    ExitError::StackOverflow => TransactionStatusEvmErrorKind::StackOverflow,
-                    ExitError::InvalidJump => TransactionStatusEvmErrorKind::InvalidJump,
-                    ExitError::InvalidRange => TransactionStatusEvmErrorKind::InvalidRange,
-                    ExitError::DesignatedInvalid => {
-                        TransactionStatusEvmErrorKind::DesignatedInvalid
-                    }
-                    ExitError::CallTooDeep => TransactionStatusEvmErrorKind::CallTooDeep,
-                    ExitError::CreateCollision => TransactionStatusEvmErrorKind::CreateCollision,
-                    ExitError::CreateContractLimit => {
-                        TransactionStatusEvmErrorKind::CreateContractLimit
-                    }
-                    ExitError::InvalidCode(opcode) => {
-                        TransactionStatusEvmErrorKind::InvalidCode(opcode.0)
-                    }
-                    ExitError::OutOfOffset => TransactionStatusEvmErrorKind::OutOfOffset,
-                    ExitError::OutOfGas => TransactionStatusEvmErrorKind::OutOfGas,
-                    ExitError::OutOfFund => TransactionStatusEvmErrorKind::OutOfFund,
-                    ExitError::PCUnderflow => TransactionStatusEvmErrorKind::PCUnderflow,
-                    ExitError::CreateEmpty => TransactionStatusEvmErrorKind::CreateEmpty,
-                    ExitError::MaxNonce => TransactionStatusEvmErrorKind::MaxNonce,
-                    ExitError::Other(msg) => TransactionStatusEvmErrorKind::Other(msg),
+                    ExitError::StackUnderflow => EvmErrorKind::StackUnderflow,
+                    ExitError::StackOverflow => EvmErrorKind::StackOverflow,
+                    ExitError::InvalidJump => EvmErrorKind::InvalidJump,
+                    ExitError::InvalidRange => EvmErrorKind::InvalidRange,
+                    ExitError::DesignatedInvalid => EvmErrorKind::DesignatedInvalid,
+                    ExitError::CallTooDeep => EvmErrorKind::CallTooDeep,
+                    ExitError::CreateCollision => EvmErrorKind::CreateCollision,
+                    ExitError::CreateContractLimit => EvmErrorKind::CreateContractLimit,
+                    ExitError::InvalidCode(opcode) => EvmErrorKind::InvalidCode(opcode.0),
+                    ExitError::OutOfOffset => EvmErrorKind::OutOfOffset,
+                    ExitError::OutOfGas => EvmErrorKind::OutOfGas,
+                    ExitError::OutOfFund => EvmErrorKind::OutOfFund,
+                    ExitError::PCUnderflow => EvmErrorKind::PCUnderflow,
+                    ExitError::CreateEmpty => EvmErrorKind::CreateEmpty,
+                    ExitError::MaxNonce => EvmErrorKind::MaxNonce,
+                    ExitError::Other(msg) => EvmErrorKind::Other(msg),
                 };
                 Ok(TransactionStatus::Error(error_status))
             }
@@ -1963,6 +1953,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
         result
     }
 
+    /// Check if the storage of the address is empty.
+    /// Related to EIP-7610.
     fn is_empty_storage(&self, address: H160) -> bool {
         let address = Address::new(address);
         if self
@@ -2267,7 +2259,7 @@ mod tests {
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
 
-        let expected_status = TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund);
+        let expected_status = TransactionStatus::Error(EvmErrorKind::OutOfFund);
         let expected_gas_used = 21000;
         let expected_logs = Vec::new();
         let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);

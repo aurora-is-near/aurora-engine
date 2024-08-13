@@ -2,7 +2,7 @@ use aurora_engine::engine::EngineErrorKind;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshSerialize;
-use aurora_engine_types::parameters::engine::{TransactionStatus, TransactionStatusEvmErrorKind};
+use aurora_engine_types::parameters::engine::{EvmErrorKind, TransactionStatus};
 use aurora_engine_types::parameters::silo::{
     FixedGasArgs, SiloParamsArgs, WhitelistAccountArgs, WhitelistAddressArgs, WhitelistArgs,
     WhitelistKind, WhitelistStatusArgs,
@@ -101,7 +101,7 @@ fn test_transfer_insufficient_balance() {
         .unwrap();
     assert_eq!(
         result.status,
-        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund)
+        TransactionStatus::Error(EvmErrorKind::OutOfFund)
     );
 
     // validate post-state
@@ -169,7 +169,7 @@ fn test_transfer_insufficient_balance_fee() {
         .unwrap();
     assert!(matches!(
         result.status,
-        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund)
+        TransactionStatus::Error(EvmErrorKind::OutOfFund)
     ));
 }
 
