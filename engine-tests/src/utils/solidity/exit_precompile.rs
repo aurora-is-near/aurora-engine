@@ -95,7 +95,7 @@ impl Tester {
             aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
             aurora_engine::parameters::TransactionStatus::Revert(_bytes) => Err(Revert),
             aurora_engine::parameters::TransactionStatus::Error(err) => {
-                panic!("Unexpected status {err:?}")
+                panic!("Unexpected status {:?}", err.as_ref())
             }
         }
     }
