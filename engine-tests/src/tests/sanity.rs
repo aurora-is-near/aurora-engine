@@ -7,6 +7,7 @@ use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+use aurora_engine_types::parameters::engine::TransactionStatusEvmErrorKind;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use near_vm_runner::ContractCode;
@@ -54,7 +55,10 @@ fn bench_memory_get_standalone() {
         .unwrap();
     let duration = start.elapsed().as_secs_f32();
     assert!(
-        matches!(result.status, TransactionStatus::OutOfGas),
+        matches!(
+            result.status,
+            TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        ),
         "Infinite loops in the EVM run out of gas"
     );
     assert!(
@@ -108,7 +112,10 @@ fn test_returndatacopy() {
     let address = deploy_contract(&mut runner, &mut signer, contract_bytes);
     let result = call_contract(&mut runner, &mut signer, address);
     assert!(
-        matches!(result.status, TransactionStatus::OutOfGas),
+        matches!(
+            result.status,
+            TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        ),
         "EVM must run out of gas if len > 0 with large memory offset"
     );
 }
@@ -564,7 +571,10 @@ fn test_create_out_of_gas() {
         })
         .unwrap();
     assert!(
-        matches!(result.status, TransactionStatus::OutOfGas),
+        matches!(
+            result.status,
+            TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+        ),
         "Unexpected status: {:?}",
         result.status
     );
@@ -758,7 +768,10 @@ fn test_eth_transfer_insufficient_balance() {
             utils::transfer(dest_address, INITIAL_BALANCE + INITIAL_BALANCE, nonce)
         })
         .unwrap();
-    assert_eq!(result.status, TransactionStatus::OutOfFund);
+    assert_eq!(
+        result.status,
+        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+    );
 
     // validate post-state
     utils::validate_address_balance_and_nonce(
@@ -1067,7 +1080,8 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    utils::panic_on_fail(result.status);
+    let res = utils::panic_on_fail(result.status);
+    assert!(res.is_none(), "Status: {:?}", res);
 }
 
 #[cfg(not(feature = "ext-connector"))]
@@ -1220,7 +1234,9 @@ mod workspace {
     use crate::prelude::{Address, U256};
     use crate::tests::sanity::{GAS_PRICE, INITIAL_BALANCE, INITIAL_NONCE, TRANSFER_AMOUNT};
     use crate::utils;
-    use aurora_engine_types::parameters::engine::TransactionStatus;
+    use aurora_engine_types::parameters::engine::{
+        TransactionStatus, TransactionStatusEvmErrorKind,
+    };
     use aurora_engine_workspace::EngineContract;
 
     // Same as `test_eth_transfer_insufficient_balance` above, except runs through
@@ -1245,13 +1261,23 @@ mod workspace {
             Some(utils::AuroraRunner::default().chain_id),
             &signer.secret_key,
         );
+
+        let res = aurora
+            .submit(rlp::encode(&signed_tx).to_vec())
+            .transact()
+            .await;
+        println!("RES: {:?}", res);
+
         let result = aurora
             .submit(rlp::encode(&signed_tx).to_vec())
             .transact()
             .await
             .unwrap()
             .into_value();
-        assert_eq!(result.status, TransactionStatus::OutOfFund);
+        assert_eq!(
+            result.status,
+            TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund)
+        );
 
         // validate post-state
         assert_eq!(

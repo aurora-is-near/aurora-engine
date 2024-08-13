@@ -859,22 +859,6 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     kind: evm_err.into(),
                     gas_used: submit_result.gas_used,
                 }),
-                TransactionStatus::OutOfFund => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfOffset => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfGas => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::CallTooDeep => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
-                    gas_used: submit_result.gas_used,
-                }),
             })
             .inspect_err(|_e| {
                 sdk::log!("{:?}", _e);
@@ -2283,7 +2267,7 @@ mod tests {
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
 
-        let expected_status = TransactionStatus::OutOfFund;
+        let expected_status = TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfFund);
         let expected_gas_used = 21000;
         let expected_logs = Vec::new();
         let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);

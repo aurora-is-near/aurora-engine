@@ -247,10 +247,6 @@ pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
     Error(TransactionStatusEvmErrorKind),
-    OutOfGas,
-    OutOfFund,
-    OutOfOffset,
-    CallTooDeep,
 }
 
 impl TransactionStatus {
@@ -265,11 +261,8 @@ impl TransactionStatus {
     }
 
     #[must_use]
-    pub fn is_fail(&self) -> bool {
-        *self == Self::OutOfGas
-            || *self == Self::OutOfFund
-            || *self == Self::OutOfOffset
-            || *self == Self::CallTooDeep
+    pub const fn is_fail(&self) -> bool {
+        matches!(*self, Self::Error(_))
     }
 }
 
@@ -279,10 +272,6 @@ impl AsRef<[u8]> for TransactionStatus {
             Self::Succeed(_) => b"SUCCESS",
             Self::Revert(_) => errors::ERR_REVERT,
             Self::Error(kind) => kind.as_ref(),
-            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
-            Self::OutOfGas => errors::ERR_OUT_OF_GAS,
-            Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
-            Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
         }
     }
 }

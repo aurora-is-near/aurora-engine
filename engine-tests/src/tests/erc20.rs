@@ -12,8 +12,9 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, SetErc20MetadataArgs,
 };
-use aurora_engine_types::parameters::engine::SetOwnerArgs;
+use aurora_engine_types::parameters::engine::{SetOwnerArgs, TransactionStatusEvmErrorKind};
 use bstr::ByteSlice;
+
 use libsecp256k1::SecretKey;
 use std::str::FromStr;
 
@@ -78,7 +79,10 @@ fn erc20_mint_out_of_gas() {
     mint_tx.gas_price = U256::from(GAS_PRICE); // also set non-zero gas price to check gas still charged.
     let outcome = runner.submit_transaction(&source_account.secret_key, mint_tx);
     let error = outcome.unwrap();
-    assert_eq!(error.status, TransactionStatus::OutOfGas);
+    assert_eq!(
+        error.status,
+        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+    );
 
     // Validate post-state
 
@@ -232,7 +236,10 @@ fn deploy_erc_20_out_of_gas() {
     deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
-    assert_eq!(error.status, TransactionStatus::OutOfGas);
+    assert_eq!(
+        error.status,
+        TransactionStatus::Error(TransactionStatusEvmErrorKind::OutOfGas)
+    );
 
     // Validate post-state
     utils::validate_address_balance_and_nonce(

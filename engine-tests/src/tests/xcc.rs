@@ -1054,7 +1054,7 @@ pub mod workspace {
                     .unwrap();
                 anyhow::bail!("TX has been reverted with message: {revert_message}");
             }
-            _ => anyhow::bail!("Wrong status of the transaction"),
+            TransactionStatus::Error(_) => anyhow::bail!("Wrong status of the transaction"),
         }
     }
 
