@@ -1579,11 +1579,6 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
         .unwrap_or_default()
 }
 
-pub fn is_empty_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> bool {
-    io.read_storage(storage_to_key(address, key, generation).as_ref())
-        .is_none()
-}
-
 pub fn storage_has_key<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> bool {
     io.storage_has_key(storage_to_key(address, key, generation).as_ref())
 }
@@ -1964,20 +1959,24 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     /// Check if the storage of the address is empty.
     /// Related to EIP-7610: non-empty storage
     fn is_empty_storage(&self, address: H160) -> bool {
+        // As we can't read all storage data for account we assuming that if storage exists
+        // `index = 0` always true
+        let index = H256::zero();
+        // First we're checking cache to not produce read-storage operation
         let address = Address::new(address);
         if self
             .contract_storage_cache
             .borrow()
-            .contains_key(&(address, H256::zero()))
+            .contains_key(&(address, index))
         {
-            return true;
+            return false;
         }
         let generation = *self
             .generation_cache
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        is_empty_storage(&self.io, &address, &H256::zero(), generation)
+        storage_has_key(&self.io, &address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
