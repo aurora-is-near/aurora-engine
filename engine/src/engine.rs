@@ -1584,10 +1584,16 @@ pub fn is_empty_storage<I: IO>(io: &I, address: &Address, key: &H256, generation
         .is_none()
 }
 
+pub fn storage_has_key<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> bool {
+    io.storage_has_key(storage_to_key(address, key, generation).as_ref())
+}
+
+/// EIP-7610: balance, nonce, code, storage should be empty
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
     get_balance(io, address).is_zero()
         && get_nonce(io, address).is_zero()
         && get_code_size(io, address) == 0
+        && !storage_has_key(io, address, &H256::zero(), get_generation(io, address))
 }
 
 /// Increments storage generation for a given address.
@@ -1956,7 +1962,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     }
 
     /// Check if the storage of the address is empty.
-    /// Related to EIP-7610.
+    /// Related to EIP-7610: non-empty storage
     fn is_empty_storage(&self, address: H160) -> bool {
         let address = Address::new(address);
         if self
