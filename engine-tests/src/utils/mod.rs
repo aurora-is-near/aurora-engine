@@ -1000,7 +1000,7 @@ pub fn unwrap_revert_slice(result: &SubmitResult) -> &[u8] {
     }
 }
 
-pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
+pub fn get_error_message(status: TransactionStatus) -> Option<String> {
     match status {
         TransactionStatus::Succeed(_) => None,
         TransactionStatus::Revert(message) => {

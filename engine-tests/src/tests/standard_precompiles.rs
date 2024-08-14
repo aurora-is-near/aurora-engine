@@ -24,7 +24,7 @@ fn test_standard_precompiles() {
         .submit_with_signer(&mut signer, |nonce| contract.call_method("test_all", nonce))
         .unwrap();
 
-    let res = utils::panic_on_fail(outcome.status);
+    let res = utils::get_error_message(outcome.status);
     assert!(res.is_none(), "Status: {res:?}");
 }
 

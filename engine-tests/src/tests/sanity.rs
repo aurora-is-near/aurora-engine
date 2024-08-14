@@ -1080,7 +1080,7 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    let res = utils::panic_on_fail(result.status);
+    let res = utils::get_error_message(result.status);
     assert!(res.is_none(), "Status: {res:?}");
 }
 
