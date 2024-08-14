@@ -1976,7 +1976,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        storage_has_key(&self.io, &address, &index, generation)
+        !storage_has_key(&self.io, &address, &index, generation)
     }
 
     /// Get original storage value of address at index, if available.
