@@ -10,7 +10,7 @@
 # Editor backup files
 *~
 
-# ENV
+# dotenv
 .env/custom.env
 
 # Rust artifacts
