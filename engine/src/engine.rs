@@ -176,13 +176,9 @@ impl From<EvmErrorKind> for EngineErrorKind {
             EvmErrorKind::InvalidJump => ExitError::InvalidJump.into(),
             EvmErrorKind::InvalidRange => ExitError::InvalidRange.into(),
             EvmErrorKind::DesignatedInvalid => ExitError::DesignatedInvalid.into(),
-            EvmErrorKind::CallTooDeep => ExitError::CallTooDeep.into(),
             EvmErrorKind::CreateCollision => ExitError::CreateCollision.into(),
             EvmErrorKind::CreateContractLimit => ExitError::CreateContractLimit.into(),
             EvmErrorKind::InvalidCode(opcode) => ExitError::InvalidCode(evm::Opcode(opcode)).into(),
-            EvmErrorKind::OutOfOffset => ExitError::OutOfOffset.into(),
-            EvmErrorKind::OutOfGas => ExitError::OutOfGas.into(),
-            EvmErrorKind::OutOfFund => ExitError::OutOfFund.into(),
             EvmErrorKind::PCUnderflow => ExitError::PCUnderflow.into(),
             EvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
             EvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
@@ -210,29 +206,51 @@ impl ExitIntoResult for ExitReason {
         match self {
             Self::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
             Self::Revert(_) => Ok(TransactionStatus::Revert(data)),
+            Self::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
+            Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
+            Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
+            Self::Error(ExitError::CallTooDeep) => Ok(TransactionStatus::CallTooDeep),
             // To be compatible with Ethereum behaviour we should charge gas for Execution errors
-            Self::Error(err) => {
-                let error_status = match err {
-                    ExitError::StackUnderflow => EvmErrorKind::StackUnderflow,
-                    ExitError::StackOverflow => EvmErrorKind::StackOverflow,
-                    ExitError::InvalidJump => EvmErrorKind::InvalidJump,
-                    ExitError::InvalidRange => EvmErrorKind::InvalidRange,
-                    ExitError::DesignatedInvalid => EvmErrorKind::DesignatedInvalid,
-                    ExitError::CallTooDeep => EvmErrorKind::CallTooDeep,
-                    ExitError::CreateCollision => EvmErrorKind::CreateCollision,
-                    ExitError::CreateContractLimit => EvmErrorKind::CreateContractLimit,
-                    ExitError::InvalidCode(opcode) => EvmErrorKind::InvalidCode(opcode.0),
-                    ExitError::OutOfOffset => EvmErrorKind::OutOfOffset,
-                    ExitError::OutOfGas => EvmErrorKind::OutOfGas,
-                    ExitError::OutOfFund => EvmErrorKind::OutOfFund,
-                    ExitError::PCUnderflow => EvmErrorKind::PCUnderflow,
-                    ExitError::CreateEmpty => EvmErrorKind::CreateEmpty,
-                    ExitError::MaxNonce => EvmErrorKind::MaxNonce,
-                    ExitError::UsizeOverflow => EvmErrorKind::UsizeOverflow,
-                    ExitError::Other(msg) => EvmErrorKind::Other(msg),
-                };
-                Ok(TransactionStatus::Error(error_status))
+            Self::Error(ExitError::StackUnderflow) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::StackUnderflow))
             }
+            Self::Error(ExitError::StackOverflow) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::StackOverflow))
+            }
+            Self::Error(ExitError::InvalidJump) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::InvalidJump))
+            }
+            Self::Error(ExitError::InvalidRange) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::InvalidRange))
+            }
+            Self::Error(ExitError::DesignatedInvalid) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::DesignatedInvalid))
+            }
+            Self::Error(ExitError::CreateCollision) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::CreateCollision))
+            }
+            Self::Error(ExitError::CreateContractLimit) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::CreateContractLimit))
+            }
+            Self::Error(ExitError::InvalidCode(opcode)) => Ok(TransactionStatus::Error(
+                EvmErrorKind::InvalidCode(opcode.0),
+            )),
+            Self::Error(ExitError::PCUnderflow) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::PCUnderflow))
+            }
+            Self::Error(ExitError::CreateEmpty) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::CreateEmpty))
+            }
+            Self::Error(ExitError::MaxNonce) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::MaxNonce))
+            }
+            Self::Error(ExitError::UsizeOverflow) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::UsizeOverflow))
+            }
+            Self::Error(ExitError::Other(msg)) => {
+                Ok(TransactionStatus::Error(EvmErrorKind::Other(msg)))
+            }
+
             Self::Fatal(e) => Err(e.into()),
         }
     }
@@ -847,6 +865,22 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                         gas_used: submit_result.gas_used,
                     })
                 }
+                TransactionStatus::OutOfFund => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfOffset => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::OutOfGas => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
+                    gas_used: submit_result.gas_used,
+                }),
+                TransactionStatus::CallTooDeep => Err(EngineError {
+                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
+                    gas_used: submit_result.gas_used,
+                }),
                 TransactionStatus::Error(evm_err) => Err(EngineError {
                     kind: evm_err.into(),
                     gas_used: submit_result.gas_used,
@@ -2266,7 +2300,7 @@ mod tests {
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
 
-        let expected_status = TransactionStatus::Error(EvmErrorKind::OutOfFund);
+        let expected_status = TransactionStatus::OutOfFund;
         let expected_gas_used = 21000;
         let expected_logs = Vec::new();
         let expected_result = SubmitResult::new(expected_status, expected_gas_used, expected_logs);
@@ -2607,6 +2641,46 @@ mod tests {
         let actual_value = engine.original_storage(origin.raw(), index).unwrap();
 
         assert_eq!(expected_value, actual_value);
+    }
+
+    #[test]
+    fn test_storage_is_empty_with_cache() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let expected_value = H256::from_low_u64_le(64);
+        let index = H256::zero();
+        // Check that storage is empty
+        assert!(engine.is_empty_storage(origin.raw()));
+        let generation = get_generation(&io, &origin);
+        set_storage(&mut io, &origin, &index, &expected_value, generation);
+        // It will read without cache
+        assert!(!engine.is_empty_storage(origin.raw()));
+        // Cache should be empty
+        let cache_val = engine
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(origin, index));
+        assert!(!cache_val);
+        // Check the storage value and hit the cache
+        let actual_value = engine.storage(origin.raw(), index);
+        assert_eq!(expected_value, actual_value);
+        // Cache should exists
+        let cache_val = engine
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(origin, index));
+        assert!(cache_val);
+        remove_storage(&mut io, &origin, &index, generation);
+        // Value should still be in the cache
+        let actual_value = engine.storage(origin.raw(), index);
+        assert_eq!(expected_value, actual_value);
+        assert!(!engine.is_empty_storage(origin.raw()));
     }
 
     #[test]

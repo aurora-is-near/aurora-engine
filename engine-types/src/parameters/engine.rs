@@ -178,6 +178,12 @@ pub struct ResultLog {
 }
 
 /// EVM error king of transaction status
+///
+/// It excludes, as it is part of `TransactionStatus`:
+/// - `OutOfGas`
+/// - `OutOfFund`
+/// - `OutOfOffset`
+/// - `CallTooDeep`
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
 pub enum EvmErrorKind {
@@ -191,21 +197,12 @@ pub enum EvmErrorKind {
     InvalidRange,
     /// Encountered the designated invalid opcode.
     DesignatedInvalid,
-    /// Call stack is too deep (runtime).
-    CallTooDeep,
     /// Create opcode encountered collision (runtime).
     CreateCollision,
     /// Create init code exceeds limit (runtime).
     CreateContractLimit,
     /// Invalid opcode during execution or starting byte is 0xef. See [EIP-3541](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md).
     InvalidCode(u8),
-    /// An opcode accesses external information, but the request is off offset
-    /// limit (runtime).
-    OutOfOffset,
-    /// Execution runs out of gas (runtime).
-    OutOfGas,
-    /// Not enough fund to start the execution (runtime).
-    OutOfFund,
     /// PC underflowed (unused).
     #[allow(clippy::upper_case_acronyms)]
     PCUnderflow,
@@ -227,13 +224,9 @@ impl AsRef<[u8]> for EvmErrorKind {
             Self::InvalidJump => b"INVALID_JUMP",
             Self::InvalidRange => b"INVALID_RANGE",
             Self::DesignatedInvalid => b"DESIGNATED_INVALID",
-            Self::CallTooDeep => b"CALL_TOO_DEEP",
             Self::CreateCollision => b"CREATE_COLLISION",
             Self::CreateContractLimit => b"CREATE_CONTRACT_LIMIT",
             Self::InvalidCode(_) => b"INVALID_CODE",
-            Self::OutOfOffset => b"OUT_OF_OFFSET",
-            Self::OutOfGas => b"OUT_OF_GAS",
-            Self::OutOfFund => b"OUT_OF_FUND",
             Self::PCUnderflow => b"PC_UNDERFLOW",
             Self::CreateEmpty => b"CREATE_EMPTY",
             Self::MaxNonce => b"MAX_NONCE",
@@ -249,6 +242,10 @@ impl AsRef<[u8]> for EvmErrorKind {
 pub enum TransactionStatus {
     Succeed(Vec<u8>),
     Revert(Vec<u8>),
+    OutOfGas,
+    OutOfFund,
+    OutOfOffset,
+    CallTooDeep,
     Error(EvmErrorKind),
 }
 
@@ -274,6 +271,10 @@ impl AsRef<[u8]> for TransactionStatus {
         match self {
             Self::Succeed(_) => b"SUCCESS",
             Self::Revert(_) => errors::ERR_REVERT,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
+            Self::OutOfGas => errors::ERR_OUT_OF_GAS,
+            Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
+            Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
             Self::Error(kind) => kind.as_ref(),
         }
     }

@@ -5,13 +5,12 @@ use aurora_engine::{
     parameters::{ResultLog, SubmitResult, TransactionStatus},
 };
 use aurora_engine_transactions::eip_2930::AccessTuple;
-use aurora_engine_types::parameters::engine::EvmErrorKind;
 use aurora_engine_types::{types::Address, H160};
 
 #[test]
 fn test_serde_submit_result() {
     let result = SubmitResult::new(
-        TransactionStatus::Error(EvmErrorKind::OutOfFund),
+        TransactionStatus::OutOfFund,
         0,
         vec![ResultLog {
             address: Address::default(),

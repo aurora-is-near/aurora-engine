@@ -1006,9 +1006,7 @@ pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
         TransactionStatus::Revert(message) => {
             Some(format!("Revert: {}", String::from_utf8_lossy(&message)))
         }
-        TransactionStatus::Error(err) => {
-            Some(format!("Error: {}", String::from_utf8_lossy(err.as_ref())))
-        }
+        other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
     }
 }
 

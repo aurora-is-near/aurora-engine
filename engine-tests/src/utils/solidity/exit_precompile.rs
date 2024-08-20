@@ -94,9 +94,7 @@ impl Tester {
         match result.status {
             aurora_engine::parameters::TransactionStatus::Succeed(_) => Ok(result),
             aurora_engine::parameters::TransactionStatus::Revert(_bytes) => Err(Revert),
-            aurora_engine::parameters::TransactionStatus::Error(err) => {
-                panic!("Unexpected status {err:?}")
-            }
+            other => panic!("Unexpected status {other:?}"),
         }
     }
 
