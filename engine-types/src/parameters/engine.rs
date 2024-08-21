@@ -261,8 +261,8 @@ impl TransactionStatus {
     }
 
     #[must_use]
-    pub const fn is_fail(&self) -> bool {
-        *self == Self::OutOfGas
+    pub fn is_fail(&self) -> bool {
+        matches!(*self, Self::OutOfGas)
             || *self == Self::OutOfFund
             || *self == Self::OutOfOffset
             || *self == Self::CallTooDeep
@@ -613,7 +613,7 @@ mod tests {
         let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateEmpty)).unwrap();
         assert_eq!(&[6, 9], res.as_slice());
         let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::Other(
-            crate::Cow::from(String::from("")),
+            crate::Cow::from(String::new()),
         )))
         .unwrap();
         assert_eq!(&[6, 10, 0, 0, 0, 0], res.as_slice());
