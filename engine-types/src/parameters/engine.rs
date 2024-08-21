@@ -262,7 +262,11 @@ impl TransactionStatus {
 
     #[must_use]
     pub const fn is_fail(&self) -> bool {
-        matches!(*self, Self::Error(_))
+        *self == Self::OutOfGas
+            || *self == Self::OutOfFund
+            || *self == Self::OutOfOffset
+            || *self == Self::CallTooDeep
+            || matches!(*self, Self::Error(_))
     }
 }
 
@@ -568,5 +572,54 @@ mod tests {
         });
         let arguments = NewCallArgs::deserialize(&serde_json::to_vec(&outdated).unwrap());
         assert!(arguments.is_err());
+    }
+
+    #[test]
+    fn test_serialization_order_transaction_status() {
+        let res = borsh::to_vec(&TransactionStatus::Succeed(Vec::new())).unwrap();
+        assert_eq!(&[0, 0, 0, 0, 0], res.as_slice());
+
+        let res = borsh::to_vec(&TransactionStatus::Revert(Vec::new())).unwrap();
+        assert_eq!(&[1, 0, 0, 0, 0], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::OutOfGas).unwrap();
+        assert_eq!(&[2], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::OutOfFund).unwrap();
+        assert_eq!(&[3], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::OutOfOffset).unwrap();
+        assert_eq!(&[4], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::CallTooDeep).unwrap();
+        assert_eq!(&[5], res.as_slice());
+
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::StackUnderflow)).unwrap();
+        assert_eq!(&[6, 0], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::StackOverflow)).unwrap();
+        assert_eq!(&[6, 1], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidJump)).unwrap();
+        assert_eq!(&[6, 2], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidRange)).unwrap();
+        assert_eq!(&[6, 3], res.as_slice());
+        let res =
+            borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::DesignatedInvalid)).unwrap();
+        assert_eq!(&[6, 4], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateCollision)).unwrap();
+        assert_eq!(&[6, 5], res.as_slice());
+        let res =
+            borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateContractLimit)).unwrap();
+        assert_eq!(&[6, 6], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidCode(0))).unwrap();
+        assert_eq!(&[6, 7, 0], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::PCUnderflow)).unwrap();
+        assert_eq!(&[6, 8], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateEmpty)).unwrap();
+        assert_eq!(&[6, 9], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::Other(
+            crate::Cow::from(String::from("")),
+        )))
+        .unwrap();
+        assert_eq!(&[6, 10, 0, 0, 0, 0], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::MaxNonce)).unwrap();
+        assert_eq!(&[6, 11], res.as_slice());
+        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::UsizeOverflow)).unwrap();
+        assert_eq!(&[6, 12], res.as_slice());
     }
 }
