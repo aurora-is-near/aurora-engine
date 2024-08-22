@@ -14,7 +14,6 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::SetOwnerArgs;
 use bstr::ByteSlice;
-
 use libsecp256k1::SecretKey;
 use std::str::FromStr;
 

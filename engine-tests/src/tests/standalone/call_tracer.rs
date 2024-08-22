@@ -2,7 +2,7 @@ use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
-use aurora_engine_types::parameters::engine::{EvmErrorKind, TransactionStatus};
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -299,7 +299,7 @@ fn test_contract_create_too_large() {
     });
     assert!(matches!(
         standalone_result.unwrap().status,
-        TransactionStatus::Error(EvmErrorKind::CreateContractLimit)
+        TransactionStatus::CreateContractLimit
     ));
 }
 
