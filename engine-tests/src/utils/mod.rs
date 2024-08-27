@@ -1000,10 +1000,12 @@ pub fn unwrap_revert_slice(result: &SubmitResult) -> &[u8] {
     }
 }
 
-pub fn panic_on_fail(status: TransactionStatus) {
+pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
     match status {
-        TransactionStatus::Succeed(_) => (),
-        TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
+        TransactionStatus::Succeed(_) => None,
+        TransactionStatus::Revert(message) => {
+            Some(format!("Revert: {}", String::from_utf8_lossy(&message)))
+        }
         other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
     }
 }
