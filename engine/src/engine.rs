@@ -5,7 +5,7 @@ use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor;
+use evm::{executor, Opcode};
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
@@ -40,7 +40,7 @@ use aurora_engine_precompiles::PrecompileConstructorContext;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
-use aurora_engine_types::parameters::engine::{EvmErrorKind, FunctionCallArgsV2};
+use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
@@ -168,26 +168,6 @@ impl From<ExitFatal> for EngineErrorKind {
     }
 }
 
-impl From<EvmErrorKind> for EngineErrorKind {
-    fn from(kind: EvmErrorKind) -> Self {
-        match kind {
-            EvmErrorKind::StackUnderflow => ExitError::StackUnderflow.into(),
-            EvmErrorKind::StackOverflow => ExitError::StackOverflow.into(),
-            EvmErrorKind::InvalidJump => ExitError::InvalidJump.into(),
-            EvmErrorKind::InvalidRange => ExitError::InvalidRange.into(),
-            EvmErrorKind::DesignatedInvalid => ExitError::DesignatedInvalid.into(),
-            EvmErrorKind::CreateCollision => ExitError::CreateCollision.into(),
-            EvmErrorKind::CreateContractLimit => ExitError::CreateContractLimit.into(),
-            EvmErrorKind::InvalidCode(opcode) => ExitError::InvalidCode(evm::Opcode(opcode)).into(),
-            EvmErrorKind::PCUnderflow => ExitError::PCUnderflow.into(),
-            EvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
-            EvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
-            EvmErrorKind::UsizeOverflow => ExitError::UsizeOverflow.into(),
-            EvmErrorKind::Other(msg) => ExitError::Other(msg).into(),
-        }
-    }
-}
-
 /// An engine result.
 pub type EngineResult<T> = Result<T, EngineError>;
 
@@ -210,47 +190,23 @@ impl ExitIntoResult for ExitReason {
             Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
             Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
             Self::Error(ExitError::CallTooDeep) => Ok(TransactionStatus::CallTooDeep),
-            // To be compatible with Ethereum behaviour we should charge gas for Execution errors
-            Self::Error(ExitError::StackUnderflow) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::StackUnderflow))
-            }
-            Self::Error(ExitError::StackOverflow) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::StackOverflow))
-            }
-            Self::Error(ExitError::InvalidJump) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::InvalidJump))
-            }
-            Self::Error(ExitError::InvalidRange) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::InvalidRange))
-            }
-            Self::Error(ExitError::DesignatedInvalid) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::DesignatedInvalid))
-            }
-            Self::Error(ExitError::CreateCollision) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::CreateCollision))
-            }
+            Self::Error(ExitError::StackUnderflow) => Ok(TransactionStatus::StackUnderflow),
+            Self::Error(ExitError::StackOverflow) => Ok(TransactionStatus::StackOverflow),
+            Self::Error(ExitError::InvalidJump) => Ok(TransactionStatus::InvalidJump),
+            Self::Error(ExitError::InvalidRange) => Ok(TransactionStatus::InvalidRange),
+            Self::Error(ExitError::DesignatedInvalid) => Ok(TransactionStatus::DesignatedInvalid),
+            Self::Error(ExitError::CreateCollision) => Ok(TransactionStatus::CreateCollision),
             Self::Error(ExitError::CreateContractLimit) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::CreateContractLimit))
+                Ok(TransactionStatus::CreateContractLimit)
             }
-            Self::Error(ExitError::InvalidCode(opcode)) => Ok(TransactionStatus::Error(
-                EvmErrorKind::InvalidCode(opcode.0),
-            )),
-            Self::Error(ExitError::PCUnderflow) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::PCUnderflow))
+            Self::Error(ExitError::InvalidCode(opcode)) => {
+                Ok(TransactionStatus::InvalidCode(opcode.0))
             }
-            Self::Error(ExitError::CreateEmpty) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::CreateEmpty))
-            }
-            Self::Error(ExitError::MaxNonce) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::MaxNonce))
-            }
-            Self::Error(ExitError::UsizeOverflow) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::UsizeOverflow))
-            }
-            Self::Error(ExitError::Other(msg)) => {
-                Ok(TransactionStatus::Error(EvmErrorKind::Other(msg)))
-            }
-
+            Self::Error(ExitError::PCUnderflow) => Ok(TransactionStatus::PCUnderflow),
+            Self::Error(ExitError::CreateEmpty) => Ok(TransactionStatus::CreateEmpty),
+            Self::Error(ExitError::MaxNonce) => Ok(TransactionStatus::MaxNonce),
+            Self::Error(ExitError::UsizeOverflow) => Ok(TransactionStatus::UsizeOverflow),
+            Self::Error(ExitError::Other(msg)) => Ok(TransactionStatus::Other(msg)),
             Self::Fatal(e) => Err(e.into()),
         }
     }
@@ -851,41 +807,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
-            .and_then(|submit_result| match submit_result.status {
-                TransactionStatus::Succeed(_) => Ok(submit_result),
-                TransactionStatus::Revert(bytes) => {
-                    let error_message = crate::prelude::format!(
-                        "Reverted with message: {}",
-                        crate::prelude::String::from_utf8_lossy(&bytes)
-                    );
-                    Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::Other(
-                            crate::prelude::Cow::from(error_message),
-                        )),
-                        gas_used: submit_result.gas_used,
-                    })
-                }
-                TransactionStatus::OutOfFund => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfOffset => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfGas => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::CallTooDeep => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::Error(evm_err) => Err(EngineError {
-                    kind: evm_err.into(),
-                    gas_used: submit_result.gas_used,
-                }),
-            })
+            .and_then(submit_result_or_err)
             .inspect_err(|_e| {
                 sdk::log!("{:?}", _e);
                 self.io.return_output(output_on_fail);
@@ -2154,6 +2076,88 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             writes_counter,
             total_bytes
         );
+    }
+}
+
+fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, EngineError> {
+    match submit_result.status {
+        TransactionStatus::Succeed(_) => Ok(submit_result),
+        TransactionStatus::Revert(bytes) => {
+            let error_message = crate::prelude::format!(
+                "Reverted with message: {}",
+                crate::prelude::String::from_utf8_lossy(&bytes)
+            );
+            Err(engine_error(
+                ExitError::Other(error_message.into()),
+                submit_result.gas_used,
+            ))
+        }
+        TransactionStatus::OutOfFund => {
+            Err(engine_error(ExitError::OutOfFund, submit_result.gas_used))
+        }
+        TransactionStatus::OutOfOffset => {
+            Err(engine_error(ExitError::OutOfOffset, submit_result.gas_used))
+        }
+        TransactionStatus::OutOfGas => {
+            Err(engine_error(ExitError::OutOfGas, submit_result.gas_used))
+        }
+        TransactionStatus::CallTooDeep => {
+            Err(engine_error(ExitError::CallTooDeep, submit_result.gas_used))
+        }
+        TransactionStatus::StackUnderflow => Err(engine_error(
+            ExitError::StackUnderflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::StackOverflow => Err(engine_error(
+            ExitError::StackOverflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::InvalidJump => {
+            Err(engine_error(ExitError::InvalidJump, submit_result.gas_used))
+        }
+        TransactionStatus::InvalidRange => Err(engine_error(
+            ExitError::InvalidRange,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::DesignatedInvalid => Err(engine_error(
+            ExitError::DesignatedInvalid,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateCollision => Err(engine_error(
+            ExitError::CreateCollision,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateContractLimit => Err(engine_error(
+            ExitError::CreateContractLimit,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::InvalidCode(code) => Err(engine_error(
+            ExitError::InvalidCode(Opcode(code)),
+            submit_result.gas_used,
+        )),
+        TransactionStatus::PCUnderflow => {
+            Err(engine_error(ExitError::PCUnderflow, submit_result.gas_used))
+        }
+        TransactionStatus::CreateEmpty => {
+            Err(engine_error(ExitError::CreateEmpty, submit_result.gas_used))
+        }
+        TransactionStatus::MaxNonce => {
+            Err(engine_error(ExitError::MaxNonce, submit_result.gas_used))
+        }
+        TransactionStatus::UsizeOverflow => Err(engine_error(
+            ExitError::UsizeOverflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::Other(e) => {
+            Err(engine_error(ExitError::Other(e), submit_result.gas_used))
+        }
+    }
+}
+
+const fn engine_error(exit_error: ExitError, gas_used: u64) -> EngineError {
+    EngineError {
+        kind: EngineErrorKind::EvmError(exit_error),
+        gas_used,
     }
 }
 

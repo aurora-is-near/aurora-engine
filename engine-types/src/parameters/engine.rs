@@ -177,16 +177,24 @@ pub struct ResultLog {
     pub data: Vec<u8>,
 }
 
-/// EVM error king of transaction status
-///
-/// It excludes, as it is part of `TransactionStatus`:
-/// - `OutOfGas`
-/// - `OutOfFund`
-/// - `OutOfOffset`
-/// - `CallTooDeep`
+/// The status of a transaction representing EVM error kinds.
+/// !!! THE ORDER OF VARIANTS MUSTN'T BE CHANGED FOR SAVING BACKWARD COMPATIBILITY !!!
+/// !!! NEW VARIANTS SHOULD BE ADDED IN THE END OF THE ENUM ONLY !!!
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
-pub enum EvmErrorKind {
+pub enum TransactionStatus {
+    /// The transaction succeeded.
+    Succeed(Vec<u8>),
+    /// The transaction reverted.
+    Revert(Vec<u8>),
+    /// Execution runs out of gas.
+    OutOfGas,
+    /// Not enough fund to start the execution.
+    OutOfFund,
+    /// An opcode accesses external information, but the request is off offset limit.
+    OutOfOffset,
+    /// Call stack is too deep.
+    CallTooDeep,
     /// Trying to pop from an empty stack.
     StackUnderflow,
     /// Trying to push into a stack over stack limit.
@@ -197,56 +205,23 @@ pub enum EvmErrorKind {
     InvalidRange,
     /// Encountered the designated invalid opcode.
     DesignatedInvalid,
-    /// Create opcode encountered collision (runtime).
+    /// Create opcode encountered collision.
     CreateCollision,
-    /// Create init code exceeds limit (runtime).
+    /// Create init code exceeds limit.
     CreateContractLimit,
     /// Invalid opcode during execution or starting byte is 0xef. See [EIP-3541](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-3541.md).
     InvalidCode(u8),
-    /// PC underflowed (unused).
+    /// PC underflow (unused).
     #[allow(clippy::upper_case_acronyms)]
     PCUnderflow,
-    /// Attempt to create an empty account (runtime, unused).
+    /// Attempt to create an empty account (unused).
     CreateEmpty,
-    /// Other normal errors.
-    Other(crate::Cow<'static, str>),
     /// Nonce reached maximum value of 2^64-1
     MaxNonce,
     /// `usize` casting overflow
     UsizeOverflow,
-}
-
-impl AsRef<[u8]> for EvmErrorKind {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::StackUnderflow => b"STACK_UNDERFLOW",
-            Self::StackOverflow => b"STACK_OVERFLOW",
-            Self::InvalidJump => b"INVALID_JUMP",
-            Self::InvalidRange => b"INVALID_RANGE",
-            Self::DesignatedInvalid => b"DESIGNATED_INVALID",
-            Self::CreateCollision => b"CREATE_COLLISION",
-            Self::CreateContractLimit => b"CREATE_CONTRACT_LIMIT",
-            Self::InvalidCode(_) => b"INVALID_CODE",
-            Self::PCUnderflow => b"PC_UNDERFLOW",
-            Self::CreateEmpty => b"CREATE_EMPTY",
-            Self::MaxNonce => b"MAX_NONCE",
-            Self::UsizeOverflow => b"USIZE_OVERFLOW",
-            Self::Other(e) => e.as_bytes(),
-        }
-    }
-}
-
-/// The status of a transaction.
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "impl-serde", derive(Serialize, Deserialize))]
-pub enum TransactionStatus {
-    Succeed(Vec<u8>),
-    Revert(Vec<u8>),
-    OutOfGas,
-    OutOfFund,
-    OutOfOffset,
-    CallTooDeep,
-    Error(EvmErrorKind),
+    /// Other normal errors.
+    Other(crate::Cow<'static, str>),
 }
 
 impl TransactionStatus {
@@ -261,12 +236,8 @@ impl TransactionStatus {
     }
 
     #[must_use]
-    pub fn is_fail(&self) -> bool {
-        matches!(*self, Self::OutOfGas)
-            || *self == Self::OutOfFund
-            || *self == Self::OutOfOffset
-            || *self == Self::CallTooDeep
-            || matches!(*self, Self::Error(_))
+    pub const fn is_fail(&self) -> bool {
+        !matches!(*self, Self::Succeed(_) | Self::Revert(_))
     }
 }
 
@@ -279,7 +250,19 @@ impl AsRef<[u8]> for TransactionStatus {
             Self::OutOfGas => errors::ERR_OUT_OF_GAS,
             Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
             Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
-            Self::Error(kind) => kind.as_ref(),
+            Self::StackUnderflow => errors::ERR_STACK_UNDERFLOW,
+            Self::StackOverflow => errors::ERR_STACK_OVERFLOW,
+            Self::InvalidJump => errors::ERR_INVALID_JUMP,
+            Self::InvalidRange => errors::ERR_INVALID_RANGE,
+            Self::DesignatedInvalid => errors::ERR_DESIGNATED_INVALID,
+            Self::CreateCollision => errors::ERR_CREATE_COLLISION,
+            Self::CreateContractLimit => errors::ERR_CREATE_CONTRACT_LIMIT,
+            Self::InvalidCode(_) => errors::ERR_INVALID_CODE,
+            Self::PCUnderflow => errors::ERR_PC_UNDERFLOW,
+            Self::CreateEmpty => errors::ERR_CREATE_EMPTY,
+            Self::MaxNonce => errors::ERR_MAX_NONCE,
+            Self::UsizeOverflow => errors::ERR_USIZE_OVERFLOW,
+            Self::Other(e) => e.as_bytes(),
         }
     }
 }
@@ -299,7 +282,7 @@ impl SubmitResult {
     /// Must be incremented when making breaking changes to the `SubmitResult` ABI.
     /// The current value of 7 is chosen because previously a `TransactionStatus` object
     /// was first in the serialization, which is an enum with less than 7 variants.
-    /// Therefore, no previous `SubmitResult` would have began with a leading 7 byte,
+    /// Therefore, no previous `SubmitResult` would have begun with a leading 7 byte,
     /// and this can be used to distinguish the new ABI (with version byte) from the old.
     const VERSION: u8 = 7;
 
@@ -434,12 +417,24 @@ mod chain_id_deserialize {
 pub mod errors {
     use crate::{account_id::ParseAccountError, String, ToString};
 
-    pub const ERR_REVERT: &[u8; 10] = b"ERR_REVERT";
-    pub const ERR_NOT_ALLOWED: &[u8; 15] = b"ERR_NOT_ALLOWED";
-    pub const ERR_OUT_OF_FUNDS: &[u8; 16] = b"ERR_OUT_OF_FUNDS";
-    pub const ERR_CALL_TOO_DEEP: &[u8; 17] = b"ERR_CALL_TOO_DEEP";
-    pub const ERR_OUT_OF_OFFSET: &[u8; 17] = b"ERR_OUT_OF_OFFSET";
-    pub const ERR_OUT_OF_GAS: &[u8; 14] = b"ERR_OUT_OF_GAS";
+    pub const ERR_REVERT: &[u8] = b"ERR_REVERT";
+    pub const ERR_NOT_ALLOWED: &[u8] = b"ERR_NOT_ALLOWED";
+    pub const ERR_OUT_OF_FUNDS: &[u8] = b"ERR_OUT_OF_FUNDS";
+    pub const ERR_CALL_TOO_DEEP: &[u8] = b"ERR_CALL_TOO_DEEP";
+    pub const ERR_OUT_OF_OFFSET: &[u8] = b"ERR_OUT_OF_OFFSET";
+    pub const ERR_OUT_OF_GAS: &[u8] = b"ERR_OUT_OF_GAS";
+    pub const ERR_STACK_UNDERFLOW: &[u8] = b"STACK_UNDERFLOW";
+    pub const ERR_STACK_OVERFLOW: &[u8] = b"STACK_OVERFLOW";
+    pub const ERR_INVALID_JUMP: &[u8] = b"INVALID_JUMP";
+    pub const ERR_INVALID_RANGE: &[u8] = b"INVALID_RANGE";
+    pub const ERR_DESIGNATED_INVALID: &[u8] = b"DESIGNATED_INVALID";
+    pub const ERR_CREATE_COLLISION: &[u8] = b"CREATE_COLLISION";
+    pub const ERR_CREATE_CONTRACT_LIMIT: &[u8] = b"CREATE_CONTRACT_LIMIT";
+    pub const ERR_INVALID_CODE: &[u8] = b"INVALID_CODE";
+    pub const ERR_PC_UNDERFLOW: &[u8] = b"PC_UNDERFLOW";
+    pub const ERR_CREATE_EMPTY: &[u8] = b"CREATE_EMPTY";
+    pub const ERR_MAX_NONCE: &[u8] = b"MAX_NONCE";
+    pub const ERR_USIZE_OVERFLOW: &[u8] = b"USIZE_OVERFLOW";
 
     #[derive(Debug)]
     pub enum ParseArgsError {
@@ -575,51 +570,47 @@ mod tests {
     }
 
     #[test]
-    fn test_serialization_order_transaction_status() {
-        let res = borsh::to_vec(&TransactionStatus::Succeed(Vec::new())).unwrap();
-        assert_eq!(&[0, 0, 0, 0, 0], res.as_slice());
+    fn test_serialization_transaction_status_regression() {
+        let bytes =
+            std::fs::read("../engine-tests/src/tests/res/transaction_status.borsh").unwrap();
+        let actual = Vec::<TransactionStatus>::try_from_slice(&bytes).unwrap();
+        let expected = transaction_status_variants();
 
-        let res = borsh::to_vec(&TransactionStatus::Revert(Vec::new())).unwrap();
-        assert_eq!(&[1, 0, 0, 0, 0], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::OutOfGas).unwrap();
-        assert_eq!(&[2], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::OutOfFund).unwrap();
-        assert_eq!(&[3], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::OutOfOffset).unwrap();
-        assert_eq!(&[4], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::CallTooDeep).unwrap();
-        assert_eq!(&[5], res.as_slice());
+        assert_eq!(actual, expected);
+    }
 
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::StackUnderflow)).unwrap();
-        assert_eq!(&[6, 0], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::StackOverflow)).unwrap();
-        assert_eq!(&[6, 1], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidJump)).unwrap();
-        assert_eq!(&[6, 2], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidRange)).unwrap();
-        assert_eq!(&[6, 3], res.as_slice());
-        let res =
-            borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::DesignatedInvalid)).unwrap();
-        assert_eq!(&[6, 4], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateCollision)).unwrap();
-        assert_eq!(&[6, 5], res.as_slice());
-        let res =
-            borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateContractLimit)).unwrap();
-        assert_eq!(&[6, 6], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::InvalidCode(0))).unwrap();
-        assert_eq!(&[6, 7, 0], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::PCUnderflow)).unwrap();
-        assert_eq!(&[6, 8], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::CreateEmpty)).unwrap();
-        assert_eq!(&[6, 9], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::Other(
-            crate::Cow::from(String::new()),
-        )))
+    #[allow(dead_code)]
+    fn generate_borsh_bytes() {
+        let variants = transaction_status_variants();
+
+        std::fs::write(
+            "../engine-tests/src/tests/res/transaction_status.borsh",
+            borsh::to_vec(&variants).unwrap(),
+        )
         .unwrap();
-        assert_eq!(&[6, 10, 0, 0, 0, 0], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::MaxNonce)).unwrap();
-        assert_eq!(&[6, 11], res.as_slice());
-        let res = borsh::to_vec(&TransactionStatus::Error(EvmErrorKind::UsizeOverflow)).unwrap();
-        assert_eq!(&[6, 12], res.as_slice());
+    }
+
+    fn transaction_status_variants() -> Vec<TransactionStatus> {
+        vec![
+            TransactionStatus::Succeed(Vec::new()),
+            TransactionStatus::Revert(Vec::new()),
+            TransactionStatus::OutOfGas,
+            TransactionStatus::OutOfFund,
+            TransactionStatus::OutOfOffset,
+            TransactionStatus::CallTooDeep,
+            TransactionStatus::StackUnderflow,
+            TransactionStatus::StackOverflow,
+            TransactionStatus::InvalidJump,
+            TransactionStatus::InvalidRange,
+            TransactionStatus::DesignatedInvalid,
+            TransactionStatus::CreateCollision,
+            TransactionStatus::CreateContractLimit,
+            TransactionStatus::InvalidCode(0),
+            TransactionStatus::PCUnderflow,
+            TransactionStatus::CreateEmpty,
+            TransactionStatus::MaxNonce,
+            TransactionStatus::UsizeOverflow,
+            TransactionStatus::Other("error".into()),
+        ]
     }
 }
