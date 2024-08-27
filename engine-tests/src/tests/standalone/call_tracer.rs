@@ -2,6 +2,7 @@ use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -296,10 +297,10 @@ fn test_contract_create_too_large() {
     let standalone_result = sputnik::traced_call(&mut listener, || {
         runner.submit_transaction(&signer.secret_key, tx)
     });
-    assert!(
-        standalone_result.is_err(),
-        "Expected contract too large error"
-    );
+    assert!(matches!(
+        standalone_result.unwrap().status,
+        TransactionStatus::CreateContractLimit
+    ));
 }
 
 #[allow(clippy::too_many_lines)]

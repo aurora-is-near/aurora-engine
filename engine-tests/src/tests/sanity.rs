@@ -1067,7 +1067,8 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    utils::panic_on_fail(result.status);
+    let res = utils::panic_on_fail(result.status);
+    assert!(res.is_none(), "Status: {res:?}");
 }
 
 #[cfg(not(feature = "ext-connector"))]
@@ -1245,6 +1246,7 @@ mod workspace {
             Some(utils::AuroraRunner::default().chain_id),
             &signer.secret_key,
         );
+
         let result = aurora
             .submit(rlp::encode(&signed_tx).to_vec())
             .transact()

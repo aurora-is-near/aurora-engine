@@ -31,10 +31,10 @@ byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
 digest = "0.10"
 ethabi = { version = "18", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.43.1-aurora", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.43.1-aurora", default-features = false, features = ["std"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.43.1-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.43.1-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.45.0-aurora", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.45.0-aurora", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.45.0-aurora", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.45.0-aurora", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.19"
