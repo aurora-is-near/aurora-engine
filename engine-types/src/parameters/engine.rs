@@ -199,7 +199,7 @@ pub enum TransactionStatus {
     StackUnderflow,
     /// Trying to push into a stack over stack limit.
     StackOverflow,
-    /// An opcode accesses memory region, but the region is invalid.
+    /// Jump destination is invalid.
     InvalidJump,
     /// An opcode accesses memory region, but the region is invalid.
     InvalidRange,
