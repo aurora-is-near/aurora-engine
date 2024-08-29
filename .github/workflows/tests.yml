@@ -42,7 +42,10 @@ jobs:
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
+        run: |
+          scripts/build-neard-sandbox.sh ${{ matrix.profile }}
+          echo $NEAR_SANDBOX_BIN_PATH
+          ls -la $NEAR_SANDBOX_BIN_PATH
       - name: Build main contract
         run: |
           case ${{ matrix.profile }} in
