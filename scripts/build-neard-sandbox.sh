@@ -7,4 +7,4 @@ make sandbox-release
 cd ..
 mv ${PWD}/nearcore/target/release/neard-sandbox .
 rm -rf nearcore
-export NEAR_SANDBOX_BIN_PATH=${PWD}/neard-sandbox
+echo "NEAR_SANDBOX_BIN_PATH=${PWD}/neard-sandbox" >> $GITHUB_ENV
