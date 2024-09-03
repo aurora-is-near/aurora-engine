@@ -2674,7 +2674,7 @@ mod tests {
         // Check the storage value and hit the cache
         let actual_value = engine.storage(origin.raw(), index);
         assert_eq!(expected_value, actual_value);
-        // Cache should exists
+        // Cache should exist
         let cache_val = engine
             .contract_storage_cache
             .borrow()
