@@ -41,8 +41,6 @@ jobs:
             etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
       - name: Build main contract
         run: |
           case ${{ matrix.profile }} in

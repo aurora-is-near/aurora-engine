@@ -44,13 +44,13 @@ impl-serde = { version = "0.4", default-features = false }
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.20"
-near-gas = "0.2"
+near-gas = "0.3"
 near-parameters = "0.20"
 near-primitives = "0.20"
 near-primitives-core = "0.20"
 near-sdk = "5"
 near-vm-runner = { version = "0.20", features = ["wasmtime_vm", "wasmer2_vm"] }
-near-workspaces = "0.10"
+near-workspaces = "0.12"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
