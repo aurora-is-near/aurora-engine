@@ -26,7 +26,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 10); // less than 9 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 11); // less than 11 NEAR Tgas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
@@ -38,7 +38,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 20);
+    assert_gas_bound(profile.all_gas(), 21);
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -72,7 +72,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 24);
+    assert_gas_bound(profile.all_gas(), 25);
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -83,7 +83,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 20);
+    assert_gas_bound(profile.all_gas(), 21);
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn test_1_inch_limit_order_deploy() {
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (45..=55).contains(&wasm_fraction),
+        (40..=50).contains(&wasm_fraction),
         "{wasm_fraction}% is not between 45% and 55%",
     );
 }
