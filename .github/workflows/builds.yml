@@ -10,13 +10,13 @@ jobs:
     runs-on: github-hosted-heavy-runner
     strategy:
       matrix:
-        profile: [mainnet, mainnet-silo, testnet, testnet-silo]
+        profile: [ mainnet, mainnet-silo, testnet, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -41,7 +41,7 @@ jobs:
     needs: build
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - run: ls -la contracts
       - name: Publish contracts for ${{ github.ref }} release
         uses: svenstaro/upload-release-action@v2

@@ -408,7 +408,7 @@ fn test_is_contract() {
 #[test]
 fn test_solidity_pure_bench() {
     let (mut runner, mut signer, _) = initialize_transfer();
-    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+    runner.max_gas_burnt(u64::MAX);
 
     let constructor = utils::solidity::ContractConstructor::force_compile(
         "src/tests/res",
@@ -454,18 +454,23 @@ fn test_solidity_pure_bench() {
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
-    let code = ContractCode::new(contract_bytes, None);
+    runner.set_code(ContractCode::new(contract_bytes, None));
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
-    let outcome = near_vm_runner::run(
-        &code,
-        "cpu_ram_soak_test",
-        &mut runner.ext,
-        context,
-        &runner.wasm_config,
-        &runner.fees_config,
-        &[],
+
+    let contract = near_vm_runner::prepare(
+        &runner.ext.underlying,
+        runner.wasm_config.clone(),
         Some(&runner.cache),
+        context.make_gas_counter(runner.wasm_config.as_ref()),
+        "cpu_ram_soak_test",
+    );
+
+    let outcome = near_vm_runner::run(
+        contract,
+        &mut runner.ext,
+        &context,
+        runner.fees_config.clone(),
     )
     .unwrap();
     let profile = utils::ExecutionProfile::new(&outcome);
@@ -685,7 +690,7 @@ fn test_num_wasm_functions() {
     // See https://github.com/near/nearcore/issues/4814 for context
     let runner = utils::deploy_runner();
     let module = walrus::ModuleConfig::default()
-        .parse(runner.code.code())
+        .parse(runner.ext.underlying.code.unwrap().code())
         .unwrap();
     let expected_number = 1600;
     let actual_number = module.funcs.iter().count();

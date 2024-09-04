@@ -284,10 +284,8 @@ fn test_xcc_exec_gas() {
 }
 
 fn deploy_router() -> AuroraRunner {
-    let mut router = AuroraRunner {
-        code: ContractCode::new(contract_bytes(), None),
-        ..Default::default()
-    };
+    let mut router = AuroraRunner::default();
+    router.set_code(ContractCode::new(contract_bytes(), None));
 
     // Standalone not relevant here because this is not an Aurora Engine instance
     router.standalone_runner = None;
