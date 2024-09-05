@@ -615,6 +615,7 @@ mod tests {
             TransactionStatus::MaxNonce,
             TransactionStatus::UsizeOverflow,
             TransactionStatus::Other("error".into()),
+            TransactionStatus::CreateContractStartingWithEF,
         ]
     }
 }
