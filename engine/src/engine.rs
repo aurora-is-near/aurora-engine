@@ -187,6 +187,9 @@ impl From<EvmErrorKind> for EngineErrorKind {
             EvmErrorKind::CreateEmpty => ExitError::CreateEmpty.into(),
             EvmErrorKind::MaxNonce => ExitError::MaxNonce.into(),
             EvmErrorKind::UsizeOverflow => ExitError::UsizeOverflow.into(),
+            EvmErrorKind::CreateContractStartingWithEF => {
+                ExitError::CreateContractStartingWithEF.into()
+            }
             EvmErrorKind::Other(msg) => ExitError::Other(msg).into(),
         }
     }
@@ -229,6 +232,9 @@ impl ExitIntoResult for ExitReason {
                     ExitError::CreateEmpty => EvmErrorKind::CreateEmpty,
                     ExitError::MaxNonce => EvmErrorKind::MaxNonce,
                     ExitError::UsizeOverflow => EvmErrorKind::UsizeOverflow,
+                    ExitError::CreateContractStartingWithEF => {
+                        EvmErrorKind::CreateContractStartingWithEF
+                    }
                     ExitError::Other(msg) => EvmErrorKind::Other(msg),
                 };
                 Ok(TransactionStatus::Error(error_status))

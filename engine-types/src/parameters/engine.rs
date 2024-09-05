@@ -217,6 +217,8 @@ pub enum EvmErrorKind {
     MaxNonce,
     /// `usize` casting overflow
     UsizeOverflow,
+    /// Contract contains forbidden opcode 0xEF
+    CreateContractStartingWithEF,
 }
 
 impl AsRef<[u8]> for EvmErrorKind {
@@ -238,6 +240,7 @@ impl AsRef<[u8]> for EvmErrorKind {
             Self::CreateEmpty => b"CREATE_EMPTY",
             Self::MaxNonce => b"MAX_NONCE",
             Self::UsizeOverflow => b"USIZE_OVERFLOW",
+            Self::CreateContractStartingWithEF => b"CREATE_CONTRACT_STARTING_WITH_EF",
             Self::Other(e) => e.as_bytes(),
         }
     }
