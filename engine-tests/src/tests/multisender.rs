@@ -122,7 +122,7 @@ fn send_eth_data(amounts: &[(Address, U256)]) -> Vec<u8> {
 
 fn initialize() -> (utils::AuroraRunner, utils::Signer, Address) {
     let mut runner = utils::deploy_runner();
-    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+    runner.max_gas_burnt(u64::MAX);
 
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);

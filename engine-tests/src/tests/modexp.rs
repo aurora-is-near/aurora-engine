@@ -321,8 +321,8 @@ impl Default for ModExpBenchContext {
 
         // Standalone not relevant here because this is not an Aurora Engine instance
         inner.standalone_runner = None;
-        inner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
-        inner.code = ContractCode::new(bench_contract_bytes, None);
+        inner.max_gas_burnt(u64::MAX);
+        inner.set_code(ContractCode::new(bench_contract_bytes, None));
 
         Self { inner }
     }

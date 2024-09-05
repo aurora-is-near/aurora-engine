@@ -167,10 +167,7 @@ fn test_transfer_insufficient_balance_fee() {
             utils::transfer_with_price(receiver, TRANSFER_AMOUNT, nonce, ONE_GAS_PRICE.raw())
         })
         .unwrap();
-    assert!(matches!(
-        result.status,
-        TransactionStatus::Error(EvmErrorKind::OutOfFund)
-    ));
+    assert!(matches!(result.status, TransactionStatus::OutOfFund));
 }
 
 #[test]
