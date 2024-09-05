@@ -220,10 +220,10 @@ pub enum TransactionStatus {
     MaxNonce,
     /// `usize` casting overflow
     UsizeOverflow,
-    /// Contract contains forbidden opcode 0xEF
-    CreateContractStartingWithEF,
     /// Other normal errors.
     Other(crate::Cow<'static, str>),
+    /// Contract contains forbidden opcode 0xEF
+    CreateContractStartingWithEF,
 }
 
 impl TransactionStatus {
