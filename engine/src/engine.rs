@@ -206,6 +206,9 @@ impl ExitIntoResult for ExitReason {
             Self::Error(ExitError::CreateEmpty) => Ok(TransactionStatus::CreateEmpty),
             Self::Error(ExitError::MaxNonce) => Ok(TransactionStatus::MaxNonce),
             Self::Error(ExitError::UsizeOverflow) => Ok(TransactionStatus::UsizeOverflow),
+            Self::Error(ExitError::CreateContractStartingWithEF) => {
+                Ok(TransactionStatus::CreateContractStartingWithEF)
+            }
             Self::Error(ExitError::Other(msg)) => Ok(TransactionStatus::Other(msg)),
             Self::Fatal(e) => Err(e.into()),
         }
@@ -2146,6 +2149,10 @@ fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, Eng
         }
         TransactionStatus::UsizeOverflow => Err(engine_error(
             ExitError::UsizeOverflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateContractStartingWithEF => Err(engine_error(
+            ExitError::CreateContractStartingWithEF,
             submit_result.gas_used,
         )),
         TransactionStatus::Other(e) => {
