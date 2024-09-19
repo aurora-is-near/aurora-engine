@@ -222,6 +222,8 @@ pub enum TransactionStatus {
     UsizeOverflow,
     /// Other normal errors.
     Other(crate::Cow<'static, str>),
+    /// Contract contains forbidden opcode 0xEF
+    CreateContractStartingWithEF,
 }
 
 impl TransactionStatus {
@@ -262,6 +264,7 @@ impl AsRef<[u8]> for TransactionStatus {
             Self::CreateEmpty => errors::ERR_CREATE_EMPTY,
             Self::MaxNonce => errors::ERR_MAX_NONCE,
             Self::UsizeOverflow => errors::ERR_USIZE_OVERFLOW,
+            Self::CreateContractStartingWithEF => errors::ERR_CREATE_CONTRACT_STARTING_WITH_EF,
             Self::Other(e) => e.as_bytes(),
         }
     }
@@ -435,6 +438,7 @@ pub mod errors {
     pub const ERR_CREATE_EMPTY: &[u8] = b"CREATE_EMPTY";
     pub const ERR_MAX_NONCE: &[u8] = b"MAX_NONCE";
     pub const ERR_USIZE_OVERFLOW: &[u8] = b"USIZE_OVERFLOW";
+    pub const ERR_CREATE_CONTRACT_STARTING_WITH_EF: &[u8] = b"ERR_CREATE_CONTRACT_STARTING_WITH_EF";
 
     #[derive(Debug)]
     pub enum ParseArgsError {
@@ -611,6 +615,7 @@ mod tests {
             TransactionStatus::MaxNonce,
             TransactionStatus::UsizeOverflow,
             TransactionStatus::Other("error".into()),
+            TransactionStatus::CreateContractStartingWithEF,
         ]
     }
 }
