@@ -44,6 +44,7 @@ use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
+use evm::executor::stack::Authorization;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -507,7 +508,16 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     ) -> EngineResult<SubmitResult> {
         let origin = Address::new(self.origin());
         let value = Wei::zero();
-        self.deploy_code(origin, value, input, address, u64::MAX, Vec::new(), handler)
+        self.deploy_code(
+            origin,
+            value,
+            input,
+            address,
+            u64::MAX,
+            Vec::new(),
+            Vec::new(),
+            handler,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -518,7 +528,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         input: Vec<u8>,
         address: Option<Address>,
         gas_limit: u64,
-        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>,    // See EIP-2930
+        authorization_list: Vec<Authorization>, // See EIP-7702
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
@@ -534,9 +545,14 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         );
         let address = executor.create_address(scheme);
         let (exit_reason, return_value) = match scheme {
-            CreateScheme::Legacy { caller } => {
-                executor.transact_create(caller, value.raw(), input, gas_limit, access_list)
-            }
+            CreateScheme::Legacy { caller } => executor.transact_create(
+                caller,
+                value.raw(),
+                input,
+                gas_limit,
+                access_list,
+                authorization_list,
+            ),
             CreateScheme::Fixed(address) => executor.transact_create_fixed(
                 origin.raw(),
                 address,
@@ -544,6 +560,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 input,
                 gas_limit,
                 access_list,
+                authorization_list,
             ),
             CreateScheme::Create2 { .. } => unreachable!(),
         };
@@ -583,6 +600,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     input,
                     u64::MAX,
                     Vec::new(),
+                    Vec::new(),
                     handler,
                 )
             }
@@ -596,6 +614,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     value,
                     input,
                     u64::MAX,
+                    Vec::new(),
                     Vec::new(),
                     handler,
                 )
@@ -611,7 +630,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>,    // See EIP-2930
+        authorization_list: Vec<Authorization>, // See EIP-7702
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
@@ -626,6 +646,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
+            authorization_list,
         );
 
         let used_gas = executor.used_gas();
@@ -673,6 +694,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value.raw(),
             input,
             executor_params.gas_limit,
+            Vec::new(),
             Vec::new(),
         );
         status.into_result(result)
@@ -734,6 +756,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value,
             Vec::new(),
             gas_limit,
+            Vec::new(),
             Vec::new(),
             handler,
         )
@@ -808,6 +831,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 setup_receive_erc20_tokens_input(args, &recipient),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
+                Vec::new(),
                 handler,
             )
             .and_then(submit_result_or_err)
@@ -1090,6 +1114,7 @@ pub fn submit_with_alt_modexp<
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
+    let authorization_list = transaction.authorization_list;
     let result = if let Some(receiver) = transaction.to {
         engine.call(
             &sender,
@@ -1098,6 +1123,7 @@ pub fn submit_with_alt_modexp<
             transaction.data,
             gas_limit,
             access_list,
+            authorization_list,
             handler,
         )
         // TODO: charge for storage
@@ -1110,6 +1136,7 @@ pub fn submit_with_alt_modexp<
             None,
             gas_limit,
             access_list,
+            authorization_list,
             handler,
         )
         // TODO: charge for storage
@@ -1174,6 +1201,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
             input,
             u64::MAX,
             Vec::new(),
+            Vec::new(),
             handler,
         )
     } else {
@@ -1193,6 +1221,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
                 (exit_address.raw(), Vec::new()),
                 (refund_address.raw(), Vec::new()),
             ],
+            Vec::new(),
             handler,
         )
     }
@@ -2504,6 +2533,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
@@ -2540,6 +2570,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
