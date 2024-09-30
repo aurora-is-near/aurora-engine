@@ -6,11 +6,11 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: [ self-hosted, heavy ]
+    runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
       matrix:
-        profile: [ mainnet, testnet ]
+        profile: [ mainnet, mainnet-silo, testnet, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -21,8 +21,13 @@ jobs:
         run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
       - name: Test ${{ matrix.profile }}
         run: cargo make --profile ${{ matrix.profile }} test-flow
-      - name: Test ${{ matrix.profile }}-silo
-        run: cargo make --profile ${{ matrix.profile }}-silo test-flow
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,job,took
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   checks:
     name: Run checks
@@ -34,3 +39,10 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - run: cargo make check
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,job,took
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
