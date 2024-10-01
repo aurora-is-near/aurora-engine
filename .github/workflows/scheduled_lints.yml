@@ -1,7 +1,7 @@
 ---
 on:
   schedule:
-    - cron: '0 8 * * 1-5'
+    - cron: '30 8 * * 1-5'
 name: Scheduled checks
 jobs:
   tests:
@@ -17,6 +17,26 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ matrix.profile }}-cargo-test
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 16
+          cache: 'yarn'
+          cache-dependency-path: |
+            etc/eth-contracts
+            etc/tests/uniswap
+      - name: Install cargo-make
+        run: cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
       - name: Test ${{ matrix.profile }}
