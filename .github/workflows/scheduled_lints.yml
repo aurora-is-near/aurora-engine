@@ -1,7 +1,7 @@
 ---
 on:
   schedule:
-    - cron: '30 8 * * 1-5'
+    - cron: '0 9 * * 1-5'
 name: Scheduled checks
 jobs:
   tests:
@@ -36,7 +36,7 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install cargo-make
-        run: cargo +stable install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
       - name: Test ${{ matrix.profile }}
