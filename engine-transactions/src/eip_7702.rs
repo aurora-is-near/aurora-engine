@@ -72,8 +72,8 @@ pub struct Transaction7702 {
     pub max_fee_per_gas: U256,
     /// The maximum amount of gas the sender is willing to consume on a transaction.
     pub gas_limit: U256,
-    /// The receiving address (`None` for the zero address).
-    pub to: Option<Address>,
+    /// The receiving address.
+    pub to: Address,
     /// The amount of ETH to transfer.
     pub value: Wei,
     /// Arbitrary binary data for a contract call invocation.
@@ -104,10 +104,7 @@ impl Transaction7702 {
         s.append(&self.max_priority_fee_per_gas);
         s.append(&self.max_fee_per_gas);
         s.append(&self.gas_limit);
-        match self.to.as_ref() {
-            None => s.append(&""),
-            Some(address) => s.append(&address.raw()),
-        };
+        s.append(&self.to.raw());
         s.append(&self.value.raw());
         s.append(&self.data);
         s.begin_list(self.access_list.len());
@@ -156,7 +153,7 @@ impl SignedTransaction7702 {
         .map_err(|_e| Error::EcRecover)
     }
 
-    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
+    pub fn authorization_list(&self) -> Result<Vec<(U256, Authorization)>, Error> {
         if self.transaction.authorization_list.is_empty() {
             return Err(Error::EmptyAuthorizationList);
         }
@@ -181,20 +178,20 @@ impl SignedTransaction7702 {
                 return Err(Error::InvalidAuthorizationSignature);
             }
 
-            // According to EIP-7702 step 1. validation, we should verify is `chain_id` is related to current network.
-            // We just ensure that `chain_id` is not zero, as it's possible different `chain_id` and
-            // `chain_id == 0` is related to Ethereum `mainnet`, that's not correct for Aurora.
-            let mut is_valid = !auth.chain_id.is_zero();
+            // According to EIP-7702 step 1. validation, we should verify is
+            // `chain_id = 0 || current_chain_id`. But we don't have `current_chain_id` here. And
+            // we should validate it in the context of the Engine submit execution. So, we just skip it.
+            let mut is_valid = true;
 
             // 2. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             let mut rlp_stream = RlpStream::new();
-            rlp_stream.begin_list(4);
-            rlp_stream.append(&MAGIC);
+            rlp_stream.begin_list(3);
             rlp_stream.append(&auth.chain_id);
             rlp_stream.append(&auth.address);
             rlp_stream.append(&auth.nonce);
 
-            let signature_hash = aurora_engine_sdk::keccak(rlp_stream.as_raw());
+            let message_bytes = [&[MAGIC], rlp_stream.as_raw()].concat();
+            let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
 
             let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s));
             let auth_address = auth_address.unwrap_or_else(|_| {
@@ -203,12 +200,15 @@ impl SignedTransaction7702 {
             });
 
             // Validations steps 3-8 0f EIP-7702 provided by EVM itself.
-            authorization_list.push(Authorization {
-                authority: auth_address.raw(),
-                address: auth.address,
-                nonce: auth.nonce,
-                is_valid,
-            });
+            authorization_list.push((
+                auth.chain_id,
+                Authorization {
+                    authority: auth_address.raw(),
+                    address: auth.address,
+                    nonce: auth.nonce,
+                    is_valid,
+                },
+            ));
         }
         Ok(authorization_list)
     }
@@ -233,7 +233,7 @@ impl Decodable for SignedTransaction7702 {
         let max_priority_fee_per_gas = rlp.val_at(2)?;
         let max_fee_per_gas = rlp.val_at(3)?;
         let gas_limit = rlp.val_at(4)?;
-        let to = super::rlp_extract_to(rlp, 5)?;
+        let to = Address::new(rlp.val_at(5)?);
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
         let access_list = rlp.list_at(8)?;
@@ -258,5 +258,109 @@ impl Decodable for SignedTransaction7702 {
             r,
             s,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rlp::RlpStream;
+
+    #[test]
+    fn test_authorization_tuple_decode() {
+        let chain_id = U256::from(1);
+        let address = H160::from_low_u64_be(0x1234);
+        let nonce = 1u64;
+        let parity = U256::from(0);
+        let r = U256::from(2);
+        let s = U256::from(3);
+
+        let mut stream = RlpStream::new_list(6);
+        stream.append(&chain_id);
+        stream.append(&address);
+        stream.append(&nonce);
+        stream.append(&parity);
+        stream.append(&r);
+        stream.append(&s);
+
+        let rlp = Rlp::new(stream.as_raw());
+        let decoded: AuthorizationTuple = rlp.as_val().unwrap();
+
+        assert_eq!(decoded.chain_id, chain_id);
+        assert_eq!(decoded.address, address);
+        assert_eq!(decoded.nonce, nonce);
+        assert_eq!(decoded.parity, parity);
+        assert_eq!(decoded.r, r);
+        assert_eq!(decoded.s, s);
+    }
+
+    #[test]
+    fn test_transaction7702_rlp_append_unsigned() {
+        let tx = Transaction7702 {
+            chain_id: 1,
+            nonce: U256::from(1),
+            max_priority_fee_per_gas: U256::from(2),
+            max_fee_per_gas: U256::from(3),
+            gas_limit: U256::from(4),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(U256::from(5)),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![AuthorizationTuple {
+                chain_id: U256::from(1),
+                address: H160::from_low_u64_be(0x1234),
+                nonce: 1u64,
+                parity: U256::from(0),
+                r: U256::from(2),
+                s: U256::from(3),
+            }],
+        };
+
+        let mut stream = RlpStream::new();
+        tx.rlp_append_unsigned(&mut stream);
+
+        let rlp = Rlp::new(stream.as_raw());
+        assert_eq!(
+            rlp.item_count().unwrap(),
+            Transaction7702::TRANSACTION_FIELDS
+        );
+    }
+
+    #[test]
+    fn test_signed_transaction7702_rlp_encode_decode() {
+        let tx = Transaction7702 {
+            chain_id: 1,
+            nonce: U256::from(1),
+            max_priority_fee_per_gas: U256::from(2),
+            max_fee_per_gas: U256::from(3),
+            gas_limit: U256::from(4),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(U256::from(5)),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![AuthorizationTuple {
+                chain_id: U256::from(1),
+                address: H160::from_low_u64_be(0x1234),
+                nonce: 1u64,
+                parity: U256::from(0),
+                r: U256::from(2),
+                s: U256::from(3),
+            }],
+        };
+
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx,
+            parity: 0,
+            r: U256::from(7),
+            s: U256::from(8),
+        };
+
+        let mut stream = RlpStream::new();
+        signed_tx.rlp_append(&mut stream);
+
+        let rlp = Rlp::new(stream.as_raw());
+        let decoded: SignedTransaction7702 = rlp.as_val().unwrap();
+
+        assert_eq!(decoded, signed_tx);
     }
 }

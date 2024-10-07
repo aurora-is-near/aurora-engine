@@ -98,7 +98,8 @@ pub struct NormalizedEthTransaction {
     pub value: Wei,
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
-    pub authorization_list: Vec<Authorization>,
+    // Contains additional information - `chain_id` for each authorization item
+    pub authorization_list: Vec<(U256, Authorization)>,
 }
 
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
@@ -153,7 +154,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 gas_limit: tx.transaction.gas_limit,
                 max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
                 max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: tx.transaction.to,
+                to: Some(tx.transaction.to),
                 value: tx.transaction.value,
                 data: tx.transaction.data.clone(),
                 access_list: tx.transaction.access_list.clone(),
@@ -310,7 +311,7 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 #[cfg(test)]
 mod tests {
     use super::{Error, EthTransactionKind};
-    use crate::{eip_1559, eip_2930};
+    use crate::{eip_1559, eip_2930, eip_7702};
 
     #[test]
     fn test_try_parse_empty_input() {
@@ -331,6 +332,10 @@ mod tests {
         ));
         assert!(matches!(
             EthTransactionKind::try_from([0x80].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_7702::TYPE_BYTE].as_ref()),
             Err(Error::RlpDecodeError(_))
         ));
     }

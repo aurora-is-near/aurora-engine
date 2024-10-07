@@ -1052,6 +1052,20 @@ pub fn submit_with_alt_modexp<
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
+
+    // EIP-7702: validate `chain_id` for each item of `authorization_list`
+    let mut authorization_list = Vec::new();
+    if CONFIG.has_authorization_list {
+        let mut pre_authorization_list = transaction.authorization_list.clone();
+        let current_chain_id = U256::from(state.chain_id);
+        for auth in &mut pre_authorization_list {
+            if auth.0 != current_chain_id {
+                auth.1.is_valid = false;
+            }
+            authorization_list.push(auth.1.clone());
+        }
+    }
+
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
 
@@ -1114,7 +1128,7 @@ pub fn submit_with_alt_modexp<
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
-    let authorization_list = transaction.authorization_list;
+
     let result = if let Some(receiver) = transaction.to {
         engine.call(
             &sender,
