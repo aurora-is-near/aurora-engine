@@ -99,7 +99,7 @@ pub struct NormalizedEthTransaction {
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
     // Contains additional information - `chain_id` for each authorization item
-    pub authorization_list: Vec<(U256, Authorization)>,
+    pub authorization_list: Vec<Authorization>,
 }
 
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {

@@ -153,10 +153,11 @@ impl SignedTransaction7702 {
         .map_err(|_e| Error::EcRecover)
     }
 
-    pub fn authorization_list(&self) -> Result<Vec<(U256, Authorization)>, Error> {
+    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
         if self.transaction.authorization_list.is_empty() {
             return Err(Error::EmptyAuthorizationList);
         }
+        let current_tx_chain_id = U256::from(self.transaction.chain_id);
         let mut authorization_list = Vec::with_capacity(self.transaction.authorization_list.len());
         // According to EIP-7702 we should validate each authorization. We shouldn't skip any of them.
         // And just put `is_valid` flag to `false` if any of them is invalid. It's related to
@@ -179,9 +180,10 @@ impl SignedTransaction7702 {
             }
 
             // According to EIP-7702 step 1. validation, we should verify is
-            // `chain_id = 0 || current_chain_id`. But we don't have `current_chain_id` here. And
-            // we should validate it in the context of the Engine submit execution. So, we just skip it.
-            let mut is_valid = true;
+            // `chain_id = 0 || current_chain_id`.
+            // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
+            // Engine `submit_transaction` method.
+            let mut is_valid = auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id;
 
             // 2. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             let mut rlp_stream = RlpStream::new();
@@ -200,15 +202,12 @@ impl SignedTransaction7702 {
             });
 
             // Validations steps 3-8 0f EIP-7702 provided by EVM itself.
-            authorization_list.push((
-                auth.chain_id,
-                Authorization {
-                    authority: auth_address.raw(),
-                    address: auth.address,
-                    nonce: auth.nonce,
-                    is_valid,
-                },
-            ));
+            authorization_list.push(Authorization {
+                authority: auth_address.raw(),
+                address: auth.address,
+                nonce: auth.nonce,
+                is_valid,
+            });
         }
         Ok(authorization_list)
     }

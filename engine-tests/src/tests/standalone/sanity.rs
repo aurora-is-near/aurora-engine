@@ -46,7 +46,6 @@ fn test_deploy_code() {
         None,
         u64::MAX,
         Vec::new(),
-        Vec::new(),
         &mut handler,
     );
 
