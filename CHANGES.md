@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.7.0] 2024-10-09
+
+### Additions
+
+- Added support of CANCUN hardfork by [@mrLSD]. ([#926])
+- Added support of EIP-3607 by [@mrLSD]. ([#930])
+- Removed restrictions from funding XCC sub-accounts by [@birchmd]. ([#931])
+
+### Changes
+
+- Made some EVM gas costs optimisations by [@mrLSD]. ([#934])
+- Refactored the gas charge logic form EVM exit reasons by [@mrLSD]. ([#935])
+- Updated some dependencies and rust-toolchain by [@mrLSD]. ([#936])
+- Removed unused `bytes_to_hex` function by [@dwiekawki]. ([#942])
+- Added building of actual version of the `near-sandbox` in the scheduled CI job by [@aleksuss] ([#950])
+
+### Fixes
+
+- Removed duplicated `test` task in the `README.md` by [@dwiekawki]. ([#943])
+- Fixed some typos in the `README.md` and `Cargo.toml` by [@DemoYeti]. ([#945]) ([#946])
+- Fixed exceeded prepaid gas error in the `mirror_erc20_token` transaction by [@aleksuss] ([#951])
+- Modified `hardhat.config.js` to support contract verification by [@spilin] ([#958])q
+
+[#926]: https://github.com/aurora-is-near/aurora-engine/pull/926
+[#930]: https://github.com/aurora-is-near/aurora-engine/pull/930
+[#931]: https://github.com/aurora-is-near/aurora-engine/pull/931
+[#934]: https://github.com/aurora-is-near/aurora-engine/pull/934
+[#935]: https://github.com/aurora-is-near/aurora-engine/pull/935
+[#936]: https://github.com/aurora-is-near/aurora-engine/pull/936
+[#942]: https://github.com/aurora-is-near/aurora-engine/pull/942
+[#943]: https://github.com/aurora-is-near/aurora-engine/pull/943
+[#945]: https://github.com/aurora-is-near/aurora-engine/pull/945
+[#946]: https://github.com/aurora-is-near/aurora-engine/pull/946
+[#950]: https://github.com/aurora-is-near/aurora-engine/pull/950
+[#951]: https://github.com/aurora-is-near/aurora-engine/pull/951
+[#958]: https://github.com/aurora-is-near/aurora-engine/pull/958
+
 ## [3.6.4] 2024-07-22
 
 ### Additions
@@ -660,7 +697,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...develop
+[3.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...3.7.0
 [3.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...3.6.4
 [3.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...3.6.3
 [3.6.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.1...3.6.2
@@ -716,6 +754,8 @@ struct SubmitResult {
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
+[@DemoYeti]: https://github.com/DemoYeti
+[@dwiekawki]: https://github.com/dwiekawki
 [@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
 [@joshuajbouw]: https://github.com/joshuajbouw
@@ -728,3 +768,4 @@ struct SubmitResult {
 [@raventid]: https://github.com/raventid
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
+[@spilin]: https://github.com/spilin
