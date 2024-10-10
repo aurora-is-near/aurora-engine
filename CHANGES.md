@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed duplicated `test` task in the `README.md` by [@dwiekawki]. ([#943])
 - Fixed some typos in the `README.md` and `Cargo.toml` by [@DemoYeti]. ([#945]) ([#946])
 - Fixed exceeded prepaid gas error in the `mirror_erc20_token` transaction by [@aleksuss] ([#951])
-- Modified `hardhat.config.js` to support contract verification by [@spilin] ([#958])q
+- Modified `hardhat.config.js` to support contract verification by [@spilin] ([#958])
 
 [#926]: https://github.com/aurora-is-near/aurora-engine/pull/926
 [#930]: https://github.com/aurora-is-near/aurora-engine/pull/930
