@@ -67,15 +67,12 @@ impl ContractConstructor {
         let bin_file = format!("{contract_name}.bin");
         let abi_file = format!("{contract_name}.abi");
         let hex_path = artifacts_base_path.as_ref().join(bin_file);
-        let hex_rep = fs::read_to_string(&hex_path).map_or_else(
-            |_| {
-                // An error occurred opening the file, maybe the contract hasn't been compiled?
-                compile(sources_root, contract_file, &artifacts_base_path);
-                // If another error occurs, then we can't handle it so we just unwrap.
-                fs::read_to_string(hex_path).unwrap()
-            },
-            |hex| hex,
-        );
+        let hex_rep = fs::read_to_string(&hex_path).unwrap_or_else(|_| {
+            // An error occurred opening the file, maybe the contract hasn't been compiled?
+            compile(sources_root, contract_file, &artifacts_base_path);
+            // If another error occurs, then we can't handle it so we just unwrap.
+            fs::read_to_string(hex_path).unwrap()
+        });
         let code = hex::decode(hex_rep).unwrap();
         let abi_path = artifacts_base_path.as_ref().join(abi_file);
         let file = fs::File::open(abi_path).unwrap();

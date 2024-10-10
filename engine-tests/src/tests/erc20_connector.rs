@@ -540,6 +540,12 @@ pub mod workspace {
             .map(|o| o.tokens_burnt.as_yoctonear())
             .sum();
 
+        // We need to skip at least 1 block before checking ft_owner's balance, because the refund
+        // receipt is executed in the next(skipped) block, because the transaction broadcasts with
+        // default `wait_until` parameter, which is [ExecutedOptimistic](https://github.com/near/nearcore/blob/master/core/primitives/src/views.rs#L1743)
+        // since nearcore 1.39.0.
+        aurora.node.skip_blocks(1).await.unwrap();
+
         // Check that the wnear tokens are properly unwrapped and transferred to `ft_owner`
         assert_eq!(
             aurora.node.get_balance(&ft_owner.id()).await.unwrap(),
@@ -589,6 +595,12 @@ pub mod workspace {
             .iter()
             .map(|o| o.tokens_burnt.as_yoctonear())
             .sum();
+
+        // We need to skip at least 1 block before checking ft_owner's balance, because the refund
+        // receipt is executed in the next(skipped) block, because the transaction broadcasts with
+        // default `wait_until` parameter, which is [ExecutedOptimistic](https://github.com/near/nearcore/blob/master/core/primitives/src/views.rs#L1743)
+        // since nearcore 1.39.0.
+        aurora.node.skip_blocks(1).await.unwrap();
 
         // Check that there were no near tokens transferred to `ft_owner`
         assert_eq!(

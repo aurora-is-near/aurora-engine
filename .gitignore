@@ -12,6 +12,7 @@
 
 # ENV
 .env/custom.env
+etc/eth-contracts/.env
 
 # Rust artifacts
 bin/

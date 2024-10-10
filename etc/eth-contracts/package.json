@@ -6,9 +6,11 @@
     "@openzeppelin/contracts": "^4.7.3"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-verify": "^2.0.10",
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
     "chai": "^4.3.6",
+    "dotenv": "^16.4.5",
     "eslint": "^8.18.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",

@@ -167,8 +167,7 @@ fn initialize_evm() -> (utils::AuroraRunner, utils::Signer, Address) {
     let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
     let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
-
-    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+    runner.max_gas_burnt(u64::MAX);
 
     (runner, signer, dest_address)
 }

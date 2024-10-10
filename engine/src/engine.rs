@@ -5,7 +5,7 @@ use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
 use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::executor;
+use evm::{executor, Opcode};
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
@@ -177,6 +177,11 @@ trait ExitIntoResult {
 }
 
 impl ExitIntoResult for ExitReason {
+    /// We should be aligned to Ethereum's gas charging:
+    /// - `Success` | `Revert`
+    /// - `ExitError` - Execution errors should charge gas from users
+    /// - `ExitFatal` - shouldn't charge user gas
+    /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
             Self::Succeed(_) => Ok(TransactionStatus::Succeed(data)),
@@ -184,7 +189,27 @@ impl ExitIntoResult for ExitReason {
             Self::Error(ExitError::OutOfOffset) => Ok(TransactionStatus::OutOfOffset),
             Self::Error(ExitError::OutOfFund) => Ok(TransactionStatus::OutOfFund),
             Self::Error(ExitError::OutOfGas) => Ok(TransactionStatus::OutOfGas),
-            Self::Error(e) => Err(e.into()),
+            Self::Error(ExitError::CallTooDeep) => Ok(TransactionStatus::CallTooDeep),
+            Self::Error(ExitError::StackUnderflow) => Ok(TransactionStatus::StackUnderflow),
+            Self::Error(ExitError::StackOverflow) => Ok(TransactionStatus::StackOverflow),
+            Self::Error(ExitError::InvalidJump) => Ok(TransactionStatus::InvalidJump),
+            Self::Error(ExitError::InvalidRange) => Ok(TransactionStatus::InvalidRange),
+            Self::Error(ExitError::DesignatedInvalid) => Ok(TransactionStatus::DesignatedInvalid),
+            Self::Error(ExitError::CreateCollision) => Ok(TransactionStatus::CreateCollision),
+            Self::Error(ExitError::CreateContractLimit) => {
+                Ok(TransactionStatus::CreateContractLimit)
+            }
+            Self::Error(ExitError::InvalidCode(opcode)) => {
+                Ok(TransactionStatus::InvalidCode(opcode.0))
+            }
+            Self::Error(ExitError::PCUnderflow) => Ok(TransactionStatus::PCUnderflow),
+            Self::Error(ExitError::CreateEmpty) => Ok(TransactionStatus::CreateEmpty),
+            Self::Error(ExitError::MaxNonce) => Ok(TransactionStatus::MaxNonce),
+            Self::Error(ExitError::UsizeOverflow) => Ok(TransactionStatus::UsizeOverflow),
+            Self::Error(ExitError::CreateContractStartingWithEF) => {
+                Ok(TransactionStatus::CreateContractStartingWithEF)
+            }
+            Self::Error(ExitError::Other(msg)) => Ok(TransactionStatus::Other(msg)),
             Self::Fatal(e) => Err(e.into()),
         }
     }
@@ -206,7 +231,7 @@ impl AsRef<[u8]> for BalanceOverflow {
 pub enum GasPaymentError {
     /// Overflow adding ETH to an account balance (should never happen)
     BalanceOverflow(BalanceOverflow),
-    /// Overflow in gas * gas_price calculation
+    /// Overflow in `gas * gas_price` calculation
     EthAmountOverflow,
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
@@ -785,41 +810,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
-            .and_then(|submit_result| match submit_result.status {
-                TransactionStatus::Succeed(_) => Ok(submit_result),
-                TransactionStatus::Revert(bytes) => {
-                    let error_message = crate::prelude::format!(
-                        "Reverted with message: {}",
-                        crate::prelude::String::from_utf8_lossy(&bytes)
-                    );
-                    Err(EngineError {
-                        kind: EngineErrorKind::EvmError(ExitError::Other(
-                            crate::prelude::Cow::from(error_message),
-                        )),
-                        gas_used: submit_result.gas_used,
-                    })
-                }
-                TransactionStatus::OutOfFund => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfFund),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfOffset => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfOffset),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::OutOfGas => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::OutOfGas),
-                    gas_used: submit_result.gas_used,
-                }),
-                TransactionStatus::CallTooDeep => Err(EngineError {
-                    kind: EngineErrorKind::EvmError(ExitError::CallTooDeep),
-                    gas_used: submit_result.gas_used,
-                }),
-            })
-            .map_err(|e| {
-                sdk::log!("{:?}", e);
+            .and_then(submit_result_or_err)
+            .inspect_err(|_e| {
+                sdk::log!("{:?}", _e);
                 self.io.return_output(output_on_fail);
-                e
             })?;
 
         // Everything succeed so return "0"
@@ -1544,10 +1538,16 @@ pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32
         .unwrap_or_default()
 }
 
+pub fn storage_has_key<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> bool {
+    io.storage_has_key(storage_to_key(address, key, generation).as_ref())
+}
+
+/// EIP-7610: balance, nonce, code, storage should be empty
 pub fn is_account_empty<I: IO>(io: &I, address: &Address) -> bool {
     get_balance(io, address).is_zero()
         && get_nonce(io, address).is_zero()
         && get_code_size(io, address) == 0
+        && !storage_has_key(io, address, &H256::zero(), get_generation(io, address))
 }
 
 /// Increments storage generation for a given address.
@@ -1915,6 +1915,29 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
         result
     }
 
+    /// Check if the storage of the address is empty.
+    /// Related to EIP-7610: non-empty storage
+    fn is_empty_storage(&self, address: H160) -> bool {
+        // As we can't read all storage data for account we assuming that if storage exists
+        // `index = 0` always true
+        let index = H256::zero();
+        // First we're checking cache to not produce read-storage operation
+        let address = Address::new(address);
+        if self
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(address, index))
+        {
+            return false;
+        }
+        let generation = *self
+            .generation_cache
+            .borrow_mut()
+            .entry(address)
+            .or_insert_with(|| get_generation(&self.io, &address));
+        !storage_has_key(&self.io, &address, &index, generation)
+    }
+
     /// Get original storage value of address at index, if available.
     ///
     /// Since `SputnikVM` collects storage changes in memory until the transaction is over,
@@ -2056,6 +2079,92 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
             writes_counter,
             total_bytes
         );
+    }
+}
+
+fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, EngineError> {
+    match submit_result.status {
+        TransactionStatus::Succeed(_) => Ok(submit_result),
+        TransactionStatus::Revert(bytes) => {
+            let error_message = crate::prelude::format!(
+                "Reverted with message: {}",
+                crate::prelude::String::from_utf8_lossy(&bytes)
+            );
+            Err(engine_error(
+                ExitError::Other(error_message.into()),
+                submit_result.gas_used,
+            ))
+        }
+        TransactionStatus::OutOfFund => {
+            Err(engine_error(ExitError::OutOfFund, submit_result.gas_used))
+        }
+        TransactionStatus::OutOfOffset => {
+            Err(engine_error(ExitError::OutOfOffset, submit_result.gas_used))
+        }
+        TransactionStatus::OutOfGas => {
+            Err(engine_error(ExitError::OutOfGas, submit_result.gas_used))
+        }
+        TransactionStatus::CallTooDeep => {
+            Err(engine_error(ExitError::CallTooDeep, submit_result.gas_used))
+        }
+        TransactionStatus::StackUnderflow => Err(engine_error(
+            ExitError::StackUnderflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::StackOverflow => Err(engine_error(
+            ExitError::StackOverflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::InvalidJump => {
+            Err(engine_error(ExitError::InvalidJump, submit_result.gas_used))
+        }
+        TransactionStatus::InvalidRange => Err(engine_error(
+            ExitError::InvalidRange,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::DesignatedInvalid => Err(engine_error(
+            ExitError::DesignatedInvalid,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateCollision => Err(engine_error(
+            ExitError::CreateCollision,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateContractLimit => Err(engine_error(
+            ExitError::CreateContractLimit,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::InvalidCode(code) => Err(engine_error(
+            ExitError::InvalidCode(Opcode(code)),
+            submit_result.gas_used,
+        )),
+        TransactionStatus::PCUnderflow => {
+            Err(engine_error(ExitError::PCUnderflow, submit_result.gas_used))
+        }
+        TransactionStatus::CreateEmpty => {
+            Err(engine_error(ExitError::CreateEmpty, submit_result.gas_used))
+        }
+        TransactionStatus::MaxNonce => {
+            Err(engine_error(ExitError::MaxNonce, submit_result.gas_used))
+        }
+        TransactionStatus::UsizeOverflow => Err(engine_error(
+            ExitError::UsizeOverflow,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::CreateContractStartingWithEF => Err(engine_error(
+            ExitError::CreateContractStartingWithEF,
+            submit_result.gas_used,
+        )),
+        TransactionStatus::Other(e) => {
+            Err(engine_error(ExitError::Other(e), submit_result.gas_used))
+        }
+    }
+}
+
+const fn engine_error(exit_error: ExitError, gas_used: u64) -> EngineError {
+    EngineError {
+        kind: EngineErrorKind::EvmError(exit_error),
+        gas_used,
     }
 }
 
@@ -2543,6 +2652,46 @@ mod tests {
         let actual_value = engine.original_storage(origin.raw(), index).unwrap();
 
         assert_eq!(expected_value, actual_value);
+    }
+
+    #[test]
+    fn test_storage_is_empty_with_cache() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+
+        let expected_value = H256::from_low_u64_le(64);
+        let index = H256::zero();
+        // Check that storage is empty
+        assert!(engine.is_empty_storage(origin.raw()));
+        let generation = get_generation(&io, &origin);
+        set_storage(&mut io, &origin, &index, &expected_value, generation);
+        // It will read without cache
+        assert!(!engine.is_empty_storage(origin.raw()));
+        // Cache should be empty
+        let cache_val = engine
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(origin, index));
+        assert!(!cache_val);
+        // Check the storage value and hit the cache
+        let actual_value = engine.storage(origin.raw(), index);
+        assert_eq!(expected_value, actual_value);
+        // Cache should exist
+        let cache_val = engine
+            .contract_storage_cache
+            .borrow()
+            .contains_key(&(origin, index));
+        assert!(cache_val);
+        remove_storage(&mut io, &origin, &index, generation);
+        // Value should still be in the cache
+        let actual_value = engine.storage(origin.raw(), index);
+        assert_eq!(expected_value, actual_value);
+        assert!(!engine.is_empty_storage(origin.raw()));
     }
 
     #[test]

@@ -13,7 +13,6 @@ use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
-use near_parameters::vm::VMKind;
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::ViewConfig;
@@ -21,9 +20,10 @@ use near_vm_runner::logic::errors::FunctionCallError;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::ReturnData;
 use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
-use near_vm_runner::{ContractCode, MockCompiledContractCache, ProfileDataV3};
+use near_vm_runner::{ContractCode, MockContractRuntimeCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
+use std::sync::Arc;
 
 #[cfg(not(feature = "ext-connector"))]
 use crate::prelude::parameters::InitCallArgs;
@@ -82,13 +82,11 @@ impl Signer {
 pub struct AuroraRunner {
     pub aurora_account_id: String,
     pub chain_id: u64,
-    pub code: ContractCode,
-    pub cache: MockCompiledContractCache,
+    pub cache: MockContractRuntimeCache,
     pub ext: mocked_external::MockedExternalWithTrie,
     pub context: VMContext,
-    pub wasm_config: Config,
-    pub fees_config: RuntimeFeesConfig,
-    pub current_protocol_version: u32,
+    pub wasm_config: Arc<Config>,
+    pub fees_config: Arc<RuntimeFeesConfig>,
     pub previous_logs: Vec<String>,
     // Use the standalone in parallel if set. This allows checking both
     // implementations give the same results.
@@ -140,15 +138,19 @@ impl<'a> OneShotAuroraRunner<'a> {
             input,
         );
 
-        let outcome = near_vm_runner::run(
-            &self.base.code,
-            method_name,
-            &mut self.ext,
-            self.context.clone(),
-            &self.base.wasm_config,
-            &self.base.fees_config,
-            &[],
+        let contract = near_vm_runner::prepare(
+            &self.ext.underlying,
+            self.base.wasm_config.clone(),
             Some(&self.base.cache),
+            self.context.make_gas_counter(&self.base.wasm_config),
+            method_name,
+        );
+
+        let outcome = near_vm_runner::run(
+            contract,
+            &mut self.ext,
+            &self.context,
+            self.base.fees_config.clone(),
         )
         .unwrap();
 
@@ -216,15 +218,22 @@ impl AuroraRunner {
                 }
             })
             .collect();
-        let outcome = near_vm_runner::run(
-            &self.code,
-            method_name,
-            &mut self.ext,
-            self.context.clone(),
-            &self.wasm_config,
-            &self.fees_config,
-            &vm_promise_results,
+
+        self.context.promise_results = vm_promise_results.into();
+
+        let contract = near_vm_runner::prepare(
+            &self.ext.underlying,
+            self.wasm_config.clone(),
             Some(&self.cache),
+            self.context.make_gas_counter(&self.wasm_config),
+            method_name,
+        );
+
+        let outcome = near_vm_runner::run(
+            contract,
+            &mut self.ext,
+            &self.context,
+            self.fees_config.clone(),
         )
         .unwrap();
 
@@ -233,7 +242,7 @@ impl AuroraRunner {
         }
 
         self.context.storage_usage = outcome.storage_usage;
-        self.previous_logs = outcome.logs.clone();
+        self.previous_logs.clone_from(&outcome.logs);
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.submit_raw(
@@ -509,7 +518,7 @@ impl AuroraRunner {
         self.getter_method_call("get_code", address)
     }
 
-    pub fn get_fixed_gas(&mut self) -> Option<EthGas> {
+    pub fn get_fixed_gas(&self) -> Option<EthGas> {
         let outcome = self
             .one_shot()
             .call("get_fixed_gas", "getter", vec![])
@@ -621,6 +630,17 @@ impl AuroraRunner {
     pub const fn get_default_chain_id() -> u64 {
         DEFAULT_CHAIN_ID
     }
+
+    pub fn max_gas_burnt(&mut self, max_gas_burnt: u64) {
+        Arc::get_mut(&mut self.wasm_config)
+            .unwrap()
+            .limit_config
+            .max_gas_burnt = max_gas_burnt;
+    }
+
+    pub fn set_code(&mut self, code: ContractCode) {
+        self.ext.underlying.code = Some(Arc::new(code));
+    }
 }
 
 impl Default for AuroraRunner {
@@ -629,29 +649,25 @@ impl Default for AuroraRunner {
         // Fetch config (mainly costs) for the latest protocol version.
         let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config = runtime_config_store.get_config(PROTOCOL_VERSION);
-        let mut wasm_config = runtime_config.wasm_config.clone();
-
-        if cfg!(not(target_arch = "x86_64")) {
-            wasm_config.vm_kind = VMKind::Wasmtime;
-        } else {
-            wasm_config.vm_kind = VMKind::Wasmer2;
-        }
-
+        let wasm_config = runtime_config.wasm_config.clone();
         let origin_account_id: near_primitives::types::AccountId =
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
+        let mut mocked_external = MockedExternal::default();
+
+        mocked_external.code = Some(Arc::new(ContractCode::new(evm_wasm_bytes, None)));
 
         Self {
             aurora_account_id: DEFAULT_AURORA_ACCOUNT_ID.to_string(),
             chain_id: DEFAULT_CHAIN_ID,
-            code: ContractCode::new(evm_wasm_bytes, None),
-            cache: MockCompiledContractCache::default(),
-            ext: mocked_external::MockedExternalWithTrie::new(MockedExternal::default()),
+            cache: MockContractRuntimeCache::default(),
+            ext: mocked_external::MockedExternalWithTrie::new(mocked_external),
             context: VMContext {
                 current_account_id: origin_account_id.clone(),
                 signer_account_id: origin_account_id.clone(),
                 signer_account_pk: vec![],
                 predecessor_account_id: origin_account_id,
                 input: vec![],
+                promise_results: Arc::new([]),
                 block_height: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
@@ -665,8 +681,7 @@ impl Default for AuroraRunner {
                 view_config: None,
             },
             wasm_config,
-            fees_config: RuntimeFeesConfig::test(),
-            current_protocol_version: u32::MAX,
+            fees_config: Arc::new(RuntimeFeesConfig::test()),
             previous_logs: Vec::new(),
             standalone_runner: Some(standalone::StandaloneRunner::default()),
             promise_results: Vec::new(),
@@ -681,7 +696,6 @@ impl Default for AuroraRunner {
 pub struct ExecutionProfile {
     pub host_breakdown: ProfileDataV3,
     total_gas_cost: u64,
-    pub logs: Vec<String>,
 }
 
 impl ExecutionProfile {
@@ -689,7 +703,6 @@ impl ExecutionProfile {
         Self {
             host_breakdown: outcome.profile.clone(),
             total_gas_cost: outcome.burnt_gas,
-            logs: outcome.logs.clone(),
         }
     }
 
@@ -1004,10 +1017,12 @@ pub fn unwrap_revert_slice(result: &SubmitResult) -> &[u8] {
     }
 }
 
-pub fn panic_on_fail(status: TransactionStatus) {
+pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
     match status {
-        TransactionStatus::Succeed(_) => (),
-        TransactionStatus::Revert(message) => panic!("{}", String::from_utf8_lossy(&message)),
+        TransactionStatus::Succeed(_) => None,
+        TransactionStatus::Revert(message) => {
+            Some(format!("Revert: {}", String::from_utf8_lossy(&message)))
+        }
         other => panic!("{}", String::from_utf8_lossy(other.as_ref())),
     }
 }
@@ -1031,8 +1046,7 @@ pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
 /// this simpler formula to avoid floating point arithmetic.
 pub const fn within_x_percent(x: u64, a: u64, b: u64) -> bool {
     let (larger, smaller) = if a < b { (b, a) } else { (a, b) };
-
-    (100 / x) * (larger - smaller) <= larger
+    100 * (larger - smaller) <= larger * x
 }
 
 fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError {

@@ -126,7 +126,6 @@ shasum -a 256 bin/aurora-<profile>.wasm
 #### Running unit & integration tests
 
 To run tests, there are a few cargo make tasks we can run:
-- `test`: tests the whole cargo workspace and ETH contracts. Requires a `--profile` argument.
 - `test-workspace`: tests only the cargo workspace.
 - `test-contracts`: tests only the contracts.
 - `test`: tests the whole cargo workspace, ETH contracts and runs modexp benchmarks. Requires a `--profile` argument.
@@ -149,7 +148,7 @@ The following tasks are available to run lints and checks:
 
 For example, the following command will run the checks. `profile` is not required
 here:
-```
+```sh
 cargo make check
 ```
 
@@ -182,7 +181,7 @@ Additionally, there is also but not included in the `clean` task:
 
 For example, the following command will clean everything. `profile` is not 
 required:
-```
+```sh
 cargo make clean
 ```
 

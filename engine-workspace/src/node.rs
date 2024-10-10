@@ -40,6 +40,13 @@ impl Node {
             .map_err(Into::into)
     }
 
+    pub async fn skip_blocks(&self, num_blocks: u64) -> anyhow::Result<()> {
+        self.worker
+            .fast_forward(num_blocks)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn create_root_account(
         worker: &Worker<Sandbox>,
         root_acc_name: &str,
