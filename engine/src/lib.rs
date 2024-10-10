@@ -65,7 +65,6 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
             prelude::sdk::panic_utf8(log.to_string().as_bytes());
         }
     }
-
     ::core::arch::wasm32::unreachable();
 }
 

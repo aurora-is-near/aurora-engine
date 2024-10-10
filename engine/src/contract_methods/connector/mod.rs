@@ -45,7 +45,9 @@ pub const ERR_NOT_ENOUGH_BALANCE_FOR_FEE: &str = "ERR_NOT_ENOUGH_BALANCE_FOR_FEE
 /// Indicate zero attached balance for promise call
 pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 /// Amount of attached gas for read-only promises.
-const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(5_000_000_000_000);
+const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(6_000_000_000_000);
+/// Amount of attached gas for the `mirror_erc20_token_callback`.
+const MIRROR_ERC20_TOKEN_CALLBACK_ATTACHED_GAS: NearGas = NearGas::new(10_000_000_000_000);
 
 /// Create new eth-connector;
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -465,7 +467,9 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
     let args = MirrorErc20TokenArgs::try_from_slice(&input)
         .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
 
-    let promise = vec![
+    // We can't use a batch of actions here, since we need to get responses from both
+    // view transactions in the `mirror_erc20_token_callback` callback.
+    let promises = vec![
         PromiseCreateArgs {
             target_account_id: args.contract_id.clone(),
             method: "get_erc20_from_nep141".to_string(),
@@ -491,12 +495,12 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         method: "mirror_erc20_token_callback".to_string(),
         args: input,
         attached_balance: Yocto::new(0),
-        attached_gas: READ_PROMISE_ATTACHED_GAS,
+        attached_gas: MIRROR_ERC20_TOKEN_CALLBACK_ATTACHED_GAS,
     };
     // Safe because these promises are read-only calls to the main engine contract
     // and this transaction could be executed by the owner of the contract only.
     let promise_id = unsafe {
-        let promise_id = handler.promise_create_and_combine(&promise);
+        let promise_id = handler.promise_create_and_combine(&promises);
         handler.promise_attach_callback(promise_id, &callback)
     };
 

@@ -57,10 +57,9 @@ impl Hashchain {
     }
 
     /// Moves to the indicated block height if it is bigger than the current block height:
-    /// -Updates the previous block hashchain computing the hash.
-    /// -Updates the current block height.
-    /// -Clears the transactions.
-    /// -Clears the transactions.
+    /// - Updates the previous block hashchain computing the hash.
+    /// - Updates the current block height.
+    /// - Clears the transactions.
     /// Returns an error in other case.
     pub fn move_to_block(
         &mut self,

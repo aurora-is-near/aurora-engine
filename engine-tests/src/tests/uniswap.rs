@@ -12,6 +12,7 @@ use aurora_engine_types::types::Wei;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use rand::SeedableRng;
+use std::sync::Arc;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -38,7 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(109, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(108, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -49,7 +50,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    utils::assert_gas_bound(profile.all_gas(), 31);
+    utils::assert_gas_bound(profile.all_gas(), 32);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (40..=50).contains(&wasm_fraction),
@@ -58,7 +59,7 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    utils::assert_gas_bound(profile.all_gas(), 16);
+    utils::assert_gas_bound(profile.all_gas(), 17);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (40..=50).contains(&wasm_fraction),
@@ -148,7 +149,9 @@ impl UniswapTestContext {
     }
 
     pub fn no_gas(&mut self) {
-        self.runner.wasm_config.regular_op_cost = 0;
+        Arc::get_mut(&mut self.runner.wasm_config)
+            .unwrap()
+            .regular_op_cost = 0;
     }
 
     pub fn create_tokens(&mut self, n: usize, mint_amount: U256) -> Vec<ERC20> {

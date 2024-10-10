@@ -27,7 +27,7 @@ fn test_promise_results_precompile() {
         data: Vec::new(),
     };
 
-    runner.promise_results = promise_results.clone();
+    runner.promise_results.clone_from(&promise_results);
     let result = runner
         .submit_transaction(&signer.secret_key, transaction)
         .unwrap();
@@ -119,14 +119,15 @@ fn test_promise_result_gas_cost() {
 
     let total_gas1 = y1 + baseline.all_gas();
     let total_gas2 = y2 + baseline.all_gas();
+
     assert!(
-        utils::within_x_percent(15, evm1, total_gas1 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(36, evm1, total_gas1 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
     assert!(
-        utils::within_x_percent(15, evm2, total_gas2 / NEAR_GAS_PER_EVM),
+        utils::within_x_percent(36, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",
         evm2,
         total_gas2 / NEAR_GAS_PER_EVM

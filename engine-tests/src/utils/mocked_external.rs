@@ -93,6 +93,10 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         }
     }
 
+    fn get_recorded_storage_size(&self) -> usize {
+        self.underlying.get_recorded_storage_size()
+    }
+
     fn validator_stake(&self, account_id: &AccountId) -> Result<Option<Balance>, VMLogicError> {
         self.underlying.validator_stake(account_id)
     }
@@ -101,12 +105,28 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         self.underlying.validator_total_stake()
     }
 
-    fn create_receipt(
+    fn create_action_receipt(
         &mut self,
         receipt_indices: Vec<ReceiptIndex>,
         receiver_id: AccountId,
     ) -> Result<ReceiptIndex, VMLogicError> {
-        self.underlying.create_receipt(receipt_indices, receiver_id)
+        self.underlying
+            .create_action_receipt(receipt_indices, receiver_id)
+    }
+
+    fn create_promise_yield_receipt(
+        &mut self,
+        receiver_id: AccountId,
+    ) -> Result<(ReceiptIndex, CryptoHash), VMLogicError> {
+        self.underlying.create_promise_yield_receipt(receiver_id)
+    }
+
+    fn submit_promise_resume_data(
+        &mut self,
+        data_id: CryptoHash,
+        data: Vec<u8>,
+    ) -> Result<bool, VMLogicError> {
+        self.underlying.submit_promise_resume_data(data_id, data)
     }
 
     fn append_action_create_account(

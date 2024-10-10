@@ -22,7 +22,7 @@ pub struct JsonSnapshotResult {
     /// Base 64 encoding of the block hash
     pub block_hash: String,
     pub block_height: u64,
-    /// See https://github.com/near/nearcore/blob/2bc63c60afe202e7c78a67176a4e267b8c0fb48f/core/primitives/src/views.rs#L201-L202.
+    /// See <https://github.com/near/nearcore/blob/2bc63c60afe202e7c78a67176a4e267b8c0fb48f/core/primitives/src/views.rs#L201-L202>.
     pub proof: Vec<String>,
     pub values: Vec<JsonSnapshotValue>,
 }
@@ -31,7 +31,7 @@ pub struct JsonSnapshotResult {
 pub struct JsonSnapshotValue {
     /// Base 64 encoding of the key
     pub key: String,
-    /// See https://github.com/near/nearcore/blob/2bc63c60afe202e7c78a67176a4e267b8c0fb48f/core/primitives/src/views.rs#L201-L202.
+    /// See <https://github.com/near/nearcore/blob/2bc63c60afe202e7c78a67176a4e267b8c0fb48f/core/primitives/src/views.rs#L201-L202>.
     pub proof: Vec<String>,
     /// Base 64 encoding of the value
     pub value: String,

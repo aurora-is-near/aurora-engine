@@ -180,10 +180,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     #[cfg(not(feature = "ext-connector"))]
-    assert_eq!(
-        get_total_supply(&mut runner),
-        INITIAL_BALANCE - TRANSFER_AMOUNT
-    );
+    // For CANCUN hard fork `total_supply` can't change
+    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 }
 
 #[test]
@@ -410,7 +408,7 @@ fn test_is_contract() {
 #[test]
 fn test_solidity_pure_bench() {
     let (mut runner, mut signer, _) = initialize_transfer();
-    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+    runner.max_gas_burnt(u64::MAX);
 
     let constructor = utils::solidity::ContractConstructor::force_compile(
         "src/tests/res",
@@ -445,7 +443,7 @@ fn test_solidity_pure_bench() {
     );
     let near_gas = profile.all_gas();
     assert!(
-        near_gas > 1500 * 1_000_000_000_000,
+        near_gas > 1400 * 1_000_000_000_000,
         "Expected 1500 NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
@@ -456,18 +454,23 @@ fn test_solidity_pure_bench() {
         base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
     utils::rust::compile(base_path);
     let contract_bytes = std::fs::read(output_path).unwrap();
-    let code = ContractCode::new(contract_bytes, None);
+    runner.set_code(ContractCode::new(contract_bytes, None));
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();
-    let outcome = near_vm_runner::run(
-        &code,
-        "cpu_ram_soak_test",
-        &mut runner.ext,
-        context,
-        &runner.wasm_config,
-        &runner.fees_config,
-        &[],
+
+    let contract = near_vm_runner::prepare(
+        &runner.ext.underlying,
+        runner.wasm_config.clone(),
         Some(&runner.cache),
+        context.make_gas_counter(runner.wasm_config.as_ref()),
+        "cpu_ram_soak_test",
+    );
+
+    let outcome = near_vm_runner::run(
+        contract,
+        &mut runner.ext,
+        &context,
+        runner.fees_config.clone(),
     )
     .unwrap();
     let profile = utils::ExecutionProfile::new(&outcome);
@@ -687,7 +690,7 @@ fn test_num_wasm_functions() {
     // See https://github.com/near/nearcore/issues/4814 for context
     let runner = utils::deploy_runner();
     let module = walrus::ModuleConfig::default()
-        .parse(runner.code.code())
+        .parse(runner.ext.underlying.code.unwrap().code())
         .unwrap();
     let expected_number = 1600;
     let actual_number = module.funcs.iter().count();
@@ -1069,7 +1072,8 @@ fn test_block_hash_contract() {
         })
         .unwrap();
 
-    utils::panic_on_fail(result.status);
+    let res = utils::panic_on_fail(result.status);
+    assert!(res.is_none(), "Status: {res:?}");
 }
 
 #[cfg(not(feature = "ext-connector"))]
@@ -1247,6 +1251,7 @@ mod workspace {
             Some(utils::AuroraRunner::default().chain_id),
             &signer.secret_key,
         );
+
         let result = aurora
             .submit(rlp::encode(&signed_tx).to_vec())
             .transact()

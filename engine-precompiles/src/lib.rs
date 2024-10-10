@@ -59,7 +59,7 @@ pub struct PrecompileOutput {
 
 impl PrecompileOutput {
     #[must_use]
-    pub fn without_logs(cost: EthGas, output: Vec<u8>) -> Self {
+    pub const fn without_logs(cost: EthGas, output: Vec<u8>) -> Self {
         Self {
             cost,
             output,
