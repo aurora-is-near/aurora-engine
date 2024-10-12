@@ -49,6 +49,9 @@ impl EthTransactionKindAdapter {
                         tx.transaction.to = None;
                     }
                 }
+                EthTransactionKind::Eip7702(_) => {
+                    unreachable!();
+                }
             }
         }
 
