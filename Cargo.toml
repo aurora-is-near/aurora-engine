@@ -40,17 +40,17 @@ function_name = "0.3"
 git2 = "0.19"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
-impl-serde = { version = "0.4", default-features = false }
+impl-serde = { version = "0.5", default-features = false }
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.25"
+near-crypto = "0.26"
 near-gas = "0.3"
-near-parameters = "0.25"
-near-primitives = "0.25"
-near-primitives-core = "0.25"
+near-parameters = "0.26"
+near-primitives = "0.26"
+near-primitives-core = "0.26"
 near-sdk = "5"
-near-vm-runner = { version = "0.25", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.12"
+near-vm-runner = { version = "0.26", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
+near-workspaces = "0.14"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -67,7 +67,7 @@ strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
-walrus = "0.21"
+walrus = "0.22"
 wee_alloc = { version = "0.4", default-features = false }
 
 [workspace]
