@@ -71,10 +71,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        #[cfg(not(feature = "ext-connector"))]
         near_gas_used: 168,
-        #[cfg(feature = "ext-connector")]
-        near_gas_used: 167,
     });
 }
 
@@ -91,7 +88,7 @@ fn repro_5bEgfRQ() {
         block_timestamp: 1_651_073_772_931_594_646,
         input_path: "src/tests/res/input_5bEgfRQ.hex",
         evm_gas_used: 6_414_105,
-        near_gas_used: 650,
+        near_gas_used: 649,
     });
 }
 
