@@ -74,7 +74,7 @@ fn repro_FRcorNv() {
         #[cfg(not(feature = "ext-connector"))]
         near_gas_used: 168,
         #[cfg(feature = "ext-connector")]
-        near_gas_used: 167,
+        near_gas_used: 168,
     });
 }
 
