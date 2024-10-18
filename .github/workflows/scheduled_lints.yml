@@ -30,7 +30,10 @@ jobs:
             target/
           key: ${{ matrix.profile }}-cargo-test
       - name: Install dependencies
-        run: sudo apt update && sudo apt install -y yarn
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          sudo apt update && sudo apt install -y yarn
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
