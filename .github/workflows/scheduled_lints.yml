@@ -17,11 +17,18 @@ jobs:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Install dependencies
+        run: |
+          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+          sudo apt update && sudo apt install -y yarn build-essential libclang-dev
       - name: Clone the repository
         uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable, nightly
+          cache: 'false'
+          toolchain: stable
           target: wasm32-unknown-unknown
       - name: Cargo Cache
         uses: actions/cache@v4
@@ -33,11 +40,6 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.profile }}-cargo-test
-      - name: Install dependencies
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          sudo apt update && sudo apt install -y yarn build-essential libclang-dev
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
