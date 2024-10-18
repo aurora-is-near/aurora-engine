@@ -3,7 +3,7 @@ TAG=`curl -s https://rpc.${NETWORK}.near.org/status  | jq -r .version.build`
 
 git clone https://github.com/near/nearcore -b $TAG
 cd nearcore
-make sandbox
+make sandbox-release
 mv $(find target -name neard-sandbox) ../
 cd ..
 rm -rf nearcore

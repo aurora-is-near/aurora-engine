@@ -2,11 +2,13 @@
 on:
   schedule:
     - cron: '0 9 * * 1-5'
+  pull_request: # !!! Remove after successful testing !!!
+
 name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: github-hosted-heavy-runner
+    runs-on: k8s-infrastructure-generic
     strategy:
       fail-fast: false
       matrix:
