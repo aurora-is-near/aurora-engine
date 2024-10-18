@@ -8,7 +8,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: k8s-infrastructure-generic
+    runs-on: k8s-infrastructure-dind
     strategy:
       fail-fast: false
       matrix:
