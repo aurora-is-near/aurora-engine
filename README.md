@@ -93,7 +93,7 @@ cargo make --profile mainnet build
 
 #### Verifying binary hash
 
-To verify that a deployed binary matches the source code, you may want build it reproducibly and then verify that the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being deployed.
+To verify that a deployed binary matches the source code, you may want to build it reproducibly and then verify that the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being deployed.
 
 Run these commands to produce the binary hash:
 ```sh
@@ -141,7 +141,7 @@ The following tasks are available to clean up the workspace:
 
 Additionally, there is also but not included in the `clean` task:
 
-- `sweep`: sweeps the set amount of days in the ENV, default at 30 days.
+- `sweep`: sweeps the set amount of days in the ENV, default to 30 days.
 
 For example, the following command will clean everything. `profile` is not 
 required:
