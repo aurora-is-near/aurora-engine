@@ -141,7 +141,7 @@ The following tasks are available to clean up the workspace:
 
 Additionally, there is also but not included in the `clean` task:
 
-- `sweep`: sweeps the set amount of days in the ENV, default at 30 days.
+- `sweep`: sweeps the set amount of days in the ENV, default to 30 days.
 
 For example, the following command will clean everything. `profile` is not 
 required:
@@ -154,5 +154,5 @@ cargo make clean
 
 ## License
 **aurora-engine** has multiple licenses:
-* All crates except `engine-test` has **CCO-1.0** license
+* All crates except `engine-test` have **CCO-1.0** license
 * `engine-test` has **GPL-v3** license

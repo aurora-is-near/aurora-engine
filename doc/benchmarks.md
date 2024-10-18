@@ -13,13 +13,13 @@ A final quantity of interest is the wall-clock time to execute a transaction.
 This is less important for us as a smart contract on NEAR, but is reasonably important for the NEAR runtime itself.
 At a high level, the NEAR runtime attempts to maintain the invariant that 1000 Tgas worth of computation can be completed in 1 second (regardless of which operations happen within this 1000 Tgas).
 This arises from the [1000 Tgas gas limit](https://github.com/near/nearcore/blob/9a41274ddef3616ab195b24a207389c5ad5c7f5a/nearcore/res/genesis_config.json#L20) per block and the [1 second block time](https://github.com/near/nearcore/blob/9a41274ddef3616ab195b24a207389c5ad5c7f5a/nearcore/res/genesis_config.json#L238).
-Moreover, the runtime wants the there to be a linear relationship between gas usage and time taken to complete the computation.
+Moreover, the runtime wants a linear relationship between gas usage and time taken to complete the computation.
 Obviously wall-clock time is not a stable metric as it varies according to the hardware and other details of the system running the test.
 This means in reality the NEAR runtime measures gas costs by counting CPU instructions, with the assumption this has a rough correlation with wall-clock time.
 For us, we measure wall-clock time because it is simpler and we do not need extreme precision the same way the runtime itself does.
 The primary goal of these wall-clock measurements is simply to check the runtime's assumptions about the linear relationship between gas used and wall-clock time, and how much gas can be consumed in 1 second.
 
-## How to do we measure these things?
+## How do we measure these things?
 
 NEAR gas is measured by [importing the NEAR runtime as a library](https://github.com/aurora-is-near/aurora-engine/blob/0fe4f0506866bd8813b270760864d22723925962/engine-tests/Cargo.toml#L34-L35), and executing our engine contract inside it.
 There a [simple profiling structure](https://github.com/near/nearcore/blob/9a41274ddef3616ab195b24a207389c5ad5c7f5a/core/primitives-core/src/profile.rs#L49) that is returned by the runtime which breaks down how much NEAR gas was used by each host function which we also use.
@@ -64,7 +64,7 @@ make mainnet-test-build && cargo test --features mainnet-test uniswap
 ```
 
 The adding liquidity operation consumes around 500k EVM gas, and around 165 NEAR Tgas.
-With an EVM gas limit of 15 million on Ethereum. this means around 30 such operations could fit in one block.
+With an EVM gas limit of 15 million on Ethereum. This means around 30 such operations could fit in one block.
 30 such operations on Aurora would cost nearly 5000 Tgas, the equivalent of 5 blocks.
 Therefore, for this benchmark we aim to have it cost 1/5th the amount of NEAR gas it does presently.
 
