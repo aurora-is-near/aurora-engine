@@ -27,9 +27,9 @@ jobs:
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          cache: 'false'
+          cache: false
           toolchain: stable
-          target: wasm32-unknown-unknown
+          override: false
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
