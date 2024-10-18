@@ -20,6 +20,9 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable, nightly
+          target: wasm32-unknown-unknown
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
