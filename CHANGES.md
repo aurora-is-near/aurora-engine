@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
 
 - Fixed underflow in the modexp gas calculation by [@guidovranken]. ([#883])
-- Prevented subtraction underflow in th xcc module by [@guidovranken]. ([#888])
+- Prevented subtraction underflow in the xcc module by [@guidovranken]. ([#888])
 - Fixed balance and gas overflows in the xcc module by [@guidovranken]. ([#889])
 
 ### Changes
@@ -287,7 +287,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- Use ibig implemenation of modexp by [@birchmd]. ([#778])
+- Use ibig implementation of modexp by [@birchmd]. ([#778])
 
 [#778]: https://github.com/aurora-is-near/aurora-engine/pull/778
 
@@ -504,9 +504,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changes
 
 - Performance improvements by [@birchmd] and [@matklad]; the engine should now consume much less NEAR gas: ([#427]) ([#438]) ([#439]) ([#445]) ([#446])
-- Security improvment: only Engine contract owner can use the `deploy_upgrade` method by [@birchmd]. ([#410])
+- Security improvement: only Engine contract owner can use the `deploy_upgrade` method by [@birchmd]. ([#410])
 - Bug fix: Engine now returns the error message in the case of a revert during an EVM contract deploy, previously it would always return an address (even when the deploy failed) by [@birchmd]. ([#424])
-- Security improvment: Engine will no longer accept EVM transactions without a chain ID as part of their signature by [@birchmd]. This should have no impact on users as all modern Ethereum tooling includes the chain ID. ([#432])
+- Security improvement: Engine will no longer accept EVM transactions without a chain ID as part of their signature by [@birchmd]. This should have no impact on users as all modern Ethereum tooling includes the chain ID. ([#432])
 - Improvements to code quality by [@mrLSD]: ([#386]) ([#387])
 - Improvements and additions to internal tests and benchmarks by [@birchmd]: ([#408]) ([#415]) ([#429])
 
@@ -592,7 +592,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Public method for computing Aurora blockhash at a given hight by [@birchmd]. ([#303](https://github.com/aurora-is-near/aurora-engine/pull/303))
+- Public method for computing Aurora blockhash at a given height by [@birchmd]. ([#303](https://github.com/aurora-is-near/aurora-engine/pull/303))
 
 ### Changed
 
