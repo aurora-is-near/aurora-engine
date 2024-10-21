@@ -93,7 +93,7 @@ cargo make --profile mainnet build
 
 #### Verifying binary hash
 
-To verify that a deployed binary matches the source code, you may want build it reproducibly and then verify that the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being deployed.
+To verify that a deployed binary matches the source code, you may want to build it reproducibly and then verify that the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being deployed.
 
 Run these commands to produce the binary hash:
 ```sh
