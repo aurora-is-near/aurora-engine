@@ -214,6 +214,10 @@ pub fn parse_transaction_kind(
             let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddRelayerKey(args)
         }
+        TransactionKindTag::StoreRelayerKeyCallback => {
+            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::StoreRelayerKeyCallback(args)
+        }
         TransactionKindTag::RemoveRelayerKey => {
             let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveRelayerKey(args)
@@ -695,6 +699,11 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::AddRelayerKey(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::StoreRelayerKeyCallback(_) => {
+            contract_methods::admin::store_relayer_key_callback(io, env)?;
 
             None
         }

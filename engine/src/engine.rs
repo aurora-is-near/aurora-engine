@@ -789,7 +789,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
                 recipient = fallback_address;
             }
-        };
+        }
 
         let erc20_token = {
             let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
