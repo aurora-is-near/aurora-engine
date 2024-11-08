@@ -32,7 +32,7 @@ pub fn download_and_compile_solidity_sources(
         // install packages
         let output = Command::new("/usr/bin/env")
             .current_dir(&sources_dir)
-            .args(["yarn", "install"])
+            .args(["yarn", "install", "--network-concurrency", "1"])
             .output()
             .unwrap();
         assert!(
