@@ -1,3 +1,4 @@
+#![feature(lazy_cell)]
 #![deny(clippy::pedantic, clippy::nursery)]
 #![allow(clippy::unreadable_literal, clippy::module_name_repetitions)]
 #[cfg(test)]

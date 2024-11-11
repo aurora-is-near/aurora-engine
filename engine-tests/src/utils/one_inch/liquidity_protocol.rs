@@ -1,12 +1,9 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
+use crate::utils::one_inch::LIQUIDITY_PROTOCOL_PATH;
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, solidity, ExecutionProfile};
 use aurora_engine_types::types::Wei;
-use std::path::PathBuf;
-use std::sync::Once;
-
-static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 pub struct Helper<'a> {
     pub runner: &'a mut utils::AuroraRunner,
@@ -17,9 +14,8 @@ impl<'a> Helper<'a> {
     pub(crate) fn create_mooniswap_deployer(
         &mut self,
     ) -> (SubmitResult, ExecutionProfile, PoolDeployer) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let deployer_constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
         );
         let data = deployer_constructor.code;
         let abi = deployer_constructor.abi;
@@ -52,9 +48,8 @@ impl<'a> Helper<'a> {
         &mut self,
         pool_deployer: &PoolDeployer,
     ) -> (SubmitResult, ExecutionProfile, PoolFactory) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("MooniswapFactory.sol/MooniswapFactory.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("MooniswapFactory.sol/MooniswapFactory.json"),
         );
 
         let signer_address = utils::address_from_secret_key(&self.signer.secret_key);
@@ -84,9 +79,8 @@ impl<'a> Helper<'a> {
         token_a: Address,
         token_b: Address,
     ) -> (SubmitResult, ExecutionProfile, Pool) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("Mooniswap.sol/Mooniswap.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("Mooniswap.sol/Mooniswap.json"),
         );
 
         let (result, profile) = self
@@ -247,8 +241,4 @@ impl Pool {
     pub const fn address(&self) -> Address {
         self.0.address
     }
-}
-
-fn download_and_compile_solidity_sources() -> PathBuf {
-    super::download_and_compile_solidity_sources("liquidity-protocol", &DOWNLOAD_COMPILE_ONCE)
 }
