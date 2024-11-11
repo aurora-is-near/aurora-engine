@@ -451,6 +451,17 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Callback which is called by `add_relayer_key` and stores the relayer function
+    /// call key into the storage.
+    #[no_mangle]
+    pub extern "C" fn store_relayer_key_callback() {
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::store_relayer_key_callback(io, &env)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Removes a relayer function call key.
     #[no_mangle]
     pub extern "C" fn remove_relayer_key() {

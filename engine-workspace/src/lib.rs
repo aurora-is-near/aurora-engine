@@ -115,10 +115,11 @@ impl EngineContractBuilder {
         } else {
             node.root()
         };
+        let public_key = owner_acc.public_key()?;
         let contract = owner_acc
             .deploy(&self.code.expect("WASM wasn't set"))
             .await?;
-        let engine: EngineContract = (contract, node).into();
+        let engine: EngineContract = (contract, public_key, node).into();
 
         engine
             .new(self.chain_id, self.owner_id, self.upgrade_delay_blocks)

@@ -34,6 +34,7 @@ use aurora_engine_types::parameters::silo::{
     FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
+use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::{Address, RawU256, WeiU256};
 use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
@@ -43,6 +44,7 @@ use serde_json::json;
 #[derive(Debug, Clone)]
 pub struct EngineContract {
     contract: RawContract,
+    public_key: PublicKey,
     pub node: Node,
 }
 
@@ -59,6 +61,10 @@ impl EngineContract {
         self.node.root()
     }
 
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
     pub fn create_account(&self, account_id: &AccountId, secret_key: SecretKey) -> Account {
         let inner = near_workspaces::Account::from_secret_key(
             account_id.as_ref().parse().unwrap(),
@@ -70,9 +76,13 @@ impl EngineContract {
     }
 }
 
-impl From<(RawContract, Node)> for EngineContract {
-    fn from((contract, node): (RawContract, Node)) -> Self {
-        Self { contract, node }
+impl From<(RawContract, PublicKey, Node)> for EngineContract {
+    fn from((contract, public_key, node): (RawContract, PublicKey, Node)) -> Self {
+        Self {
+            contract,
+            public_key,
+            node,
+        }
     }
 }
 

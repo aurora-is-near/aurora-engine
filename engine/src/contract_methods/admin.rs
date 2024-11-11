@@ -49,6 +49,7 @@ use function_name::named;
 const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(50_000_000_000_000);
+const GAS_FOR_STORING_RELAYER_KEY: NearGas = NearGas::new(5_000_000_000_000);
 
 #[named]
 pub fn new<I: IO + Copy, E: Env>(mut io: I, env: &E) -> Result<(), ContractError> {
@@ -309,46 +310,72 @@ pub fn set_key_manager<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Contr
     })
 }
 
-#[named]
 pub fn add_relayer_key<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
 ) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+
+    require_running(&state)?;
+    require_key_manager_only(&state, &env.predecessor_account_id())?;
+
+    let input = io.read_input().to_vec();
+    let public_key = serde_json::from_slice::<RelayerKeyArgs>(&input)
+        .map(|args| args.public_key)
+        .map_err(|_| errors::ERR_JSON_DESERIALIZE)?;
+    let allowance = Yocto::new(env.attached_deposit());
+    aurora_engine_sdk::log!("attached key allowance: {allowance}");
+
+    if allowance.as_u128() < 100 {
+        // TODO: Clarify the minimum amount if check is needed then change error type
+        return Err(errors::ERR_NOT_ALLOWED.into());
+    }
+
+    let current_account_id = env.current_account_id();
+    let promise = PromiseBatchAction {
+        target_account_id: current_account_id.clone(),
+        actions: vec![
+            PromiseAction::AddFunctionCallKey {
+                public_key,
+                allowance,
+                nonce: 0, // not actually used - depends on block height
+                receiver_id: current_account_id,
+                function_names: "call,submit,submit_with_args".into(),
+            },
+            PromiseAction::FunctionCall {
+                name: "store_relayer_key_callback".to_string(),
+                args: input,
+                attached_yocto: ZERO_YOCTO,
+                gas: GAS_FOR_STORING_RELAYER_KEY,
+            },
+        ],
+    };
+
+    let promise_id = unsafe { handler.promise_create_batch(&promise) };
+    handler.promise_return(promise_id);
+
+    Ok(())
+}
+
+#[named]
+pub fn store_relayer_key_callback<I: IO + Copy, E: Env>(
+    io: I,
+    env: &E,
+) -> Result<(), ContractError> {
     with_hashchain(io, env, function_name!(), |mut io| {
         let state = state::get_state(&io)?;
 
         require_running(&state)?;
-        require_key_manager_only(&state, &env.predecessor_account_id())?;
+        env.assert_private_call()?;
 
         let public_key = serde_json::from_slice::<RelayerKeyArgs>(&io.read_input().to_vec())
             .map(|args| args.public_key)
             .map_err(|_| errors::ERR_JSON_DESERIALIZE)?;
-        let allowance = Yocto::new(env.attached_deposit());
-        aurora_engine_sdk::log!("attached key allowance: {allowance}");
 
-        if allowance.as_u128() < 100 {
-            // TODO: Clarify the minimum amount if check is needed then change error type
-            return Err(errors::ERR_NOT_ALLOWED.into());
-        }
+        aurora_engine_sdk::log!("add relayer public key: {public_key}");
 
         engine::add_function_call_key(&mut io, &public_key);
-
-        let current_account_id = env.current_account_id();
-        let action = PromiseAction::AddFunctionCallKey {
-            public_key,
-            allowance,
-            nonce: 0, // not actually used - depends on block height
-            receiver_id: current_account_id.clone(),
-            function_names: "call,submit,submit_with_args".into(),
-        };
-        let promise = PromiseBatchAction {
-            target_account_id: current_account_id,
-            actions: vec![action],
-        };
-
-        let promise_id = unsafe { handler.promise_create_batch(&promise) };
-        handler.promise_return(promise_id);
 
         Ok(())
     })
