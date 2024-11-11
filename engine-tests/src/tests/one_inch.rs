@@ -1,16 +1,13 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Wei, U256};
-use crate::utils::one_inch::liquidity_protocol;
+use crate::utils::one_inch::{liquidity_protocol, LIMIT_ORDER_PROTOCOL_PATH};
 use crate::utils::{self, assert_gas_bound};
 use aurora_engine_types::{borsh::BorshDeserialize, types::Address};
 use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
-use std::sync::Once;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
-
-static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 #[test]
 fn test_1inch_liquidity_protocol() {
@@ -113,11 +110,8 @@ fn deploy_1_inch_limit_order_contract(
     runner: &mut utils::AuroraRunner,
     signer: &mut utils::Signer,
 ) -> VMOutcome {
-    let artifacts_path = utils::one_inch::download_and_compile_solidity_sources(
-        "limit-order-protocol",
-        &DOWNLOAD_COMPILE_ONCE,
-    );
-    let contract_path = artifacts_path.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
+    let contract_path =
+        LIMIT_ORDER_PROTOCOL_PATH.join("LimitOrderProtocol.sol/LimitOrderProtocol.json");
     let constructor =
         utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 

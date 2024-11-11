@@ -182,7 +182,8 @@ async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract 
         .unwrap();
     let silo_bytes = AuroraRunner::get_engine_code();
     let contract = silo_account.deploy(&silo_bytes).await.unwrap();
-    let silo = EngineContract::from((contract, main_contract.node.clone()));
+    let public_key = silo_account.public_key().unwrap();
+    let silo = EngineContract::from((contract, public_key, main_contract.node.clone()));
 
     let result = silo
         .new(
