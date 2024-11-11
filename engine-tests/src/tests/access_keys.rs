@@ -193,6 +193,52 @@ async fn test_delete_relayer_key() {
 }
 
 #[tokio::test]
+async fn test_delete_fak_via_relayer_key() {
+    let aurora = deploy_engine().await;
+    let public_key = aurora.public_key();
+
+    let manager = aurora
+        .root()
+        .create_subaccount("key_manager", BALANCE)
+        .await
+        .unwrap();
+    let result = aurora
+        .set_key_manager(RelayerKeyManagerArgs {
+            key_manager: Some(manager.id().clone()),
+        })
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
+
+    let result = manager
+        .call(&aurora.id(), "add_relayer_key")
+        .args_json(RelayerKeyArgs { public_key })
+        .max_gas()
+        .deposit(DEPOSIT)
+        .transact()
+        .await
+        .unwrap();
+    // Should be failed because the key is already added.
+    assert!(result.is_failure());
+
+    let result = manager
+        .call(&aurora.id(), "remove_relayer_key")
+        .args_json(RelayerKeyArgs { public_key })
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    // Should be failed because the key hasn't been added by the `store_relayer_key_callback`
+    // triggered by the `add_relayer_key` transaction. The changes made by
+    // `store_relayer_key_callback` are rollbacked in this case because it’s called with
+    // `AddFunctionCallKey` action in one batch, and the action `AddFunctionCallKey`
+    // failed because the key is already added.
+    assert!(result.is_failure());
+}
+
+#[tokio::test]
 async fn test_call_not_allowed_method() {
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
