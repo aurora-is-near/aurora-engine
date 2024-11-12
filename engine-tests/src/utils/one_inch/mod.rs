@@ -14,8 +14,8 @@ pub static LIMIT_ORDER_PROTOCOL_PATH: LazyLock<PathBuf> =
 
 fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     let target_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
-    let lock_file = target_dir.join(&format!("{repo_name}.lock"));
-    // Using file lock to prevent parallel execution from the different processes in GitHub CI.
+    let lock_file = target_dir.join(format!("{repo_name}.lock"));
+    // Using a file lock to prevent parallel execution from the different processes in GitHub CI.
     let mut lock = fslock::LockFile::open(&lock_file).unwrap();
 
     lock.lock().unwrap();
