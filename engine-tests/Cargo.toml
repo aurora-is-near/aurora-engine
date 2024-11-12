@@ -34,7 +34,6 @@ evm-gasometer.workspace = true
 evm-runtime.workspace = true
 git2.workspace = true
 hex.workspace = true
-fslock.workspace = true
 libsecp256k1.workspace = true
 near-crypto.workspace = true
 near-parameters.workspace = true

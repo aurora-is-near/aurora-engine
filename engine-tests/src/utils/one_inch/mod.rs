@@ -13,14 +13,9 @@ pub static LIMIT_ORDER_PROTOCOL_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| download_and_compile_solidity_sources("limit-order-protocol"));
 
 fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
-    let target_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target");
-    let lock_file = target_dir.join(format!("{repo_name}.lock"));
-    // Using a file lock to prevent parallel execution from the different processes in GitHub CI.
-    let mut lock = fslock::LockFile::open(&lock_file).unwrap();
-
-    lock.lock().unwrap();
-
-    let sources_dir = target_dir.join(repo_name);
+    let sources_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(repo_name);
     // Contracts not already present, so download and compile them (but only once, even
     // if multiple tests running in parallel saw `contracts_dir` does not exist).
     if !sources_dir.exists() {
@@ -50,8 +45,6 @@ fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     // clean and compile EVM contracts
     hardhat(&sources_dir, "clean");
     hardhat(&sources_dir, "compile");
-
-    lock.unlock().unwrap();
 
     sources_dir.join("artifacts/contracts")
 }

@@ -36,7 +36,6 @@ evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.
 evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false, features = ["std", "tracing"] }
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
-fslock = "0.2"
 function_name = "0.3"
 git2 = "0.19"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
