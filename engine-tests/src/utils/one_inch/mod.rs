@@ -13,7 +13,8 @@ pub static LIMIT_ORDER_PROTOCOL_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| download_and_compile_solidity_sources("limit-order-protocol"));
 
 fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
-    let sources_dir = Path::new("target").join(repo_name);
+    let process_id = std::process::id();
+    let sources_dir = Path::new(&format!("target/{process_id}")).join(repo_name);
 
     // Contracts not already present, so download and compile them (but only once, even
     // if multiple tests running in parallel saw `contracts_dir` does not exist).
