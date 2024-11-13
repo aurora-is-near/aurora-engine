@@ -38,8 +38,11 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
+            target/liquidity-protocol
+            target/limit-order-protocol
           key: ${{ matrix.profile }}-cargo-test
       - name: Check cache
+        continue-on-error: true
         run: |
           ls -la target/
           ls -la target/liquidity-protocol
@@ -68,6 +71,12 @@ jobs:
           esac
       - name: Tests ${{ matrix.profile }}
         run: cargo make --profile ${{ matrix.profile }} test-flow
+      - name: Check cache after tests
+        continue-on-error: true
+        run: |
+          ls -la target/
+          ls -la target/liquidity-protocol
+          ls -la target/limit-order-protocol
 
   test_modexp:
     name: Test modexp suite ${{ matrix.profile }}
