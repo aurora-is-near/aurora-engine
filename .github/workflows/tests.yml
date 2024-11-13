@@ -39,6 +39,11 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.profile }}-cargo-test
+      - name: Check cache
+        run: |
+          ls -la target/
+          ls -la target/liquidity-protocol
+          ls -la target/limit-order-protocol
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
