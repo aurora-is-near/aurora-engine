@@ -14,6 +14,8 @@ pub static LIMIT_ORDER_PROTOCOL_PATH: LazyLock<PathBuf> =
 
 fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     let sources_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
         .join("target")
         .join(repo_name);
     // Contracts not already present, so download and compile them (but only once, even

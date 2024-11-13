@@ -38,8 +38,6 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-            target/liquidity-protocol
-            target/limit-order-protocol
           key: ${{ matrix.profile }}-cargo-test
       - name: Check cache
         continue-on-error: true
