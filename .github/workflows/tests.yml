@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite ${{ matrix.profile }}
-    runs-on: github-hosted-heavy-runner
+    runs-on: k8s-infrastructure-dind
     strategy:
       fail-fast: false
       matrix:
@@ -21,6 +21,14 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/dind.sh
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable
+          override: false
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -35,10 +43,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'yarn'
+          cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build main contract
@@ -58,7 +66,8 @@ jobs:
 
   test_modexp:
     name: Test modexp suite ${{ matrix.profile }}
-    runs-on: github-hosted-heavy-runner
+    runs-on: k8s-infrastructure-native
+    container: ubuntu:20.04
     strategy:
       fail-fast: false
       matrix:
@@ -69,6 +78,14 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable
+          override: false
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -81,6 +98,10 @@ jobs:
           key: ${{ matrix.profile }}-cargo-modexp-test
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
       - name: Test ${{ matrix.profile }} bench-modexp
         run: cargo make --profile ${{ matrix.profile }} bench-modexp
 

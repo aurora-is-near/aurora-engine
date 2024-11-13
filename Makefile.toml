@@ -72,8 +72,9 @@ args = [
 
 [tasks.udeps]
 category = "Check"
-env = { "CARGO_MAKE_RUST_CHANNEL" = "nightly", "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.41", test_arg = ["udeps", "-h"], force = true }
+env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
+toolchain = "nightly"
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.52", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",

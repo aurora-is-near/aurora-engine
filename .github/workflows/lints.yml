@@ -8,49 +8,61 @@ on:
 
 name: Lints
 jobs:
-  fmt:
-    name: Format
-    runs-on: [ self-hosted, light ]
+  rust:
+    name: Run ${{ matrix.command }}
+    runs-on: k8s-infrastructure-native
+    container: ubuntu:20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [ check-fmt, clippy, udeps ]
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Run cargo fmt
-        run: cargo make check-fmt
-  clippy:
-    name: Clippy
-    runs-on: [ self-hosted, heavy ]
-    steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Clone the repository
-        uses: actions/checkout@v4
-      - run: cargo make build-contracts
-      - name: Run Contract cargo clippy
-        run: cargo make clippy
-  udeps:
-    name: Udeps
-    runs-on: [ self-hosted, heavy ]
-    steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Clone the repository
-        uses: actions/checkout@v4
-      - name: Run udeps
-        run: cargo make udeps
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable,nightly
+          override: false
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Run ${{ matrix.command }}
+        run: cargo make ${{ matrix.command }}
+
   contracts:
     name: Contracts
-    runs-on: [ self-hosted, light ]
+    runs-on: k8s-infrastructure-native
+    container: ubuntu:20.04
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable
+          override: false
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin

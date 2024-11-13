@@ -2,6 +2,7 @@
 on:
   schedule:
     - cron: '0 9 * * 1-5'
+
 name: Scheduled checks
 jobs:
   tests:
@@ -15,13 +16,10 @@ jobs:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Install dependencies
-        run: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          sudo apt update && sudo apt install -y yarn build-essential pkg-config libclang-dev libssl-dev
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/dind.sh
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -41,11 +39,11 @@ jobs:
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
-          node-version: 16
-          cache: 'yarn'
+          node-version: 18
+          cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
@@ -62,13 +60,28 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: [ self-hosted, heavy ]
+    runs-on: k8s-infrastructure-native
+    container: ubuntu:20.04
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable,nightly
+          override: false
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
       - run: cargo make check
       - uses: 8398a7/action-slack@v3
         if: failure()
