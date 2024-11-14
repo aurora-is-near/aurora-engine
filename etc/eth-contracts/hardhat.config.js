@@ -17,7 +17,7 @@ const privateKey = process.env.PRIVATE_KEY || '';
 module.exports = {
     newStorageLayoutPath: './storageLayout',
     solidity: {
-        version: '0.8.15',
+        version: '0.8.24', // shanghai hardfork
         settings: {
             optimizer: {
                 enabled: true,
