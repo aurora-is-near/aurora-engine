@@ -15,7 +15,6 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        max-parallel: 2
         profile: [ mainnet, testnet, mainnet-silo, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
@@ -65,7 +64,6 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        max-parallel: 1
         profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
