@@ -36,7 +36,7 @@ jobs:
           npm install -g yarn
           echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
       - name: Build contracts
-      - run: cargo make build-contracts
+        run: cargo make build-contracts
       - name: Run Contract cargo clippy
         run: cargo make clippy
   udeps:
