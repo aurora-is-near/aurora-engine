@@ -13,6 +13,7 @@ jobs:
     runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         profile: [ mainnet, testnet, mainnet-silo, testnet-silo ]
     steps:
@@ -61,6 +62,7 @@ jobs:
     runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         profile: [ mainnet, testnet ]
     steps:
