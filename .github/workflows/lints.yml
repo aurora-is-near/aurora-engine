@@ -32,7 +32,7 @@ jobs:
         run: |
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm use 18
+          nvm install 18 && nvm alias default 18
       - run: cargo make build-contracts
       - name: Run Contract cargo clippy
         run: cargo make clippy
@@ -60,7 +60,7 @@ jobs:
         run: |
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm use 18
+          nvm install 18 && nvm alias default 18
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin
