@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install node
         run: |
-          export NVM_DIR="$HOME/.nvm"
+          export NVM_DIR="$HOME/.nvm" [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           nvm install 18 && nvm use 18
       - run: cargo make build-contracts
       - name: Run Contract cargo clippy
@@ -57,7 +57,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install node
         run: |
-          export NVM_DIR="$HOME/.nvm"
+          export NVM_DIR="$HOME/.nvm" [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           nvm install 18 && nvm use 18
       - name: Run yarn lint
         run: cargo make check-contracts
