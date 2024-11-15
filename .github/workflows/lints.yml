@@ -28,6 +28,10 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install node
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+          nvm install 18 && nvm use 18
       - run: cargo make build-contracts
       - name: Run Contract cargo clippy
         run: cargo make clippy
@@ -51,6 +55,10 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install node
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+          nvm install 18 && nvm use 18
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin
