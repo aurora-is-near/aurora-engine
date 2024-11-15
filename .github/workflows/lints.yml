@@ -28,11 +28,12 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install node
+      - name: Build contracts
         run: |
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           nvm install 18 && nvm alias default 18
+          npm install -g yarn
           cargo make build-contracts
       - name: Run Contract cargo clippy
         run: cargo make clippy
@@ -61,6 +62,7 @@ jobs:
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           nvm install 18 && nvm alias default 18
+          npm install -g yarn
           cargo make check-contracts
       - name: Check committed EvmErc20.bin
         run: bash scripts/verify_evm_erc20.sh
