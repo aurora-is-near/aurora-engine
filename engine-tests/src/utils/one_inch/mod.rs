@@ -35,7 +35,7 @@ fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     // install packages
     let output = Command::new("/usr/bin/env")
         .current_dir(&sources_dir)
-        .args(["yarn", "install", "--force", "--network-timeout", "1000000"])
+        .args(["yarn", "install", "--cache-folder", repo_name])
         .output()
         .unwrap();
     assert!(
