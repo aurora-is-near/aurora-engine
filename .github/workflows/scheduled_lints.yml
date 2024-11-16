@@ -41,8 +41,8 @@ jobs:
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
-          node-version: 16
-          cache: 'yarn'
+          node-version: 18
+          cache: yarn
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
