@@ -35,6 +35,9 @@ fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     // install packages
     let output = Command::new("/usr/bin/env")
         .current_dir(&sources_dir)
+        // The `--cache-folder` argument should be provided because there could be a case when
+        // two instances of yarn are running in parallel, and they are trying to install
+        // the same dependencies.
         .args(["yarn", "install", "--cache-folder", repo_name])
         .output()
         .unwrap();
