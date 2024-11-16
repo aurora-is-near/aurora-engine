@@ -20,7 +20,7 @@
     "eth-gas-reporter": "^0.2.25",
     "ethereum-waffle": "^3.4.4",
     "ethers": "^5.6.9",
-    "hardhat": "^2.12.7",
+    "hardhat": "^2.12.15",
     "hardhat-storage-layout": "^0.1.6",
     "rainbow-bridge-lib": "^3.0.0",
     "solc": "0.8.15",

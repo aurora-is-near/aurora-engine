@@ -14,6 +14,8 @@ pub static LIMIT_ORDER_PROTOCOL_PATH: LazyLock<PathBuf> =
 
 fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     let sources_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
         .join("target")
         .join(repo_name);
     // Contracts not already present, so download and compile them (but only once, even
@@ -33,7 +35,10 @@ fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
     // install packages
     let output = Command::new("/usr/bin/env")
         .current_dir(&sources_dir)
-        .args(["yarn", "install"])
+        // The `--cache-folder` argument should be provided because there could be a case when
+        // two instances of yarn are running in parallel, and they are trying to install
+        // the same dependencies.
+        .args(["yarn", "install", "--cache-folder", repo_name])
         .output()
         .unwrap();
     assert!(
