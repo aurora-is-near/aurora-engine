@@ -1,8 +1,8 @@
 ---
 on:
   schedule:
-    - cron: '0 9 * * 1-5'
-  pull_request:
+    - cron: '0 8 * * 1-5'
+
 name: Scheduled checks
 jobs:
   tests:
