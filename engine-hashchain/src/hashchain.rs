@@ -60,6 +60,7 @@ impl Hashchain {
     /// - Updates the previous block hashchain computing the hash.
     /// - Updates the current block height.
     /// - Clears the transactions.
+    ///
     /// Returns an error in other case.
     pub fn move_to_block(
         &mut self,

@@ -6,7 +6,6 @@ use crate::prelude::{Address, H256};
 use sha3::{Digest, Keccak256};
 
 #[cfg(feature = "contract")]
-#[inline]
 #[must_use]
 pub fn keccak(input: &[u8]) -> H256 {
     unsafe {
