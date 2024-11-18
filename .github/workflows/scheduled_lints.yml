@@ -2,6 +2,7 @@
 on:
   schedule:
     - cron: '0 9 * * 1-5'
+  pull_request:
 name: Scheduled checks
 jobs:
   tests:
@@ -69,7 +70,15 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - run: cargo make check
+      - name: Update Node and Yarn
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          nvm install 18 && nvm alias default 18
+          npm install -g yarn
+          echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
+      - name: Run checks
+        run: cargo make check
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
