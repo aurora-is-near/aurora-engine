@@ -7,7 +7,7 @@
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
 Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
-See [doc.aurora.dev](https://doc.aurora.dev/develop/compat/evm) for additional
+See [doc.aurora.dev](https://doc.aurora.dev/dev-reference/aurora-engine) for additional
 documentation.
 
 ## Deployments
@@ -18,14 +18,14 @@ documentation.
 | Testnet | [`aurora`][Testnet] | 1313161555 |
 | Local   | `aurora.test.near`  | 1313161556 |
 
-[Mainnet]: https://explorer.near.org/accounts/aurora
-[Testnet]: https://explorer.testnet.near.org/accounts/aurora
+[Mainnet]: https://nearblocks.io/address/aurora
+[Testnet]: https://testnet.nearblocks.io/address/aurora
 
 ## Development
 
 ### Prerequisites
 
-- Node.js (v14+)
+- Node.js (v18+)
 - cargo-make
 
 ```sh
@@ -34,7 +34,7 @@ cargo install --force cargo-make
 
 ### Prerequisites for Development
 
-- Node.js (v14+)
+- Node.js (v18+)
 - Docker
 - cargo-make
 
@@ -84,7 +84,8 @@ for the `task` field are listed below:
 - `build-test`: builds all the below using test features. Requires a `--profile`
   argument.
 - `build-contracts`: builds all the ETH contracts.
-- `build-docker`: builds the `aurora-<profile>-test.wasm` in the `bin` folder using docker build environment. The purpose of this task is to produce reproducible binaries.
+- `build-docker`: builds the `aurora-<profile>-test.wasm` in the `bin` folder using docker build environment.
+  The purpose of this task is to produce reproducible binaries.
 
 For example, the following will build the mainnet debug binary:
 ```sh
@@ -93,7 +94,9 @@ cargo make --profile mainnet build
 
 #### Verifying binary hash
 
-To verify that a deployed binary matches the source code, you may want to build it reproducibly and then verify that the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being deployed.
+To verify that a deployed binary matches the source code, you may want to build it reproducibly and then verify that
+the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being
+deployed.
 
 Run these commands to produce the binary hash:
 ```sh
