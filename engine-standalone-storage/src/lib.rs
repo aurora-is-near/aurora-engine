@@ -226,6 +226,7 @@ impl Storage {
         })
     }
 
+    #[allow(clippy::needless_pass_by_ref_mut)]
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
         &mut self,
         tx_hash: H256,

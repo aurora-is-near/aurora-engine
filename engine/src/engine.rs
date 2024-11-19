@@ -181,6 +181,7 @@ impl ExitIntoResult for ExitReason {
     /// - `Success` | `Revert`
     /// - `ExitError` - Execution errors should charge gas from users
     /// - `ExitFatal` - shouldn't charge user gas
+    ///
     /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
@@ -393,7 +394,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::stack::MemoryStackState<Engine<'env, I, E, M>>,
+        executor::stack::MemoryStackState<'a, 'static, Engine<'env, I, E, M>>,
         Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
