@@ -4,6 +4,7 @@ on:
     branches:
       - master
       - develop
+      - ci/aleksuss/k8-runners
   pull_request:
 
 name: Tests
