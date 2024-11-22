@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite ${{ matrix.profile }}
-    runs-on: k8s-infrastructure-dind
+    runs-on: selfhosted-heavy
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +66,7 @@ jobs:
 
   test_modexp:
     name: Test modexp suite ${{ matrix.profile }}
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted-heavy
     container: ubuntu:20.04
     strategy:
       fail-fast: false
