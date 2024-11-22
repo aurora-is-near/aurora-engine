@@ -7,7 +7,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: k8s-infrastructure-dind
+    runs-on: selfhosted
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +60,7 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted
     container: ubuntu:20.04
     steps:
       - name: Potential broken submodules fix
