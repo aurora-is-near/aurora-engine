@@ -181,6 +181,7 @@ impl ExitIntoResult for ExitReason {
     /// - `Success` | `Revert`
     /// - `ExitError` - Execution errors should charge gas from users
     /// - `ExitFatal` - shouldn't charge user gas
+    ///
     /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
