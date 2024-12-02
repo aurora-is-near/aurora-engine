@@ -4,7 +4,7 @@ kind: Component
 metadata:
   name: aurora-engine-standalone-tracing
   description: |-
-    Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution.
+    Aurora engine standalone tracing library. Provides functions and types for extracting geth-like traces from standalone engine execution.
   tags:
     - near
   links: []
