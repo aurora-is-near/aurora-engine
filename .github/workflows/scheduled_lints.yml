@@ -7,7 +7,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: k8s-infrastructure-dind
+    runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
       matrix:
