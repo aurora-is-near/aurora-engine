@@ -4,13 +4,14 @@ on:
     branches:
       - master
       - develop
+      - rg/*
   pull_request:
 
 name: Tests
 jobs:
   test:
     name: Test suite ${{ matrix.profile }}
-    runs-on: selfhosted-heavy
+    runs-on: selfhosted-heavy-v2
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +67,7 @@ jobs:
 
   test_modexp:
     name: Test modexp suite ${{ matrix.profile }}
-    runs-on: selfhosted-heavy
+    runs-on: selfhosted-heavy-v2
     container: ubuntu:20.04
     strategy:
       fail-fast: false
