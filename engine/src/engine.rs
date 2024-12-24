@@ -182,6 +182,7 @@ impl ExitIntoResult for ExitReason {
     /// - `Success` | `Revert`
     /// - `ExitError` - Execution errors should charge gas from users
     /// - `ExitFatal` - shouldn't charge user gas
+    ///
     /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
@@ -394,7 +395,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::stack::MemoryStackState<Engine<'env, I, E, M>>,
+        executor::stack::MemoryStackState<'a, 'static, Engine<'env, I, E, M>>,
         Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
@@ -796,7 +797,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
                 recipient = fallback_address;
             }
-        };
+        }
 
         let erc20_token = {
             let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)

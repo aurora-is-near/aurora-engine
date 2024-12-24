@@ -1,9 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![cfg_attr(
-    all(feature = "log", target_arch = "wasm32"),
-    feature(panic_info_message)
-)]
 #![deny(clippy::pedantic, clippy::nursery)]
 #![allow(
     clippy::missing_errors_doc,
@@ -54,24 +49,15 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     {
         use prelude::ToString;
 
-        if let Some(msg) = info.message() {
-            let msg = if let Some(log) = info.location() {
-                prelude::format!("{} [{}]", msg, log)
-            } else {
-                msg.to_string()
-            };
-            prelude::sdk::panic_utf8(msg.as_bytes());
-        } else if let Some(log) = info.location() {
-            prelude::sdk::panic_utf8(log.to_string().as_bytes());
-        }
+        let msg = info.message();
+        let msg = if let Some(log) = info.location() {
+            prelude::format!("{msg} [{log}]")
+        } else {
+            msg.to_string()
+        };
+        prelude::sdk::panic_utf8(msg.as_bytes());
     }
-    ::core::arch::wasm32::unreachable();
-}
-
-#[cfg(target_arch = "wasm32")]
-#[alloc_error_handler]
-#[no_mangle]
-pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
+    #[cfg(not(feature = "log"))]
     ::core::arch::wasm32::unreachable();
 }
 
@@ -446,6 +432,17 @@ mod contract {
         let env = Runtime;
         let mut handler = Runtime;
         contract_methods::admin::add_relayer_key(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Callback which is called by `add_relayer_key` and stores the relayer function
+    /// call key into the storage.
+    #[no_mangle]
+    pub extern "C" fn store_relayer_key_callback() {
+        let io = Runtime;
+        let env = Runtime;
+        contract_methods::admin::store_relayer_key_callback(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }

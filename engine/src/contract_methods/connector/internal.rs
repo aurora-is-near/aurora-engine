@@ -786,7 +786,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<WithdrawResult, errors::WithdrawError> {
         // Check if the current account id is owner.
         let is_owner = current_account_id == predecessor_account_id;
-        // Check if the withdraw flow is paused. If it's owner just skip the assertion.
+        // Check if the withdrawal flow is paused. If it's owner just skip the assertion.
         self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
             .map_err(|_| errors::WithdrawError::Paused)?;
 

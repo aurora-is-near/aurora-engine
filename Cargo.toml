@@ -43,13 +43,13 @@ ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
 lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.26"
+near-crypto = "0.27"
 near-gas = "0.3"
-near-parameters = "0.26"
-near-primitives = "0.26"
-near-primitives-core = "0.26"
+near-parameters = "0.27"
+near-primitives = "0.27"
+near-primitives-core = "0.27"
 near-sdk = "5"
-near-vm-runner = { version = "0.26", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
+near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
 near-workspaces = "0.14"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"

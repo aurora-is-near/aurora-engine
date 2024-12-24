@@ -13,6 +13,7 @@ use crate::utils::{self, standalone};
 /// Transactions:
 /// * `https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
 /// * `https://etherscan.io/tx/0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
+///
 /// Traces:
 /// * `https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
 /// * `https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`

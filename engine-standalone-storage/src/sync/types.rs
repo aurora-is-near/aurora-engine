@@ -158,6 +158,8 @@ pub enum TransactionKind {
     SetKeyManager(parameters::RelayerKeyManagerArgs),
     /// Add a new relayer public function call access key
     AddRelayerKey(parameters::RelayerKeyArgs),
+    /// Callback which stores the relayer public function call access key into the storage
+    StoreRelayerKeyCallback(parameters::RelayerKeyArgs),
     /// Remove the relayer public function call access key
     RemoveRelayerKey(parameters::RelayerKeyArgs),
     StartHashchain(parameters::StartHashchainArgs),
@@ -442,6 +444,9 @@ impl TransactionKind {
             Self::ResumeContract => Self::no_evm_execution("resume_contract"),
             Self::SetKeyManager(_) => Self::no_evm_execution("set_key_manager"),
             Self::AddRelayerKey(_) => Self::no_evm_execution("add_relayer_key"),
+            Self::StoreRelayerKeyCallback(_) => {
+                Self::no_evm_execution("store_relayer_key_callback")
+            }
             Self::RemoveRelayerKey(_) => Self::no_evm_execution("remove_relayer_key"),
             Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
             Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
@@ -461,8 +466,9 @@ impl TransactionKind {
         }
     }
 
-    /// There are many cases where a receipt on NEAR can change the Aurora contract state, but no EVM execution actually occurs.
-    /// In these cases we have a sentinel Ethereum transaction from the zero address to itself with input equal to the method name.
+    /// There are many cases where a receipt on NEAR can change the Aurora contract state,
+    /// but no EVM execution actually occurs. In these cases we have a sentinel Ethereum transaction
+    /// from the zero address to itself with input equal to the method name.
     fn no_evm_execution(method_name: &str) -> NormalizedEthTransaction {
         NormalizedEthTransaction {
             address: Address::from_array([0; 20]),
@@ -479,12 +485,12 @@ impl TransactionKind {
         }
     }
 
-    fn get_implicit_address(caller: &AccountId) -> types::Address {
+    fn get_implicit_address(caller: &AccountId) -> Address {
         aurora_engine_sdk::types::near_account_to_evm_address(caller.as_bytes())
     }
 
     fn get_implicit_nonce(
-        from: &types::Address,
+        from: &Address,
         block_height: u64,
         transaction_position: u16,
         storage: &Storage,
@@ -565,6 +571,8 @@ pub enum TransactionKindTag {
     SetKeyManager,
     #[strum(serialize = "add_relayer_key")]
     AddRelayerKey,
+    #[strum(serialize = "store_relayer_key_callback")]
+    StoreRelayerKeyCallback,
     #[strum(serialize = "remove_relayer_key")]
     RemoveRelayerKey,
     #[strum(serialize = "start_hashchain")]
@@ -630,7 +638,9 @@ impl TransactionKind {
             Self::WithdrawWnearToRouter(args) => to_borsh(args),
             Self::PauseContract | Self::ResumeContract | Self::Unknown => Vec::new(),
             Self::SetKeyManager(args) => to_borsh(args),
-            Self::AddRelayerKey(args) | Self::RemoveRelayerKey(args) => to_borsh(args),
+            Self::AddRelayerKey(args)
+            | Self::RemoveRelayerKey(args)
+            | Self::StoreRelayerKeyCallback(args) => to_json(args),
             Self::StartHashchain(args) => to_borsh(args),
             Self::SetErc20Metadata(args) => to_json(args),
             Self::SetFixedGas(args) => to_borsh(args),
@@ -692,6 +702,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::ResumeContract => Self::ResumeContract,
             TransactionKind::SetKeyManager(_) => Self::SetKeyManager,
             TransactionKind::AddRelayerKey(_) => Self::AddRelayerKey,
+            TransactionKind::StoreRelayerKeyCallback(_) => Self::StoreRelayerKeyCallback,
             TransactionKind::RemoveRelayerKey(_) => Self::RemoveRelayerKey,
             TransactionKind::StartHashchain(_) => Self::StartHashchain,
             TransactionKind::SetErc20Metadata(_) => Self::SetErc20Metadata,
@@ -936,6 +947,7 @@ enum BorshableTransactionKind<'a> {
     SetEthConnectorContractAccount(Cow<'a, parameters::SetEthConnectorContractAccountArgs>),
     MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
     WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
+    StoreRelayerKeyCallback(Cow<'a, parameters::RelayerKeyArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -992,6 +1004,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::ResumeContract => Self::ResumeContract,
             TransactionKind::SetKeyManager(x) => Self::SetKeyManager(Cow::Borrowed(x)),
             TransactionKind::AddRelayerKey(x) => Self::AddRelayerKey(Cow::Borrowed(x)),
+            TransactionKind::StoreRelayerKeyCallback(x) => {
+                Self::StoreRelayerKeyCallback(Cow::Borrowed(x))
+            }
             TransactionKind::RemoveRelayerKey(x) => Self::RemoveRelayerKey(Cow::Borrowed(x)),
             TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
             TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
@@ -1080,6 +1095,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::ResumeContract => Ok(Self::ResumeContract),
             BorshableTransactionKind::SetKeyManager(x) => Ok(Self::SetKeyManager(x.into_owned())),
             BorshableTransactionKind::AddRelayerKey(x) => Ok(Self::AddRelayerKey(x.into_owned())),
+            BorshableTransactionKind::StoreRelayerKeyCallback(x) => {
+                Ok(Self::StoreRelayerKeyCallback(x.into_owned()))
+            }
             BorshableTransactionKind::RemoveRelayerKey(x) => {
                 Ok(Self::RemoveRelayerKey(x.into_owned()))
             }
