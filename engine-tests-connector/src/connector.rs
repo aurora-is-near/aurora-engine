@@ -1076,7 +1076,7 @@ async fn test_deposit_to_aurora_amount_zero_fee_non_zero() -> anyhow::Result<()>
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(contract.check_error_message(res, "The amount should be a positive numbe"));
+    assert!(contract.check_error_message(res, "The amount should be a positive number"));
     assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
