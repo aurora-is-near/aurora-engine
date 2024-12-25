@@ -143,10 +143,7 @@ impl EngineContractBuilder {
 
 fn into_chain_id(value: u64) -> [u8; 32] {
     let chain_id = U256::from(value);
-    let mut result = [0; 32];
-    chain_id.to_big_endian(&mut result);
-
-    result
+    chain_id.to_big_endian()
 }
 
 #[tokio::test]
@@ -162,7 +159,10 @@ async fn test_creating_aurora_contract() {
         .unwrap();
 
     let chain_id = contract.get_chain_id().await.unwrap().result;
-    assert_eq!(chain_id, U256::from(into_chain_id(AURORA_LOCAL_CHAIN_ID)));
+    assert_eq!(
+        chain_id,
+        U256::from_big_endian(&into_chain_id(AURORA_LOCAL_CHAIN_ID))
+    );
 }
 
 #[cfg(test)]

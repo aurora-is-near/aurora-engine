@@ -31,10 +31,10 @@ byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
 digest = "0.10"
 ethabi = { version = "18", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false, features = ["std"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.46.1-aurora", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.19"
@@ -53,11 +53,11 @@ near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "n
 near-workspaces = "0.14"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
-primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
+primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
 reqwest = "0.12"
 ripemd = { version = "0.1", default-features = false }
-rlp = { version = "0.5", default-features = false }
+rlp = { version = "0.6", default-features = false }
 rocksdb = { version = "0.21", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }

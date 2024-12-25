@@ -627,6 +627,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
+            Vec::new(),
         );
 
         let used_gas = executor.used_gas();
@@ -674,6 +675,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value.raw(),
             input,
             executor_params.gas_limit,
+            Vec::new(),
             Vec::new(),
         );
         status.into_result(result)
@@ -1039,7 +1041,7 @@ pub fn submit_with_alt_modexp<
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from(state.chain_id) {
+        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
@@ -1143,8 +1145,8 @@ pub fn submit_with_alt_modexp<
 pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let mint_args = ethabi::encode(&[
-        ethabi::Token::Address(refund_address.raw()),
-        ethabi::Token::Uint(amount),
+        ethabi::Token::Address(ethabi::Address::from(refund_address.raw().0)),
+        ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
     ]);
 
     [selector, mint_args.as_slice()].concat()
@@ -1284,8 +1286,8 @@ pub fn setup_receive_erc20_tokens_input(
 ) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let tail = ethabi::encode(&[
-        ethabi::Token::Address(recipient.raw()),
-        ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+        ethabi::Token::Address(ethabi::Address::from(recipient.raw().0)),
+        ethabi::Token::Uint(ethabi::Uint::from(args.amount.as_u128())),
     ]);
 
     [selector, tail.as_slice()].concat()
@@ -1308,7 +1310,7 @@ pub fn setup_deploy_erc20_input(
         ethabi::Token::String(erc20_metadata.name),
         ethabi::Token::String(erc20_metadata.symbol),
         ethabi::Token::Uint(erc20_metadata.decimals.into()),
-        ethabi::Token::Address(erc20_admin_address.raw()),
+        ethabi::Token::Address(ethabi::Address::from(erc20_admin_address.raw().0)),
     ]);
 
     [erc20_contract, deploy_args.as_slice()].concat()
@@ -1857,7 +1859,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
 
     /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
-        U256::from(self.state.chain_id)
+        U256::from_big_endian(&self.state.chain_id)
     }
 
     /// Checks if an address exists.
@@ -2198,7 +2200,7 @@ mod tests {
         let args = ViewCallArgs {
             sender: origin,
             address: contract,
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
             input,
         };
         let actual_status = engine.view_with_args(args).unwrap();
@@ -2277,7 +2279,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2307,7 +2309,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2723,7 +2725,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
-            amount: RawU256::from(refund_amount.raw()),
+            amount: RawU256::from(refund_amount.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
@@ -2745,7 +2747,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address: Address::default(),
             erc20_address: Some(origin),
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
