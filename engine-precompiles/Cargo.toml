@@ -27,8 +27,6 @@ sha3.workspace = true
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
 rand.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 
 [features]
 default = ["std"]
