@@ -159,7 +159,9 @@ fn test_total_supply_accounting() {
         .submit_with_signer(&mut signer, |nonce| {
             contract.call_method_with_args(
                 "destruct",
-                &[ethabi::Token::Address(benefactor.raw())],
+                &[ethabi::Token::Address(ethabi::Address::from(
+                    benefactor.raw().0,
+                ))],
                 nonce,
             )
         })
@@ -174,7 +176,9 @@ fn test_total_supply_accounting() {
         .submit_with_signer(&mut signer, |nonce| {
             contract.call_method_with_args(
                 "destruct",
-                &[ethabi::Token::Address(contract.address.raw())],
+                &[ethabi::Token::Address(ethabi::Address::from(
+                    contract.address.raw().0,
+                ))],
                 nonce,
             )
         })
@@ -333,7 +337,9 @@ fn test_log_address() {
         .submit_with_signer(&mut signer, |nonce| {
             caller_contract.call_method_with_args(
                 "greet",
-                &[ethabi::Token::Address(greet_contract.address.raw())],
+                &[ethabi::Token::Address(ethabi::Address::from(
+                    greet_contract.address.raw().0,
+                ))],
                 nonce,
             )
         })
@@ -370,7 +376,9 @@ fn test_is_contract() {
                 .submit_with_signer(signer, |nonce| {
                     contract.call_method_with_args(
                         "isContract",
-                        &[ethabi::Token::Address(account.raw())],
+                        &[ethabi::Token::Address(ethabi::Address::from(
+                            account.raw().0,
+                        ))],
                         nonce,
                     )
                 })
@@ -493,7 +501,7 @@ fn test_revert_during_contract_deploy() {
 
     let nonce = signer.use_nonce();
     let deploy_tx =
-        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Uint(U256::zero())]);
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Uint(ethabi::Uint::zero())]);
     let submit_result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();

@@ -132,9 +132,9 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "minar",
             &[
-                ethabi::Token::Address(recipient.raw()),
+                ethabi::Token::Address(ethabi::Address::from(recipient.raw().0)),
                 ethabi::Token::String(data),
-                ethabi::Token::Uint(price.raw()),
+                ethabi::Token::Uint(ethabi::Uint::from(price.raw().to_big_endian())),
             ],
             nonce,
         )
@@ -149,8 +149,8 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "obtenerPaginav2",
             &[
-                ethabi::Token::Uint(U256::from(tokens_per_page)),
-                ethabi::Token::Uint(U256::from(page_index)),
+                ethabi::Token::Uint(ethabi::Uint::from(tokens_per_page)),
+                ethabi::Token::Uint(ethabi::Uint::from(page_index)),
             ],
             nonce,
         )

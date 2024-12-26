@@ -506,14 +506,14 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
-            event_schema.signature(),
+            H256::from(event_schema.signature().0),
             // the sender is not important
             H256::zero(),
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.amount.as_u128())),
+            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.fee.as_u128())),
         ]),
     };
     let proof = Proof {

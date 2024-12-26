@@ -187,7 +187,7 @@ async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract 
 
     let result = silo
         .new(
-            RawU256::from(U256::from(AuroraRunner::get_default_chain_id() + 1)),
+            RawU256::from(U256::from(AuroraRunner::get_default_chain_id() + 1).to_big_endian()),
             silo_account.id(),
             1,
         )
