@@ -361,7 +361,7 @@ impl crate::env::Env for Runtime {
 
     fn attached_deposit(&self) -> u128 {
         unsafe {
-            let data = [0u8; core::mem::size_of::<u128>()];
+            let data = [0u8; size_of::<u128>()];
             exports::attached_deposit(data.as_ptr() as u64);
             u128::from_le_bytes(data)
         }

@@ -285,7 +285,7 @@ fn test_transaction_index() {
             aurora_engine_types::storage::KeyPrefix::Balance,
             &[1u8; 20],
         );
-        let value = crate::prelude::Wei::new_u64(159).to_bytes().to_vec();
+        let value = Wei::new_u64(159).to_bytes().to_vec();
         tmp.modify(key, value);
         tmp
     };

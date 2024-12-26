@@ -326,9 +326,7 @@ fn test_consume_ft_on_transfer_message() {
     #[cfg(not(feature = "ext-connector"))]
     let caller = runner.env.predecessor_account_id();
     #[cfg(feature = "ext-connector")]
-    let caller = crate::utils::standalone::mocks::EXT_ETH_CONNECTOR
-        .parse()
-        .unwrap();
+    let caller = utils::standalone::mocks::EXT_ETH_CONNECTOR.parse().unwrap();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
         near_receipt_id: H256([8u8; 32]),

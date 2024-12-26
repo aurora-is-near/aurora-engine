@@ -258,7 +258,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
         if value.is_data() {
             Ok(None)
         } else {
-            Err(rlp::DecoderError::RlpExpectedToBeData)
+            Err(DecoderError::RlpExpectedToBeData)
         }
     } else {
         let v: H160 = value.as_val()?;

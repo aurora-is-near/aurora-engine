@@ -29,7 +29,6 @@ bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"]
 bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
-digest = "0.10"
 ethabi = { version = "18", default-features = false }
 evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false }
 evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std"] }
@@ -41,7 +40,6 @@ git2 = "0.19"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
-lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.27"
 near-gas = "0.3"

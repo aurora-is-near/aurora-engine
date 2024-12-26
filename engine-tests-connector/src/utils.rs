@@ -240,7 +240,7 @@ impl TestContract {
     }
 
     pub async fn call_deposit_eth_to_aurora(&self) -> anyhow::Result<()> {
-        let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
+        let proof: Proof = serde_json::from_str(PROOF_DATA_ETH)?;
         let res = self.deposit_with_proof(&proof).await?;
         assert!(res.is_success());
         Ok(())
@@ -271,7 +271,7 @@ impl TestContract {
     }
 
     pub async fn call_is_used_proof(&self, proof: &str) -> anyhow::Result<bool> {
-        let proof: Proof = serde_json::from_str(proof).unwrap();
+        let proof: Proof = serde_json::from_str(proof)?;
         let res = self
             .engine_contract
             .call("is_used_proof")
@@ -279,10 +279,8 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .borsh::<bool>()
-            .unwrap();
+            .into_result()?
+            .borsh::<bool>()?;
         Ok(res)
     }
 
@@ -294,10 +292,8 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .json::<U128>()
-            .unwrap();
+            .into_result()?
+            .json::<U128>()?;
         Ok(res)
     }
 
@@ -316,8 +312,7 @@ impl TestContract {
             .transact()
             .await?;
 
-        res.into_result()
-            .unwrap()
+        res.into_result()?
             .json::<Wei>()
             .map_err(Into::into)
             .and_then(|res| {
@@ -333,10 +328,8 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .json::<U128>()
-            .unwrap();
+            .into_result()?
+            .json::<U128>()?;
         Ok(res.0)
     }
 }

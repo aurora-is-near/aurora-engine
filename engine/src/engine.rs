@@ -3,7 +3,6 @@ use crate::parameters::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
-use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Opcode};
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
@@ -762,7 +761,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         const INVALID_MESSAGE: &str = "receive_erc20_tokens invalid message";
         const UNKNOWN_NEP_141: &str = "receive_erc20_tokens unknown NEP-141";
 
-        let str_amount = crate::prelude::format!("\"{}\"", args.amount);
+        let str_amount = format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
         let mut local_io = self.io;
         let mut engine_err = |msg: &'static str| {
@@ -1214,9 +1213,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
 /// ```
 #[must_use]
 pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
-    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
-    debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
-    debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, size_of_val(&BLOCK_HASH_PREFIX));
+    debug_assert_eq!(BLOCK_HEIGHT_SIZE, size_of_val(&block_height));
+    debug_assert_eq!(CHAIN_ID_SIZE, size_of_val(&chain_id));
     let mut data = Vec::with_capacity(
         BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
     );
@@ -2089,10 +2088,8 @@ fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, Eng
     match submit_result.status {
         TransactionStatus::Succeed(_) => Ok(submit_result),
         TransactionStatus::Revert(bytes) => {
-            let error_message = crate::prelude::format!(
-                "Reverted with message: {}",
-                crate::prelude::String::from_utf8_lossy(&bytes)
-            );
+            let error_message =
+                format!("Reverted with message: {}", String::from_utf8_lossy(&bytes));
             Err(engine_error(
                 ExitError::Other(error_message.into()),
                 submit_result.gas_used,

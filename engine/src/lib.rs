@@ -216,7 +216,7 @@ mod contract {
 
     /// Resumes previously [`paused`] precompiles.
     ///
-    /// [`paused`]: crate::contract::pause_precompiles
+    /// [`paused`]: pause_precompiles
     #[no_mangle]
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;

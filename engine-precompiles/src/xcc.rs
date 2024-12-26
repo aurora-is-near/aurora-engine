@@ -358,7 +358,7 @@ mod tests {
                 },
             ],
             outputs: vec![ethabi::Param {
-                name: crate::prelude::String::new(),
+                name: String::new(),
                 kind: ethabi::ParamType::Bool,
                 internal_type: None,
             }],
