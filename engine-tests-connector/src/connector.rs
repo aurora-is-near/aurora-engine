@@ -509,8 +509,8 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.amount.as_u128())),
-            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.fee.as_u128())),
+            ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+            ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
         ]),
     };
     let proof = Proof {

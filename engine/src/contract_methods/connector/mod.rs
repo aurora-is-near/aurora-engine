@@ -569,7 +569,7 @@ fn get_contract_data<T: BorshDeserialize, I: IO>(
 
 #[cfg(any(not(feature = "ext-connector"), test))]
 #[must_use]
-fn proof_key(proof: &aurora_engine_types::parameters::connector::Proof) -> String {
+fn proof_key(proof: &aurora_engine_types::parameters::connector::Proof) -> crate::prelude::String {
     let mut data = borsh::to_vec(&proof.log_index).unwrap();
     data.extend(borsh::to_vec(&proof.receipt_index).unwrap());
     data.extend(proof.header_data.clone());

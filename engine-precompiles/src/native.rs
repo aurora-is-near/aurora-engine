@@ -131,10 +131,10 @@ pub mod events {
                 self.amount.to_big_endian(),
             ))]);
             let topics = vec![
-                ethabi::Hash::from(EXIT_TO_ETH_SIGNATURE.0),
-                ethabi::Hash::from(encode_address(self.sender).0),
-                ethabi::Hash::from(encode_address(self.erc20_address).0),
-                ethabi::Hash::from(encode_address(self.dest).0),
+                EXIT_TO_ETH_SIGNATURE.0.into(),
+                encode_address(self.sender).0.into(),
+                encode_address(self.erc20_address).0.into(),
+                encode_address(self.dest).0.into(),
             ];
 
             ethabi::RawLog { topics, data }
@@ -518,7 +518,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             address: exit_to_near::ADDRESS.raw(),
             topics: exit_event_log
                 .topics
-                .iter()
+                .into_iter()
                 .map(|h| H256::from(h.0))
                 .collect(),
             data: exit_event_log.data,
