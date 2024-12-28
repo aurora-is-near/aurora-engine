@@ -119,7 +119,7 @@ impl AuroraRunner {
     pub fn balance_of(&mut self, token: Address, target: Address, origin: &str) -> U256 {
         let input = build_input(
             "balanceOf(address)",
-            &[Token::Address(ethabi::Address::from(target.raw().0))],
+            &[Token::Address(target.raw().0.into())],
         );
         let result = self.evm_call(token, input, origin).unwrap();
         let output = result.return_data.as_value().unwrap();
@@ -141,8 +141,8 @@ impl AuroraRunner {
         let input = build_input(
             "mint(address,uint256)",
             &[
-                Token::Address(ethabi::Address::from(target.raw().0)),
-                Token::Uint(ethabi::Uint::from(amount)),
+                Token::Address(target.raw().0.into()),
+                Token::Uint(amount.into()),
             ],
         );
 
@@ -167,8 +167,8 @@ impl AuroraRunner {
         let input = build_input(
             "transfer(address,uint256)",
             &[
-                Token::Address(ethabi::Address::from(receiver.raw().0)),
-                Token::Uint(ethabi::Uint::from(amount)),
+                Token::Address(receiver.raw().0.into()),
+                Token::Uint(amount.into()),
             ],
         );
         let input = create_eth_transaction(Some(token), Wei::zero(), input, None, &sender);
@@ -1232,14 +1232,14 @@ pub mod workspace {
         let log_entry = aurora_engine_types::parameters::connector::LogEntry {
             address: eth_custodian_address.raw(),
             topics: vec![
-                crate::prelude::H256::from(event_schema.signature().0),
+                event_schema.signature().0.into(),
                 // the sender is not important
                 crate::prelude::H256::zero(),
             ],
             data: ethabi::encode(&[
                 ethabi::Token::String(message),
-                ethabi::Token::Uint(ethabi::Uint::from(deposit_event.amount.as_u128())),
-                ethabi::Token::Uint(ethabi::Uint::from(deposit_event.fee.as_u128())),
+                ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+                ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
             ]),
         };
         Proof {

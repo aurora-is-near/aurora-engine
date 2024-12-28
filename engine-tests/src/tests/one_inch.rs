@@ -115,12 +115,10 @@ fn deploy_1_inch_limit_order_contract(
     let constructor =
         utils::solidity::ContractConstructor::compile_from_extended_json(contract_path);
 
-    let weth = Address::from_array([0; 20]);
+    let weth = Address::zero();
     let nonce = signer.use_nonce();
-    let deploy_tx = constructor.deploy_with_args(
-        nonce.into(),
-        &[ethabi::Token::Address(ethabi::Address::from(weth.raw().0))],
-    );
+    let deploy_tx =
+        constructor.deploy_with_args(nonce.into(), &[ethabi::Token::Address(weth.raw().0.into())]);
     let tx = utils::sign_transaction(deploy_tx, Some(runner.chain_id), &signer.secret_key);
     let outcome = runner.call(utils::SUBMIT, "any_account.near", rlp::encode(&tx).to_vec());
 

@@ -630,14 +630,14 @@ mod tests {
         let log_entry = LogEntry {
             address: eth_custodian_address.raw(),
             topics: vec![
-                crate::prelude::H256::from(event_schema.signature().0),
+                event_schema.signature().0.into(),
                 // the sender is not important
                 crate::prelude::H256::zero(),
             ],
             data: ethabi::encode(&[
                 ethabi::Token::String(message),
-                ethabi::Token::Uint(ethabi::Uint::from(deposit_event.amount.as_u128())),
-                ethabi::Token::Uint(ethabi::Uint::from(deposit_event.fee.as_u128())),
+                ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+                ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
             ]),
         };
 

@@ -102,17 +102,17 @@ fn withdraw() {
             let address = Address::try_from_slice(&address).unwrap();
             ethabi::LogParam {
                 name: "dest".to_string(),
-                value: ethabi::Token::Address(ethabi::Address::from(address.raw().0)),
+                value: ethabi::Token::Address(address.raw().0.into()),
             }
         };
         let expected_event = vec![
             ethabi::LogParam {
                 name: "sender".to_string(),
-                value: ethabi::Token::Address(ethabi::Address::from(token.raw().0)),
+                value: ethabi::Token::Address(token.raw().0.into()),
             },
             ethabi::LogParam {
                 name: "erc20_address".to_string(),
-                value: ethabi::Token::Address(ethabi::Address::from(token.raw().0)),
+                value: ethabi::Token::Address(token.raw().0.into()),
             },
             dest,
             ethabi::LogParam {
@@ -201,15 +201,16 @@ fn withdraw_eth() {
     let mut expected_event = vec![
         ethabi::LogParam {
             name: "sender".to_string(),
-            value: ethabi::Token::Address(ethabi::Address::from(tester.contract.address.raw().0)),
+            value: ethabi::Token::Address(tester.contract.address.raw().0.into()),
         },
         ethabi::LogParam {
             name: "erc20_address".to_string(),
-            value: ethabi::Token::Address(ethabi::Address::from(
+            value: ethabi::Token::Address(
                 aurora_engine_precompiles::native::events::ETH_ADDRESS
                     .raw()
-                    .0,
-            )),
+                    .0
+                    .into(),
+            ),
         },
         ethabi::LogParam {
             name: "dest".to_string(),
@@ -217,7 +218,7 @@ fn withdraw_eth() {
         },
         ethabi::LogParam {
             name: "amount".to_string(),
-            value: ethabi::Token::Uint(ethabi::Uint::from(amount.raw().to_big_endian())),
+            value: ethabi::Token::Uint(amount.raw().to_big_endian().into()),
         },
     ];
     let exit_events = parse_exit_events(result, &schema);
@@ -232,11 +233,11 @@ fn withdraw_eth() {
         .unwrap();
     expected_event[2] = ethabi::LogParam {
         name: "dest".to_string(),
-        value: ethabi::Token::Address(ethabi::Address::from(DEST_ADDRESS.raw().0)),
+        value: ethabi::Token::Address(DEST_ADDRESS.raw().0.into()),
     };
     expected_event[3] = ethabi::LogParam {
         name: "amount".to_string(),
-        value: ethabi::Token::Uint(ethabi::Uint::from(amount.raw().to_big_endian())),
+        value: ethabi::Token::Uint(amount.raw().to_big_endian().into()),
     };
     let schema = aurora_engine_precompiles::native::events::exit_to_eth_schema();
     let exit_events = parse_exit_events(result, &schema);
@@ -257,8 +258,7 @@ fn parse_exit_events(result: SubmitResult, schema: &ethabi::Event) -> Vec<ethabi
             Some(
                 schema
                     .parse_log(ethabi::RawLog {
-                        topics: log.topics.into_iter().map(ethabi::Hash::from).collect(),
-
+                        topics: log.topics.into_iter().map(Into::into).collect(),
                         data: log.data,
                     })
                     .unwrap(),

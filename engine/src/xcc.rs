@@ -486,7 +486,7 @@ fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
     let recipient_with_msg = format!("{recipient}:unwrap");
     let args = ethabi::encode(&[
         ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-        ethabi::Token::Uint(ethabi::Uint::from(amount.as_u128())),
+        ethabi::Token::Uint(amount.as_u128().into()),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
 }
@@ -598,7 +598,7 @@ mod tests {
         let expected_tx_data = withdraw_function
             .encode_input(&[
                 ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-                ethabi::Token::Uint(ethabi::Uint::from(amount.as_u128())),
+                ethabi::Token::Uint(amount.as_u128().into()),
             ])
             .unwrap();
 

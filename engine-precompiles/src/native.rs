@@ -90,17 +90,14 @@ pub mod events {
     impl ExitToNear {
         #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
-            let data = ethabi::encode(&[ethabi::Token::Int(ethabi::Uint::from(
-                self.amount.to_big_endian(),
-            ))]);
+            let data = ethabi::encode(&[ethabi::Token::Uint(self.amount.to_big_endian().into())]);
             let topics = vec![
-                ethabi::Hash::from(EXIT_TO_NEAR_SIGNATURE.0),
-                ethabi::Hash::from(encode_address(self.sender).0),
-                ethabi::Hash::from(encode_address(self.erc20_address).0),
-                ethabi::Hash::from(
-                    aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)]))
-                        .0,
-                ),
+                EXIT_TO_NEAR_SIGNATURE.0.into(),
+                encode_address(self.sender),
+                encode_address(self.erc20_address),
+                aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)]))
+                    .0
+                    .into(),
             ];
 
             ethabi::RawLog { topics, data }
@@ -127,24 +124,22 @@ pub mod events {
     impl ExitToEth {
         #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
-            let data = ethabi::encode(&[ethabi::Token::Int(ethabi::Uint::from(
-                self.amount.to_big_endian(),
-            ))]);
+            let data = ethabi::encode(&[ethabi::Token::Uint(self.amount.to_big_endian().into())]);
             let topics = vec![
                 EXIT_TO_ETH_SIGNATURE.0.into(),
-                encode_address(self.sender).0.into(),
-                encode_address(self.erc20_address).0.into(),
-                encode_address(self.dest).0.into(),
+                encode_address(self.sender),
+                encode_address(self.erc20_address),
+                encode_address(self.dest),
             ];
 
             ethabi::RawLog { topics, data }
         }
     }
 
-    fn encode_address(a: Address) -> H256 {
+    fn encode_address(a: Address) -> ethabi::Hash {
         let mut result = [0u8; 32];
         result[12..].copy_from_slice(a.as_bytes());
-        H256(result)
+        result.into()
     }
 
     #[must_use]

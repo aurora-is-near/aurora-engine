@@ -1144,8 +1144,8 @@ pub fn submit_with_alt_modexp<
 pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let mint_args = ethabi::encode(&[
-        ethabi::Token::Address(ethabi::Address::from(refund_address.raw().0)),
-        ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
+        ethabi::Token::Address(refund_address.raw().0.into()),
+        ethabi::Token::Uint(amount.to_big_endian().into()),
     ]);
 
     [selector, mint_args.as_slice()].concat()
@@ -1285,8 +1285,8 @@ pub fn setup_receive_erc20_tokens_input(
 ) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let tail = ethabi::encode(&[
-        ethabi::Token::Address(ethabi::Address::from(recipient.raw().0)),
-        ethabi::Token::Uint(ethabi::Uint::from(args.amount.as_u128())),
+        ethabi::Token::Address(recipient.raw().0.into()),
+        ethabi::Token::Uint(args.amount.as_u128().into()),
     ]);
 
     [selector, tail.as_slice()].concat()
@@ -1309,7 +1309,7 @@ pub fn setup_deploy_erc20_input(
         ethabi::Token::String(erc20_metadata.name),
         ethabi::Token::String(erc20_metadata.symbol),
         ethabi::Token::Uint(erc20_metadata.decimals.into()),
-        ethabi::Token::Address(ethabi::Address::from(erc20_admin_address.raw().0)),
+        ethabi::Token::Address(erc20_admin_address.raw().0.into()),
     ]);
 
     [erc20_contract, deploy_args.as_slice()].concat()

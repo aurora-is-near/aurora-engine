@@ -488,14 +488,14 @@ fn mock_proof(recipient_address: Address, deposit_amount: Wei) -> aurora_engine:
     let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
-            H256::from(event_schema.signature().0),
+            event_schema.signature().0.into(),
             // the sender is not important
-            crate::prelude::H256::zero(),
+            H256::zero(),
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.amount.as_u128())),
-            ethabi::Token::Uint(ethabi::Uint::from(deposit_event.fee.as_u128())),
+            ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+            ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
         ]),
     };
     aurora_engine::proof::Proof {

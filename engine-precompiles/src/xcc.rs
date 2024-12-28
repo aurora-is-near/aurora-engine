@@ -183,9 +183,9 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 self.engine_account_id.as_bytes(),
             );
             let tx_data = transfer_from_args(
-                ethabi::Address::from(sender.0),
-                ethabi::Address::from(engine_implicit_address.raw().0),
-                ethabi::Uint::from(required_near.as_u128()),
+                sender.0.into(),
+                engine_implicit_address.raw().0.into(),
+                required_near.as_u128().into(),
             );
             let wnear_address = state::get_wnear_address(&self.io);
             let context = evm::Context {
@@ -329,13 +329,10 @@ mod tests {
     #[test]
     fn test_transfer_from_encoding() {
         let mut rng = rand::thread_rng();
-        let from: [u8; 20] = rng.gen();
-        let to: [u8; 20] = rng.gen();
-        let amount: [u8; 32] = rng.gen();
 
-        let from = ethabi::Address::from(from);
-        let to = ethabi::Address::from(to);
-        let amount = ethabi::Uint::from(&amount);
+        let from = rng.gen::<[u8; 20]>().into();
+        let to = rng.gen::<[u8; 20]>().into();
+        let amount = rng.gen::<[u8; 32]>().into();
 
         #[allow(deprecated)]
         let transfer_from_function = ethabi::Function {

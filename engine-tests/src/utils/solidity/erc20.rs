@@ -88,7 +88,7 @@ impl ERC20 {
             .function("mint")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(ethabi::Address::from(recipient.raw().0)),
+                ethabi::Token::Address(recipient.raw().0.into()),
                 ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
             ])
             .unwrap();
@@ -110,8 +110,8 @@ impl ERC20 {
             .function("transfer")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(ethabi::Address::from(recipient.raw().0)),
-                ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
+                ethabi::Token::Address(recipient.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -137,9 +137,9 @@ impl ERC20 {
             .function("transferFrom")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(ethabi::Address::from(from.raw().0)),
-                ethabi::Token::Address(ethabi::Address::from(to.raw().0)),
-                ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
+                ethabi::Token::Address(from.raw().0.into()),
+                ethabi::Token::Address(to.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -159,8 +159,8 @@ impl ERC20 {
             .function("approve")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(ethabi::Address::from(spender.raw().0)),
-                ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
+                ethabi::Token::Address(spender.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -179,9 +179,7 @@ impl ERC20 {
             .abi
             .function("balanceOf")
             .unwrap()
-            .encode_input(&[ethabi::Token::Address(ethabi::Address::from(
-                address.raw().0,
-            ))])
+            .encode_input(&[ethabi::Token::Address(address.raw().0.into())])
             .unwrap();
         TransactionLegacy {
             nonce,
