@@ -59,7 +59,7 @@ It confirms it is possible to execute simple transactions involving the [Uniswap
 In particular the test creates a liquidity pool for a pair of tokens, adds liquidity and performs a swap.
 [The test](https://github.com/aurora-is-near/aurora-engine/blob/a4c3cebbc5da0b14331601f2bff8047d276d2da0/engine-tests/src/tests/uniswap.rs#L24) can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test uniswap
 ```
 
@@ -71,7 +71,7 @@ Therefore, for this benchmark we aim to have it cost 1/5th the amount of NEAR ga
 A wall-clock measurement using the uniswap contract also exists.
 [That benchmark](https://github.com/aurora-is-near/aurora-engine/blob/a4c3cebbc5da0b14331601f2bff8047d276d2da0/engine-tests/src/benches/mod.rs#L42) can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test uniswap -- --ignored --nocapture
 ```
 
@@ -81,7 +81,7 @@ This is a performance regression test.
 It confirms it is possible to execute simple transactions involving the [1inch liquidity protocol](https://github.com/1inch/liquidity-protocol).
 [The test](https://github.com/aurora-is-near/aurora-engine/blob/0fe4f0506866bd8813b270760864d22723925962/engine-tests/src/tests/one_inch.rs#L17) can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test 1inch
 ```
 
@@ -100,7 +100,7 @@ The purpose of the test was to see how high we would need to set the gas limit t
 Results from the last run of this test can be seen [here](https://github.com/aurora-is-near/aurora-engine/issues/199#issuecomment-906747906).
 The benchmark can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test nft_pagination -- --ignored --nocapture
 ```
 
@@ -114,7 +114,7 @@ This is a performance regression test.
 It checks we are able to deploy all possible EVM smart contracts (without any initialization logic) by showing the largest allowed (in terms of number of bytes) is able to be deployed within the gas limit.
 [The test](https://github.com/aurora-is-near/aurora-engine/blob/a4c3cebbc5da0b14331601f2bff8047d276d2da0/engine-tests/src/tests/sanity.rs#L45) can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test deploy_largest_contract
 ```
 
@@ -131,7 +131,7 @@ It may be the case that this cannot be done efficiently enough in wasm and it wi
 [The test](https://github.com/aurora-is-near/aurora-engine/blob/a4c3cebbc5da0b14331601f2bff8047d276d2da0/engine-tests/src/tests/standard_precompiles.rs#L24) is listed as `ignored` currently because the amount of gas it uses is too large.
 It can be run using the following command
 
-```
+```bash
 make mainnet-test-build && cargo test --features mainnet-test ecpair -- --ignored --nocapture
 ```
 
