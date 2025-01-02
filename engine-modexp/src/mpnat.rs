@@ -9,7 +9,7 @@ use crate::{
 
 pub type Word = u64;
 pub type DoubleWord = u128;
-pub const WORD_BYTES: usize = core::mem::size_of::<Word>();
+pub const WORD_BYTES: usize = size_of::<Word>();
 pub const WORD_BITS: usize = Word::BITS as usize;
 pub const BASE: DoubleWord = (Word::MAX as DoubleWord) + 1;
 
@@ -174,7 +174,7 @@ impl MPNat {
             }
         }
 
-        if exp.len() <= core::mem::size_of::<usize>() {
+        if exp.len() <= size_of::<usize>() {
             let exp_as_number = {
                 let mut tmp: usize = 0;
                 for d in exp {

@@ -117,7 +117,10 @@ impl AuroraRunner {
     }
 
     pub fn balance_of(&mut self, token: Address, target: Address, origin: &str) -> U256 {
-        let input = build_input("balanceOf(address)", &[Token::Address(target.raw())]);
+        let input = build_input(
+            "balanceOf(address)",
+            &[Token::Address(target.raw().0.into())],
+        );
         let result = self.evm_call(token, input, origin).unwrap();
         let output = result.return_data.as_value().unwrap();
         let result = SubmitResult::try_from_slice(&output).unwrap();
@@ -138,8 +141,8 @@ impl AuroraRunner {
         let input = build_input(
             "mint(address,uint256)",
             &[
-                Token::Address(target.raw()),
-                Token::Uint(U256::from(amount)),
+                Token::Address(target.raw().0.into()),
+                Token::Uint(amount.into()),
             ],
         );
 
@@ -164,8 +167,8 @@ impl AuroraRunner {
         let input = build_input(
             "transfer(address,uint256)",
             &[
-                Token::Address(receiver.raw()),
-                Token::Uint(U256::from(amount)),
+                Token::Address(receiver.raw().0.into()),
+                Token::Uint(amount.into()),
             ],
         );
         let input = create_eth_transaction(Some(token), Wei::zero(), input, None, &sender);
@@ -311,8 +314,7 @@ fn test_relayer_charge_fee() {
     let balance = runner.balance_of(token, recipient, DEFAULT_AURORA_ACCOUNT_ID);
     assert_eq!(balance, U256::from(0));
 
-    let fee_encoded = &mut [0; 32];
-    U256::from(fee).to_big_endian(fee_encoded);
+    let fee_encoded = U256::from(fee).to_big_endian();
 
     runner.ft_on_transfer(
         nep141,
@@ -1093,8 +1095,7 @@ pub mod workspace {
             FT_TRANSFER_AMOUNT,
             &aurora,
         )
-        .await
-        .unwrap();
+        .await?;
 
         assert_eq!(
             nep_141_balance_of(&nep_141, &ft_owner.id()).await,
@@ -1231,14 +1232,14 @@ pub mod workspace {
         let log_entry = aurora_engine_types::parameters::connector::LogEntry {
             address: eth_custodian_address.raw(),
             topics: vec![
-                event_schema.signature(),
+                event_schema.signature().0.into(),
                 // the sender is not important
                 crate::prelude::H256::zero(),
             ],
             data: ethabi::encode(&[
                 ethabi::Token::String(message),
-                ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
-                ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+                ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+                ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
             ]),
         };
         Proof {

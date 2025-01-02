@@ -48,7 +48,7 @@ impl ViewResult<U256> {
         let mut buf = [0u8; 32];
         buf.copy_from_slice(view.result.as_slice());
         Ok(Self {
-            result: U256::from(buf),
+            result: U256::from_big_endian(&buf),
             logs: view.logs,
         })
     }

@@ -103,8 +103,8 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }
@@ -126,8 +126,8 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }

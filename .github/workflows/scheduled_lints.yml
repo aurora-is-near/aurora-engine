@@ -86,3 +86,7 @@ jobs:
           fields: repo,message,commit,author,action,eventName,job,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0

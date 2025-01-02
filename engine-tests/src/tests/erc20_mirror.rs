@@ -10,7 +10,6 @@ use aurora_engine_types::parameters::connector::{
     WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::silo::SiloParamsArgs;
-use aurora_engine_types::types::RawU256;
 use aurora_engine_workspace::account::Account;
 use aurora_engine_workspace::types::NearToken;
 use aurora_engine_workspace::{EngineContract, RawContract};
@@ -187,7 +186,7 @@ async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract 
 
     let result = silo
         .new(
-            RawU256::from(U256::from(AuroraRunner::get_default_chain_id() + 1)),
+            U256::from(AuroraRunner::get_default_chain_id() + 1).to_big_endian(),
             silo_account.id(),
             1,
         )

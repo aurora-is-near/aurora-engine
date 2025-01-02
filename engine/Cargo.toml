@@ -34,7 +34,6 @@ wee_alloc.workspace = true
 
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
-digest.workspace = true
 test-case.workspace = true
 
 [features]

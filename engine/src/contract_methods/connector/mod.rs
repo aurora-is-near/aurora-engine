@@ -588,7 +588,7 @@ mod tests {
     };
     use aurora_engine_types::parameters::connector::{LogEntry, Proof};
     use aurora_engine_types::types::{make_address, Address, Fee, NEP141Wei, Wei};
-    use aurora_engine_types::{H160, U256};
+    use aurora_engine_types::H160;
 
     const ETH_CUSTODIAN_ADDRESS: Address =
         make_address(0xd045f7e1, 0x9b2488924b97f9c145b5e51d0d895a65);
@@ -630,14 +630,14 @@ mod tests {
         let log_entry = LogEntry {
             address: eth_custodian_address.raw(),
             topics: vec![
-                event_schema.signature(),
+                event_schema.signature().0.into(),
                 // the sender is not important
                 crate::prelude::H256::zero(),
             ],
             data: ethabi::encode(&[
                 ethabi::Token::String(message),
-                ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
-                ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+                ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+                ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
             ]),
         };
 

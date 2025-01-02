@@ -215,9 +215,7 @@ impl From<NEP141Wei> for Wei {
 #[allow(dead_code)]
 #[must_use]
 pub fn u256_to_arr(value: &U256) -> [u8; 32] {
-    let mut result = [0u8; 32];
-    value.to_big_endian(&mut result);
-    result
+    value.to_big_endian()
 }
 
 impl BorshSerialize for Wei {

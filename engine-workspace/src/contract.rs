@@ -227,7 +227,7 @@ impl EngineContract {
     }
 
     pub fn call(&self, contract: Address, amount: U256, input: Vec<u8>) -> CallCall {
-        let value = WeiU256::from(amount);
+        let value = WeiU256::from(amount.to_big_endian());
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
             value,
@@ -451,9 +451,7 @@ impl EngineContract {
         amount: U256,
         input: Vec<u8>,
     ) -> ViewView {
-        let mut raw_amount = [0u8; 32];
-        amount.to_big_endian(&mut raw_amount);
-        ViewView::view(&self.contract).args_borsh((sender, address, raw_amount, input))
+        ViewView::view(&self.contract).args_borsh((sender, address, amount.to_big_endian(), input))
     }
 
     pub fn is_used_proof(&self, proof: Proof) -> ViewIsUsedProof {
