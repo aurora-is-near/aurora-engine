@@ -258,7 +258,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
         if value.is_data() {
             Ok(None)
         } else {
-            Err(rlp::DecoderError::RlpExpectedToBeData)
+            Err(DecoderError::RlpExpectedToBeData)
         }
     } else {
         let v: H160 = value.as_val()?;
@@ -269,8 +269,8 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
     let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
-    r.to_big_endian(&mut result[0..32]);
-    s.to_big_endian(&mut result[32..64]);
+    result[..32].copy_from_slice(&r.to_big_endian());
+    result[32..64].copy_from_slice(&s.to_big_endian());
     result[64] = v;
     result
 }

@@ -12,7 +12,7 @@ use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
-use aurora_engine_types::{format, Cow, Vec, U256};
+use aurora_engine_types::{format, Cow, Vec};
 
 pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 
@@ -486,7 +486,7 @@ fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
     let recipient_with_msg = format!("{recipient}:unwrap");
     let args = ethabi::encode(&[
         ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-        ethabi::Token::Uint(U256::from(amount.as_u128())),
+        ethabi::Token::Uint(amount.as_u128().into()),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
 }
@@ -569,7 +569,7 @@ impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
 
 #[cfg(test)]
 mod tests {
-    use aurora_engine_types::{account_id::AccountId, types::Yocto, U256};
+    use aurora_engine_types::{account_id::AccountId, types::Yocto};
 
     #[test]
     fn test_withdraw_to_near_encoding() {
@@ -598,7 +598,7 @@ mod tests {
         let expected_tx_data = withdraw_function
             .encode_input(&[
                 ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-                ethabi::Token::Uint(U256::from(amount.as_u128())),
+                ethabi::Token::Uint(amount.as_u128().into()),
             ])
             .unwrap();
 

@@ -63,8 +63,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .args_json((&receiver_id,))
         .view()
         .await?
-        .json::<U128>()
-        .unwrap();
+        .json::<U128>()?;
     assert_eq!(balance.0, transfer_amount.0);
 
     let balance = contract
@@ -73,8 +72,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .args_json((user_acc.id(),))
         .view()
         .await?
-        .json::<U128>()
-        .unwrap();
+        .json::<U128>()?;
     assert_eq!(balance.0, DEPOSITED_AMOUNT - transfer_amount.0);
 
     let balance = contract
@@ -82,8 +80,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .call("ft_total_supply")
         .view()
         .await?
-        .json::<U128>()
-        .unwrap();
+        .json::<U128>()?;
     assert_eq!(balance.0, DEPOSITED_AMOUNT);
 
     Ok(())
@@ -382,7 +379,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     );
 
     // Sending to random account should not change balances
-    let some_acc = AccountId::from_str("some-test-acc").unwrap();
+    let some_acc = AccountId::from_str("some-test-acc")?;
     let res = user_acc
         .call(contract.engine_contract.id(), "ft_transfer_call")
         .args_json(json!({
@@ -506,14 +503,14 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     let log_entry = aurora_engine_types::parameters::connector::LogEntry {
         address: eth_custodian_address.raw(),
         topics: vec![
-            event_schema.signature(),
+            H256::from(event_schema.signature().0),
             // the sender is not important
             H256::zero(),
         ],
         data: ethabi::encode(&[
             ethabi::Token::String(message),
-            ethabi::Token::Uint(U256::from(deposit_event.amount.as_u128())),
-            ethabi::Token::Uint(U256::from(deposit_event.fee.as_u128())),
+            ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
+            ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
         ]),
     };
     let proof = Proof {
@@ -689,7 +686,7 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_access_right() -> anyhow::Result<()> {
-    let owner = "owner.root".parse().unwrap();
+    let owner = "owner.root".parse()?;
     let contract = TestContract::new_with_owner(owner).await?;
     let owner_acc = contract.create_sub_account("owner").await?;
     contract.call_deposit_eth_to_near().await?;
@@ -702,8 +699,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .call("get_aurora_engine_account_id")
         .view()
         .await?
-        .json::<AccountId>()
-        .unwrap();
+        .json::<AccountId>()?;
     assert_eq!(&res, contract.engine_contract.id());
 
     let withdraw_amount = NEP141Wei::new(100);
@@ -735,8 +731,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .call("get_aurora_engine_account_id")
         .view()
         .await?
-        .json::<AccountId>()
-        .unwrap();
+        .json::<AccountId>()?;
     assert_eq!(&res, user_acc.id());
 
     let res = user_acc
@@ -767,7 +762,7 @@ async fn test_access_right() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
-    let acc_name = AccountId::try_from("some_user.root".to_string()).unwrap();
+    let acc_name = AccountId::try_from("some_user.root".to_string())?;
     let contract = TestContract::new_with_owner(acc_name).await?;
     let user_acc = contract.create_sub_account("some_user").await?;
     let args = json!({"key": "deposit"});
@@ -885,7 +880,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
-    let owner = "owner.root".parse().unwrap();
+    let owner = "owner.root".parse()?;
     let contract = TestContract::new_with_owner(owner).await?;
     let owner_acc = contract.create_sub_account("owner").await?;
     let user_acc = contract
@@ -990,7 +985,7 @@ async fn test_deposit_to_near_with_zero_fee() -> anyhow::Result<()> {
     assert!(contract.call_is_used_proof(proof_str).await?);
 
     let deposited_amount = 3000;
-    let receiver_id = AccountId::from_str(DEPOSITED_RECIPIENT).unwrap();
+    let receiver_id = AccountId::from_str(DEPOSITED_RECIPIENT)?;
 
     assert_eq!(
         contract.get_eth_on_near_balance(&receiver_id).await?.0,
@@ -1164,7 +1159,7 @@ async fn test_ft_transfer_wrong_u128_json_type() -> anyhow::Result<()> {
     contract.call_deposit_eth_to_near().await?;
 
     let transfer_amount = 200;
-    let receiver_id = AccountId::from_str(DEPOSITED_RECIPIENT).unwrap();
+    let receiver_id = AccountId::from_str(DEPOSITED_RECIPIENT)?;
     let res = contract
         .engine_contract
         .call("ft_transfer")
@@ -1291,17 +1286,15 @@ async fn test_ft_metadata() -> anyhow::Result<()> {
 
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
-
     let metadata = contract
         .engine_contract
         .call("ft_metadata")
         .max_gas()
         .transact()
         .await?
-        .into_result()
-        .unwrap()
-        .json::<FungibleTokenMetadata>()
-        .unwrap();
+        .into_result()?
+        .json::<FungibleTokenMetadata>()?;
+
     let m = ft_m::default();
     let reference_hash = m.reference_hash.map(|h| {
         let x: [u8; 32] = h.as_ref().try_into().unwrap();
