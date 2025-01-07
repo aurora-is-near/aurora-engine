@@ -1,10 +1,4 @@
 #![cfg_attr(not(any(feature = "std", feature = "contracts-std")), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::module_name_repetitions
-)]
 
 pub mod account_id;
 pub mod parameters;

@@ -94,22 +94,22 @@ impl TestContract {
         Ok((engine_contract, eth_connector_contract, root_account))
     }
 
-    pub async fn new() -> anyhow::Result<TestContract> {
+    pub async fn new() -> anyhow::Result<Self> {
         Self::new_with_custodian(CUSTODIAN_ADDRESS).await
     }
 
-    pub async fn new_with_owner(owner: AccountId) -> anyhow::Result<TestContract> {
+    pub async fn new_with_owner(owner: AccountId) -> anyhow::Result<Self> {
         Self::new_contract(CUSTODIAN_ADDRESS, Some(owner)).await
     }
 
-    pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
+    pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<Self> {
         Self::new_contract(eth_custodian_address, None).await
     }
 
     async fn new_contract(
         eth_custodian_address: &str,
         owner: Option<AccountId>,
-    ) -> anyhow::Result<TestContract> {
+    ) -> anyhow::Result<Self> {
         let (engine_contract, eth_connector_contract, root_account) =
             Self::deploy_aurora_contract().await?;
 
@@ -187,7 +187,7 @@ impl TestContract {
     }
 
     /// Waiting for the account creation
-    async fn waiting_account_creation<T: NetworkClient + ?Sized>(
+    async fn waiting_account_creation<T: NetworkClient + ?Sized + Send + Sync>(
         worker: &Worker<T>,
         account_id: &AccountId,
     ) -> anyhow::Result<()> {
@@ -208,6 +208,7 @@ impl TestContract {
         )
     }
 
+    #[must_use]
     pub fn get_proof(&self, proof: &str) -> Proof {
         serde_json::from_str(proof).unwrap()
     }
@@ -259,12 +260,13 @@ impl TestContract {
             .await?)
     }
 
-    pub fn check_error_message(&self, res: ExecutionFinalResult, error_msg: &str) -> bool {
+    #[must_use]
+    pub fn check_error_message(&self, res: &ExecutionFinalResult, error_msg: &str) -> bool {
         let mut is_failure = false;
         for out in res.receipt_outcomes() {
             is_failure = out.is_failure();
             if is_failure {
-                return format!("{:?}", res).contains(error_msg);
+                return format!("{res:?}").contains(error_msg);
             }
         }
         is_failure
@@ -334,16 +336,18 @@ impl TestContract {
     }
 }
 
-pub fn print_logs(res: ExecutionFinalResult) {
-    for log in res.logs().iter() {
-        println!("\t[LOG] {}", log);
+pub fn print_logs(res: &ExecutionFinalResult) {
+    for log in &res.logs() {
+        println!("\t[LOG] {log}");
     }
 }
 
+#[must_use]
 pub fn validate_eth_address(address: &str) -> Address {
     Address::decode(address).unwrap()
 }
 
+#[must_use]
 pub fn get_eth_connector_contract() -> Vec<u8> {
     let contract_path = Path::new("etc/aurora-eth-connector");
     std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()

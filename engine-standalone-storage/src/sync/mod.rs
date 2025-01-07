@@ -156,14 +156,15 @@ pub fn parse_transaction_kind(
             })?;
             TransactionKind::RegisterRelayer(address)
         }
-        TransactionKindTag::ExitToNear => match promise_data.first().and_then(Option::as_ref) {
-            None => TransactionKind::ExitToNear(None),
-            Some(_) => {
+        TransactionKindTag::ExitToNear => {
+            if promise_data.first().and_then(Option::as_ref).is_none() {
+                TransactionKind::ExitToNear(None)
+            } else {
                 let args = aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs::try_from_slice(&bytes)
-                    .map_err(f)?;
+                             .map_err(f)?;
                 TransactionKind::ExitToNear(Some(args))
             }
-        },
+        }
         TransactionKindTag::SetConnectorData => {
             let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetConnectorData(args)

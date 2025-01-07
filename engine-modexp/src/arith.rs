@@ -110,7 +110,7 @@ pub fn monsq(x: &MPNat, n: &MPNat, n_prime: Word, out: &mut [Word]) {
         }
     }
     // Only keep the last `s + 1` digits in `out`.
-    for i in 0..(s + 1) {
+    for i in 0..=s {
         out[i] = out[i + s];
     }
     out[(s + 1)..].fill(0);
@@ -158,8 +158,8 @@ pub fn mod_inv(x: Word) -> Word {
     y
 }
 
-/// Computes R mod n, where R = 2^(WORD_BITS*k) and k = n.digits.len()
-/// Note that if R = qn + r, q must be smaller than 2^WORD_BITS since `2^(WORD_BITS) * n > R`
+/// Computes R mod n, where R = `2^(WORD_BITS*k)` and k = `n.digits.len()`
+/// Note that if R = qn + r, q must be smaller than `2^WORD_BITS` since `2^(WORD_BITS) * n > R`
 /// (adding a whole additional word to n is too much).
 /// Uses the two most significant digits of n to approximate the quotient,
 /// then computes the difference to get the remainder. It is possible that this
@@ -365,7 +365,7 @@ pub fn in_place_mul_sub(a: &mut [Word], x: &[Word], y: Word) -> Word {
 /// the second part of the output. The arithmetic in this function is
 /// guaranteed to never overflow because even when all 4 variables are
 /// equal to `Word::MAX` the output is smaller than `DoubleWord::MAX`.
-pub fn shifted_carrying_mul(a: Word, x: Word, y: Word, c: Word) -> (Word, Word) {
+pub const fn shifted_carrying_mul(a: Word, x: Word, y: Word, c: Word) -> (Word, Word) {
     let wide = { (a as DoubleWord) + ((x as DoubleWord) * (y as DoubleWord)) + (c as DoubleWord) };
     (wide as Word, (wide >> WORD_BITS) as Word)
 }
@@ -374,20 +374,20 @@ pub fn shifted_carrying_mul(a: Word, x: Word, y: Word, c: Word) -> (Word, Word) 
 /// the second part of the output. The arithmetic in this function is
 /// guaranteed to never overflow because even when all 3 variables are
 /// equal to `Word::MAX` the output is smaller than `DoubleWord::MAX`.
-pub fn carrying_mul(x: Word, y: Word, c: Word) -> (Word, Word) {
+pub const fn carrying_mul(x: Word, y: Word, c: Word) -> (Word, Word) {
     let wide = { ((x as DoubleWord) * (y as DoubleWord)) + (c as DoubleWord) };
     (wide as Word, (wide >> WORD_BITS) as Word)
 }
 
 // Computes `x + y` with "carry the 1" semantics
-pub fn carrying_add(x: Word, y: Word, carry: bool) -> (Word, bool) {
+pub const fn carrying_add(x: Word, y: Word, carry: bool) -> (Word, bool) {
     let (a, b) = x.overflowing_add(y);
     let (c, d) = a.overflowing_add(carry as Word);
     (c, b | d)
 }
 
 // Computes `x - y` with "borrow from your neighbour" semantics
-pub fn borrowing_sub(x: Word, y: Word, borrow: bool) -> (Word, bool) {
+pub const fn borrowing_sub(x: Word, y: Word, borrow: bool) -> (Word, bool) {
     let (a, b) = x.overflowing_sub(y);
     let (c, d) = a.overflowing_sub(borrow as Word);
     (c, b | d)
@@ -399,19 +399,8 @@ pub fn join_as_double(hi: Word, lo: Word) -> DoubleWord {
 
 #[test]
 fn test_monsq() {
-    check_monsq(1, 31);
-    check_monsq(6, 31);
     // This example is intentionally chosen because 5 * 5 = 25 = 0 mod 25,
     // therefore it requires the final subtraction step in the algorithm.
-    check_monsq(5, 25);
-    check_monsq(0x1FFF_FFFF_FFFF_FFF0, 0x1FFF_FFFF_FFFF_FFF1);
-    check_monsq(0x16FF_221F_CB7D, 0x011E_842B_6BAA_5017_EBF2_8293);
-    check_monsq(0x0A2D_63F5_CFF9, 0x1F3B_3BD9_43EF);
-    check_monsq(
-        0xa6b0ce71a380dea7c83435bc,
-        0xc4550871a1cfc67af3e77eceb2ecfce5,
-    );
-
     fn check_monsq(x: u128, n: u128) {
         let a = MPNat::from_big_endian(&x.to_be_bytes());
         let m = MPNat::from_big_endian(&n.to_be_bytes());
@@ -431,24 +420,23 @@ fn test_monsq() {
             "{x}^2 failed monsq check"
         );
     }
+
+    check_monsq(1, 31);
+    check_monsq(6, 31);
+
+    check_monsq(5, 25);
+    check_monsq(0x1FFF_FFFF_FFFF_FFF0, 0x1FFF_FFFF_FFFF_FFF1);
+    check_monsq(0x16FF_221F_CB7D, 0x011E_842B_6BAA_5017_EBF2_8293);
+    check_monsq(0x0A2D_63F5_CFF9, 0x1F3B_3BD9_43EF);
+    check_monsq(
+        0xa6b0ce71a380dea7c83435bc,
+        0xc4550871a1cfc67af3e77eceb2ecfce5,
+    );
 }
 
 #[test]
 fn test_monpro() {
     use num::Integer;
-
-    check_monpro(1, 1, 31);
-    check_monpro(6, 7, 31);
-    // This example is intentionally chosen because 5 * 7 = 35 = 0 mod 35,
-    // therefore it requires the final subtraction step in the algorithm.
-    check_monpro(5, 7, 35);
-    check_monpro(0x1FFF_FFFF_FFFF_FFF0, 0x1234, 0x1FFF_FFFF_FFFF_FFF1);
-    check_monpro(
-        0x16FF_221F_CB7D,
-        0x0C75_8535_434F,
-        0x011E_842B_6BAA_5017_EBF2_8293,
-    );
-    check_monpro(0x0A2D_63F5_CFF9, 0x1B21_FF3C_FA8E, 0x1F3B_3BD9_43EF);
 
     fn check_monpro(x: u128, y: u128, n: u128) {
         let a = MPNat::from_big_endian(&x.to_be_bytes());
@@ -468,18 +456,23 @@ fn test_monpro() {
         let actual = mp_nat_to_u128(&result);
         assert_eq!(actual, expected, "{x}*{y} failed monpro check");
     }
+
+    check_monpro(1, 1, 31);
+    check_monpro(6, 7, 31);
+    // This example is intentionally chosen because 5 * 7 = 35 = 0 mod 35,
+    // therefore it requires the final subtraction step in the algorithm.
+    check_monpro(5, 7, 35);
+    check_monpro(0x1FFF_FFFF_FFFF_FFF0, 0x1234, 0x1FFF_FFFF_FFFF_FFF1);
+    check_monpro(
+        0x16FF_221F_CB7D,
+        0x0C75_8535_434F,
+        0x011E_842B_6BAA_5017_EBF2_8293,
+    );
+    check_monpro(0x0A2D_63F5_CFF9, 0x1B21_FF3C_FA8E, 0x1F3B_3BD9_43EF);
 }
 
 #[test]
 fn test_r_mod_n() {
-    check_r_mod_n(0x01_00_00_00_01);
-    check_r_mod_n(0x80_00_00_00_01);
-    check_r_mod_n(0xFFFF_FFFF_FFFF_FFFF);
-    check_r_mod_n(0x0001_0000_0000_0000_0001);
-    check_r_mod_n(0x8000_0000_0000_0000_0001);
-    check_r_mod_n(0xbf2d_c9a3_82c5_6e85_b033_7651);
-    check_r_mod_n(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF);
-
     fn check_r_mod_n(n: u128) {
         let x = MPNat::from_big_endian(&n.to_be_bytes());
         let mut out = vec![0; x.digits.len()];
@@ -489,15 +482,18 @@ fn test_r_mod_n() {
             % num::BigUint::from(n);
         assert_eq!(num::BigUint::from(result), expected);
     }
+
+    check_r_mod_n(0x01_00_00_00_01);
+    check_r_mod_n(0x80_00_00_00_01);
+    check_r_mod_n(0xFFFF_FFFF_FFFF_FFFF);
+    check_r_mod_n(0x0001_0000_0000_0000_0001);
+    check_r_mod_n(0x8000_0000_0000_0000_0001);
+    check_r_mod_n(0xbf2d_c9a3_82c5_6e85_b033_7651);
+    check_r_mod_n(0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF);
 }
 
 #[test]
 fn test_in_place_shl() {
-    check_in_place_shl(0, 0);
-    check_in_place_shl(1, 10);
-    check_in_place_shl(Word::MAX as u128, 5);
-    check_in_place_shl(u128::MAX, 16);
-
     fn check_in_place_shl(n: u128, shift: u32) {
         let mut x = MPNat::from_big_endian(&n.to_be_bytes());
         in_place_shl(&mut x.digits, shift);
@@ -508,47 +504,46 @@ fn test_in_place_shl() {
             .wrapping_sub(1);
         assert_eq!(result, n.overflowing_shl(shift).0 & mask);
     }
+
+    check_in_place_shl(0, 0);
+    check_in_place_shl(1, 10);
+    check_in_place_shl(u128::from(Word::MAX), 5);
+    check_in_place_shl(u128::MAX, 16);
 }
 
 #[test]
 fn test_in_place_shr() {
-    check_in_place_shr(0, 0);
-    check_in_place_shr(1, 10);
-    check_in_place_shr(0x1234_5678, 10);
-    check_in_place_shr(Word::MAX as u128, 5);
-    check_in_place_shr(u128::MAX, 16);
-
     fn check_in_place_shr(n: u128, shift: u32) {
         let mut x = MPNat::from_big_endian(&n.to_be_bytes());
         in_place_shr(&mut x.digits, shift);
         let result = mp_nat_to_u128(&x);
         assert_eq!(result, n.overflowing_shr(shift).0);
     }
+
+    check_in_place_shr(0, 0);
+    check_in_place_shr(1, 10);
+    check_in_place_shr(0x1234_5678, 10);
+    check_in_place_shr(u128::from(Word::MAX), 5);
+    check_in_place_shr(u128::MAX, 16);
 }
 
 #[test]
 fn test_mod_inv() {
+    fn check_mod_inv(n: Word) {
+        let n_inv = mod_inv(n);
+        assert_eq!(n.wrapping_mul(n_inv), 1, "{n} failed mod_inv check");
+    }
+
     for i in 1..1025 {
         check_mod_inv(2 * i - 1);
     }
     for i in 0..1025 {
         check_mod_inv(0xFF_FF_FF_FF - 2 * i);
     }
-
-    fn check_mod_inv(n: Word) {
-        let n_inv = mod_inv(n);
-        assert_eq!(n.wrapping_mul(n_inv), 1, "{n} failed mod_inv check");
-    }
 }
 
 #[test]
 fn test_big_wrapping_pow() {
-    check_big_wrapping_pow(1, 1);
-    check_big_wrapping_pow(10, 2);
-    check_big_wrapping_pow(2, 32);
-    check_big_wrapping_pow(2, 64);
-    check_big_wrapping_pow(2766, 844);
-
     fn check_big_wrapping_pow(a: u128, b: u32) {
         let expected = num::BigUint::from(a).pow(b);
         let x = MPNat::from_big_endian(&a.to_be_bytes());
@@ -561,10 +556,30 @@ fn test_big_wrapping_pow() {
         };
         assert_eq!(result, expected, "{a} ^ {b} != {expected}");
     }
+
+    check_big_wrapping_pow(1, 1);
+    check_big_wrapping_pow(10, 2);
+    check_big_wrapping_pow(2, 32);
+    check_big_wrapping_pow(2, 64);
+    check_big_wrapping_pow(2766, 844);
 }
 
 #[test]
 fn test_big_wrapping_mul() {
+    fn check_big_wrapping_mul(a: u128, b: u128, output_digits: usize) {
+        let expected = (num::BigUint::from(a) * num::BigUint::from(b))
+            % num::BigUint::from(2_u32).pow(u32::try_from(output_digits * WORD_BITS).unwrap());
+        let x = MPNat::from_big_endian(&a.to_be_bytes());
+        let y = MPNat::from_big_endian(&b.to_be_bytes());
+        let mut out = vec![0; output_digits];
+        big_wrapping_mul(&x, &y, &mut out);
+        let result = {
+            let result = MPNat { digits: out }.to_big_endian();
+            num::BigUint::from_bytes_be(&result)
+        };
+        assert_eq!(result, expected, "{a}*{b} != {expected}");
+    }
+
     check_big_wrapping_mul(0, 0, 1);
     check_big_wrapping_mul(1, 1, 1);
     check_big_wrapping_mul(7, 6, 1);
@@ -577,35 +592,10 @@ fn test_big_wrapping_mul() {
         0x43e9_8b77_1f7c_aa93_6c4c_85e9_7fd0_504f,
         3,
     );
-
-    fn check_big_wrapping_mul(a: u128, b: u128, output_digits: usize) {
-        let expected = (num::BigUint::from(a) * num::BigUint::from(b))
-            % num::BigUint::from(2_u32).pow((output_digits * WORD_BITS) as u32);
-        let x = MPNat::from_big_endian(&a.to_be_bytes());
-        let y = MPNat::from_big_endian(&b.to_be_bytes());
-        let mut out = vec![0; output_digits];
-        big_wrapping_mul(&x, &y, &mut out);
-        let result = {
-            let result = MPNat { digits: out }.to_big_endian();
-            num::BigUint::from_bytes_be(&result)
-        };
-        assert_eq!(result, expected, "{a}*{b} != {expected}");
-    }
 }
 
 #[test]
 fn test_big_sq() {
-    check_big_sq(0);
-    check_big_sq(1);
-    check_big_sq(Word::MAX.into());
-    check_big_sq(2 * (Word::MAX as u128));
-    check_big_sq(0x8e67904953db9a2bf6da64bf8bda866d);
-    check_big_sq(0x9f8dc1c3fc0bf50fe75ac3bbc03124c9);
-    check_big_sq(0x9c9a17378f3d064e5eaa80eeb3850cd7);
-    check_big_sq(0xc7f03fbb1c186c05e54b3ee19106baa4);
-    check_big_sq(0xcf2025cee03025d247ad190e9366d926);
-    check_big_sq(u128::MAX);
-
     fn check_big_sq(a: u128) {
         let expected = num::BigUint::from(a).pow(2_u32);
         let x = MPNat::from_big_endian(&a.to_be_bytes());
@@ -617,6 +607,17 @@ fn test_big_sq() {
         };
         assert_eq!(result, expected, "{a}^2 != {expected}");
     }
+
+    check_big_sq(0);
+    check_big_sq(1);
+    check_big_sq(Word::MAX.into());
+    check_big_sq(2 * (Word::MAX as u128));
+    check_big_sq(0x8e67904953db9a2bf6da64bf8bda866d);
+    check_big_sq(0x9f8dc1c3fc0bf50fe75ac3bbc03124c9);
+    check_big_sq(0x9c9a17378f3d064e5eaa80eeb3850cd7);
+    check_big_sq(0xc7f03fbb1c186c05e54b3ee19106baa4);
+    check_big_sq(0xcf2025cee03025d247ad190e9366d926);
+    check_big_sq(u128::MAX);
 
     /* Test for addition overflows in the big_sq inner loop */
     {

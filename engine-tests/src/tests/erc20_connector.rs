@@ -738,7 +738,7 @@ pub mod workspace {
             .ft_transfer(
                 &"tmp.near".parse().unwrap(),
                 u128::from(INITIAL_ETH_BALANCE).into(),
-                None,
+                &None,
             )
             .max_gas()
             .deposit(NearToken::from_yoctonear(1))
@@ -814,7 +814,7 @@ pub mod workspace {
 
         for (account_id, amount) in &balances {
             aurora
-                .ft_transfer(account_id, (*amount).into(), None)
+                .ft_transfer(account_id, (*amount).into(), &None)
                 .deposit(ONE_YOCTO)
                 .transact()
                 .await
@@ -864,7 +864,7 @@ pub mod workspace {
         assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
         // Try to transfer tokens
         let result = aurora
-            .ft_transfer(&recipient_id, transfer_amount.into(), None)
+            .ft_transfer(&recipient_id, transfer_amount.into(), &None)
             .deposit(ONE_YOCTO)
             .transact()
             .await;
@@ -881,7 +881,7 @@ pub mod workspace {
             .unwrap();
         // Transfer tokens
         aurora
-            .ft_transfer(&recipient_id, transfer_amount.into(), None)
+            .ft_transfer(&recipient_id, transfer_amount.into(), &None)
             .deposit(ONE_YOCTO)
             .transact()
             .await
@@ -918,7 +918,7 @@ pub mod workspace {
         let transfer_amount = 10;
         // Transfer tokens to the `ft_owner` account
         aurora
-            .ft_transfer(&ft_owner.id(), transfer_amount.into(), None)
+            .ft_transfer(&ft_owner.id(), transfer_amount.into(), &None)
             .deposit(ONE_YOCTO)
             .transact()
             .await

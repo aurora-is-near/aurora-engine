@@ -27,7 +27,7 @@ pub struct IOCache {
 }
 
 impl<'cache, I> CachedIO<'cache, I> {
-    pub fn new(io: I, cache: &'cache RefCell<IOCache>) -> Self {
+    pub const fn new(io: I, cache: &'cache RefCell<IOCache>) -> Self {
         Self { inner: io, cache }
     }
 }
