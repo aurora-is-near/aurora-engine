@@ -97,10 +97,12 @@ impl Hashchain {
         self.previous_block_hashchain
     }
 
-    pub fn get_logs_bloom(&self) -> &Bloom {
+    #[must_use]
+    pub const fn get_logs_bloom(&self) -> &Bloom {
         &self.block_hashchain_computer.txs_logs_bloom
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.block_hashchain_computer.is_empty()
     }
@@ -125,34 +127,41 @@ pub struct HashchainBuilder {
 }
 
 impl HashchainBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_chain_id(mut self, chain_id: [u8; 32]) -> Self {
+    #[must_use]
+    pub const fn with_chain_id(mut self, chain_id: [u8; 32]) -> Self {
         self.chain_id = chain_id;
         self
     }
 
+    #[must_use]
     pub fn with_u64_chain_id(self, chain_id: u64) -> Self {
         self.with_chain_id(aurora_engine_types::types::u256_to_arr(&chain_id.into()))
     }
 
+    #[must_use]
     pub fn with_account_id(mut self, id: AccountId) -> Self {
         self.contract_account_id = id;
         self
     }
 
-    pub fn with_current_block_height(mut self, height: u64) -> Self {
+    #[must_use]
+    pub const fn with_current_block_height(mut self, height: u64) -> Self {
         self.current_block_height = height;
         self
     }
 
-    pub fn with_previous_hashchain(mut self, hashchain: RawH256) -> Self {
+    #[must_use]
+    pub const fn with_previous_hashchain(mut self, hashchain: RawH256) -> Self {
         self.previous_block_hashchain = hashchain;
         self
     }
 
+    #[must_use]
     pub fn build(self) -> Hashchain {
         Hashchain::new(
             self.chain_id,

@@ -36,6 +36,9 @@ wee_alloc.workspace = true
 aurora-engine-test-doubles.workspace = true
 test-case.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-hashchain/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]

@@ -315,6 +315,7 @@ async fn test_ft_transfer_call_without_fee() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
     let contract = TestContract::new().await?;
     contract.call_deposit_eth_to_near().await?;
@@ -356,7 +357,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(contract.check_error_message(res, "ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT"));
+    assert!(contract.check_error_message(&res, "ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT"));
 
     // Assert balances remain unchanged
     assert_eq!(
@@ -547,7 +548,7 @@ async fn test_deposit_with_same_proof() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_PROOF_EXIST"));
+    assert!(contract.check_error_message(&res, "ERR_PROOF_EXIST"));
     Ok(())
 }
 
@@ -559,7 +560,7 @@ async fn test_deposit_wrong_custodian_address() -> anyhow::Result<()> {
         .deposit_with_proof(&contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "ERR_WRONG_EVENT_ADDRESS"));
+    assert!(contract.check_error_message(&res, "ERR_WRONG_EVENT_ADDRESS"));
     assert!(!contract.call_is_used_proof(PROOF_DATA_NEAR).await?);
     Ok(())
 }
@@ -673,7 +674,7 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Insufficient permissions for method"));
+    assert!(contract.check_error_message(&res, "Insufficient permissions for method"));
 
     let res = owner
         .call(contract.eth_connector_contract.id(), "pa_pause_feature")
@@ -711,7 +712,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Method can be called only by aurora engine"));
+    assert!(contract.check_error_message(&res, "Method can be called only by aurora engine"));
 
     let res = owner_acc
         .call(
@@ -782,7 +783,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
         .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
+    assert!(contract.check_error_message(&res, "Pausable: Method is paused"));
 
     let res = contract
         .engine_contract
@@ -792,7 +793,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
+    assert!(contract.check_error_message(&res, "Pausable: Method is paused"));
 
     assert_eq!(contract.total_supply().await?, 0);
 
@@ -829,7 +830,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
+    assert!(contract.check_error_message(&res, "Pausable: Method is paused"));
 
     let res = contract
         .engine_contract
@@ -839,7 +840,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
+    assert!(contract.check_error_message(&res, "Pausable: Method is paused"));
 
     // Unpause all
     let res = owner_acc
@@ -926,7 +927,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Pausable: Method is paused"));
+    assert!(contract.check_error_message(&res, "Pausable: Method is paused"));
 
     // Direct call to eth-connector from owner should be success
     let res = user_acc
@@ -1071,7 +1072,7 @@ async fn test_deposit_to_aurora_amount_zero_fee_non_zero() -> anyhow::Result<()>
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(contract.check_error_message(res, "The amount should be a positive number"));
+    assert!(contract.check_error_message(&res, "The amount should be a positive number"));
     assert!(!contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1124,7 +1125,7 @@ async fn test_ft_transfer_max_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "The account doesn't have enough balance"));
+    assert!(contract.check_error_message(&res, "The account doesn't have enough balance"));
     Ok(())
 }
 
@@ -1149,7 +1150,7 @@ async fn test_ft_transfer_empty_value() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "cannot parse integer from empty string"));
+    assert!(contract.check_error_message(&res, "cannot parse integer from empty string"));
     Ok(())
 }
 
@@ -1172,7 +1173,7 @@ async fn test_ft_transfer_wrong_u128_json_type() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_failure());
-    assert!(contract.check_error_message(res, "Wait for a string"));
+    assert!(contract.check_error_message(&res, "Wait for a string"));
     Ok(())
 }
 

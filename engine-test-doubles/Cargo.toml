@@ -17,3 +17,6 @@ aurora-engine-sdk.workspace = true
 evm = { workspace = true, features = ["std", "tracing"] }
 evm-gasometer.workspace = true
 evm-runtime.workspace = true
+
+[lints]
+workspace = true

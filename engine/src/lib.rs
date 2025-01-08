@@ -1,11 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::module_name_repetitions,
-    clippy::unreadable_literal
-)]
 
 use aurora_engine_types::parameters::PromiseCreateArgs;
 

@@ -39,19 +39,19 @@ impl MPNat {
         debug_assert!(aa.is_odd());
 
         let length = k / WORD_BITS;
-        let mut b = MPNat {
+        let mut b = Self {
             digits: vec![0; length + 1],
         };
         b.digits[0] = 1;
 
-        let mut a = MPNat {
+        let mut a = Self {
             digits: aa.digits.clone(),
         };
         a.digits.resize(length + 1, 0);
 
         let mut neg: bool = false;
 
-        let mut res = MPNat {
+        let mut res = Self {
             digits: vec![0; length + 1],
         };
 
@@ -60,17 +60,17 @@ impl MPNat {
         for _ in 0..k {
             let x = b.digits[0] & 1;
             if x != 0 {
-                if !neg {
+                if neg {
+                    // b = b - a
+                    in_place_add(&mut b.digits, &a.digits);
+                } else {
                     // b = a - b
-                    let mut tmp = MPNat {
+                    let mut tmp = Self {
                         digits: a.digits.clone(),
                     };
                     in_place_mul_sub(&mut tmp.digits, &b.digits, 1);
                     b = tmp;
                     neg = true;
-                } else {
-                    // b = b - a
-                    in_place_add(&mut b.digits, &a.digits);
                 }
             }
 
@@ -120,10 +120,10 @@ impl MPNat {
             digits[i] = Word::from_be_bytes(buf);
             if i == 0 {
                 break;
-            } else {
-                i -= 1;
-                j = next_j;
             }
+
+            i -= 1;
+            j = next_j;
         }
         // throw away leading zeros
         while digits.len() > 1 && digits[digits.len() - 1] == 0 {
@@ -136,7 +136,7 @@ impl MPNat {
         // A multi-precision number is a power of 2 iff exactly one digit
         // is a power of 2 and all others are zero.
         let mut found_power_of_two = false;
-        for &d in self.digits.iter() {
+        for &d in &self.digits {
             let is_p2 = d.is_power_of_two();
             if (!is_p2 && d != 0) || (is_p2 && found_power_of_two) {
                 return false;
@@ -153,14 +153,15 @@ impl MPNat {
     }
 
     /// Computes `self ^ exp mod modulus`. `exp` must be given as big-endian bytes.
+    #[allow(clippy::too_many_lines, clippy::debug_assert_with_mut_call)]
     pub fn modpow(&mut self, exp: &[u8], modulus: &Self) -> Self {
         // exp must be stripped because it is iterated over in
-        // big_wrapping_pow and modpow_montgomery, and a large
+        // `big_wrapping_pow` and `modpow_montgomery`, and a large
         // zero-padded exp leads to performance issues.
         let (exp, exp_is_zero) = Self::strip_leading_zeroes(exp);
 
         // base^0 is always 1, regardless of base.
-        // Hence the result is 0 for (base^0) % 1, and 1
+        // Hence, the result is 0 for (base^0) % 1, and 1
         // for every modulus larger than 1.
         //
         // The case of modulus being 0 should have already been
@@ -169,9 +170,9 @@ impl MPNat {
         if exp_is_zero {
             if modulus.digits.len() == 1 && modulus.digits[0] == 1 {
                 return Self { digits: vec![0] };
-            } else {
-                return Self { digits: vec![1] };
             }
+
+            return Self { digits: vec![1] };
         }
 
         if exp.len() <= size_of::<usize>() {
@@ -207,7 +208,7 @@ impl MPNat {
         let trailing_zeros = modulus.digits.iter().take_while(|x| x == &&0).count();
         let additional_zero_bits = modulus.digits[trailing_zeros].trailing_zeros() as usize;
         let power_of_two = {
-            let mut tmp = MPNat {
+            let mut tmp = Self {
                 digits: vec![0; trailing_zeros + 1],
             };
             tmp.digits[trailing_zeros] = 1 << additional_zero_bits;
@@ -216,7 +217,7 @@ impl MPNat {
         let power_of_two_mask = *power_of_two.digits.last().unwrap() - 1;
         let odd = {
             let num_digits = modulus.digits.len() - trailing_zeros;
-            let mut tmp = MPNat {
+            let mut tmp = Self {
                 digits: vec![0; num_digits],
             };
             if additional_zero_bits > 0 {
@@ -250,7 +251,7 @@ impl MPNat {
             "modulus is factored"
         );
 
-        let mut base_copy = MPNat {
+        let mut base_copy = Self {
             digits: self.digits.clone(),
         };
         let x1 = base_copy.modpow_montgomery(exp, &odd);
@@ -273,13 +274,13 @@ impl MPNat {
                 *scratch_digit = diff;
                 b = borrow;
             }
-            MPNat { digits: scratch }
+            Self { digits: scratch }
         };
         let y = {
             let mut out = vec![0; s];
             big_wrapping_mul(&diff, &odd_inv, &mut out);
             *out.last_mut().unwrap() &= power_of_two_mask;
-            MPNat { digits: out }
+            Self { digits: out }
         };
 
         // Re-use allocation for efficiency
@@ -294,7 +295,7 @@ impl MPNat {
             c = carry;
             *out_digit = sum;
         }
-        MPNat { digits }
+        Self { digits }
     }
 
     // Computes `self ^ exp mod modulus` using Montgomery multiplication.
@@ -308,7 +309,7 @@ impl MPNat {
         let n_prime = Word::MAX - mod_inv(modulus.digits[0]) + 1;
         let s = modulus.digits.len();
 
-        let mut x_bar = MPNat { digits: vec![0; s] };
+        let mut x_bar = Self { digits: vec![0; s] };
         // Initialize result as `r mod modulus` (Montgomery form of 1)
         compute_r_mod_n(modulus, &mut x_bar.digits);
 
@@ -319,7 +320,7 @@ impl MPNat {
         // First directly multiply base * r to get a 2s-digit number,
         // then reduce mod modulus.
         let a_bar = {
-            let mut tmp = MPNat {
+            let mut tmp = Self {
                 digits: vec![0; 2 * s],
             };
             big_wrapping_mul(self, &x_bar, &mut tmp.digits);
@@ -359,11 +360,11 @@ impl MPNat {
             let mut digits = a_bar.digits;
             digits.fill(0);
             digits[0] = 1;
-            MPNat { digits }
+            Self { digits }
         };
         monpro(&x_bar, &one, modulus, n_prime, &mut scratch[0..monpro_len]);
         scratch.resize(s, 0);
-        MPNat { digits: scratch }
+        Self { digits: scratch }
     }
 
     fn modpow_with_power_of_two(&mut self, exp: &[u8], modulus: &Self) -> Self {
@@ -480,7 +481,7 @@ impl MPNat {
             );
 
             // Run algorithm on normalized values
-            self.sub_to_same_size(&MPNat { digits: normalized });
+            self.sub_to_same_size(&Self { digits: normalized });
 
             // need to de-normalize to get the correct result
             in_place_shr(&mut self.digits, shift);
@@ -561,6 +562,14 @@ impl MPNat {
 
 #[test]
 fn test_modpow_even() {
+    fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
+        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
+        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
+        let result = x.modpow(&exp.to_be_bytes(), &m);
+        let result = crate::arith::mp_nat_to_u128(&result);
+        assert_eq!(result, expected);
+    }
+
     check_modpow_even(3, 5, 500, 243);
     check_modpow_even(3, 5, 20, 3);
 
@@ -644,18 +653,21 @@ fn test_modpow_even() {
     let modulus = hex::decode("02").unwrap();
     let result = crate::modexp(&base, &exponent, &modulus);
     assert_eq!(hex::encode(result), "01");
-
-    fn check_modpow_even(base: u128, exp: u128, modulus: u128, expected: u128) {
-        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
-        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
-        let result = x.modpow(&exp.to_be_bytes(), &m);
-        let result = crate::arith::mp_nat_to_u128(&result);
-        assert_eq!(result, expected);
-    }
 }
 
 #[test]
 fn test_modpow_montgomery() {
+    fn check_modpow_montgomery(base: u128, exp: u128, modulus: u128, expected: u128) {
+        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
+        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
+        let result = x.modpow_montgomery(&exp.to_be_bytes(), &m);
+        let result = crate::arith::mp_nat_to_u128(&result);
+        assert_eq!(
+            result, expected,
+            "({base} ^ {exp}) % {modulus} failed check_modpow_montgomery"
+        );
+    }
+
     check_modpow_montgomery(3, 5, 0x9346_9d50_1f74_d1c1, 243);
     check_modpow_montgomery(3, 5, 19, 15);
     check_modpow_montgomery(
@@ -688,21 +700,18 @@ fn test_modpow_montgomery() {
         0x52e104dc72423b534d8e49d878f29e3b,
         0x2aa756846258d5cfa6a3f8b9b181a11c,
     );
-
-    fn check_modpow_montgomery(base: u128, exp: u128, modulus: u128, expected: u128) {
-        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
-        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
-        let result = x.modpow_montgomery(&exp.to_be_bytes(), &m);
-        let result = crate::arith::mp_nat_to_u128(&result);
-        assert_eq!(
-            result, expected,
-            "({base} ^ {exp}) % {modulus} failed check_modpow_montgomery"
-        );
-    }
 }
 
 #[test]
 fn test_modpow_with_power_of_two() {
+    fn check_modpow_with_power_of_two(base: u128, exp: u128, modulus: u128, expected: u128) {
+        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
+        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
+        let result = x.modpow_with_power_of_two(&exp.to_be_bytes(), &m);
+        let result = crate::arith::mp_nat_to_u128(&result);
+        assert_eq!(result, expected);
+    }
+
     check_modpow_with_power_of_two(3, 2, 1 << 30, 9);
     check_modpow_with_power_of_two(3, 5, 1 << 30, 243);
     check_modpow_with_power_of_two(3, 1_000_000, 1 << 30, 641836289);
@@ -720,27 +729,10 @@ fn test_modpow_with_power_of_two() {
         1 << 118,
         0x0028_3d19_e6cc_b8a0_e050_6abb_b9b1_1a03,
     );
-
-    fn check_modpow_with_power_of_two(base: u128, exp: u128, modulus: u128, expected: u128) {
-        let mut x = MPNat::from_big_endian(&base.to_be_bytes());
-        let m = MPNat::from_big_endian(&modulus.to_be_bytes());
-        let result = x.modpow_with_power_of_two(&exp.to_be_bytes(), &m);
-        let result = crate::arith::mp_nat_to_u128(&result);
-        assert_eq!(result, expected);
-    }
 }
 
 #[test]
 fn test_sub_to_same_size() {
-    check_sub_to_same_size(0x10_00_00_00_00, 0xFF_00_00_00);
-    check_sub_to_same_size(0x10_00_00_00_00, 0x01_00_00_00);
-    check_sub_to_same_size(0x35_00_00_00_00, 0x01_00_00_00);
-    check_sub_to_same_size(0xEF_00_00_00_00_00_00, 0x02_FF_FF_FF);
-
-    let n = 10;
-    let a = 57 + 2 * n + 0x1234_0000_0000 * n + 0x000b_0000_0000_0000_0000 * n;
-    check_sub_to_same_size(a, n);
-
     fn check_sub_to_same_size(a: u128, n: u128) {
         let mut x = MPNat::from_big_endian(&a.to_be_bytes());
         let y = MPNat::from_big_endian(&n.to_be_bytes());
@@ -749,6 +741,15 @@ fn test_sub_to_same_size() {
         let result = crate::arith::mp_nat_to_u128(&x);
         assert_eq!(result % n, a % n, "{a} % {n} failed sub_to_same_size check");
     }
+
+    check_sub_to_same_size(0x10_00_00_00_00, 0xFF_00_00_00);
+    check_sub_to_same_size(0x10_00_00_00_00, 0x01_00_00_00);
+    check_sub_to_same_size(0x35_00_00_00_00, 0x01_00_00_00);
+    check_sub_to_same_size(0xEF_00_00_00_00_00_00, 0x02_FF_FF_FF);
+
+    let n = 10;
+    let a = 57 + 2 * n + 0x1234_0000_0000 * n + 0x000b_0000_0000_0000_0000 * n;
+    check_sub_to_same_size(a, n);
 
     /* Test that borrow equals self_most_sig at end of sub_to_same_size */
     {
@@ -781,21 +782,30 @@ fn test_sub_to_same_size() {
 
 #[test]
 fn test_mp_nat_is_odd() {
+    fn check_is_odd(n: u128) {
+        let mp = MPNat::from_big_endian(&n.to_be_bytes());
+        assert_eq!(mp.is_odd(), n % 2 == 1, "{n} failed is_odd test");
+    }
+
     for n in 0..1025 {
         check_is_odd(n);
     }
     for n in 0xFF_FF_FF_FF_00_00_00_00..0xFF_FF_FF_FF_00_00_04_01 {
         check_is_odd(n);
     }
-
-    fn check_is_odd(n: u128) {
-        let mp = MPNat::from_big_endian(&n.to_be_bytes());
-        assert_eq!(mp.is_odd(), n % 2 == 1, "{n} failed is_odd test");
-    }
 }
 
 #[test]
 fn test_mp_nat_is_power_of_two() {
+    fn check_is_p2(n: u128, expected_result: bool) {
+        let mp = MPNat::from_big_endian(&n.to_be_bytes());
+        assert_eq!(
+            mp.is_power_of_two(),
+            expected_result,
+            "{n} failed is_power_of_two test"
+        );
+    }
+
     check_is_p2(0, false);
     check_is_p2(1, true);
     check_is_p2(1327, false);
@@ -810,19 +820,22 @@ fn test_mp_nat_is_power_of_two() {
     check_is_p2(1 << 64, true);
     check_is_p2(1 << 65, true);
     check_is_p2(1 << 127, true);
-
-    fn check_is_p2(n: u128, expected_result: bool) {
-        let mp = MPNat::from_big_endian(&n.to_be_bytes());
-        assert_eq!(
-            mp.is_power_of_two(),
-            expected_result,
-            "{n} failed is_power_of_two test"
-        );
-    }
 }
 
 #[test]
 fn test_mp_nat_be() {
+    fn be_round_trip(hex_input: &str) {
+        let bytes = hex::decode(hex_input).unwrap();
+        let mp = MPNat::from_big_endian(&bytes);
+        let output = mp.to_big_endian();
+        let hex_output = hex::encode(output);
+        let trimmed = match hex_input.trim_start_matches('0') {
+            "" => "00",
+            x => x,
+        };
+        assert_eq!(hex_output, trimmed);
+    }
+
     be_round_trip("");
     be_round_trip("00");
     be_round_trip("77");
@@ -836,16 +849,4 @@ fn test_mp_nat_be() {
     be_round_trip("abcdef0011223344");
     be_round_trip("abcdef001122334455");
     be_round_trip("abcdef01234567891011121314151617181920");
-
-    fn be_round_trip(hex_input: &str) {
-        let bytes = hex::decode(hex_input).unwrap();
-        let mp = MPNat::from_big_endian(&bytes);
-        let output = mp.to_big_endian();
-        let hex_output = hex::encode(output);
-        let trimmed = match hex_input.trim_start_matches('0') {
-            "" => "00",
-            x => x,
-        };
-        assert_eq!(hex_output, trimmed)
-    }
 }

@@ -74,10 +74,11 @@ args = [
 category = "Check"
 env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
 toolchain = "nightly"
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.52", test_arg = ["udeps", "-h"], force = true }
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.53", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
+    "--workspace",
     "--all-targets",
 ]
 
@@ -248,7 +249,7 @@ args = [
 category = "Build"
 script = '''
 cd etc/xcc-router
-cargo build --verbose --target ${ENGINE_CARGO_TARGET} --release
+cargo build --target ${ENGINE_CARGO_TARGET} --release
 cd ../..
 '''
 
@@ -338,6 +339,7 @@ args = [
     "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
+    "${@}",
 ]
 
 [tasks.test-connector]
@@ -350,6 +352,7 @@ args = [
     "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
+    "${@}",
 ]
 
 [tasks.bench-modexp-test]
