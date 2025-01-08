@@ -27,7 +27,7 @@ documentation.
 
 - Node.js (v18+)
 - cargo-make
-- wasm-opt (<= v110)
+- wasm-opt
 
 ```sh
 cargo install --force cargo-make
@@ -38,16 +38,14 @@ cargo install --force cargo-make
 - Node.js (v18+)
 - Docker
 - cargo-make
-- wasm-opt (<= v110)
+- wasm-opt
 
 ### Prerequisite wasm-opt
 
-For WebAssembly optimization we use `wasm-opt`.
-The supported version of [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen)
-is `<= v110`. A higher version is not supported.
+For WebAssembly optimization we use `wasm-opt` from the [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen).
 
 We recommend installing the release:
-https://github.com/WebAssembly/binaryen/releases/tag/version_110
+https://github.com/WebAssembly/binaryen/releases/tag/version_121
 
 `wasm-opt` command should be available for the build process.
 
@@ -55,7 +53,7 @@ Verify version:
 
 ```bash
 $ wasm-opt --version
-wasm-opt version 110 (version_110)
+wasm-opt version 121 (version_121)
 ```
 
 Please keep in mind, that `wasm-opt` runs automatically when you run `cargo make build-*` and `cargo make test` commands.
