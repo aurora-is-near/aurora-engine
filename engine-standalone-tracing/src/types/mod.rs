@@ -102,7 +102,7 @@ impl LogStack {
     }
 }
 
-impl std::iter::FromIterator<[u8; 32]> for LogStack {
+impl FromIterator<[u8; 32]> for LogStack {
     fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
         let vec = iter.into_iter().collect();
         Self(vec)

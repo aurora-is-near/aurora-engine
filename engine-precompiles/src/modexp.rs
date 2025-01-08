@@ -28,8 +28,7 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
             bytes,
             start.saturating_add(96),
             core::cmp::min(32, exp_len),
-            // I don't understand why I need a closure here, but doesn't compile without one
-            |x| U256::from(x),
+            U256::from_big_endian,
         );
 
         if exp_len <= 32 && exp.is_zero() {
@@ -225,8 +224,7 @@ fn saturating_round(x: U256) -> u64 {
 
 fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
     let parse = |start: usize| -> u64 {
-        // I don't understand why I need a closure here, but doesn't compile without one
-        saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
+        saturating_round(parse_bytes(input, start, 32, U256::from_big_endian))
     };
     let base_len = parse(0);
     let exp_len = parse(32);

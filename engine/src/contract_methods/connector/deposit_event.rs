@@ -113,7 +113,7 @@ impl FtTransferMessageData {
                 // Pay attention, that for compatibility reasons we used U256 type.
                 // It means 32 bytes for fee data and 20 bytes for address.
                 let mut data = [0; 52];
-                U256::from(fee.amount.as_u128()).to_little_endian(&mut data[..32]);
+                data[..32].copy_from_slice(&U256::from(fee.amount.as_u128()).to_little_endian());
                 // Second data section should contain Eth address.
                 data[32..].copy_from_slice(self.recipient.as_bytes());
                 // Add `:` separator between relayer_id and the data encoded in hex.
@@ -537,14 +537,14 @@ mod tests {
         let log_entry = LogEntry {
             address: eth_custodian_address.raw(),
             topics: vec![
-                event_schema.signature(),
+                event_schema.signature().0.into(),
                 // the sender is not important
                 crate::prelude::H256::zero(),
             ],
             data: ethabi::encode(&[
                 ethabi::Token::String(message),
-                ethabi::Token::Uint(U256::from(expected_deposited_event.amount.as_u128())),
-                ethabi::Token::Uint(U256::from(expected_deposited_event.fee.as_u128())),
+                ethabi::Token::Uint(expected_deposited_event.amount.as_u128().into()),
+                ethabi::Token::Uint(expected_deposited_event.fee.as_u128().into()),
             ]),
         };
 

@@ -94,22 +94,22 @@ impl TestContract {
         Ok((engine_contract, eth_connector_contract, root_account))
     }
 
-    pub async fn new() -> anyhow::Result<TestContract> {
+    pub async fn new() -> anyhow::Result<Self> {
         Self::new_with_custodian(CUSTODIAN_ADDRESS).await
     }
 
-    pub async fn new_with_owner(owner: AccountId) -> anyhow::Result<TestContract> {
+    pub async fn new_with_owner(owner: AccountId) -> anyhow::Result<Self> {
         Self::new_contract(CUSTODIAN_ADDRESS, Some(owner)).await
     }
 
-    pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<TestContract> {
+    pub async fn new_with_custodian(eth_custodian_address: &str) -> anyhow::Result<Self> {
         Self::new_contract(eth_custodian_address, None).await
     }
 
     async fn new_contract(
         eth_custodian_address: &str,
         owner: Option<AccountId>,
-    ) -> anyhow::Result<TestContract> {
+    ) -> anyhow::Result<Self> {
         let (engine_contract, eth_connector_contract, root_account) =
             Self::deploy_aurora_contract().await?;
 
@@ -187,7 +187,7 @@ impl TestContract {
     }
 
     /// Waiting for the account creation
-    async fn waiting_account_creation<T: NetworkClient + ?Sized>(
+    async fn waiting_account_creation<T: NetworkClient + ?Sized + Send + Sync>(
         worker: &Worker<T>,
         account_id: &AccountId,
     ) -> anyhow::Result<()> {
@@ -208,6 +208,7 @@ impl TestContract {
         )
     }
 
+    #[must_use]
     pub fn get_proof(&self, proof: &str) -> Proof {
         serde_json::from_str(proof).unwrap()
     }
@@ -240,7 +241,7 @@ impl TestContract {
     }
 
     pub async fn call_deposit_eth_to_aurora(&self) -> anyhow::Result<()> {
-        let proof: Proof = serde_json::from_str(PROOF_DATA_ETH).unwrap();
+        let proof: Proof = serde_json::from_str(PROOF_DATA_ETH)?;
         let res = self.deposit_with_proof(&proof).await?;
         assert!(res.is_success());
         Ok(())
@@ -259,19 +260,20 @@ impl TestContract {
             .await?)
     }
 
-    pub fn check_error_message(&self, res: ExecutionFinalResult, error_msg: &str) -> bool {
+    #[must_use]
+    pub fn check_error_message(&self, res: &ExecutionFinalResult, error_msg: &str) -> bool {
         let mut is_failure = false;
         for out in res.receipt_outcomes() {
             is_failure = out.is_failure();
             if is_failure {
-                return format!("{:?}", res).contains(error_msg);
+                return format!("{res:?}").contains(error_msg);
             }
         }
         is_failure
     }
 
     pub async fn call_is_used_proof(&self, proof: &str) -> anyhow::Result<bool> {
-        let proof: Proof = serde_json::from_str(proof).unwrap();
+        let proof: Proof = serde_json::from_str(proof)?;
         let res = self
             .engine_contract
             .call("is_used_proof")
@@ -279,10 +281,8 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .borsh::<bool>()
-            .unwrap();
+            .into_result()?
+            .borsh::<bool>()?;
         Ok(res)
     }
 
@@ -294,10 +294,8 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .json::<U128>()
-            .unwrap();
+            .into_result()?
+            .json::<U128>()?;
         Ok(res)
     }
 
@@ -316,8 +314,7 @@ impl TestContract {
             .transact()
             .await?;
 
-        res.into_result()
-            .unwrap()
+        res.into_result()?
             .json::<Wei>()
             .map_err(Into::into)
             .and_then(|res| {
@@ -333,24 +330,24 @@ impl TestContract {
             .gas(DEFAULT_GAS)
             .transact()
             .await?
-            .into_result()
-            .unwrap()
-            .json::<U128>()
-            .unwrap();
+            .into_result()?
+            .json::<U128>()?;
         Ok(res.0)
     }
 }
 
-pub fn print_logs(res: ExecutionFinalResult) {
-    for log in res.logs().iter() {
-        println!("\t[LOG] {}", log);
+pub fn print_logs(res: &ExecutionFinalResult) {
+    for log in &res.logs() {
+        println!("\t[LOG] {log}");
     }
 }
 
+#[must_use]
 pub fn validate_eth_address(address: &str) -> Address {
     Address::decode(address).unwrap()
 }
 
+#[must_use]
 pub fn get_eth_connector_contract() -> Vec<u8> {
     let contract_path = Path::new("etc/aurora-eth-connector");
     std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()

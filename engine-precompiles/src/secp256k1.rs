@@ -124,7 +124,7 @@ mod tests {
     use crate::utils::new_context;
 
     fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
-        matches!(ecrecover(hash, signature[0..super::consts::SIGNATURE_LENGTH].try_into().unwrap()), Ok(s) if s == signer)
+        matches!(ecrecover(hash, signature[0..consts::SIGNATURE_LENGTH].try_into().unwrap()), Ok(s) if s == signer)
     }
 
     #[test]

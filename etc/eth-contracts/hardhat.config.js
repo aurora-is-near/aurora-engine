@@ -17,7 +17,7 @@ const privateKey = process.env.PRIVATE_KEY || '';
 module.exports = {
     newStorageLayoutPath: './storageLayout',
     solidity: {
-        version: '0.8.15',
+        version: '0.8.15', // london hardfork
         settings: {
             optimizer: {
                 enabled: true,
@@ -46,8 +46,8 @@ module.exports = {
                 network: networkName,
                 chainId: parseInt(chainId),
                 urls: {
-                    apiURL: apiURL,
-                    browserURL: browserURL,
+                    apiURL,
+                    browserURL,
                 },
             },
         ],

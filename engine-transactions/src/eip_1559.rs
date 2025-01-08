@@ -107,7 +107,7 @@ impl Encodable for SignedTransaction1559 {
 impl Decodable for SignedTransaction1559 {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         if rlp.item_count() != Ok(12) {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
+            return Err(DecoderError::RlpIncorrectListLen);
         }
         let chain_id = rlp.val_at(0)?;
         let nonce = rlp.val_at(1)?;

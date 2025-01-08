@@ -1,9 +1,10 @@
 NETWORK=`echo "${1:-mainnet}" | cut -d '-' -f 1`
 TAG=`curl -s https://rpc.${NETWORK}.near.org/status  | jq -r .version.build`
 
-git clone https://github.com/near/nearcore -b $TAG
+git clone https://github.com/near/nearcore
 cd nearcore
-make sandbox
+git fetch && git checkout $TAG
+make sandbox-release
 mv $(find target -name neard-sandbox) ../
 cd ..
 rm -rf nearcore

@@ -1,12 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::similar_names,
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::unreadable_literal
-)]
 #![forbid(unsafe_code)]
 pub mod account_ids;
 pub mod alt_bn256;
@@ -41,11 +33,11 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
+use evm::backend::Log;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
@@ -156,12 +148,8 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
         Some(result.and_then(|output| post_process(output, handle)))
     }
 
-    fn is_precompile(&self, address: prelude::H160, _remaining_gas: u64) -> IsPrecompileResult {
-        let is_precompile = self.all_precompiles.contains_key(&Address::new(address));
-        IsPrecompileResult::Answer {
-            is_precompile,
-            extra_cost: 0,
-        }
+    fn is_precompile(&self, address: prelude::H160) -> bool {
+        self.all_precompiles.contains_key(&Address::new(address))
     }
 }
 

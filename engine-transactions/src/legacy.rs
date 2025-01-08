@@ -114,7 +114,7 @@ impl Encodable for LegacyEthSignedTransaction {
 impl Decodable for LegacyEthSignedTransaction {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         if rlp.item_count() != Ok(9) {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
+            return Err(DecoderError::RlpIncorrectListLen);
         }
         let nonce = rlp.val_at(0)?;
         let gas_price = rlp.val_at(1)?;

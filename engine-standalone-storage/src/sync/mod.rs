@@ -156,14 +156,15 @@ pub fn parse_transaction_kind(
             })?;
             TransactionKind::RegisterRelayer(address)
         }
-        TransactionKindTag::ExitToNear => match promise_data.first().and_then(Option::as_ref) {
-            None => TransactionKind::ExitToNear(None),
-            Some(_) => {
+        TransactionKindTag::ExitToNear => {
+            if promise_data.first().and_then(Option::as_ref).is_none() {
+                TransactionKind::ExitToNear(None)
+            } else {
                 let args = aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs::try_from_slice(&bytes)
-                    .map_err(f)?;
+                             .map_err(f)?;
                 TransactionKind::ExitToNear(Some(args))
             }
-        },
+        }
         TransactionKindTag::SetConnectorData => {
             let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetConnectorData(args)
@@ -213,6 +214,10 @@ pub fn parse_transaction_kind(
         TransactionKindTag::AddRelayerKey => {
             let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddRelayerKey(args)
+        }
+        TransactionKindTag::StoreRelayerKeyCallback => {
+            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::StoreRelayerKeyCallback(args)
         }
         TransactionKindTag::RemoveRelayerKey => {
             let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
@@ -695,6 +700,11 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::AddRelayerKey(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::StoreRelayerKeyCallback(_) => {
+            contract_methods::admin::store_relayer_key_callback(io, env)?;
 
             None
         }

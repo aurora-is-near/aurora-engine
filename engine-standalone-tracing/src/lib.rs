@@ -1,5 +1,3 @@
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(clippy::module_name_repetitions, clippy::missing_panics_doc)]
 pub mod sputnik;
 pub mod types;
 

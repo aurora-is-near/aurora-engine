@@ -72,11 +72,13 @@ args = [
 
 [tasks.udeps]
 category = "Check"
-env = { "CARGO_MAKE_RUST_CHANNEL" = "nightly", "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.41", test_arg = ["udeps", "-h"], force = true }
+env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
+toolchain = "nightly"
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.53", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
+    "--workspace",
     "--all-targets",
 ]
 
@@ -240,17 +242,14 @@ args = [
     "--no-default-features",
     "--features=${CARGO_FEATURES}",
     "-p",
-    "aurora-engine",
-    "-Z",
-    "avoid-dev-deps",
-    "${@}",
+    "aurora-engine"
 ]
 
 [tasks.build-xcc-router]
 category = "Build"
 script = '''
 cd etc/xcc-router
-cargo build --verbose --target ${ENGINE_CARGO_TARGET} -Z avoid-dev-deps ${@} --release
+cargo build --target ${ENGINE_CARGO_TARGET} --release
 cd ../..
 '''
 
@@ -352,6 +351,7 @@ args = [
     "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
+    "${@}",
 ]
 
 [tasks.test-connector]
@@ -364,6 +364,7 @@ args = [
     "aurora-engine-tests-connector",
     "--features",
     "${CARGO_FEATURES_TEST}",
+    "${@}",
 ]
 
 [tasks.bench-modexp-test]
