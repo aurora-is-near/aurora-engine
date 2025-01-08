@@ -399,8 +399,6 @@ pub fn join_as_double(hi: Word, lo: Word) -> DoubleWord {
 
 #[test]
 fn test_monsq() {
-    // This example is intentionally chosen because 5 * 5 = 25 = 0 mod 25,
-    // therefore it requires the final subtraction step in the algorithm.
     fn check_monsq(x: u128, n: u128) {
         let a = MPNat::from_big_endian(&x.to_be_bytes());
         let m = MPNat::from_big_endian(&n.to_be_bytes());
@@ -423,7 +421,8 @@ fn test_monsq() {
 
     check_monsq(1, 31);
     check_monsq(6, 31);
-
+    // This example is intentionally chosen because 5 * 5 = 25 = 0 mod 25,
+    // therefore it requires the final subtraction step in the algorithm.
     check_monsq(5, 25);
     check_monsq(0x1FFF_FFFF_FFFF_FFF0, 0x1FFF_FFFF_FFFF_FFF1);
     check_monsq(0x16FF_221F_CB7D, 0x011E_842B_6BAA_5017_EBF2_8293);
