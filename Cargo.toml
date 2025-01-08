@@ -107,7 +107,7 @@ exclude = [
 ]
 
 [profile.release]
-opt-level = 3
+opt-level = "z"
 debug = false
 debug-assertions = false
 overflow-checks = true
