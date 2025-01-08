@@ -9,7 +9,9 @@ pub fn compile<P: AsRef<Path>>(source_path: P) {
         .output()
         .unwrap();
 
-    if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
-    }
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8(output.stderr).unwrap()
+    );
 }

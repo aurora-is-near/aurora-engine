@@ -22,11 +22,13 @@ impl Node {
         Ok(Self { root, worker })
     }
 
+    #[must_use]
     pub fn root(&self) -> Account {
         Account::from_inner(self.root.clone())
     }
 
-    pub fn worker(&self) -> &Worker<Sandbox> {
+    #[must_use]
+    pub const fn worker(&self) -> &Worker<Sandbox> {
         &self.worker
     }
 
@@ -92,7 +94,7 @@ impl Node {
     }
 
     /// Waiting for the account creation
-    async fn waiting_account_creation<T: NetworkClient + ?Sized>(
+    async fn waiting_account_creation<T: NetworkClient + ?Sized + Send + Sync>(
         worker: &Worker<T>,
         account_id: &near_workspaces::AccountId,
     ) -> anyhow::Result<()> {

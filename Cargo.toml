@@ -36,7 +36,7 @@ evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag =
 evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
-git2 = "0.19"
+git2 = "0.20"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
@@ -48,7 +48,7 @@ near-primitives = "0.27"
 near-primitives-core = "0.27"
 near-sdk = "5"
 near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.14"
+near-workspaces = "0.16"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -65,8 +65,18 @@ strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
-walrus = "0.22"
+walrus = "0.23"
 wee_alloc = { version = "0.4", default-features = false }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+unreadable_literal = "allow"
+similar_names = "allow"
 
 [workspace]
 resolver = "2"

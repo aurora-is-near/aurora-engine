@@ -535,15 +535,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!("[init contract]");
 
-        let contract_data = set_contract_data(
-            &mut io,
-            SetContractDataCallArgs {
-                prover_account: args.prover_account,
-                eth_custodian_address: args.eth_custodian_address,
-                metadata: args.metadata,
-            },
-        )
-        .map_err(errors::InitContractError::InvalidCustodianAddress)?;
+        let contract_data = set_contract_data(&mut io, args)
+            .map_err(errors::InitContractError::InvalidCustodianAddress)?;
 
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract

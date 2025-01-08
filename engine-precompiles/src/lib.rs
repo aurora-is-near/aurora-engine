@@ -1,12 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::similar_names,
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::unreadable_literal
-)]
 #![forbid(unsafe_code)]
 pub mod account_ids;
 pub mod alt_bn256;

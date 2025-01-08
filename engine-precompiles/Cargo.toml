@@ -28,6 +28,9 @@ sha3.workspace = true
 aurora-engine-test-doubles.workspace = true
 rand.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]

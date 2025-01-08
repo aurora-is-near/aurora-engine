@@ -79,6 +79,8 @@ jobs:
           echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
       - name: Run checks
         run: cargo make check
+      - name: Run build XCC router
+        run: cargo make build-xcc-router
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
