@@ -16,6 +16,9 @@ base64.workspace = true
 sha2.workspace = true
 sha3.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 std = ["aurora-engine-types/std", "sha3/std", "sha2/std", "base64/std"]
 contract = []

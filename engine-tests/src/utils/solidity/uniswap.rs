@@ -113,9 +113,9 @@ impl PositionManagerConstructor {
             .encode_input(
                 self.0.code.clone(),
                 &[
-                    ethabi::Token::Address(factory.raw()),
-                    ethabi::Token::Address(wrapped_eth.raw()),
-                    ethabi::Token::Address(token_descriptor.raw()),
+                    ethabi::Token::Address(factory.raw().0.into()),
+                    ethabi::Token::Address(wrapped_eth.raw().0.into()),
+                    ethabi::Token::Address(token_descriptor.raw().0.into()),
                 ],
             )
             .unwrap();
@@ -144,9 +144,9 @@ impl Factory {
             .function("createPool")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(token_a.raw()),
-                ethabi::Token::Address(token_b.raw()),
-                ethabi::Token::Uint(fee),
+                ethabi::Token::Address(token_a.raw().0.into()),
+                ethabi::Token::Address(token_b.raw().0.into()),
+                ethabi::Token::Uint(fee.to_big_endian().into()),
             ])
             .unwrap();
 
@@ -190,7 +190,7 @@ impl Pool {
             .abi
             .function("initialize")
             .unwrap()
-            .encode_input(&[ethabi::Token::Uint(price)])
+            .encode_input(&[ethabi::Token::Uint(price.to_big_endian().into())])
             .unwrap();
 
         TransactionLegacy {
@@ -214,17 +214,17 @@ impl PositionManager {
             .function("mint")
             .unwrap()
             .encode_input(&[ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(params.token0.raw()),
-                ethabi::Token::Address(params.token1.raw()),
+                ethabi::Token::Address(params.token0.raw().0.into()),
+                ethabi::Token::Address(params.token1.raw().0.into()),
                 ethabi::Token::Uint(params.fee.into()),
-                ethabi::Token::Int(tick_lower),
-                ethabi::Token::Int(tick_upper),
-                ethabi::Token::Uint(params.amount0_desired),
-                ethabi::Token::Uint(params.amount1_desired),
-                ethabi::Token::Uint(params.amount0_min),
-                ethabi::Token::Uint(params.amount1_min),
-                ethabi::Token::Address(params.recipient.raw()),
-                ethabi::Token::Uint(params.deadline),
+                ethabi::Token::Int(tick_lower.to_big_endian().into()),
+                ethabi::Token::Int(tick_upper.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount0_desired.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount1_desired.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount0_min.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount1_min.to_big_endian().into()),
+                ethabi::Token::Address(params.recipient.raw().0.into()),
+                ethabi::Token::Uint(params.deadline.to_big_endian().into()),
             ])])
             .unwrap();
 
@@ -277,8 +277,8 @@ impl SwapRouterConstructor {
             .encode_input(
                 self.0.code.clone(),
                 &[
-                    ethabi::Token::Address(factory.raw()),
-                    ethabi::Token::Address(wrapped_eth.raw()),
+                    ethabi::Token::Address(factory.raw().0.into()),
+                    ethabi::Token::Address(wrapped_eth.raw().0.into()),
                 ],
             )
             .unwrap();
@@ -326,14 +326,14 @@ impl SwapRouter {
             .function("exactOutputSingle")
             .unwrap()
             .encode_input(&[ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(params.token_in.raw()),
-                ethabi::Token::Address(params.token_out.raw()),
+                ethabi::Token::Address(params.token_in.raw().0.into()),
+                ethabi::Token::Address(params.token_out.raw().0.into()),
                 ethabi::Token::Uint(params.fee.into()),
-                ethabi::Token::Address(params.recipient.raw()),
-                ethabi::Token::Uint(params.deadline),
-                ethabi::Token::Uint(params.amount_out),
-                ethabi::Token::Uint(params.amount_in_max),
-                ethabi::Token::Uint(params.price_limit),
+                ethabi::Token::Address(params.recipient.raw().0.into()),
+                ethabi::Token::Uint(params.deadline.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount_out.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount_in_max.to_big_endian().into()),
+                ethabi::Token::Uint(params.price_limit.to_big_endian().into()),
             ])])
             .unwrap();
 
@@ -366,10 +366,10 @@ impl SwapRouter {
             .unwrap()
             .encode_input(&[ethabi::Token::Tuple(vec![
                 ethabi::Token::Bytes(path),
-                ethabi::Token::Address(params.recipient.raw()),
-                ethabi::Token::Uint(params.deadline),
-                ethabi::Token::Uint(params.amount_in),
-                ethabi::Token::Uint(params.amount_out_min),
+                ethabi::Token::Address(params.recipient.raw().0.into()),
+                ethabi::Token::Uint(params.deadline.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount_in.to_big_endian().into()),
+                ethabi::Token::Uint(params.amount_out_min.to_big_endian().into()),
             ])])
             .unwrap();
 

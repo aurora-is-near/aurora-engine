@@ -16,10 +16,12 @@ panic = "abort"
 
 [dependencies]
 aurora-engine-types = { path = "../../engine-types", default-features = false }
-near-sdk = { version = "5", default-features = false, features = ["legacy", "unit-testing"] }
+# The latest version of the near-sdk 5.7 includes the near-vm-runner 0.28 which uses a new operator `&raw mut target`,
+# which has not been stabilised in the Rust 1.81.0 yet.
+near-sdk = { version = "=5.6", default-features = false, features = ["legacy", "unit-testing"] }
 
 [dev-dependencies]
-near-primitives = "0.20"
+near-primitives = "0.27"
 
 [features]
 default = []

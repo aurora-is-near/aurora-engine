@@ -59,9 +59,9 @@ impl<'a> Helper<'a> {
                 constructor.deploy_with_args(
                     nonce,
                     &[
-                        ethabi::Token::Address(signer_address.raw()),
-                        ethabi::Token::Address(pool_deployer.0.address.raw()),
-                        ethabi::Token::Address(signer_address.raw()),
+                        ethabi::Token::Address(signer_address.raw().0.into()),
+                        ethabi::Token::Address(pool_deployer.0.address.raw().0.into()),
+                        ethabi::Token::Address(signer_address.raw().0.into()),
                     ],
                 )
             })
@@ -89,8 +89,8 @@ impl<'a> Helper<'a> {
                 pool_factory.0.call_method_with_args(
                     "deploy",
                     &[
-                        ethabi::Token::Address(token_a.raw()),
-                        ethabi::Token::Address(token_b.raw()),
+                        ethabi::Token::Address(token_a.raw().0.into()),
+                        ethabi::Token::Address(token_b.raw().0.into()),
                     ],
                     nonce,
                 )
@@ -146,12 +146,12 @@ impl<'a> Helper<'a> {
             "deposit",
             &[
                 ethabi::Token::FixedArray(vec![
-                    ethabi::Token::Uint(args.max_token_a),
-                    ethabi::Token::Uint(args.max_token_b),
+                    ethabi::Token::Uint(args.max_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.max_token_b.to_big_endian().into()),
                 ]),
                 ethabi::Token::FixedArray(vec![
-                    ethabi::Token::Uint(args.min_token_a),
-                    ethabi::Token::Uint(args.min_token_b),
+                    ethabi::Token::Uint(args.min_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.min_token_b.to_big_endian().into()),
                 ]),
             ],
         )
@@ -166,11 +166,11 @@ impl<'a> Helper<'a> {
             pool,
             "swap",
             &[
-                ethabi::Token::Address(args.src_token.raw()),
-                ethabi::Token::Address(args.dst_token.raw()),
-                ethabi::Token::Uint(args.amount),
-                ethabi::Token::Uint(args.min_amount),
-                ethabi::Token::Address(args.referral.raw()),
+                ethabi::Token::Address(args.src_token.raw().0.into()),
+                ethabi::Token::Address(args.dst_token.raw().0.into()),
+                ethabi::Token::Uint(args.amount.to_big_endian().into()),
+                ethabi::Token::Uint(args.min_amount.to_big_endian().into()),
+                ethabi::Token::Address(args.referral.raw().0.into()),
             ],
         )
     }
@@ -184,10 +184,10 @@ impl<'a> Helper<'a> {
             pool,
             "withdraw",
             &[
-                ethabi::Token::Uint(args.amount),
+                ethabi::Token::Uint(args.amount.to_big_endian().into()),
                 ethabi::Token::Array(vec![
-                    ethabi::Token::Uint(args.min_token_a),
-                    ethabi::Token::Uint(args.min_token_b),
+                    ethabi::Token::Uint(args.min_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.min_token_b.to_big_endian().into()),
                 ]),
             ],
         )

@@ -29,19 +29,17 @@ bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"]
 bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
-digest = "0.10"
 ethabi = { version = "18", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v1.0-opt.8", default-features = false }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v1.0-opt.8", default-features = false, features = ["std"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v1.0-opt.8", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v1.0-opt.8", default-features = false, features = ["std", "tracing"] }
+evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false }
+evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std"] }
+evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std", "tracing"] }
+evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.47.0-beta.1", default-features = false, features = ["std", "tracing"] }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
-git2 = "0.19"
+git2 = "0.20"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
-lazy_static = "1"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.27"
 near-gas = "0.3"
@@ -50,14 +48,14 @@ near-primitives = "0.27"
 near-primitives-core = "0.27"
 near-sdk = "5"
 near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.14"
+near-workspaces = "0.16"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
-primitive-types = { version = "0.12", default-features = false, features = ["rlp", "serde_no_std"] }
+primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
 reqwest = "0.12"
 ripemd = { version = "0.1", default-features = false }
-rlp = { version = "0.5", default-features = false }
+rlp = { version = "0.6", default-features = false }
 rocksdb = { version = "0.21", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
@@ -67,8 +65,18 @@ strum = { version = "0.26", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
-walrus = "0.22"
+walrus = "0.23"
 wee_alloc = { version = "0.4", default-features = false }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+unreadable_literal = "allow"
+similar_names = "allow"
 
 [workspace]
 resolver = "2"

@@ -19,11 +19,10 @@ near-sdk.workspace = true
 near-workspaces.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = [ "time" ] }
+tokio = { workspace = true, features = ["time"] }
 
-[dev-dependencies]
-hex.workspace = true
-lazy_static.workspace = true
+[lints]
+workspace = true
 
 [features]
 mainnet-test = []

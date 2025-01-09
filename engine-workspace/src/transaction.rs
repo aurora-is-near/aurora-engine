@@ -10,20 +10,23 @@ pub struct ViewTransaction<'a> {
 }
 
 impl<'a> ViewTransaction<'a> {
-    pub(crate) fn new(view_tx: Query<'a, ViewFunction>) -> Self {
+    pub(crate) const fn new(view_tx: Query<'a, ViewFunction>) -> Self {
         Self { inner: view_tx }
     }
 
+    #[must_use]
     pub fn args(mut self, args: Vec<u8>) -> Self {
         self.inner = self.inner.args(args);
         self
     }
 
+    #[must_use]
     pub fn args_json<U: serde::Serialize>(mut self, args: U) -> Self {
         self.inner = self.inner.args_json(args);
         self
     }
 
+    #[must_use]
     pub fn args_borsh<U: BorshSerialize>(mut self, args: U) -> Self {
         self.inner = self.inner.args_borsh(args);
         self
@@ -44,35 +47,41 @@ pub struct CallTransaction {
 }
 
 impl CallTransaction {
-    pub(crate) fn new(call_tx: near_workspaces::operations::CallTransaction) -> Self {
+    pub(crate) const fn new(call_tx: near_workspaces::operations::CallTransaction) -> Self {
         Self { inner: call_tx }
     }
 
+    #[must_use]
     pub fn args(mut self, args: Vec<u8>) -> Self {
         self.inner = self.inner.args(args);
         self
     }
 
+    #[must_use]
     pub fn args_json<S: serde::Serialize>(mut self, args: S) -> Self {
         self.inner = self.inner.args_json(args);
         self
     }
 
+    #[must_use]
     pub fn args_borsh<B: BorshSerialize>(mut self, args: B) -> Self {
         self.inner = self.inner.args_borsh(args);
         self
     }
 
+    #[must_use]
     pub fn gas(mut self, gas: u64) -> Self {
         self.inner = self.inner.gas(near_gas::NearGas::from_gas(gas));
         self
     }
 
+    #[must_use]
     pub fn max_gas(mut self) -> Self {
         self.inner = self.inner.max_gas();
         self
     }
 
+    #[must_use]
     pub fn deposit(mut self, deposit: NearToken) -> Self {
         self.inner = self.inner.deposit(deposit);
         self

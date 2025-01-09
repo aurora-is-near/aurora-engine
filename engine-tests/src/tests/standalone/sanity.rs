@@ -10,9 +10,7 @@ use std::cell::RefCell;
 fn test_deploy_code() {
     let chain_id: [u8; 32] = {
         let value = U256::from(1_313_161_554);
-        let mut buf = [0u8; 32];
-        value.to_big_endian(&mut buf);
-        buf
+        value.to_big_endian()
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
     let state = state::EngineState {

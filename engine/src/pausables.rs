@@ -118,7 +118,7 @@ impl<I: IO> EnginePrecompilesPauser<I> {
         self.io
             .read_storage(&Self::storage_key())
             .map_or_else(PrecompileFlags::empty, |bytes| {
-                const U32_SIZE: usize = core::mem::size_of::<u32>();
+                const U32_SIZE: usize = size_of::<u32>();
                 assert_eq!(bytes.len(), U32_SIZE, "PrecompileFlags value is corrupted");
                 let mut buffer = [0u8; U32_SIZE];
                 bytes.copy_to_slice(&mut buffer);

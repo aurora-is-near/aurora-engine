@@ -79,6 +79,8 @@ jobs:
           echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
       - name: Run checks
         run: cargo make check
+      - name: Run build XCC router
+        run: cargo make build-xcc-router
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
@@ -86,3 +88,7 @@ jobs:
           fields: repo,message,commit,author,action,eventName,job,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0

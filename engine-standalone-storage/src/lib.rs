@@ -1,10 +1,3 @@
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::similar_names,
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc
-)]
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;

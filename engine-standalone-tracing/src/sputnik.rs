@@ -118,11 +118,7 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
                 self.current.stack = stack
                     .data()
                     .iter()
-                    .map(|x| {
-                        let mut buf = [0u8; 32];
-                        x.to_big_endian(&mut buf);
-                        buf
-                    })
+                    .map(aurora_engine_types::U256::to_big_endian)
                     .collect();
                 self.current.memory = memory.data().as_slice().into();
             }

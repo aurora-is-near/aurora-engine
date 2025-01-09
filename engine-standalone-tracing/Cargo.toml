@@ -22,6 +22,9 @@ evm-gasometer.workspace = true
 hex = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["std"], optional = true }
 
+[lints]
+workspace = true
+
 [features]
 default = []
 mainnet = []

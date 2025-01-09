@@ -48,7 +48,7 @@ impl ViewResult<U256> {
         let mut buf = [0u8; 32];
         buf.copy_from_slice(view.result.as_slice());
         Ok(Self {
-            result: U256::from(buf),
+            result: U256::from_big_endian(&buf),
             logs: view.logs,
         })
     }
@@ -128,7 +128,7 @@ impl ExecutionResult<Address> {
 }
 
 impl<T> ExecutionResult<T> {
-    pub fn new(inner: ExecutionSuccess, value: T, success: bool) -> Self {
+    pub const fn new(inner: ExecutionSuccess, value: T, success: bool) -> Self {
         Self {
             inner,
             value,
@@ -136,7 +136,7 @@ impl<T> ExecutionResult<T> {
         }
     }
 
-    pub fn value(&self) -> &T {
+    pub const fn value(&self) -> &T {
         &self.value
     }
 
@@ -144,7 +144,7 @@ impl<T> ExecutionResult<T> {
         self.value
     }
 
-    pub fn total_gas_burnt(&self) -> Gas {
+    pub const fn total_gas_burnt(&self) -> Gas {
         self.inner.total_gas_burnt
     }
 
@@ -172,11 +172,11 @@ impl<T> ExecutionResult<T> {
         self.inner.logs()
     }
 
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.success
     }
 
-    pub fn is_failure(&self) -> bool {
+    pub const fn is_failure(&self) -> bool {
         !self.success
     }
 }

@@ -7,7 +7,7 @@ use crate::prelude::{
     storage::{bytes_to_key, KeyPrefix},
     str,
     types::{Address, Yocto},
-    vec, Cow, ToString, Vec, U256,
+    vec, Cow, ToString, Vec, H256, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{parameters::RefundCallArgs, types};
@@ -90,12 +90,14 @@ pub mod events {
     impl ExitToNear {
         #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
-            let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
+            let data = ethabi::encode(&[ethabi::Token::Uint(self.amount.to_big_endian().into())]);
             let topics = vec![
-                EXIT_TO_NEAR_SIGNATURE,
+                EXIT_TO_NEAR_SIGNATURE.0.into(),
                 encode_address(self.sender),
                 encode_address(self.erc20_address),
-                aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)])),
+                aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)]))
+                    .0
+                    .into(),
             ];
 
             ethabi::RawLog { topics, data }
@@ -109,7 +111,7 @@ pub mod events {
     ///    uint amount
     /// )
     /// Note: in the ERC-20 exit case `sender` == `erc20_address` because it is
-    /// the ERC-20 contract which calls the exit precompile. However in the case
+    /// the ERC-20 contract which calls the exit precompile. However, in the case
     /// of ETH exit the sender will give the true sender (and the `erc20_address`
     /// will not be meaningful because ETH is not an ERC-20 token).
     pub struct ExitToEth {
@@ -122,9 +124,9 @@ pub mod events {
     impl ExitToEth {
         #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
-            let data = ethabi::encode(&[ethabi::Token::Int(self.amount)]);
+            let data = ethabi::encode(&[ethabi::Token::Uint(self.amount.to_big_endian().into())]);
             let topics = vec![
-                EXIT_TO_ETH_SIGNATURE,
+                EXIT_TO_ETH_SIGNATURE.0.into(),
                 encode_address(self.sender),
                 encode_address(self.erc20_address),
                 encode_address(self.dest),
@@ -134,10 +136,10 @@ pub mod events {
         }
     }
 
-    fn encode_address(a: Address) -> H256 {
+    fn encode_address(a: Address) -> ethabi::Hash {
         let mut result = [0u8; 32];
         result[12..].copy_from_slice(a.as_bytes());
-        H256(result)
+        result.into()
     }
 
     #[must_use]
@@ -509,7 +511,11 @@ impl<I: IO> Precompile for ExitToNear<I> {
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
             address: exit_to_near::ADDRESS.raw(),
-            topics: exit_event_log.topics,
+            topics: exit_event_log
+                .topics
+                .into_iter()
+                .map(|h| H256::from(h.0))
+                .collect(),
             data: exit_event_log.data,
         };
 
@@ -700,7 +706,11 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         let exit_event_log = exit_event.encode();
         let exit_event_log = Log {
             address: exit_to_ethereum::ADDRESS.raw(),
-            topics: exit_event_log.topics,
+            topics: exit_event_log
+                .topics
+                .into_iter()
+                .map(|h| H256::from(h.0))
+                .collect(),
             data: exit_event_log.data,
         };
 
@@ -756,12 +766,12 @@ mod tests {
         let exit_to_eth = super::events::exit_to_eth_schema();
 
         assert_eq!(
-            exit_to_near.signature(),
-            super::events::EXIT_TO_NEAR_SIGNATURE
+            exit_to_near.signature().0,
+            super::events::EXIT_TO_NEAR_SIGNATURE.0
         );
         assert_eq!(
-            exit_to_eth.signature(),
-            super::events::EXIT_TO_ETH_SIGNATURE
+            exit_to_eth.signature().0,
+            super::events::EXIT_TO_ETH_SIGNATURE.0
         );
     }
 
