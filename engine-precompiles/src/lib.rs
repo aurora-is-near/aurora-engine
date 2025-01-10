@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
-#![allow(clippy::too_long_first_doc_paragraph)]
+
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;

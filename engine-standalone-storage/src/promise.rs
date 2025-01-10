@@ -13,7 +13,7 @@ pub struct NoScheduler<'a> {
     pub promise_data: &'a [Option<Vec<u8>>],
 }
 
-impl<'a> PromiseHandler for NoScheduler<'a> {
+impl PromiseHandler for NoScheduler<'_> {
     type ReadOnly = Self;
 
     fn promise_results_count(&self) -> u64 {

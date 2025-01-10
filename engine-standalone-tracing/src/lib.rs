@@ -1,4 +1,3 @@
-#![allow(clippy::too_long_first_doc_paragraph)]
 pub mod sputnik;
 pub mod types;
 

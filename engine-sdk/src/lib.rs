@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // All `as` conversions in this code base have been carefully reviewed and are safe.
 #![allow(clippy::as_conversions)]
-#![allow(clippy::too_long_first_doc_paragraph)]
 
 #[cfg(feature = "contract")]
 use crate::prelude::{Address, Vec, U256};

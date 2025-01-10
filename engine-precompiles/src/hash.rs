@@ -31,10 +31,11 @@ impl SHA256 {
 }
 
 impl Precompile for SHA256 {
+    #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input_len + consts::SHA256_WORD_LEN - 1).div_ceil(consts::SHA256_WORD_LEN)
+            (input_len + consts::SHA256_WORD_LEN - 1) / consts::SHA256_WORD_LEN
                 * costs::SHA256_PER_WORD
                 + costs::SHA256_BASE,
         )
@@ -105,10 +106,11 @@ impl RIPEMD160 {
 }
 
 impl Precompile for RIPEMD160 {
+    #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input_len + consts::RIPEMD_WORD_LEN - 1).div_ceil(consts::RIPEMD_WORD_LEN)
+            (input_len + consts::RIPEMD_WORD_LEN - 1) / consts::RIPEMD_WORD_LEN
                 * costs::RIPEMD160_PER_WORD
                 + costs::RIPEMD160_BASE,
         )
