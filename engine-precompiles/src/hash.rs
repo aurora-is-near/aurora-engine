@@ -31,7 +31,8 @@ impl SHA256 {
 }
 
 impl Precompile for SHA256 {
-    #[allow(clippy::manual_div_ceil)]
+    // TODO: should be enable from `RUst 1.84`
+    // #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
@@ -106,7 +107,8 @@ impl RIPEMD160 {
 }
 
 impl Precompile for RIPEMD160 {
-    #[allow(clippy::manual_div_ceil)]
+    // TODO: should be enable from `RUst 1.84`
+    // #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
