@@ -51,7 +51,7 @@ mod costs {
 }
 
 pub mod events {
-    use crate::prelude::{types::Address, vec, String, ToString, H160, H256, U256};
+    use crate::prelude::{types::Address, vec, String, ToString, H256, U256};
 
     /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
@@ -68,7 +68,7 @@ pub mod events {
     /// which ERC-20 token is being withdrawn. However, ETH is not an ERC-20 token
     /// So we need to have some other address to fill this field. This constant is
     /// used for this purpose.
-    pub const ETH_ADDRESS: Address = Address::new(H160([0; 20]));
+    pub const ETH_ADDRESS: Address = Address::zero();
 
     /// `ExitToNear`(
     ///    Address indexed sender,
@@ -655,7 +655,11 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
-                    let eth_recipient = hex::encode(input);
+                    let mut buffer = [0; 40];
+                    hex::encode_to_slice(input, &mut buffer).unwrap();
+                    let recipient_in_hex = str::from_utf8(&buffer).map_err(|_| {
+                        ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS"))
+                    })?;
                     // unwrap cannot fail since we checked the length already
                     let recipient_address = Address::try_from_slice(input).map_err(|_| {
                         ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
@@ -668,7 +672,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                         format!(
                             r#"{{"amount": "{}", "recipient": "{}"}}"#,
                             amount.as_u128(),
-                            eth_recipient
+                            recipient_in_hex
                         )
                         .into_bytes(),
                         events::ExitToEth {

@@ -94,7 +94,8 @@ impl BorshDeserialize for AccountId {
             return Ok(Self::default());
         }
 
-        Self::new(&account).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
+        Self::try_from(account)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
     }
 }
 
@@ -105,7 +106,7 @@ impl<'de> Deserialize<'de> for AccountId {
         D::Error: serde::de::Error,
     {
         let account = <String as Deserialize>::deserialize(deserializer)?;
-        Self::new(&account).map_err(serde::de::Error::custom)
+        Self::try_from(account).map_err(serde::de::Error::custom)
     }
 }
 
@@ -113,7 +114,10 @@ impl TryFrom<String> for AccountId {
     type Error = ParseAccountError;
 
     fn try_from(account_id: String) -> Result<Self, Self::Error> {
-        Self::new(&account_id)
+        let account_id = account_id.into_boxed_str();
+        Self::validate(&account_id)?;
+
+        Ok(Self(account_id))
     }
 }
 
@@ -130,7 +134,9 @@ impl TryFrom<Vec<u8>> for AccountId {
     type Error = ParseAccountError;
 
     fn try_from(account_id: Vec<u8>) -> Result<Self, Self::Error> {
-        Self::try_from(&account_id[..])
+        String::from_utf8(account_id)
+            .map_err(|_| ParseAccountError::Invalid)
+            .and_then(Self::try_from)
     }
 }
 
@@ -138,8 +144,7 @@ impl FromStr for AccountId {
     type Err = ParseAccountError;
 
     fn from_str(account_id: &str) -> Result<Self, Self::Err> {
-        Self::validate(account_id)?;
-        Ok(Self(account_id.into()))
+        Self::new(account_id)
     }
 }
 
@@ -156,14 +161,14 @@ impl fmt::Display for AccountId {
 }
 
 impl From<AccountId> for Box<str> {
-    fn from(value: AccountId) -> Self {
-        value.0
+    fn from(account_id: AccountId) -> Self {
+        account_id.0
     }
 }
 
 impl From<AccountId> for Vec<u8> {
     fn from(account_id: AccountId) -> Self {
-        account_id.as_bytes().to_vec()
+        account_id.0.into_boxed_bytes().into_vec()
     }
 }
 
@@ -202,7 +207,7 @@ impl AsRef<[u8]> for ParseAccountError {
 
 impl fmt::Display for ParseAccountError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let msg = String::from_utf8(self.as_ref().to_vec()).unwrap();
+        let msg = str::from_utf8(self.as_ref()).map_err(|_| fmt::Error)?;
         write!(f, "{msg}")
     }
 }
