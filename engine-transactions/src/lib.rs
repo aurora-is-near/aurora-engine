@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#![allow(clippy::too_long_first_doc_paragraph)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
