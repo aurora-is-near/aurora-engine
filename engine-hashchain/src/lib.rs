@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::too_long_first_doc_paragraph)]
 
 pub mod bloom;
 pub mod error;

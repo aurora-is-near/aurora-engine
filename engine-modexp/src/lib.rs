@@ -8,6 +8,7 @@
     clippy::cast_lossless,
     clippy::many_single_char_names
 )]
+#![allow(clippy::too_long_first_doc_paragraph)]
 
 mod arith;
 mod maybe_std;
