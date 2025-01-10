@@ -34,7 +34,7 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
         }
         let args: WithdrawWnearToRouterArgs = io.read_input_borsh()?;
         let current_account_id = env.current_account_id();
-        let recipient = AccountId::new(&format!(
+        let recipient = AccountId::try_from(format!(
             "{}.{}",
             args.target.encode(),
             current_account_id.as_ref()
