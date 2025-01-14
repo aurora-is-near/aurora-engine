@@ -162,30 +162,32 @@ impl SignedTransaction7702 {
         // According to EIP-7702 we should validate each authorization. We shouldn't skip any of them.
         // And just put `is_valid` flag to `false` if any of them is invalid. It's related to
         // gas calculation, as each `authorization_list` must be charged, even if it's invalid.
-        // The exception is invalid signature, as it's indicate wrong transaction.
         for auth in &self.transaction.authorization_list {
-            // Validate the signature, as in tests it is possible to have invalid signatures values.
-            let v = auth.parity.0;
-            if !(v[0] < u64::from(u8::MAX) && v[1..4].iter().all(|&elem| elem == 0)) {
-                return Err(Error::InvalidAuthorizationSignature);
-            }
-            // Value `v` shouldn't be greater then 1
-            let v = u8::try_from(v[0]).map_err(|_| Error::InvalidAuthorizationSignature)?;
-            if v > 1 {
-                return Err(Error::InvalidAuthorizationSignature);
-            }
-            // EIP-2 validation
-            if auth.s > SECP256K1N_HALF {
-                return Err(Error::InvalidAuthorizationSignature);
-            }
-
             // According to EIP-7702 step 1. validation, we should verify is
             // `chain_id = 0 || current_chain_id`.
             // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
             // Engine `submit_transaction` method.
             let mut is_valid = auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id;
 
-            // 2. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
+            // Step 2 - validation logic inside EVM itself.
+            // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
+
+            // Validate the signature, as in tests it is possible to have invalid signatures values.
+            let v = auth.parity.0;
+            if !(v[0] < u64::from(u8::MAX) && v[1..4].iter().all(|&elem| elem == 0)) {
+                is_valid = false;
+            }
+            // `V` must be: `v < u8::MAX`. As we checked it early, then `map_err` impossible case.
+            let v = u8::try_from(v[0]).map_err(|_| Error::InvalidV)?;
+            // Value `v` shouldn't be greater then 1
+            if v > 1 {
+                is_valid = false;
+            }
+            // EIP-2 validation
+            if auth.s > SECP256K1N_HALF {
+                is_valid = false;
+            }
+
             let mut rlp_stream = RlpStream::new();
             rlp_stream.begin_list(3);
             rlp_stream.append(&auth.chain_id);
