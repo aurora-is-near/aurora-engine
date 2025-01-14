@@ -77,7 +77,7 @@ where
     E: Env,
 {
     let current_account_id = env.current_account_id();
-    let target_account_id = AccountId::new(&format!(
+    let target_account_id = AccountId::try_from(format!(
         "{}.{}",
         args.target.encode(),
         current_account_id.as_ref()
@@ -95,7 +95,7 @@ where
     if let AddressVersionStatus::DeployNeeded { create_needed } = deploy_needed {
         let code = get_router_code(io).0.into_owned();
         // wnear_account is needed for initialization so we must assume it is set
-        // in the Engine or we need to accept it as input.
+        // in the Engine, or we need to accept it as input.
         let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
             wnear_account
         } else {

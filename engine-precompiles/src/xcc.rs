@@ -9,6 +9,7 @@ use aurora_engine_types::{
     borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
+    str,
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
@@ -299,8 +300,13 @@ fn create_target_account_id(
     sender: H160,
     engine_account_id: &str,
 ) -> Result<AccountId, PrecompileFailure> {
-    format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
-        .parse()
+    let mut buffer = [0; 40];
+    hex::encode_to_slice(sender.as_bytes(), &mut buffer)
+        .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+    let sender_in_hex =
+        str::from_utf8(&buffer).map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+
+    AccountId::try_from(format!("{sender_in_hex}.{engine_account_id}"))
         .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))
 }
 

@@ -388,7 +388,7 @@ impl TransactionKind {
                 )
             }
             Self::WithdrawWnearToRouter(args) => {
-                let recipient = AccountId::new(&format!(
+                let recipient = AccountId::try_from(format!(
                     "{}.{}",
                     args.target.encode(),
                     engine_account.as_ref()
