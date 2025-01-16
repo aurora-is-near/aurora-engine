@@ -167,16 +167,15 @@ impl SignedTransaction7702 {
             // `chain_id = 0 || current_chain_id`.
             // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
             // Engine `submit_transaction` method.
-            let mut is_valid = auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id;
 
             // Step 2 - validation logic inside EVM itself.
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             // Validate the signature, as in tests it is possible to have invalid signatures values.
-
             // Value `v` shouldn't be greater then 1
-            if auth.parity > U256::from(1) {
-                is_valid = false;
-            }
+            let mut is_valid = auth.chain_id.is_zero()
+                || auth.chain_id == current_tx_chain_id
+                || auth.parity <= U256::from(1);
+
             let v = u8::try_from(auth.parity.as_u64()).map_err(|_| Error::InvalidV)?;
             // EIP-2 validation
             if auth.s > SECP256K1N_HALF {
@@ -440,7 +439,7 @@ mod tests {
         };
 
         let signed_tx = SignedTransaction7702 {
-            transaction: tx.clone(),
+            transaction: tx,
             parity: 0,
             r: 2.into(),
             s: 3.into(),
@@ -511,7 +510,7 @@ mod tests {
             s: 3.into(),
         }];
         let signed_tx = SignedTransaction7702 {
-            transaction: tx.clone(),
+            transaction: tx,
             parity: 0,
             r: 2.into(),
             s: 3.into(),
@@ -564,7 +563,7 @@ mod tests {
             s: SECP256K1N_HALF + U256::from(1),
         }];
         let signed_tx = SignedTransaction7702 {
-            transaction: tx.clone(),
+            transaction: tx,
             parity: 0,
             r: 2.into(),
             s: 3.into(),
