@@ -1,5 +1,17 @@
+#[cfg(not(feature = "ext-connector"))]
+use crate::prelude::parameters::InitCallArgs;
+use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
+use crate::prelude::transactions::{
+    eip_1559::{self, SignedTransaction1559, Transaction1559},
+    eip_2930::{self, SignedTransaction2930, Transaction2930},
+    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
+};
+use crate::prelude::{sdk, Address, Wei, H256, U256};
+use crate::utils::solidity::{ContractConstructor, DeployedContract};
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
+use aurora_engine_transactions::eip_7702;
+use aurora_engine_transactions::eip_7702::{SignedTransaction7702, Transaction7702};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshDeserialize;
 #[cfg(not(feature = "ext-connector"))]
@@ -24,17 +36,6 @@ use near_vm_runner::{ContractCode, MockContractRuntimeCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
 use std::sync::Arc;
-
-#[cfg(not(feature = "ext-connector"))]
-use crate::prelude::parameters::InitCallArgs;
-use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
-use crate::prelude::transactions::{
-    eip_1559::{self, SignedTransaction1559, Transaction1559},
-    eip_2930::{self, SignedTransaction2930, Transaction2930},
-    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
-};
-use crate::prelude::{sdk, Address, Wei, H256, U256};
-use crate::utils::solidity::{ContractConstructor, DeployedContract};
 
 pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
@@ -938,6 +939,28 @@ pub fn sign_eip_1559_transaction(
     let s = U256::from_big_endian(&signature.s.b32());
 
     SignedTransaction1559 {
+        transaction: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
+pub fn sign_eip_7702_transaction(
+    tx: Transaction7702,
+    secret_key: &SecretKey,
+) -> SignedTransaction7702 {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&eip_7702::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = sdk::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    SignedTransaction7702 {
         transaction: tx,
         parity: recovery_id.serialize(),
         r,

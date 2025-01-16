@@ -50,7 +50,7 @@ impl EthTransactionKindAdapter {
                     }
                 }
                 EthTransactionKind::Eip7702(_) => {
-                    unreachable!();
+                    // For Prague hard fork `tx.transaction.to` can't be `None`
                 }
             }
         }
