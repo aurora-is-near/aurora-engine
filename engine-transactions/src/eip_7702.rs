@@ -171,18 +171,13 @@ impl SignedTransaction7702 {
 
             // Step 2 - validation logic inside EVM itself.
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
-
             // Validate the signature, as in tests it is possible to have invalid signatures values.
-            let v = auth.parity.0;
-            if !(v[0] < u64::from(u8::MAX) && v[1..4].iter().all(|&elem| elem == 0)) {
-                is_valid = false;
-            }
-            // `V` must be: `v < u8::MAX`. As we checked it early, then `map_err` impossible case.
-            let v = u8::try_from(v[0]).map_err(|_| Error::InvalidV)?;
+
             // Value `v` shouldn't be greater then 1
-            if v > 1 {
+            if auth.parity > U256::from(1) {
                 is_valid = false;
             }
+            let v = u8::try_from(auth.parity.as_u64()).map_err(|_| Error::InvalidV)?;
             // EIP-2 validation
             if auth.s > SECP256K1N_HALF {
                 is_valid = false;
@@ -203,7 +198,7 @@ impl SignedTransaction7702 {
                 Address::default()
             });
 
-            // Validations steps 3-8 0f EIP-7702 provided by EVM itself.
+            // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {
                 authority: auth_address.raw(),
                 address: auth.address,
@@ -269,12 +264,12 @@ mod tests {
 
     #[test]
     fn test_authorization_tuple_decode() {
-        let chain_id = U256::from(1);
+        let chain_id = 1.into();
         let address = H160::from_low_u64_be(0x1234);
         let nonce = 1u64;
-        let parity = U256::from(0);
-        let r = U256::from(2);
-        let s = U256::from(3);
+        let parity = U256::zero();
+        let r = 2.into();
+        let s = 3.into();
 
         let mut stream = RlpStream::new_list(6);
         stream.append(&chain_id);
@@ -299,21 +294,21 @@ mod tests {
     fn test_transaction7702_rlp_append_unsigned() {
         let tx = Transaction7702 {
             chain_id: 1,
-            nonce: U256::from(1),
-            max_priority_fee_per_gas: U256::from(2),
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
             max_fee_per_gas: U256::from(3),
-            gas_limit: U256::from(4),
+            gas_limit: 4.into(),
             to: Address::new(H160::from_low_u64_be(0x1234)),
-            value: Wei::new(U256::from(5)),
+            value: Wei::new(5.into()),
             data: vec![0x6],
             access_list: vec![],
             authorization_list: vec![AuthorizationTuple {
-                chain_id: U256::from(1),
+                chain_id: 1.into(),
                 address: H160::from_low_u64_be(0x1234),
                 nonce: 1u64,
-                parity: U256::from(0),
-                r: U256::from(2),
-                s: U256::from(3),
+                parity: U256::zero(),
+                r: 2.into(),
+                s: 3.into(),
             }],
         };
 
@@ -331,29 +326,29 @@ mod tests {
     fn test_signed_transaction7702_rlp_encode_decode() {
         let tx = Transaction7702 {
             chain_id: 1,
-            nonce: U256::from(1),
-            max_priority_fee_per_gas: U256::from(2),
-            max_fee_per_gas: U256::from(3),
-            gas_limit: U256::from(4),
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
+            max_fee_per_gas: 3.into(),
+            gas_limit: 4.into(),
             to: Address::new(H160::from_low_u64_be(0x1234)),
-            value: Wei::new(U256::from(5)),
+            value: Wei::new(5.into()),
             data: vec![0x6],
             access_list: vec![],
             authorization_list: vec![AuthorizationTuple {
-                chain_id: U256::from(1),
+                chain_id: 1.into(),
                 address: H160::from_low_u64_be(0x1234),
                 nonce: 1u64,
-                parity: U256::from(0),
-                r: U256::from(2),
-                s: U256::from(3),
+                parity: U256::zero(),
+                r: 2.into(),
+                s: 3.into(),
             }],
         };
 
         let signed_tx = SignedTransaction7702 {
             transaction: tx,
             parity: 0,
-            r: U256::from(7),
-            s: U256::from(8),
+            r: 7.into(),
+            s: 8.into(),
         };
 
         let mut stream = RlpStream::new();
@@ -363,5 +358,218 @@ mod tests {
         let decoded: SignedTransaction7702 = rlp.as_val().unwrap();
 
         assert_eq!(decoded, signed_tx);
+    }
+
+    #[test]
+    fn test_signed_transaction7702_invalid_chain_id() {
+        let mut tx = Transaction7702 {
+            chain_id: 1,
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
+            max_fee_per_gas: 3.into(),
+            gas_limit: 4.into(),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(5.into()),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![AuthorizationTuple {
+                chain_id: 2.into(),
+                address: H160::from_low_u64_be(0x1234),
+                nonce: 1u64,
+                parity: 0.into(),
+                r: 2.into(),
+                s: 3.into(),
+            }],
+        };
+
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+
+        // Fail
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert_eq!(auth_list.len(), 1);
+        assert!(!auth_list[0].is_valid);
+
+        // Success
+        tx.chain_id = 2;
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert!(auth_list[0].is_valid);
+
+        // Success
+        tx.authorization_list = vec![AuthorizationTuple {
+            chain_id: U256::zero(),
+            address: H160::from_low_u64_be(0x1234),
+            nonce: 1u64,
+            parity: 0.into(),
+            r: 2.into(),
+            s: 3.into(),
+        }];
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx,
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert!(auth_list[0].is_valid);
+    }
+
+    #[test]
+    fn test_signed_transaction7702_empty_auth_list() {
+        let tx = Transaction7702 {
+            chain_id: 1,
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
+            max_fee_per_gas: 3.into(),
+            gas_limit: 4.into(),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(5.into()),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+
+        if let Err(err) = signed_tx.authorization_list() {
+            assert_eq!(err, Error::EmptyAuthorizationList);
+        }
+    }
+
+    #[test]
+    fn test_signed_transaction7702_invalid_signature_v() {
+        let mut tx = Transaction7702 {
+            chain_id: 1,
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
+            max_fee_per_gas: 3.into(),
+            gas_limit: 4.into(),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(5.into()),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![AuthorizationTuple {
+                chain_id: 1.into(),
+                address: H160::from_low_u64_be(0x1234),
+                nonce: 1u64,
+                parity: 2.into(),
+                r: 2.into(),
+                s: 3.into(),
+            }],
+        };
+
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert_eq!(auth_list.len(), 1);
+        assert!(!auth_list[0].is_valid);
+
+        tx.authorization_list = vec![AuthorizationTuple {
+            chain_id: 1.into(),
+            address: H160::from_low_u64_be(0x1234),
+            nonce: 1u64,
+            parity: u8::MAX.into(),
+            r: 2.into(),
+            s: 3.into(),
+        }];
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert!(!auth_list[0].is_valid);
+
+        // Success
+        tx.authorization_list = vec![AuthorizationTuple {
+            chain_id: 1.into(),
+            address: H160::from_low_u64_be(0x1234),
+            nonce: 1u64,
+            parity: 0.into(),
+            r: 2.into(),
+            s: 3.into(),
+        }];
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert!(auth_list[0].is_valid);
+    }
+
+    #[test]
+    fn test_signed_transaction7702_invalid_signature_s() {
+        let mut tx = Transaction7702 {
+            chain_id: 1,
+            nonce: 1.into(),
+            max_priority_fee_per_gas: 2.into(),
+            max_fee_per_gas: 3.into(),
+            gas_limit: 4.into(),
+            to: Address::new(H160::from_low_u64_be(0x1234)),
+            value: Wei::new(5.into()),
+            data: vec![0x6],
+            access_list: vec![],
+            authorization_list: vec![AuthorizationTuple {
+                chain_id: 1.into(),
+                address: H160::from_low_u64_be(0x1234),
+                nonce: 1u64,
+                parity: 1.into(),
+                r: 2.into(),
+                s: SECP256K1N_HALF,
+            }],
+        };
+
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+
+        // Success
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert_eq!(auth_list.len(), 1);
+        assert!(auth_list[0].is_valid);
+
+        // Fails
+        tx.authorization_list = vec![AuthorizationTuple {
+            chain_id: 1.into(),
+            address: H160::from_low_u64_be(0x1234),
+            nonce: 1u64,
+            parity: u8::MAX.into(),
+            r: 2.into(),
+            s: SECP256K1N_HALF + U256::from(1),
+        }];
+        let signed_tx = SignedTransaction7702 {
+            transaction: tx.clone(),
+            parity: 0,
+            r: 2.into(),
+            s: 3.into(),
+        };
+        let auth_list = signed_tx.authorization_list().unwrap();
+        assert!(!auth_list[0].is_valid);
     }
 }
