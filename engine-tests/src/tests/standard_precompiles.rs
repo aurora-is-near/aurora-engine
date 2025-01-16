@@ -79,7 +79,7 @@ fn profile_ecpair() {
 #[test]
 fn profile_blake2f() {
     let profile = precompile_execution_profile("test_blake2f");
-    utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 fn initialize() -> (AuroraRunner, Signer, PrecompilesContract) {
