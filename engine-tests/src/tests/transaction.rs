@@ -248,7 +248,7 @@ fn test_eip_7702_success() {
 }
 
 #[test]
-fn test_eip_7702_wrong_auth_nonce() {
+fn test_eip_7702_wrong_auth_chain_id() {
     let mut runner = utils::deploy_runner();
     let signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -290,7 +290,7 @@ fn test_eip_7702_wrong_auth_nonce() {
         H256::zero()
     );
 
-    // Authority address should increase Nonce
+    // Authority address should not increase Nonce because authorization failed
     assert_eq!(runner.get_nonce(delegated_designator), 0.into());
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
