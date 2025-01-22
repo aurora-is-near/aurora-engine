@@ -2749,7 +2749,7 @@ mod tests {
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
         let expected_result =
-            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21344, Vec::new());
+            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21860, Vec::new());
 
         assert_eq!(expected_result, actual_result);
     }
