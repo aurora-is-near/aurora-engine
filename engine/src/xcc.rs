@@ -509,7 +509,7 @@ impl<'a, H> PromiseInterceptor<'a, H> {
     }
 }
 
-impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
+impl<H: PromiseHandler> PromiseHandler for PromiseInterceptor<'_, H> {
     type ReadOnly = H::ReadOnly;
 
     fn promise_results_count(&self) -> u64 {

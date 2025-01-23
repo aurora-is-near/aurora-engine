@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
@@ -114,14 +115,14 @@ pub struct Precompiles<'a, I, E, H> {
     pub paused_precompiles: BTreeSet<Address>,
 }
 
-impl<'a, I, E, H> Precompiles<'a, I, E, H> {
+impl<I, E, H> Precompiles<'_, I, E, H> {
     fn is_paused(&self, address: &Address) -> bool {
         self.paused_precompiles.contains(address)
     }
 }
 
-impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
-    for Precompiles<'a, I, E, H>
+impl<I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
+    for Precompiles<'_, I, E, H>
 {
     fn execute(
         &self,
