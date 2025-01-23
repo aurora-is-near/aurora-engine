@@ -318,7 +318,7 @@ mod tests {
             assert!(
                 account_id
                     .parse::<AccountId>()
-                    .map_or(false, |account_id| account_id.is_top_level_account_id()),
+                    .is_ok_and(|account_id| account_id.is_top_level_account_id()),
                 "Valid top level account id {account_id:?} marked invalid",
             );
         }
@@ -364,7 +364,7 @@ mod tests {
             assert!(
                 !account_id
                     .parse::<AccountId>()
-                    .map_or(false, |account_id| account_id.is_top_level_account_id()),
+                    .is_ok_and(|account_id| account_id.is_top_level_account_id()),
                 "Invalid top level account id {account_id:?} marked valid",
             );
         }

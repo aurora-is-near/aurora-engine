@@ -29,7 +29,7 @@ pub struct Storage {
 #[derive(Debug, Clone, Copy)]
 pub struct StoragePointer<'a>(pub &'a RefCell<Storage>);
 
-impl<'a> IO for StoragePointer<'a> {
+impl IO for StoragePointer<'_> {
     type StorageValue = Value;
 
     fn read_input(&self) -> Self::StorageValue {

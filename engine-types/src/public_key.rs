@@ -159,7 +159,7 @@ fn split_key_type_data(value: &str) -> Result<(KeyType, &str), DecodeBs58Error> 
 // for that: https://github.com/Nullus157/bs58-rs/pull/97
 struct Bs58<'a>(&'a [u8]);
 
-impl<'a> fmt::Display for Bs58<'a> {
+impl fmt::Display for Bs58<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         debug_assert!(self.0.len() <= 65);
         // The largest buffer we’re ever encoding is 65-byte long.  Base58
