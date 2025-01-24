@@ -30,7 +30,7 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
     Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
-    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    Vec, Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
     ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
@@ -776,7 +776,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // Parse message to determine recipient
         let mut recipient = {
             // Message format:
-            //      Recipient of the transaction - 40 characters (Address in hex)
+            // Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
             if message.len() < 40 {
                 return Err(engine_err(INVALID_MESSAGE));
@@ -853,7 +853,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let decimals = self
             .view_with_selector(
                 erc20_address,
-                ERC20_DIGITS_SELECTOR,
+                ERC20_DECIMALS_SELECTOR,
                 &[ethabi::ParamType::Uint(8)],
             )?
             .into_uint()
