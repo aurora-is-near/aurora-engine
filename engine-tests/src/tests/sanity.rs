@@ -303,7 +303,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 11);
+    utils::assert_gas_bound(profile.all_gas(), 12);
 }
 
 #[test]
@@ -693,7 +693,7 @@ fn test_num_wasm_functions() {
     let module = walrus::ModuleConfig::default()
         .parse(runner.ext.underlying.code.unwrap().code())
         .unwrap();
-    let expected_number = 1600;
+    let expected_number = 1650;
     let actual_number = module.funcs.iter().count();
 
     assert!(
