@@ -35,7 +35,7 @@ impl<'a, E> PredecessorAccount<'a, E> {
     }
 }
 
-impl<'a, E: Env> Precompile for PredecessorAccount<'a, E> {
+impl<E: Env> Precompile for PredecessorAccount<'_, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREDECESSOR_ACCOUNT_GAS)
     }

@@ -28,7 +28,7 @@ impl<'a, E> PrepaidGas<'a, E> {
     }
 }
 
-impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
+impl<E: Env> Precompile for PrepaidGas<'_, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREPAID_GAS_COST)
     }

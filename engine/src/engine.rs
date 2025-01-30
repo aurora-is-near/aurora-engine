@@ -1036,7 +1036,7 @@ pub fn submit_with_alt_modexp<
     let fixed_gas = silo::get_fixed_gas(&io);
 
     // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, &fixed_gas, &transaction)?;
+    assert_access(&io, env, fixed_gas, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
@@ -1050,7 +1050,7 @@ pub fn submit_with_alt_modexp<
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check that fixed gas is not greater than gasLimit from the transaction.
-    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
+    if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
@@ -1739,7 +1739,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: &Option<EthGas>,
+    fixed_gas: Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
     if fixed_gas.is_some() {
@@ -1760,7 +1760,7 @@ fn assert_access<I: IO + Copy, E: Env>(
     Ok(())
 }
 
-impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
+impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1958,7 +1958,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     }
 }
 
-impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
+impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,

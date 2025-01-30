@@ -10,7 +10,7 @@ pub struct Helper<'a> {
     pub signer: &'a mut utils::Signer,
 }
 
-impl<'a> Helper<'a> {
+impl Helper<'_> {
     pub(crate) fn create_mooniswap_deployer(
         &mut self,
     ) -> (SubmitResult, ExecutionProfile, PoolDeployer) {
