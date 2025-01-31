@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 //! # BLS12-382
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
@@ -16,13 +14,17 @@ mod g1_msm;
 mod g2;
 mod g2_add;
 mod g2_msm;
-// mod map_fp_to_g1;
-// mod pairing_check;
+mod map_fp2_to_g2;
+mod map_fp_to_g1;
+mod pairing_check;
 
 pub use g1_add::BlsG1Add;
 pub use g1_msm::BlsG1Msm;
 pub use g2_add::BlsG2Add;
 pub use g2_msm::BlsG2Msm;
+pub use map_fp2_to_g2::BlsMapFp2ToG2;
+pub use map_fp_to_g1::BlsMapFpToG1;
+pub use pairing_check::BlsPairingCheck;
 
 /// Number of bits used in the BLS12-381 curve finite field elements.
 const NBITS: usize = 256;

@@ -366,6 +366,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             bls12_381::BlsG1Msm::ADDRESS,
             bls12_381::BlsG2Add::ADDRESS,
             bls12_381::BlsG2Msm::ADDRESS,
+            bls12_381::BlsPairingCheck::ADDRESS,
+            bls12_381::BlsMapFpToG1::ADDRESS,
+            bls12_381::BlsMapFp2ToG2::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -383,6 +386,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(bls12_381::BlsG1Msm),
             Box::new(bls12_381::BlsG2Add),
             Box::new(bls12_381::BlsG2Msm),
+            Box::new(bls12_381::BlsPairingCheck),
+            Box::new(bls12_381::BlsMapFpToG1),
+            Box::new(bls12_381::BlsMapFp2ToG2),
         ];
         let map = addresses
             .into_iter()

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use super::{fp_from_bendian, fp_to_bytes, remove_padding, FP_LENGTH, PADDED_FP_LENGTH};
 use crate::prelude::{vec, Borrowed, Vec};
 use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_curve};
