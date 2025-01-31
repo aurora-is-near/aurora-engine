@@ -28,6 +28,11 @@ impl Precompile for BlsG1Add {
         Ok(EthGas::new(BASE_GAS_FEE))
     }
 
+    /// G1 addition call expects `256` bytes as an input that is interpreted as byte
+    /// concatenation of two G1 points (`128` bytes each).
+    /// Output is an encoding of addition operation result - single G1 point (`128`
+    /// bytes).
+    /// See also: <https://eips.ethereum.org/EIPS/eip-2537#abi-for-g1-addition>
     fn run(
         &self,
         input: &[u8],

@@ -363,6 +363,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
             bls12_381::BlsG1Add::ADDRESS,
+            bls12_381::BlsG1Msm::ADDRESS,
+            bls12_381::BlsG2Add::ADDRESS,
+            bls12_381::BlsG2Msm::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -377,6 +380,9 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
             Box::new(bls12_381::BlsG1Add),
+            Box::new(bls12_381::BlsG1Msm),
+            Box::new(bls12_381::BlsG2Add),
+            Box::new(bls12_381::BlsG2Msm),
         ];
         let map = addresses
             .into_iter()

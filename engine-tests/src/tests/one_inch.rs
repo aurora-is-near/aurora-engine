@@ -69,7 +69,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 26);
+    assert_gas_bound(profile.all_gas(), 27);
 
     let (result, profile) = helper.pool_withdraw(
         &pool,

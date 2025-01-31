@@ -12,14 +12,17 @@ use evm::ExitError;
 
 mod g1;
 mod g1_add;
+mod g1_msm;
 mod g2;
-// mod g1_msm;
-// mod g2_add;
-// mod g2_msm;
+mod g2_add;
+mod g2_msm;
 // mod map_fp_to_g1;
 // mod pairing_check;
 
 pub use g1_add::BlsG1Add;
+pub use g1_msm::BlsG1Msm;
+pub use g2_add::BlsG2Add;
+pub use g2_msm::BlsG2Msm;
 
 /// Number of bits used in the BLS12-381 curve finite field elements.
 const NBITS: usize = 256;
