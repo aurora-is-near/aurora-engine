@@ -331,11 +331,14 @@ fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
     bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
-fn validate_amount(amount: U256) -> Result<(), ExitError> {
+fn parse_amount(input: &[u8]) -> Result<U256, ExitError> {
+    let amount = U256::from_big_endian(input);
+
     if amount > U256::from(u128::MAX) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
     }
-    Ok(())
+
+    Ok(amount)
 }
 
 #[derive(Debug, PartialEq)]
@@ -557,7 +560,7 @@ fn exit_erc20_token_to_near<I: IO>(
     ),
     ExitError,
 > {
-    if context.apparent_value != U256::from(0) {
+    if context.apparent_value != U256::zero() {
         return Err(ExitError::Other(Cow::from(
             "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
         )));
@@ -737,9 +740,7 @@ impl<'a> TryFrom<&'a [u8]> for ExitToNearParams<'a> {
                 }))
             }
             0x1 => {
-                let amount = U256::from_big_endian(&input[..32]);
-                validate_amount(amount)?;
-
+                let amount = parse_amount(&input[..32])?;
                 let Recipient {
                     receiver_account_id,
                     message,
@@ -906,9 +907,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
-
-                let amount = U256::from_big_endian(&input[..32]);
-                validate_amount(amount)?;
+                let amount = parse_amount(&input[..32])?;
 
                 input = &input[32..];
 
@@ -984,7 +983,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 #[cfg(test)]
 mod tests {
     use super::{
-        exit_to_ethereum, exit_to_near, parse_input, parse_recipient, validate_amount,
+        exit_to_ethereum, exit_to_near, parse_amount, parse_input, parse_recipient,
         validate_input_size, BaseTokenParams, Erc20TokenParams, ExitToNearParams, Message,
     };
     use crate::{native::Recipient, prelude::sdk::types::near_account_to_evm_address};
@@ -1048,12 +1047,17 @@ mod tests {
     #[test]
     #[should_panic(expected = "ERR_INVALID_AMOUNT")]
     fn test_exit_with_invalid_amount() {
-        validate_amount(U256::MAX).unwrap();
+        let input = (U256::from(u128::MAX) + 1).to_big_endian();
+        parse_amount(input.as_slice()).unwrap();
     }
 
     #[test]
     fn test_exit_with_valid_amount() {
-        validate_amount(U256::from(u128::MAX)).unwrap();
+        let input = U256::from(u128::MAX).to_big_endian();
+        assert_eq!(
+            parse_amount(input.as_slice()).unwrap(),
+            U256::from(u128::MAX)
+        );
     }
 
     #[test]
