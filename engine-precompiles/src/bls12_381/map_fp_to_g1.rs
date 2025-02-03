@@ -60,3 +60,30 @@ impl Precompile for BlsMapFpToG1 {
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aurora_engine_types::H160;
+
+    #[test]
+    fn bls12_381_fp_to_g1() {
+        let precompile = BlsMapFpToG1;
+        let ctx = Context {
+            address: H160::zero(),
+            caller: H160::zero(),
+            apparent_value: 0.into(),
+        };
+        let input = hex::decode("0000000000000000000000000000000017f66b472b36717ee0902d685c808bb5f190bbcb2c51d067f1cbec64669f10199a5868d7181dcec0498fcc71f5acaf79").expect("hex decoding failed");
+
+        let res = precompile
+            .run(&input, None, &ctx, false)
+            .expect("precompile run should not fail");
+        let expected = hex::decode("\
+               00000000000000000000000000000000188dc9e5ddf48977f33aeb6e505518269bf67fb624fa86b79741d842e75a6fa1be0911c2caa9e55571b6e55a3c0c0b9e\
+			   00000000000000000000000000000000193e8b7c7e78daf104a59d7b39401a65355fa874bd34e91688580941e99a863367efc68fe871e38e07423090e93919c9")
+            .expect("hex decoding failed");
+
+        assert_eq!(res.output, expected);
+    }
+}

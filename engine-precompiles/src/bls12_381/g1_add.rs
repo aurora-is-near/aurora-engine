@@ -73,3 +73,35 @@ impl Precompile for BlsG1Add {
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aurora_engine_types::H160;
+
+    #[test]
+    fn bls12_381_g1_add() {
+        let precompile = BlsG1Add;
+        let ctx = Context {
+            address: H160::zero(),
+            caller: H160::zero(),
+            apparent_value: 0.into(),
+        };
+        let input = hex::decode("\
+               00000000000000000000000000000000117dbe419018f67844f6a5e1b78a1e597283ad7b8ee7ac5e58846f5a5fd68d0da99ce235a91db3ec1cf340fe6b7afcdb\
+			   0000000000000000000000000000000013316f23de032d25e912ae8dc9b54c8dba1be7cecdbb9d2228d7e8f652011d46be79089dd0a6080a73c82256ce5e4ed2\
+			   000000000000000000000000000000000441e7f7f96198e4c23bd5eb16f1a7f045dbc8c53219ab2bcea91d3a027e2dfe659feac64905f8b9add7e4bfc91bec2b\
+			   0000000000000000000000000000000005fc51bb1b40c87cd4292d4b66f8ca5ce4ef9abd2b69d4464b4879064203bda7c9fc3f896a3844ebc713f7bb20951d95")
+            .expect("hex decoding failed");
+
+        let res = precompile
+            .run(&input, None, &ctx, false)
+            .expect("precompile run should not fail");
+        let expected = hex::decode("\
+                0000000000000000000000000000000016b8ab56b45a9294466809b8e858c1ad15ad0d52cfcb62f8f5753dc94cee1de6efaaebce10701e3ec2ecaa9551024ea\
+                600000000000000000000000000000000124571eec37c0b1361023188d66ec17c1ec230d31b515e0e81e599ec19e40c8a7c8cdea9735bc3d8b4e37ca7e5dd71f6")
+            .expect("hex decoding failed");
+
+        assert_eq!(res.output, expected);
+    }
+}
