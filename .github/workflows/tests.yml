@@ -41,6 +41,8 @@ jobs:
             etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Build main contract
         run: |
           case ${{ matrix.profile }} in
@@ -81,6 +83,8 @@ jobs:
           key: ${{ matrix.profile }}-cargo-modexp-test
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Test ${{ matrix.profile }} bench-modexp
         run: cargo make --profile ${{ matrix.profile }} bench-modexp
 
