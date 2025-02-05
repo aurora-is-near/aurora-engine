@@ -29,6 +29,11 @@ use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 const UNWRAP_WNEAR_MSG: &str = "unwrap";
+#[cfg(not(feature = "error_refund"))]
+const MIN_INPUT_SIZE: usize = 3;
+#[cfg(feature = "error_refund")]
+const MIN_INPUT_SIZE: usize = 21;
+const MAX_INPUT_SIZE: usize = 1_024;
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -341,13 +346,13 @@ fn parse_amount(input: &[u8]) -> Result<U256, ExitError> {
     Ok(amount)
 }
 
-#[derive(Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct Recipient<'a> {
     receiver_account_id: AccountId,
     message: Option<Message<'a>>,
 }
 
-#[derive(Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 enum Message<'a> {
     UnwrapWnear,
     Omni(&'a str),
@@ -390,13 +395,13 @@ impl<I: IO> Precompile for ExitToNear<I> {
     ) -> EvmPrecompileResult {
         // ETH (base) transfer input format: (85 bytes)
         //  - flag (1 byte)
-        //  - refund_address (20 bytes)
-        //  - recipient_account_id (max 64 bytes)
+        //  - refund_address (20 bytes), present if the feature "error_refund" is enabled
+        //  - recipient_account_id (max MAX_INPUT_SIZE - 20 - 1 bytes)
         // ERC-20 transfer input format: (124 bytes)
         //  - flag (1 byte)
-        //  - refund_address (20 bytes)
+        //  - refund_address (20 bytes), present if the feature "error_refund" is enabled.
         //  - amount (32 bytes)
-        //  - recipient_account_id (max 64 bytes)
+        //  - recipient_account_id (max MAX_INPUT_SIZE - 1 - (20) - 32 bytes)
         //  - `:unwrap` suffix in a case of wNEAR (7 bytes)
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
@@ -419,7 +424,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 //
                 // Input slice format:
                 //  recipient_account_id (bytes) - the NEAR recipient account which will receive
-                // NEP-141 ETH (base) tokens
+                //  NEP-141 (base) tokens, or also can contain the `:unwrap` suffix in case of
+                //  withdrawing wNEAR, or other message of JSON in case of OMNI, or address of
+                //  receiver in case of transfer tokens to another engine contract.
                 ExitToNearParams::BaseToken(ref exit_params) => {
                     let eth_connector_account_id = self.get_eth_connector_contract_account()?;
                     exit_base_token_to_near(eth_connector_account_id, context, exit_params)?
@@ -431,7 +438,9 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 // Input slice format:
                 //  amount (U256 big-endian bytes) - the amount that was burned
                 //  recipient_account_id (bytes) - the NEAR recipient account which will receive
-                // NEP-141 tokens
+                //  NEP-141 tokens, or also can contain the `:unwrap` suffix in case of withdrawing
+                //  wNEAR, or other message of JSON in case of OMNI, or address of receiver in case
+                //  of transfer tokens to another engine contract.
                 ExitToNearParams::Erc20TokenParams(ref exit_params) => {
                     exit_erc20_token_to_near(context, exit_params, &self.io)?
                 }
@@ -560,18 +569,28 @@ fn exit_erc20_token_to_near<I: IO>(
     ),
     ExitError,
 > {
+    // In case of withdrawing ERC-20 tokens, the `apparent_value` should be zero. In opposite way
+    // the funds will be locked in the address of the precompile without any possibility
+    // to withdraw them in the future. So, in case if the `apparent_value` is not zero, the error
+    // will be returned to prevent that.
     if context.apparent_value != U256::zero() {
         return Err(ExitError::Other(Cow::from(
             "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
         )));
     }
 
-    let erc20_address = context.caller;
+    let erc20_address = context.caller; // because ERC-20 contract calls the precompile.
     let nep141_account_id = get_nep141_from_erc20(erc20_address.as_bytes(), io)?;
 
     let (nep141_account_id, args, method, transfer_near_args, event) = match exit_params.message {
         Some(Message::UnwrapWnear) => {
+            // The flow is following here:
+            // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
+            // In such way we unwrap wNEAR to NEAR.
+            // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
+            // in which make transfer of unwrapped NEAR to the `target_account_id`.
             if erc20_address == get_wnear_address(io).raw() {
+                // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
                 (
                     nep141_account_id,
                     format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
@@ -591,11 +610,12 @@ fn exit_erc20_token_to_near<I: IO>(
                 return Err(ExitError::Other(Cow::from("ERR_INVALID_ERC20_FOR_UNWRAP")));
             }
         }
+        // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
         Some(Message::Omni(msg)) => (
             nep141_account_id,
             format!(
                 r#"{{"receiver_id":"{}","amount":"{}","msg":"{msg}"}}"#,
-                exit_params.receiver_account_id, // The locker account id
+                exit_params.receiver_account_id, // the locker's account id in case of OMNI
                 exit_params.amount.as_u128(),
             ),
             "ft_transfer_call",
@@ -608,6 +628,7 @@ fn exit_erc20_token_to_near<I: IO>(
                 msg: msg.to_string(),
             }),
         ),
+        // The legacy flow. Just withdraw the tokens to the NEAR account id.
         None => {
             // There is no way to inject json, given the encoding of both arguments
             // as decimal and valid account id respectively.
@@ -761,7 +782,7 @@ impl<'a> TryFrom<&'a [u8]> for ExitToNearParams<'a> {
 
 #[cfg(feature = "error_refund")]
 fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
-    validate_input_size(input, 21, 1024)?;
+    validate_input_size(input, MIN_INPUT_SIZE, MAX_INPUT_SIZE)?;
     let mut buffer = [0; 20];
     buffer.copy_from_slice(&input[1..21]);
     let refund_address = Address::from_array(buffer);
@@ -770,7 +791,7 @@ fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
 
 #[cfg(not(feature = "error_refund"))]
 fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
-    validate_input_size(input, 3, 1024)?;
+    validate_input_size(input, MIN_INPUT_SIZE, MAX_INPUT_SIZE)?;
     Ok(&input[1..])
 }
 
@@ -1167,23 +1188,26 @@ mod tests {
         #[cfg(feature = "error_refund")]
         let refund_address = Address::from_array([1; 20]);
 
+        fn assert_input(input: impl AsRef<[u8]>, expected: ExitToNearParams) {
+            let actual = ExitToNearParams::try_from(input.as_ref()).unwrap();
+            assert_eq!(actual, expected);
+        }
+
         let input = [
-            &[0u8],
+            &[0],
             #[cfg(feature = "error_refund")]
             refund_address.as_bytes(),
             b"test.near".as_slice(),
         ]
         .concat();
-
-        let params = ExitToNearParams::try_from(input.as_slice()).unwrap();
-        assert_eq!(
-            params,
+        assert_input(
+            input,
             ExitToNearParams::BaseToken(BaseTokenParams {
                 #[cfg(feature = "error_refund")]
                 refund_address,
                 receiver_account_id: "test.near".parse().unwrap(),
                 message: None,
-            })
+            }),
         );
 
         let input = [
@@ -1194,16 +1218,15 @@ mod tests {
             b"test.near:unwrap",
         ]
         .concat();
-        let params = ExitToNearParams::try_from(input.as_slice()).unwrap();
-        assert_eq!(
-            params,
+        assert_input(
+            input,
             ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
                 #[cfg(feature = "error_refund")]
                 refund_address,
                 receiver_account_id: "test.near".parse().unwrap(),
                 amount,
                 message: Some(Message::UnwrapWnear),
-            })
+            }),
         );
 
         let input = [
@@ -1214,9 +1237,8 @@ mod tests {
             b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2:unwrap",
         ]
         .concat();
-        let params = ExitToNearParams::try_from(input.as_slice()).unwrap();
-        assert_eq!(
-            params,
+        assert_input(
+            input,
             ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
                 #[cfg(feature = "error_refund")]
                 refund_address,
@@ -1226,7 +1248,7 @@ mod tests {
                         .unwrap(),
                 amount,
                 message: Some(Message::UnwrapWnear),
-            })
+            }),
         );
 
         let input = [
@@ -1239,10 +1261,7 @@ mod tests {
             "{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}".as_bytes(),
         ]
         .concat();
-        dbg!(input.len());
-        let params = ExitToNearParams::try_from(input.as_slice()).unwrap();
-        assert_eq!(
-            params,
+        assert_input(input,
             ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
                 #[cfg(feature = "error_refund")]
                 refund_address,
