@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 use crate::prelude::{Address, Wei, H160, H256, U256};
+use crate::tests::sanity::initialize_transfer;
 use crate::utils;
+use aurora_engine_precompiles::bls12_381;
+use aurora_engine_precompiles::Precompile;
 use aurora_engine_transactions::eip_2930;
 use aurora_engine_transactions::eip_2930::{AccessTuple, Transaction2930};
 use aurora_engine_types::borsh::BorshDeserialize;
@@ -8,7 +11,7 @@ use aurora_engine_types::parameters::engine::SubmitResult;
 use evm::backend::MemoryAccount;
 use libsecp256k1::SecretKey;
 use std::collections::BTreeMap;
-use std::iter;
+use std::{fs, iter};
 
 /// State test dump data struct for fully reprodusing execution flow
 /// with input & output and before & after state data.
@@ -39,25 +42,43 @@ impl StateTestsDump {
             })
             .collect()
     }
+
+    /// Read State tests data from directory that contains json files
+    /// with specific test cases.
+    /// Return parsed Stete tests dump data
+    fn read_test_case(path: &str) -> Vec<Self> {
+        use std::{fs, path::Path};
+
+        fs::read_dir(path)
+            .expect("Read source test directory failed")
+            .map(|entry| entry.unwrap().path())
+            .filter(|entry| fs::metadata(entry).unwrap().is_file())
+            .filter(|entry| {
+                let file_name = entry.file_name().unwrap();
+                Path::new(file_name).extension().unwrap().to_str() == Some("json")
+            })
+            .map(|entry| fs::read_to_string(entry).unwrap())
+            .map(|data| serde_json::from_str(&data).unwrap())
+            .collect::<Vec<_>>()
+    }
 }
 
-/// Read State tests data from directory that contains json files
-/// with specific test cases.
-/// Return parsed Stete tests dump data
-fn read_test_case() -> Vec<StateTestsDump> {
-    use std::{fs, path::Path};
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PrecompileStandaloneData {
+    pub input: String,
+    pub output: String,
+}
 
-    fs::read_dir("src/tests/res/bls/")
-        .expect("Read source test directory failed")
-        .map(|entry| entry.unwrap().path())
-        .filter(|entry| fs::metadata(entry).unwrap().is_file())
-        .filter(|entry| {
-            let file_name = entry.file_name().unwrap();
-            Path::new(file_name).extension().unwrap().to_str() == Some("json")
-        })
-        .map(|entry| fs::read_to_string(entry).unwrap())
-        .map(|data| serde_json::from_str(&data).unwrap())
-        .collect::<Vec<_>>()
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PrecompileStandalone {
+    pub precompile_data: Vec<PrecompileStandaloneData>,
+}
+
+impl PrecompileStandalone {
+    fn new(path: &str) -> Self {
+        let data = fs::read_to_string(path).expect("Unable to read file");
+        serde_json::from_str(&data).unwrap()
+    }
 }
 
 /// Get secret key from hash
@@ -67,9 +88,8 @@ fn get_secret_key(hash: H256) -> SecretKey {
     SecretKey::parse(&secret_key).expect("Unable to parse secret key")
 }
 
-#[test]
-fn test_bls12_381_g1_add() {
-    for test_case in read_test_case() {
+fn run_bls12_381_transaction_call(path: &str) {
+    for test_case in StateTestsDump::read_test_case(path) {
         let mut runner = utils::deploy_runner();
         runner.standalone_runner = None;
         // Get caller secret key
@@ -106,4 +126,115 @@ fn test_bls12_381_g1_add() {
         assert!(result.status.is_ok());
         assert_eq!(result.gas_used, test_case.used_gas);
     }
+}
+
+fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, path: &str) {
+    for (i, data) in PrecompileStandalone::new(path)
+        .precompile_data
+        .iter()
+        .enumerate()
+    {
+        let input = hex::decode(data.input.clone()).unwrap();
+        let output = hex::decode(data.output.clone()).unwrap();
+        println!("[{i}] {:?}", input.len());
+
+        let ctx = evm::Context {
+            address: H160::default(),
+            caller: H160::default(),
+            apparent_value: U256::zero(),
+        };
+        let standalone_result = precompile.run(&input, None, &ctx, false).unwrap();
+        assert_eq!(standalone_result.output, output);
+
+        if input.len() < 800 {
+            check_wasm_submit(address, input, &output);
+        }
+    }
+}
+
+fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
+    let (mut runner, mut signer, _) = initialize_transfer();
+    runner.context.prepaid_gas = u64::MAX;
+
+    let wasm_result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            aurora_engine_transactions::legacy::TransactionLegacy {
+                nonce,
+                gas_price: U256::zero(),
+                gas_limit: u64::MAX.into(),
+                to: Some(address),
+                value: Wei::zero(),
+                data: input,
+            }
+        })
+        .unwrap();
+    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result),);
+}
+
+#[test]
+fn test_bls12_381_g1_add() {
+    run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g1_add/");
+}
+
+#[test]
+fn test_bls12_381_g1_add_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsG1Add,
+        bls12_381::BlsG1Add::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_g1_add.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_g1_mul_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsG1Msm,
+        bls12_381::BlsG1Msm::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_g1_mul.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_g2_add_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsG2Add,
+        bls12_381::BlsG2Add::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_g2_add.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_g2_mul_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsG2Msm,
+        bls12_381::BlsG2Msm::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_g2_mul.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_pair_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsPairingCheck,
+        bls12_381::BlsPairingCheck::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_pair.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_map_fp_to_g1_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsMapFpToG1,
+        bls12_381::BlsMapFpToG1::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_map_fp_to_g1.json",
+    );
+}
+
+#[test]
+fn test_bls12_381_map_fp2_to_g2_standalone() {
+    run_bls12_381_standalone(
+        &bls12_381::BlsMapFp2ToG2,
+        bls12_381::BlsMapFp2ToG2::ADDRESS,
+        "src/tests/res/bls/standalone/bls12_381_map_fp2_to_g2.json",
+    );
 }
