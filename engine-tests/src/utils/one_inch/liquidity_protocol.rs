@@ -1,25 +1,21 @@
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
+use crate::utils::one_inch::LIQUIDITY_PROTOCOL_PATH;
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, solidity, ExecutionProfile};
 use aurora_engine_types::types::Wei;
-use std::path::PathBuf;
-use std::sync::Once;
-
-static DOWNLOAD_COMPILE_ONCE: Once = Once::new();
 
 pub struct Helper<'a> {
     pub runner: &'a mut utils::AuroraRunner,
     pub signer: &'a mut utils::Signer,
 }
 
-impl<'a> Helper<'a> {
+impl Helper<'_> {
     pub(crate) fn create_mooniswap_deployer(
         &mut self,
     ) -> (SubmitResult, ExecutionProfile, PoolDeployer) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let deployer_constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("MooniswapDeployer.sol/MooniswapDeployer.json"),
         );
         let data = deployer_constructor.code;
         let abi = deployer_constructor.abi;
@@ -52,9 +48,8 @@ impl<'a> Helper<'a> {
         &mut self,
         pool_deployer: &PoolDeployer,
     ) -> (SubmitResult, ExecutionProfile, PoolFactory) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("MooniswapFactory.sol/MooniswapFactory.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("MooniswapFactory.sol/MooniswapFactory.json"),
         );
 
         let signer_address = utils::address_from_secret_key(&self.signer.secret_key);
@@ -64,9 +59,9 @@ impl<'a> Helper<'a> {
                 constructor.deploy_with_args(
                     nonce,
                     &[
-                        ethabi::Token::Address(signer_address.raw()),
-                        ethabi::Token::Address(pool_deployer.0.address.raw()),
-                        ethabi::Token::Address(signer_address.raw()),
+                        ethabi::Token::Address(signer_address.raw().0.into()),
+                        ethabi::Token::Address(pool_deployer.0.address.raw().0.into()),
+                        ethabi::Token::Address(signer_address.raw().0.into()),
                     ],
                 )
             })
@@ -84,9 +79,8 @@ impl<'a> Helper<'a> {
         token_a: Address,
         token_b: Address,
     ) -> (SubmitResult, ExecutionProfile, Pool) {
-        let artifacts_path = download_and_compile_solidity_sources();
         let constructor = solidity::ContractConstructor::compile_from_extended_json(
-            artifacts_path.join("Mooniswap.sol/Mooniswap.json"),
+            LIQUIDITY_PROTOCOL_PATH.join("Mooniswap.sol/Mooniswap.json"),
         );
 
         let (result, profile) = self
@@ -95,8 +89,8 @@ impl<'a> Helper<'a> {
                 pool_factory.0.call_method_with_args(
                     "deploy",
                     &[
-                        ethabi::Token::Address(token_a.raw()),
-                        ethabi::Token::Address(token_b.raw()),
+                        ethabi::Token::Address(token_a.raw().0.into()),
+                        ethabi::Token::Address(token_b.raw().0.into()),
                     ],
                     nonce,
                 )
@@ -152,12 +146,12 @@ impl<'a> Helper<'a> {
             "deposit",
             &[
                 ethabi::Token::FixedArray(vec![
-                    ethabi::Token::Uint(args.max_token_a),
-                    ethabi::Token::Uint(args.max_token_b),
+                    ethabi::Token::Uint(args.max_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.max_token_b.to_big_endian().into()),
                 ]),
                 ethabi::Token::FixedArray(vec![
-                    ethabi::Token::Uint(args.min_token_a),
-                    ethabi::Token::Uint(args.min_token_b),
+                    ethabi::Token::Uint(args.min_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.min_token_b.to_big_endian().into()),
                 ]),
             ],
         )
@@ -172,11 +166,11 @@ impl<'a> Helper<'a> {
             pool,
             "swap",
             &[
-                ethabi::Token::Address(args.src_token.raw()),
-                ethabi::Token::Address(args.dst_token.raw()),
-                ethabi::Token::Uint(args.amount),
-                ethabi::Token::Uint(args.min_amount),
-                ethabi::Token::Address(args.referral.raw()),
+                ethabi::Token::Address(args.src_token.raw().0.into()),
+                ethabi::Token::Address(args.dst_token.raw().0.into()),
+                ethabi::Token::Uint(args.amount.to_big_endian().into()),
+                ethabi::Token::Uint(args.min_amount.to_big_endian().into()),
+                ethabi::Token::Address(args.referral.raw().0.into()),
             ],
         )
     }
@@ -190,10 +184,10 @@ impl<'a> Helper<'a> {
             pool,
             "withdraw",
             &[
-                ethabi::Token::Uint(args.amount),
+                ethabi::Token::Uint(args.amount.to_big_endian().into()),
                 ethabi::Token::Array(vec![
-                    ethabi::Token::Uint(args.min_token_a),
-                    ethabi::Token::Uint(args.min_token_b),
+                    ethabi::Token::Uint(args.min_token_a.to_big_endian().into()),
+                    ethabi::Token::Uint(args.min_token_b.to_big_endian().into()),
                 ]),
             ],
         )
@@ -247,8 +241,4 @@ impl Pool {
     pub const fn address(&self) -> Address {
         self.0.address
     }
-}
-
-fn download_and_compile_solidity_sources() -> PathBuf {
-    super::download_and_compile_solidity_sources("liquidity-protocol", &DOWNLOAD_COMPILE_ONCE)
 }

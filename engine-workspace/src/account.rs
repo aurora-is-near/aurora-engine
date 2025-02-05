@@ -12,7 +12,7 @@ pub struct Account {
 }
 
 impl Account {
-    pub(crate) fn from_inner(inner: near_workspaces::Account) -> Self {
+    pub(crate) const fn from_inner(inner: near_workspaces::Account) -> Self {
         Self { inner }
     }
 
@@ -35,22 +35,19 @@ impl Account {
         Ok(RawContract::from_contract(contract))
     }
 
+    #[must_use]
     pub fn id(&self) -> AccountId {
         self.inner.id().as_str().parse().unwrap()
     }
 
-    pub async fn create_subaccount(
-        &self,
-        name: &str,
-        balance: NearToken,
-    ) -> anyhow::Result<Account> {
+    pub async fn create_subaccount(&self, name: &str, balance: NearToken) -> anyhow::Result<Self> {
         self.inner
             .create_subaccount(name)
             .initial_balance(balance)
             .transact()
             .await?
             .into_result()
-            .map(|inner| Account { inner })
+            .map(|inner| Self { inner })
             .map_err(Into::into)
     }
 

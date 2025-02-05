@@ -3,7 +3,7 @@ name = "engine-standalone-tracing"
 version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
-description = "Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution."
+description = "Aurora engine standalone tracing library. Provides functions and types for extracting geth-like traces from standalone engine execution."
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
@@ -21,6 +21,9 @@ evm-runtime.workspace = true
 evm-gasometer.workspace = true
 hex = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["std"], optional = true }
+
+[lints]
+workspace = true
 
 [features]
 default = []

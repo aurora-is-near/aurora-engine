@@ -535,15 +535,8 @@ impl<I: IO + Copy> EthConnectorContract<I> {
 
         sdk::log!("[init contract]");
 
-        let contract_data = set_contract_data(
-            &mut io,
-            SetContractDataCallArgs {
-                prover_account: args.prover_account,
-                eth_custodian_address: args.eth_custodian_address,
-                metadata: args.metadata,
-            },
-        )
-        .map_err(errors::InitContractError::InvalidCustodianAddress)?;
+        let contract_data = set_contract_data(&mut io, args)
+            .map_err(errors::InitContractError::InvalidCustodianAddress)?;
 
         let mut ft = FungibleTokenOps::new(io);
         // Register FT account for current contract
@@ -786,7 +779,7 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     ) -> Result<WithdrawResult, errors::WithdrawError> {
         // Check if the current account id is owner.
         let is_owner = current_account_id == predecessor_account_id;
-        // Check if the withdraw flow is paused. If it's owner just skip the assertion.
+        // Check if the withdrawal flow is paused. If it's owner just skip the assertion.
         self.assert_not_paused(PAUSE_WITHDRAW, is_owner)
             .map_err(|_| errors::WithdrawError::Paused)?;
 

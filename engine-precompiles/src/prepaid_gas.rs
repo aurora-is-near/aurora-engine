@@ -2,7 +2,7 @@ use super::{EvmPrecompileResult, Precompile};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
-use aurora_engine_types::{vec, U256};
+use aurora_engine_types::U256;
 use evm::{Context, ExitError};
 
 /// `prepaid_gas` precompile address
@@ -28,7 +28,7 @@ impl<'a, E> PrepaidGas<'a, E> {
     }
 }
 
-impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
+impl<E: Env> Precompile for PrepaidGas<'_, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREPAID_GAS_COST)
     }
@@ -49,12 +49,8 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
         }
 
         let prepaid_gas = self.env.prepaid_gas();
-        let bytes = {
-            let mut buf = vec![0; 32];
-            U256::from(prepaid_gas.as_u64()).to_big_endian(&mut buf);
-            buf
-        };
-        Ok(PrecompileOutput::without_logs(cost, bytes))
+        let bytes = U256::from(prepaid_gas.as_u64()).to_big_endian();
+        Ok(PrecompileOutput::without_logs(cost, bytes.to_vec()))
     }
 }
 

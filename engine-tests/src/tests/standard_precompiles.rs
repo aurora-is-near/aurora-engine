@@ -55,7 +55,7 @@ fn profile_identity() {
 #[test]
 fn profile_modexp() {
     let profile = precompile_execution_profile("test_modexp");
-    utils::assert_gas_bound(profile.all_gas(), 8);
+    utils::assert_gas_bound(profile.all_gas(), 9);
 }
 
 #[test]

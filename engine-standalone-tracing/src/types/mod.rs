@@ -102,7 +102,7 @@ impl LogStack {
     }
 }
 
-impl std::iter::FromIterator<[u8; 32]> for LogStack {
+impl FromIterator<[u8; 32]> for LogStack {
     fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
         let vec = iter.into_iter().collect();
         Self(vec)
@@ -344,7 +344,7 @@ mod opcode_serde {
 
     struct U8Visitor;
 
-    impl<'de> serde::de::Visitor<'de> for U8Visitor {
+    impl serde::de::Visitor<'_> for U8Visitor {
         type Value = u8;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

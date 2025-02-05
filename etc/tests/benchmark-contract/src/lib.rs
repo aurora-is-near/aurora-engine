@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc_error_handler)]
 
 extern crate alloc;
 
@@ -11,12 +10,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[panic_handler]
 #[no_mangle]
 pub unsafe fn panic(_info: &::core::panic::PanicInfo) -> ! {
-    core::arch::wasm32::unreachable();
-}
-
-#[alloc_error_handler]
-#[no_mangle]
-pub unsafe fn on_alloc_error(_: core::alloc::Layout) -> ! {
     core::arch::wasm32::unreachable();
 }
 

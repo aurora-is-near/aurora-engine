@@ -7,14 +7,20 @@ macro_rules! impl_view_return  {
             pub(crate) fn view(contract: &'a RawContract) -> Self {
                 Self(contract.view(&$fn_name))
             }
+
+            #[must_use]
             pub fn args(mut self, args: Vec<u8>) -> Self {
                 self.0 = self.0.args(args);
                 self
             }
+
+            #[must_use]
             pub fn args_json<S: serde::Serialize>(mut self, args: S) -> Self {
                 self.0 = self.0.args_json(args);
                 self
             }
+
+            #[must_use]
             pub fn args_borsh<B: borsh::BorshSerialize>(mut self, args: B) -> Self {
                 self.0 = self.0.args_borsh(args);
                 self
@@ -40,30 +46,43 @@ macro_rules! impl_call_return  {
             pub(crate) fn call(contract: &RawContract) -> Self {
                 Self(contract.call(&$fn_name))
             }
+
+            #[must_use]
             pub fn gas(mut self, gas: u64) -> Self {
                 self.0 = self.0.gas(gas);
                 self
             }
+
+            #[must_use]
             pub fn max_gas(mut self) -> Self {
                 self.0 = self.0.max_gas();
                 self
             }
+
+            #[must_use]
             pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }
+
+            #[must_use]
             pub fn args(mut self, args: Vec<u8>) -> Self {
                 self.0 = self.0.args(args);
                 self
             }
+
+            #[must_use]
             pub fn args_json<S: serde::Serialize>(mut self, args: S) -> Self {
                 self.0 = self.0.args_json(args);
                 self
             }
+
+            #[must_use]
             pub fn args_borsh<B: borsh::BorshSerialize>(mut self, args: B) -> Self {
                 self.0 = self.0.args_borsh(args);
                 self
             }
+
             pub async fn transact(self) -> anyhow::Result<ExecutionResult<$return>> {
                 ExecutionResult::$deserialize_fn(self.0.transact().await?)
             }
@@ -75,31 +94,44 @@ macro_rules! impl_call_return  {
             pub(crate) fn call(contract: &RawContract) -> Self {
                 Self(contract.call(&$fn_name))
             }
+
+            #[must_use]
             pub fn gas(mut self, gas: u64) -> Self {
                 self.0 = self.0.gas(gas);
                 self
             }
+
+            #[must_use]
             pub fn max_gas(mut self) -> Self {
                 self.0 = self.0.max_gas();
                 self
             }
+
+            #[must_use]
             pub fn deposit(mut self, deposit: near_workspaces::types::NearToken) -> Self {
                 self.0 = self.0.deposit(deposit);
                 self
             }
+
+            #[must_use]
             pub fn args(mut self, args: Vec<u8>) -> Self {
                 self.0 = self.0.args(args);
                 self
             }
+
+            #[must_use]
             pub fn args_json<S: serde::Serialize>(mut self, args: S) -> Self {
                 self.0 = self.0.args_json(args);
                 self
 
             }
+
+            #[must_use]
             pub fn args_borsh<B: borsh::BorshSerialize>(mut self, args: B) -> Self {
                 self.0 = self.0.args_borsh(args);
                 self
             }
+
             pub async fn transact(self) -> anyhow::Result<ExecutionResult<()>> {
                 let result = self.0.transact().await?;
                 let success = result.is_success();

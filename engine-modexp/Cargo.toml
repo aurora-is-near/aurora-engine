@@ -15,6 +15,9 @@ hex.workspace = true
 num.workspace = true
 ibig = { workspace = true, optional = true }
 
+[lints]
+workspace = true
+
 [features]
 default = ["std"]
 std = ["num/std", "hex/std"]

@@ -30,9 +30,9 @@ jobs:
           cargo make --profile ${{ matrix.profile }} build-xcc-docker
       - run: ls -lH bin/aurora-*${{ matrix.profile }}.wasm
       - name: Upload aurora-${{ matrix.profile }}.wasm artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: contracts
+          name: contract-${{ matrix.profile }}
           path: bin/aurora*${{ matrix.profile }}.wasm
 
   publish:
@@ -41,7 +41,11 @@ jobs:
     needs: build
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          path: contracts
+          pattern: contract-*
+          merge-multiple: true
       - run: ls -la contracts
       - name: Publish contracts for ${{ github.ref }} release
         uses: svenstaro/upload-release-action@v2
@@ -50,6 +54,7 @@ jobs:
           file: contracts/aurora*.wasm
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
+          overwrite: true
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0

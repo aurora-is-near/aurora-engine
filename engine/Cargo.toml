@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine"
-version = "3.7.0"
+version = "3.8.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
@@ -34,8 +34,10 @@ wee_alloc.workspace = true
 
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
-digest.workspace = true
 test-case.workspace = true
+
+[lints]
+workspace = true
 
 [features]
 default = ["std"]

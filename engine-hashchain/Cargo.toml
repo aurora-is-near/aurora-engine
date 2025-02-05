@@ -16,6 +16,9 @@ aurora-engine-sdk.workspace = true
 fixed-hash.workspace = true
 impl-serde.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["std"]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "fixed-hash/std", "impl-serde/std"]

@@ -55,11 +55,13 @@ impl EngineContractBuilder {
         })
     }
 
+    #[must_use]
     pub fn with_code(mut self, code: Vec<u8>) -> Self {
         self.code = Some(code);
         self
     }
 
+    #[must_use]
     pub fn with_chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = into_chain_id(chain_id);
         self
@@ -84,22 +86,26 @@ impl EngineContractBuilder {
         Ok(self)
     }
 
-    pub fn with_upgrade_delay_blocks(mut self, upgrade_delay_blocks: u64) -> Self {
+    #[must_use]
+    pub const fn with_upgrade_delay_blocks(mut self, upgrade_delay_blocks: u64) -> Self {
         self.upgrade_delay_blocks = upgrade_delay_blocks;
         self
     }
 
+    #[must_use]
     pub fn with_ft_metadata(mut self, ft_metadata: FungibleTokenMetadata) -> Self {
         self.ft_metadata = ft_metadata;
         self
     }
 
-    pub fn with_root_balance(mut self, balance: NearToken) -> Self {
+    #[must_use]
+    pub const fn with_root_balance(mut self, balance: NearToken) -> Self {
         self.root_balance = balance;
         self
     }
 
-    pub fn with_contract_balance(mut self, balance: NearToken) -> Self {
+    #[must_use]
+    pub const fn with_contract_balance(mut self, balance: NearToken) -> Self {
         self.contract_balance = balance;
         self
     }
@@ -108,17 +114,18 @@ impl EngineContractBuilder {
         let owner_id = self.owner_id.as_ref();
         let (owner, root) = owner_id.split_once('.').unwrap_or((owner_id, owner_id));
         let node = Node::new(root, self.root_balance).await?;
-        let owner_acc = if owner != root {
+        let owner_acc = if owner == root {
+            node.root()
+        } else {
             node.root()
                 .create_subaccount(owner, self.contract_balance)
                 .await?
-        } else {
-            node.root()
         };
+        let public_key = owner_acc.public_key()?;
         let contract = owner_acc
             .deploy(&self.code.expect("WASM wasn't set"))
             .await?;
-        let engine: EngineContract = (contract, node).into();
+        let engine: EngineContract = (contract, public_key, node).into();
 
         engine
             .new(self.chain_id, self.owner_id, self.upgrade_delay_blocks)
@@ -142,10 +149,7 @@ impl EngineContractBuilder {
 
 fn into_chain_id(value: u64) -> [u8; 32] {
     let chain_id = U256::from(value);
-    let mut result = [0; 32];
-    chain_id.to_big_endian(&mut result);
-
-    result
+    chain_id.to_big_endian()
 }
 
 #[tokio::test]
@@ -161,7 +165,10 @@ async fn test_creating_aurora_contract() {
         .unwrap();
 
     let chain_id = contract.get_chain_id().await.unwrap().result;
-    assert_eq!(chain_id, U256::from(into_chain_id(AURORA_LOCAL_CHAIN_ID)));
+    assert_eq!(
+        chain_id,
+        U256::from_big_endian(&into_chain_id(AURORA_LOCAL_CHAIN_ID))
+    );
 }
 
 #[cfg(test)]

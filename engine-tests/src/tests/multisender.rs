@@ -96,7 +96,7 @@ fn send_erc20_data(token_address: Address, amounts: &[(Address, U256)]) -> Vec<u
 
     let amounts = convert_amounts(amounts);
     let tokens = vec![
-        ethabi::Token::Address(token_address.raw()),
+        ethabi::Token::Address(token_address.raw().0.into()),
         ethabi::Token::Array(amounts),
     ];
 
@@ -163,9 +163,9 @@ fn initialize() -> (utils::AuroraRunner, utils::Signer, Address) {
 fn initialize_data(owner_address: Address) -> Vec<u8> {
     const SELECTOR: [u8; 4] = [196, 214, 109, 232];
 
-    let tokens = vec![ethabi::Token::Address(owner_address.raw())];
-
     let mut result = Vec::new();
+
+    let tokens = vec![ethabi::Token::Address(owner_address.raw().0.into())];
     result.extend_from_slice(&SELECTOR);
     result.extend_from_slice(&ethabi::encode(&tokens));
 
@@ -183,8 +183,8 @@ fn convert_amounts(amounts: &[(Address, U256)]) -> Vec<ethabi::Token> {
         .iter()
         .map(|(addr, amount)| {
             ethabi::Token::Tuple(vec![
-                ethabi::Token::Address(addr.raw()),
-                ethabi::Token::Uint(*amount),
+                ethabi::Token::Address(addr.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
         })
         .collect()

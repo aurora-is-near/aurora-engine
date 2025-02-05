@@ -1,13 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::similar_names,
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::unreadable_literal
-)]
 #![forbid(unsafe_code)]
+
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
@@ -41,11 +34,11 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
+use evm::backend::Log;
 use evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{backend::Log, executor::stack::IsPrecompileResult};
 use evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
@@ -122,14 +115,14 @@ pub struct Precompiles<'a, I, E, H> {
     pub paused_precompiles: BTreeSet<Address>,
 }
 
-impl<'a, I, E, H> Precompiles<'a, I, E, H> {
+impl<I, E, H> Precompiles<'_, I, E, H> {
     fn is_paused(&self, address: &Address) -> bool {
         self.paused_precompiles.contains(address)
     }
 }
 
-impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
-    for Precompiles<'a, I, E, H>
+impl<I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::PrecompileSet
+    for Precompiles<'_, I, E, H>
 {
     fn execute(
         &self,
@@ -156,12 +149,8 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> executor::stack::Preco
         Some(result.and_then(|output| post_process(output, handle)))
     }
 
-    fn is_precompile(&self, address: prelude::H160, _remaining_gas: u64) -> IsPrecompileResult {
-        let is_precompile = self.all_precompiles.contains_key(&Address::new(address));
-        IsPrecompileResult::Answer {
-            is_precompile,
-            extra_cost: 0,
-        }
+    fn is_precompile(&self, address: prelude::H160) -> bool {
+        self.all_precompiles.contains_key(&Address::new(address))
     }
 }
 
@@ -360,10 +349,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        #[cfg(not(feature = "ext-connector"))]
         let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
-        #[cfg(feature = "ext-connector")]
-        let ethereum_exit = ExitToEthereum::new(ctx.io);
         let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);

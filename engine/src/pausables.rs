@@ -30,7 +30,7 @@ impl PrecompileFlags {
     /// Checks if the precompile belonging to the `address` is marked as paused.
     #[must_use]
     pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
+        Self::from_address(address).is_some_and(|precompile_flag| self.contains(precompile_flag))
     }
 }
 
@@ -118,7 +118,7 @@ impl<I: IO> EnginePrecompilesPauser<I> {
         self.io
             .read_storage(&Self::storage_key())
             .map_or_else(PrecompileFlags::empty, |bytes| {
-                const U32_SIZE: usize = core::mem::size_of::<u32>();
+                const U32_SIZE: usize = size_of::<u32>();
                 assert_eq!(bytes.len(), U32_SIZE, "PrecompileFlags value is corrupted");
                 let mut buffer = [0u8; U32_SIZE];
                 bytes.copy_to_slice(&mut buffer);

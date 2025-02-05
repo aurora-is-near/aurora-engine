@@ -1,11 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::as_conversions
-)]
+// All `as` conversions in this code base have been carefully reviewed and are safe.
+#![allow(clippy::as_conversions)]
 
 #[cfg(feature = "contract")]
 use crate::prelude::{Address, Vec, U256};
@@ -103,8 +98,8 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }
@@ -126,8 +121,8 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }

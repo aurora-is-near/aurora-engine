@@ -9,6 +9,7 @@ use aurora_engine_types::{
     borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
+    str,
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
@@ -107,7 +108,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
 
         // This only includes the cost we can easily derive without parsing the input.
         // This allows failing fast without wasting computation on parsing.
-        let input_len = u64::try_from(input.len()).map_err(crate::utils::err_usize_conv)?;
+        let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         let mut cost =
             costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input_len;
         let check_cost = |cost: EthGas| -> Result<(), PrecompileFailure> {
@@ -183,9 +184,9 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 self.engine_account_id.as_bytes(),
             );
             let tx_data = transfer_from_args(
-                sender,
-                engine_implicit_address.raw(),
-                U256::from(required_near.as_u128()),
+                sender.0.into(),
+                engine_implicit_address.raw().0.into(),
+                required_near.as_u128().into(),
             );
             let wnear_address = state::get_wnear_address(&self.io);
             let context = evm::Context {
@@ -286,7 +287,7 @@ pub mod state {
     }
 }
 
-fn transfer_from_args(from: H160, to: H160, amount: U256) -> Vec<u8> {
+fn transfer_from_args(from: ethabi::Address, to: ethabi::Address, amount: ethabi::Uint) -> Vec<u8> {
     let args = ethabi::encode(&[
         ethabi::Token::Address(from),
         ethabi::Token::Address(to),
@@ -299,8 +300,13 @@ fn create_target_account_id(
     sender: H160,
     engine_account_id: &str,
 ) -> Result<AccountId, PrecompileFailure> {
-    format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
-        .parse()
+    let mut buffer = [0; 40];
+    hex::encode_to_slice(sender.as_bytes(), &mut buffer)
+        .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+    let sender_in_hex =
+        str::from_utf8(&buffer).map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+
+    AccountId::try_from(format!("{sender_in_hex}.{engine_account_id}"))
         .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))
 }
 
@@ -315,7 +321,7 @@ fn revert_with_message(message: &str) -> PrecompileFailure {
 mod tests {
     use crate::prelude::sdk::types::near_account_to_evm_address;
     use crate::xcc::cross_contract_call;
-    use aurora_engine_types::{vec, H160, U256};
+    use aurora_engine_types::vec;
     use rand::Rng;
 
     #[test]
@@ -329,13 +335,10 @@ mod tests {
     #[test]
     fn test_transfer_from_encoding() {
         let mut rng = rand::thread_rng();
-        let from: [u8; 20] = rng.gen();
-        let to: [u8; 20] = rng.gen();
-        let amount: [u8; 32] = rng.gen();
 
-        let from = H160(from);
-        let to = H160(to);
-        let amount = U256::from_big_endian(&amount);
+        let from = rng.gen::<[u8; 20]>().into();
+        let to = rng.gen::<[u8; 20]>().into();
+        let amount = rng.gen::<[u8; 32]>().into();
 
         #[allow(deprecated)]
         let transfer_from_function = ethabi::Function {
@@ -365,6 +368,7 @@ mod tests {
             constant: None,
             state_mutability: ethabi::StateMutability::NonPayable,
         };
+
         let expected_tx_data = transfer_from_function
             .encode_input(&[
                 ethabi::Token::Address(from),

@@ -23,6 +23,9 @@ serde_json.workspace = true
 [dev-dependencies]
 rand.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 default = ["std"]
 std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std", "rlp/std"]

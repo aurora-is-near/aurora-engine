@@ -70,7 +70,7 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
         .unwrap();
 
     let number = match result.status {
-        TransactionStatus::Succeed(number) => U256::from(number.as_slice()),
+        TransactionStatus::Succeed(number) => U256::from_big_endian(number.as_slice()),
         _ => panic!("Unexpected status {result:?}"),
     };
 

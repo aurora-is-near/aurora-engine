@@ -21,6 +21,9 @@ serde = { workspace = true, optional = true }
 [dev-dependencies]
 hex.workspace = true
 
+[lints]
+workspace = true
+
 [features]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]

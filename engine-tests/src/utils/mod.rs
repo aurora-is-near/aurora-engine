@@ -111,7 +111,7 @@ pub struct OneShotAuroraRunner<'a> {
     pub context: VMContext,
 }
 
-impl<'a> OneShotAuroraRunner<'a> {
+impl OneShotAuroraRunner<'_> {
     pub fn profiled_call(
         self,
         method_name: &str,

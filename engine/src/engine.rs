@@ -3,7 +3,6 @@ use crate::parameters::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
-use core::mem;
 use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
 use evm::{executor, Opcode};
 use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
@@ -31,7 +30,7 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
     Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
-    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    Vec, Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
     ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
@@ -181,6 +180,7 @@ impl ExitIntoResult for ExitReason {
     /// - `Success` | `Revert`
     /// - `ExitError` - Execution errors should charge gas from users
     /// - `ExitFatal` - shouldn't charge user gas
+    ///
     /// NOTE: Transactions validation errors should not charge user gas
     fn into_result(self, data: Vec<u8>) -> Result<TransactionStatus, EngineErrorKind> {
         match self {
@@ -393,7 +393,7 @@ impl<'env, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> StackExecutorParams<
     ) -> executor::stack::StackExecutor<
         'static,
         'a,
-        executor::stack::MemoryStackState<Engine<'env, I, E, M>>,
+        executor::stack::MemoryStackState<'a, 'static, Engine<'env, I, E, M>>,
         Precompiles<'env, I, E, H>,
     > {
         let metadata = executor::stack::StackSubstateMetadata::new(self.gas_limit, CONFIG);
@@ -626,6 +626,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
+            Vec::new(),
         );
 
         let used_gas = executor.used_gas();
@@ -673,6 +674,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value.raw(),
             input,
             executor_params.gas_limit,
+            Vec::new(),
             Vec::new(),
         );
         status.into_result(result)
@@ -759,7 +761,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         const INVALID_MESSAGE: &str = "receive_erc20_tokens invalid message";
         const UNKNOWN_NEP_141: &str = "receive_erc20_tokens unknown NEP-141";
 
-        let str_amount = crate::prelude::format!("\"{}\"", args.amount);
+        let str_amount = format!("\"{}\"", args.amount);
         let output_on_fail = str_amount.as_bytes();
         let mut local_io = self.io;
         let mut engine_err = |msg: &'static str| {
@@ -774,7 +776,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // Parse message to determine recipient
         let mut recipient = {
             // Message format:
-            //      Recipient of the transaction - 40 characters (Address in hex)
+            // Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
             if message.len() < 40 {
                 return Err(engine_err(INVALID_MESSAGE));
@@ -789,7 +791,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
                 recipient = fallback_address;
             }
-        };
+        }
 
         let erc20_token = {
             let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
@@ -851,7 +853,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let decimals = self
             .view_with_selector(
                 erc20_address,
-                ERC20_DIGITS_SELECTOR,
+                ERC20_DECIMALS_SELECTOR,
                 &[ethabi::ParamType::Uint(8)],
             )?
             .into_uint()
@@ -1034,11 +1036,11 @@ pub fn submit_with_alt_modexp<
     let fixed_gas = silo::get_fixed_gas(&io);
 
     // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, &fixed_gas, &transaction)?;
+    assert_access(&io, env, fixed_gas, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from(state.chain_id) {
+        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
@@ -1048,7 +1050,7 @@ pub fn submit_with_alt_modexp<
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check that fixed gas is not greater than gasLimit from the transaction.
-    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
+    if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
@@ -1142,8 +1144,8 @@ pub fn submit_with_alt_modexp<
 pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let mint_args = ethabi::encode(&[
-        ethabi::Token::Address(refund_address.raw()),
-        ethabi::Token::Uint(amount),
+        ethabi::Token::Address(refund_address.raw().0.into()),
+        ethabi::Token::Uint(amount.to_big_endian().into()),
     ]);
 
     [selector, mint_args.as_slice()].concat()
@@ -1211,9 +1213,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
 /// ```
 #[must_use]
 pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
-    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
-    debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
-    debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, size_of_val(&BLOCK_HASH_PREFIX));
+    debug_assert_eq!(BLOCK_HEIGHT_SIZE, size_of_val(&block_height));
+    debug_assert_eq!(CHAIN_ID_SIZE, size_of_val(&chain_id));
     let mut data = Vec::with_capacity(
         BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
     );
@@ -1283,8 +1285,8 @@ pub fn setup_receive_erc20_tokens_input(
 ) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let tail = ethabi::encode(&[
-        ethabi::Token::Address(recipient.raw()),
-        ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+        ethabi::Token::Address(recipient.raw().0.into()),
+        ethabi::Token::Uint(args.amount.as_u128().into()),
     ]);
 
     [selector, tail.as_slice()].concat()
@@ -1307,7 +1309,7 @@ pub fn setup_deploy_erc20_input(
         ethabi::Token::String(erc20_metadata.name),
         ethabi::Token::String(erc20_metadata.symbol),
         ethabi::Token::Uint(erc20_metadata.decimals.into()),
-        ethabi::Token::Address(erc20_admin_address.raw()),
+        ethabi::Token::Address(erc20_admin_address.raw().0.into()),
     ]);
 
     [erc20_contract, deploy_args.as_slice()].concat()
@@ -1737,7 +1739,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: &Option<EthGas>,
+    fixed_gas: Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
     if fixed_gas.is_some() {
@@ -1758,7 +1760,7 @@ fn assert_access<I: IO + Copy, E: Env>(
     Ok(())
 }
 
-impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
+impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1856,7 +1858,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
 
     /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
-        U256::from(self.state.chain_id)
+        U256::from_big_endian(&self.state.chain_id)
     }
 
     /// Checks if an address exists.
@@ -1956,7 +1958,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     }
 }
 
-impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
+impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
@@ -2086,10 +2088,8 @@ fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, Eng
     match submit_result.status {
         TransactionStatus::Succeed(_) => Ok(submit_result),
         TransactionStatus::Revert(bytes) => {
-            let error_message = crate::prelude::format!(
-                "Reverted with message: {}",
-                crate::prelude::String::from_utf8_lossy(&bytes)
-            );
+            let error_message =
+                format!("Reverted with message: {}", String::from_utf8_lossy(&bytes));
             Err(engine_error(
                 ExitError::Other(error_message.into()),
                 submit_result.gas_used,
@@ -2197,7 +2197,7 @@ mod tests {
         let args = ViewCallArgs {
             sender: origin,
             address: contract,
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
             input,
         };
         let actual_status = engine.view_with_args(args).unwrap();
@@ -2276,7 +2276,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2306,7 +2306,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2722,7 +2722,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
-            amount: RawU256::from(refund_amount.raw()),
+            amount: RawU256::from(refund_amount.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
@@ -2744,7 +2744,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address: Address::default(),
             erc20_address: Some(origin),
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();

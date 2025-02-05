@@ -25,6 +25,9 @@ ethabi.workspace = true
 rlp.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
+[lints]
+workspace = true
+
 [features]
 mainnet-test = []
 testnet-test = []
