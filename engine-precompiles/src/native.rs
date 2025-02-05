@@ -1188,10 +1188,10 @@ mod tests {
         #[cfg(feature = "error_refund")]
         let refund_address = Address::from_array([1; 20]);
 
-        fn assert_input(input: impl AsRef<[u8]>, expected: ExitToNearParams) {
-            let actual = ExitToNearParams::try_from(input.as_ref()).unwrap();
+        let assert_input = |input: Vec<u8>, expected| {
+            let actual = ExitToNearParams::try_from(input.as_slice()).unwrap();
             assert_eq!(actual, expected);
-        }
+        };
 
         let input = [
             &[0],
