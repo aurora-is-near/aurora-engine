@@ -1,5 +1,6 @@
 mod access_keys;
 mod account_id_precompiles;
+mod bls12_381;
 mod contract_call;
 mod ecrecover;
 mod erc20;
