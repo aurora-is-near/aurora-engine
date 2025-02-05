@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changes
 
-- Bumped the SptunikVM up to 0.46.1-aurora by [@mrLSD]. ([#966])
+- Bumped the SputnikVM up to 0.46.1-aurora by [@mrLSD]. ([#966])
 - The nightly rust compiler has been replaced with stable by [@aleksuss]. ([#977])
 - Added changes regarding bumping the `primitive-types` crate by [@mrLSD]. ([#982])
 - The code coverage by clippy has been extended by [@aleksuss]. ([#984])
