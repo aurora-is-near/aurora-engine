@@ -71,6 +71,7 @@ fn get_secret_key(hash: H256) -> SecretKey {
 fn test_bls12_381_g1_add() {
     for test_case in read_test_case() {
         let mut runner = utils::deploy_runner();
+        runner.standalone_runner = None;
         // Get caller secret key
         let sk = get_secret_key(test_case.caller_secret_key);
         for (address, account) in &test_case.state {

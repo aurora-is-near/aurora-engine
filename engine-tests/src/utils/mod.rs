@@ -717,7 +717,6 @@ impl ExecutionProfile {
 
 pub fn deploy_runner() -> AuroraRunner {
     let mut runner = AuroraRunner::default();
-    runner.standalone_runner = None;
     let aurora_account_id = str_to_account_id(runner.aurora_account_id.as_str());
     let args = NewCallArgs::V4(NewCallArgsV4 {
         chain_id: crate::prelude::u256_to_arr(&U256::from(runner.chain_id)),
