@@ -1,4 +1,24 @@
-#![allow(dead_code)]
+//! # BLS12-382 precompiles tests
+//!
+//! Tests bases on parse data from:
+//! <https://github.com/ethereum/execution-spec-tests/releases/tag/pectra-devnet-5%40v1.2.0>
+//! for Prague hard fork.
+//!
+//! To generate test cases created special tool for dump data:
+//! <https://github.com/aurora-is-near/sputnikvm/pull/78>
+//! It generates full EVM state for transaction execution from `execution-spec-tests`
+//! for BLS12-381 precompiles.
+//!
+//! Second kind of tests is `standalone`. It based on parsed `execution-spec-tests`
+//! data for BLS12-381 precompiles but distilled to input/output data only.
+//!
+//! Full EVM state tests has only limited count. As we can't send big bunch of test
+//! cases to NEAR VM, as it's extremely expensive operation from time
+//! consumption point of view.
+//!
+//! Standalone data set fully represents all tests from `execution-spec-tests` for
+//! BLS12-381 precompiles. We run this test in standalone manner.
+
 use crate::prelude::{Address, Wei, H160, H256, U256};
 use crate::tests::sanity::initialize_transfer;
 use crate::utils;
@@ -15,6 +35,7 @@ use std::{fs, iter};
 
 /// State test dump data struct for fully reprodusing execution flow
 /// with input & output and before & after state data.
+#[allow(dead_code)]
 #[derive(Default, Debug, Clone, serde::Deserialize)]
 pub struct StateTestsDump {
     pub state: BTreeMap<H160, MemoryAccount>,
@@ -33,6 +54,7 @@ pub struct StateTestsDump {
 }
 
 impl StateTestsDump {
+    /// Transform `access_list` from test case data.
     fn get_access_list(&self) -> Vec<AccessTuple> {
         let al = self.access_list.clone();
         al.iter()
@@ -44,18 +66,20 @@ impl StateTestsDump {
     }
 
     /// Read State tests data from directory that contains json files
-    /// with specific test cases.
-    /// Return parsed Stete tests dump data
+    /// with specific test cases for precompile.
+    /// Return parsed state tests dump data for precompile.
     fn read_test_case(path: &str) -> Vec<Self> {
-        use std::{fs, path::Path};
-
         fs::read_dir(path)
             .expect("Read source test directory failed")
             .map(|entry| entry.unwrap().path())
             .filter(|entry| fs::metadata(entry).unwrap().is_file())
             .filter(|entry| {
                 let file_name = entry.file_name().unwrap();
-                Path::new(file_name).extension().unwrap().to_str() == Some("json")
+                std::path::Path::new(file_name)
+                    .extension()
+                    .unwrap()
+                    .to_str()
+                    == Some("json")
             })
             .map(|entry| fs::read_to_string(entry).unwrap())
             .map(|data| serde_json::from_str(&data).unwrap())
@@ -63,12 +87,16 @@ impl StateTestsDump {
     }
 }
 
+/// Precompile input and output data struct
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PrecompileStandaloneData {
     pub input: String,
     pub output: String,
 }
 
+/// Standalone data for precompile tests.
+/// It contains input data for precompile and expected
+/// output after precompile execution.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PrecompileStandalone {
     pub precompile_data: Vec<PrecompileStandaloneData>,
@@ -88,6 +116,12 @@ fn get_secret_key(hash: H256) -> SecretKey {
     SecretKey::parse(&secret_key).expect("Unable to parse secret key")
 }
 
+/// Read test cases from directory, fill blockchain state
+/// and send transaction that execute logic that touch precompile
+/// logic. To validate correctness we check transaction status and
+/// EVM gas consumption. We don't validate result state as it's extremely
+/// expensive operation from execution time point. Most important part
+/// of test case execution is controlled NEAR gas consumption.
 fn run_bls12_381_transaction_call(path: &str) {
     for test_case in StateTestsDump::read_test_case(path) {
         let mut runner = utils::deploy_runner();
@@ -128,30 +162,34 @@ fn run_bls12_381_transaction_call(path: &str) {
     }
 }
 
+/// Run precompile with specific input data from the file.
+/// It executes precompile it two ways:
+///   1. Run directly and check result with expected output
+///   2. Call transaction and validation expected output. To avoid NEAR gas limit errors
+///      we only send input with limited expected size.
 fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, path: &str) {
-    for (i, data) in PrecompileStandalone::new(path)
-        .precompile_data
-        .iter()
-        .enumerate()
-    {
+    for data in PrecompileStandalone::new(path).precompile_data {
         let input = hex::decode(data.input.clone()).unwrap();
         let output = hex::decode(data.output.clone()).unwrap();
-        println!("[{i}] {:?}", input.len());
 
         let ctx = evm::Context {
             address: H160::default(),
             caller: H160::default(),
             apparent_value: U256::zero(),
         };
+        // Run precompile directly with specific input and validate output result
         let standalone_result = precompile.run(&input, None, &ctx, false).unwrap();
         assert_eq!(standalone_result.output, output);
 
+        // To avoid NEAR gas error "GasLimit" it make sense to limit input size.
+        // and send transaction.
         if input.len() < 800 {
             check_wasm_submit(address, input, &output);
         }
     }
 }
 
+/// Submit transaction to precompile address and check result with expected output.
 fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = u64::MAX;
