@@ -12,7 +12,7 @@ const PAIRING_OFFSET_BASE: u64 = 37700;
 /// Input length of pairing operation.
 const INPUT_LENGTH: usize = 384;
 
-/// BLS12-382 Pairing check
+/// BLS12-381 Pairing check
 pub struct BlsPairingCheck;
 
 impl BlsPairingCheck {

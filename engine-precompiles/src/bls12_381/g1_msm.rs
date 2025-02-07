@@ -22,7 +22,7 @@ const DISCOUNT_TABLE: [u16; 128] = [
     528, 528, 527, 526, 525, 525, 524, 523, 522, 522, 521, 520, 520, 519,
 ];
 
-/// BLS12-382 G1 MSM
+/// BLS12-381 G1 MSM
 pub struct BlsG1Msm;
 
 impl BlsG1Msm {

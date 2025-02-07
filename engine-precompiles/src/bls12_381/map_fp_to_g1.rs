@@ -9,7 +9,7 @@ use evm::{Context, ExitError};
 /// Base gas fee for BLS12-381 `map_fp_to_g1` operation.
 const MAP_FP_TO_G1_BASE: u64 = 5500;
 
-/// BLS12-382 Map FP to G1
+/// BLS12-381 Map FP to G1
 pub struct BlsMapFpToG1;
 
 impl BlsMapFpToG1 {

@@ -13,7 +13,7 @@ const BASE_GAS_FEE: u64 = 600;
 /// Input length of `g2_add` operation.
 const INPUT_LENGTH: usize = 512;
 
-/// BLS12-382 G2 Add
+/// BLS12-381 G2 Add
 pub struct BlsG2Add;
 
 impl BlsG2Add {

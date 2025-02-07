@@ -1,4 +1,4 @@
-//! # BLS12-382
+//! # BLS12-381
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
 use crate::prelude::Borrowed;
