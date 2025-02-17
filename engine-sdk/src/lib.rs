@@ -151,12 +151,12 @@ where
 
 #[cfg(feature = "contract")]
 #[must_use]
-pub fn bls12381_p1_sum(input: &[u8]) -> H256 {
+pub fn bls12381_p1_sum(input: &[u8]) -> [u8; 96] {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::bls12381_p1_sum(input.len() as u64, input.as_ptr() as u64, REGISTER_ID);
-        let bytes = H256::zero();
-        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as u64);
+        let bytes = [0u8; 96];
+        exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
         bytes
     }
 }
