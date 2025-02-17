@@ -1,8 +1,7 @@
-#[cfg(feature = "contract")]
-use crate::bls12_381::{g1, FP_LENGTH};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 use evm::{Context, ExitError};
+use std::borrow::Cow::Borrowed;
 
 /// Base gas fee for BLS12-381 `g1_add` operation.
 const BASE_GAS_FEE: u64 = 375;
@@ -19,15 +18,10 @@ impl BlsG1Add {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::g1;
-        use crate::prelude::Borrowed;
         use blst::{
             blst_p1, blst_p1_add_or_double_affine, blst_p1_affine, blst_p1_from_affine,
             blst_p1_to_affine,
         };
-
-        if input.len() != INPUT_LENGTH {
-            return Err(ExitError::Other(Borrowed("ERR_BLS_G1ADD_INPUT_LEN")));
-        }
 
         // NB: There is no subgroup check for the G1 addition precompile.
         //
@@ -82,6 +76,10 @@ impl Precompile for BlsG1Add {
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        if input.len() != INPUT_LENGTH {
+            return Err(ExitError::Other(Borrowed("ERR_BLS_G1ADD_INPUT_LEN")));
+        }
+
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {

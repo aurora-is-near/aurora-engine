@@ -5,8 +5,8 @@ use blst::{
 };
 use evm::ExitError;
 
-mod g1;
-mod g2;
+pub mod g1;
+pub mod g2;
 
 /// Number of bits used in the BLS12-381 curve finite field elements.
 pub const NBITS: usize = 256;
@@ -44,7 +44,7 @@ fn is_valid_be(input: &[u8; 48]) -> bool {
 
 /// Checks whether or not the input represents a canonical field element, returning the field
 /// element if successful.
-fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
+pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
     if !is_valid_be(input) {
         return Err(ExitError::Other(Borrowed("ERR_BLS12_INVALID_FP_VALUE")));
     }

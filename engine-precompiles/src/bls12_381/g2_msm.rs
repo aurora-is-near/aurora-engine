@@ -1,4 +1,4 @@
-use crate::bls12_381::{extract_scalar_input, g2, msm_required_gas, NBITS, SCALAR_LENGTH};
+use crate::bls12_381::{msm_required_gas, SCALAR_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -27,49 +27,12 @@ pub struct BlsG2Msm;
 
 impl BlsG2Msm {
     pub const ADDRESS: Address = make_address(0, 0xE);
-}
 
-impl Precompile for BlsG2Msm {
-    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError>
-    where
-        Self: Sized,
-    {
+    #[cfg(not(feature = "contract"))]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::standalone::{extract_scalar_input, g2};
+
         let k = input.len() / INPUT_LENGTH;
-        Ok(EthGas::new(msm_required_gas(
-            k,
-            &DISCOUNT_TABLE,
-            BASE_GAS_FEE,
-        )?))
-    }
-
-    /// Implements EIP-2537 G2MSM precompile.
-    /// G2 multi-scalar-multiplication call expects `288*k` bytes as an input that is interpreted
-    /// as byte concatenation of `k` slices each of them being a byte concatenation
-    /// of encoding of G2 point (`256` bytes) and encoding of a scalar value (`32`
-    /// bytes).
-    /// Output is an encoding of multi-scalar-multiplication operation result - single G2
-    /// point (`256` bytes).
-    /// See also: <https://eips.ethereum.org/EIPS/eip-2537#abi-for-g2-multiexponentiation>
-    fn run(
-        &self,
-        input: &[u8],
-        target_gas: Option<EthGas>,
-        _context: &Context,
-        _is_static: bool,
-    ) -> EvmPrecompileResult {
-        let input_len = input.len();
-        if input_len == 0 || input_len % INPUT_LENGTH != 0 {
-            return Err(ExitError::Other(Borrowed("ERR_BLS_G2MSM_INPUT_LEN")));
-        }
-
-        let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
-        }
-
-        let k = input_len / INPUT_LENGTH;
         let mut g2_points: Vec<blst_p2> = Vec::with_capacity(k);
         let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
         for i in 0..k {
@@ -112,7 +75,56 @@ impl Precompile for BlsG2Msm {
         // SAFETY: multiexp_aff and multiexp are blst values.
         unsafe { blst_p2_to_affine(&mut multiexp_aff, &multiexp) };
 
-        let output = g2::encode_g2_point(&multiexp_aff);
+        Ok(g2::encode_g2_point(&multiexp_aff))
+    }
+
+    #[cfg(feature = "contract")]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        todo!()
+    }
+}
+
+impl Precompile for BlsG2Msm {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError>
+    where
+        Self: Sized,
+    {
+        let k = input.len() / INPUT_LENGTH;
+        Ok(EthGas::new(msm_required_gas(
+            k,
+            &DISCOUNT_TABLE,
+            BASE_GAS_FEE,
+        )?))
+    }
+
+    /// Implements EIP-2537 G2MSM precompile.
+    /// G2 multi-scalar-multiplication call expects `288*k` bytes as an input that is interpreted
+    /// as byte concatenation of `k` slices each of them being a byte concatenation
+    /// of encoding of G2 point (`256` bytes) and encoding of a scalar value (`32`
+    /// bytes).
+    /// Output is an encoding of multi-scalar-multiplication operation result - single G2
+    /// point (`256` bytes).
+    /// See also: <https://eips.ethereum.org/EIPS/eip-2537#abi-for-g2-multiexponentiation>
+    fn run(
+        &self,
+        input: &[u8],
+        target_gas: Option<EthGas>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
+        let input_len = input.len();
+        if input_len == 0 || input_len % INPUT_LENGTH != 0 {
+            return Err(ExitError::Other(Borrowed("ERR_BLS_G2MSM_INPUT_LEN")));
+        }
+
+        let cost = Self::required_gas(input)?;
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
+        }
+
+        let output = Self::execute(input)?;
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }

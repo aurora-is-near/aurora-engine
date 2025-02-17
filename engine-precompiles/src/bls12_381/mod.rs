@@ -84,9 +84,6 @@ pub fn extract_g1(
 pub fn transform_input(input: &[u8]) -> Result<(&[u8; G1_TRANSFORMED_INPUT_LENGTH]), ExitError> {
     use super::FP_LENGTH;
 
-    if input.len() != 2 * crate::bls12_381::standalone::g1::G1_INPUT_ITEM_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_G1_INPUT")));
-    }
     let (p0_x, p0_y) =
         extract_g1(&input[..crate::bls12_381::standalone::g1::G1_INPUT_ITEM_LENGTH])?;
     let (p1_x, p1_y) =
