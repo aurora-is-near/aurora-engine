@@ -5,15 +5,9 @@ use crate::prelude::{vec, Vec};
 use blst::{blst_p1_affine, blst_p1_affine_in_g1, blst_p1_affine_on_curve};
 use evm::ExitError;
 
-/// Length of each of the elements in a g1 operation input.
-pub const G1_INPUT_ITEM_LENGTH: usize = 128;
-
-/// Output length of a g1 operation.
-const G1_OUTPUT_LENGTH: usize = 128;
-
 /// Encodes a G1 point in affine format into byte slice with padded elements.
 pub fn encode_g1_point(input: *const blst_p1_affine) -> Vec<u8> {
-    let mut out = vec![0u8; G1_OUTPUT_LENGTH];
+    let mut out = vec![0u8; G1_INPUT_ITEM_LENGTH];
     // SAFETY: outcomes from fixed length array, input is a blst value.
     unsafe {
         fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &(*input).x);

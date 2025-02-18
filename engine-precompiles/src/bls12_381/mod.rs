@@ -22,6 +22,10 @@ pub use map_fp2_to_g2::BlsMapFp2ToG2;
 pub use map_fp_to_g1::BlsMapFpToG1;
 pub use pairing_check::BlsPairingCheck;
 
+/// Length of each of the elements in a g1 operation input.
+const G1_INPUT_ITEM_LENGTH: usize = 128;
+/// Amount used to calculate the multi-scalar-multiplication discount.
+const MSM_MULTIPLIER: u64 = 1000;
 /// Finite field element input length.
 const FP_LENGTH: usize = 48;
 /// Finite field element padded input length.
@@ -61,40 +65,21 @@ fn msm_required_gas(
     let index = core::cmp::min(k - 1, discount_table.len() - 1);
     let discount = u64::from(discount_table[index]);
 
-    let k = u64::try_from(k).map_err(utils::err_usize_conv)?;
-    Ok((k * discount * multiplication_cost) / crate::bls12_381::standalone::MSM_MULTIPLIER)
+    let k = u64::try_from(k).map_err(crate::utils::err_usize_conv)?;
+    Ok((k * discount * multiplication_cost) / MSM_MULTIPLIER)
 }
 
-#[cfg(feature = "contract")]
-pub const G1_TRANSFORMED_INPUT_LENGTH: usize = 194;
-
-#[cfg(feature = "contract")]
-pub fn extract_g1(
-    input: &[u8],
-) -> Result<(&[u8; super::FP_LENGTH], &[u8; super::FP_LENGTH]), ExitError> {
+pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
     let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
-    let p_y = remove_padding(
-        &input[PADDED_FP_LENGTH..crate::bls12_381::standalone::g1::G1_INPUT_ITEM_LENGTH],
-    )?;
+    let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
 
     Ok((p_x, p_y))
 }
 
-#[cfg(feature = "contract")]
-pub fn transform_input(input: &[u8]) -> Result<(&[u8; G1_TRANSFORMED_INPUT_LENGTH]), ExitError> {
-    use super::FP_LENGTH;
-
-    let (p0_x, p0_y) =
-        extract_g1(&input[..crate::bls12_381::standalone::g1::G1_INPUT_ITEM_LENGTH])?;
-    let (p1_x, p1_y) =
-        extract_g1(&input[crate::bls12_381::standalone::g1::G1_INPUT_ITEM_LENGTH..])?;
-
-    let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
-    g1_input[0] = 0;
-    g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
-    g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
-    g1_input[1 + 2 * FP_LENGTH] = 0;
-    g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
-    g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
-    Ok(&g1_input)
+pub fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> Vec<u8> {
+    let mut result = vec![0u8; 2 * PADDED_FP_LENGTH];
+    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
+    result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[FP_LENGTH..]);
+    result
 }

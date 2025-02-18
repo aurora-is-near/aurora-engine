@@ -1,4 +1,4 @@
-use super::{msm_required_gas, BlsG1Add, FP_LENGTH, SCALAR_LENGTH};
+use super::{msm_required_gas, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
@@ -30,16 +30,13 @@ impl BlsG1Msm {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{extract_scalar_input, g1, NBITS};
-        use blst::{
-            blst_p1, blst_p1_add_or_double_affine, blst_p1_affine, blst_p1_from_affine,
-            blst_p1_to_affine,
-        };
+        use blst::{blst_p1, blst_p1_affine, blst_p1_from_affine, blst_p1_to_affine, p1_affines};
 
         let k = input.len() / INPUT_LENGTH;
         let mut g1_points: Vec<blst_p1> = Vec::with_capacity(k);
         let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
         for i in 0..k {
-            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH];
+            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH];
 
             // BLST batch API for p1_affines blows up when you pass it a point at infinity, so we must
             // filter points at infinity (and their corresponding scalars) from the input.
@@ -59,8 +56,8 @@ impl BlsG1Msm {
 
             scalars.extend_from_slice(
                 &extract_scalar_input(
-                    &input[i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH
-                        ..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
+                    &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
+                        ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
                 )?
                 .b,
             );
@@ -68,7 +65,7 @@ impl BlsG1Msm {
 
         // return infinity point if all points are infinity
         if g1_points.is_empty() {
-            return Ok(PrecompileOutput::without_logs(cost, [0; 128].into()));
+            return Ok([0; 128].into());
         }
 
         let points = p1_affines::from(&g1_points);
@@ -83,7 +80,32 @@ impl BlsG1Msm {
 
     #[cfg(feature = "contract")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        todo!();
+        use super::{extract_g1, padding_g1_result, FP_LENGTH};
+
+        let zero_slice = &[0; FP_LENGTH];
+        let k = input.len() / INPUT_LENGTH;
+        let mut g1_input = vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
+        for i in 0..k {
+            let (p0_x, p0_y) =
+                extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
+            // Check is p0 zero coordinate
+            if p0_x == zero_slice && p0_y == zero_slice {
+                g1_input[i * INPUT_LENGTH] = 0x40;
+            } else {
+                g1_input[i * INPUT_LENGTH..i * INPUT_LENGTH + FP_LENGTH].copy_from_slice(p0_x);
+                g1_input[i * INPUT_LENGTH + FP_LENGTH..i * INPUT_LENGTH + 2 * FP_LENGTH]
+                    .copy_from_slice(p0_y);
+            }
+            // Set scalar
+            let mut scalar = &input[i * INPUT_LENGTH..(i + 1) * INPUT_LENGTH - SCALAR_LENGTH];
+            scalar.reverse();
+            g1_input[i * INPUT_LENGTH + 2 * FP_LENGTH
+                ..i * INPUT_LENGTH + 2 * FP_LENGTH + SCALAR_LENGTH]
+                .copy_from_slice(scalar);
+        }
+
+        let output = aurora_engine_sdk::bls12381_g1_multiexp(&g1_input[..]);
+        Ok(padding_g1_result(&output))
     }
 }
 

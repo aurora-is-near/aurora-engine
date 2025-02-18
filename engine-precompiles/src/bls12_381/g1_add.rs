@@ -1,3 +1,4 @@
+use super::G1_INPUT_ITEM_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 use evm::{Context, ExitError};
@@ -26,8 +27,8 @@ impl BlsG1Add {
         // NB: There is no subgroup check for the G1 addition precompile.
         //
         // We set the subgroup checks here to `false`
-        let a_aff = &g1::extract_g1_input(&input[..g1::G1_INPUT_ITEM_LENGTH], false)?;
-        let b_aff = &g1::extract_g1_input(&input[g1::G1_INPUT_ITEM_LENGTH..], false)?;
+        let a_aff = &g1::extract_g1_input(&input[..G1_INPUT_ITEM_LENGTH], false)?;
+        let b_aff = &g1::extract_g1_input(&input[G1_INPUT_ITEM_LENGTH..], false)?;
 
         let mut b = blst_p1::default();
         // SAFETY: b and b_aff are blst values.
@@ -46,13 +47,32 @@ impl BlsG1Add {
 
     #[cfg(feature = "contract")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let g1_input = super::transform_input(input)?;
+        use super::{extract_g1, padding_g1_result, FP_LENGTH};
 
-        let mut result = [0u8; 128];
+        let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
+        let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
+        let zero_slice = &[0; FP_LENGTH];
+
+        let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
+        g1_input[0] = 0;
+        // Check is p0 zero coordinate
+        if p0_x == zero_slice && p0_y == zero_slice {
+            g1_input[1] = 0x40;
+        } else {
+            g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
+            g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
+        }
+
+        g1_input[1 + 2 * FP_LENGTH] = 0;
+        if p1_x == zero_slice && p1_y == zero_slice {
+            g1_input[2 + 2 * FP_LENGTH] = 0x40;
+        } else {
+            g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
+            g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
+        }
+
         let output = aurora_engine_sdk::bls12381_p1_sum(&g1_input[..]);
-        result[16..64].copy_from_slice(&output[..FP_LENGTH]);
-        result[16 + 64..128].copy_from_slice(&output[FP_LENGTH..]);
-        Ok(result.to_vec())
+        Ok(padding_g1_result(&output))
     }
 }
 
