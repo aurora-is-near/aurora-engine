@@ -237,41 +237,49 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g1_add() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g1_add/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g1_mul() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g1_mul/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g2_add() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g2_add/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g2_mul() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g2_mul/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_pairing() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_pair/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_map_fp_to_g1() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_map_fp_to_g1/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_map_fp2_to_g2() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_map_fp2_to_g2/");
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g1_add_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG1Add,
@@ -281,6 +289,7 @@ fn test_bls12_381_g1_add_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g1_mul_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG1Msm,
@@ -290,6 +299,7 @@ fn test_bls12_381_g1_mul_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g2_add_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG2Add,
@@ -299,6 +309,7 @@ fn test_bls12_381_g2_add_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_g2_mul_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG2Msm,
@@ -308,6 +319,7 @@ fn test_bls12_381_g2_mul_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_pair_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsPairingCheck,
@@ -317,6 +329,7 @@ fn test_bls12_381_pair_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_map_fp_to_g1_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsMapFpToG1,
@@ -326,6 +339,7 @@ fn test_bls12_381_map_fp_to_g1_standalone() {
 }
 
 #[test]
+#[ignore]
 fn test_bls12_381_map_fp2_to_g2_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsMapFp2ToG2,

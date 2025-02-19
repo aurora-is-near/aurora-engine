@@ -1,6 +1,6 @@
 use super::{msm_required_gas, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::{vec, Borrowed, Vec};
+use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 
@@ -84,7 +84,7 @@ impl BlsG1Msm {
 
         let zero_slice = &[0; FP_LENGTH];
         let k = input.len() / INPUT_LENGTH;
-        let mut g1_input = vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
+        let mut g1_input = crate::vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
         for i in 0..k {
             let (p0_x, p0_y) =
                 extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
