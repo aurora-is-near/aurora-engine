@@ -9,7 +9,7 @@ pub mod g1;
 pub mod g2;
 
 /// Number of bits used in the BLS12-381 curve finite field elements.
-pub const NBITS: usize = 256;
+pub(super) const NBITS: usize = 256;
 /// Big-endian non-Montgomery form.
 const MODULUS_REPR: [u8; 48] = [
     0x1a, 0x01, 0x11, 0xea, 0x39, 0x7f, 0xe6, 0x9a, 0x4b, 0x1b, 0xa7, 0xb6, 0x43, 0x4b, 0xac, 0xd7,
@@ -42,7 +42,7 @@ fn is_valid_be(input: &[u8; 48]) -> bool {
 
 /// Checks whether or not the input represents a canonical field element, returning the field
 /// element if successful.
-pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
+pub(super) fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
     if !is_valid_be(input) {
         return Err(ExitError::Other(Borrowed("ERR_BLS12_INVALID_FP_VALUE")));
     }
@@ -65,7 +65,7 @@ pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
 /// We do not check that the scalar is a canonical Fr element, because the EIP specifies:
 /// * The corresponding integer is not required to be less than or equal than main subgroup order
 ///   `q`.
-pub fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, ExitError> {
+pub(super) fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, ExitError> {
     if input.len() != SCALAR_LENGTH {
         return Err(ExitError::Other(Borrowed("ERR_BLS12_SCALAR_INPUT")));
     }

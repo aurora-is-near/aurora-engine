@@ -1,5 +1,4 @@
-use super::remove_padding;
-use super::{PADDED_FP2_LENGTH, PADDED_FP_LENGTH};
+use super::PADDED_FP2_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::Borrowed;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
@@ -17,6 +16,7 @@ impl BlsMapFp2ToG2 {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::g2;
+        use super::{remove_padding, PADDED_FP_LENGTH};
         use blst::{blst_map_to_g2, blst_p2, blst_p2_affine, blst_p2_to_affine};
 
         let input_p0_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
@@ -36,7 +36,7 @@ impl BlsMapFp2ToG2 {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
         todo!()
     }
 }

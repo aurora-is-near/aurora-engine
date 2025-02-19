@@ -19,6 +19,7 @@ impl BlsPairingCheck {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{g1, g2};
+        use super::G1_INPUT_ITEM_LENGTH;
         use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
 
         let k = input.len() / INPUT_LENGTH;
@@ -29,7 +30,7 @@ impl BlsPairingCheck {
             //
             // So we set the subgroup_check flag to `true`
             let p1_aff = &g1::extract_g1_input(
-                &input[i * INPUT_LENGTH..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH],
+                &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH],
                 true,
             )?;
 
@@ -37,8 +38,8 @@ impl BlsPairingCheck {
             //
             // So we set the subgroup_check flag to `true`
             let p2_aff = &g2::extract_g2_input(
-                &input[i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH
-                    ..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH + g2::G2_INPUT_ITEM_LENGTH],
+                &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
+                    ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + g2::G2_INPUT_ITEM_LENGTH],
                 true,
             )?;
 
@@ -83,7 +84,7 @@ impl BlsPairingCheck {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
         todo!()
     }
 }

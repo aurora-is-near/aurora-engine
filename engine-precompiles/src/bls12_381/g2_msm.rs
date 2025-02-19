@@ -1,8 +1,7 @@
-use crate::bls12_381::{msm_required_gas, SCALAR_LENGTH};
+use super::msm_required_gas;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
-use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
 use evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_mul` operation.
@@ -30,7 +29,9 @@ impl BlsG2Msm {
 
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::{extract_scalar_input, g2};
+        use super::standalone::{extract_scalar_input, g2, NBITS};
+        use super::SCALAR_LENGTH;
+        use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
 
         let k = input.len() / INPUT_LENGTH;
         let mut g2_points: Vec<blst_p2> = Vec::with_capacity(k);
@@ -65,7 +66,7 @@ impl BlsG2Msm {
 
         // return infinity point if all points are infinity
         if g2_points.is_empty() {
-            return Ok(PrecompileOutput::without_logs(cost, [0; 256].into()));
+            return Ok([0; 256].into());
         }
 
         let points = p2_affines::from(&g2_points);
@@ -79,7 +80,7 @@ impl BlsG2Msm {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
         todo!()
     }
 }

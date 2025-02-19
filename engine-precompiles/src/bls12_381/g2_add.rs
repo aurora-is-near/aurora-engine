@@ -46,7 +46,32 @@ impl BlsG2Add {
 
     #[cfg(feature = "contract")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        todo!()
+        use super::{extract_g1, padding_g2_result, FP_LENGTH, G1_INPUT_ITEM_LENGTH};
+
+        let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
+        let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
+        let zero_slice = &[0; FP_LENGTH];
+
+        let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
+        g1_input[0] = 0;
+        // Check is p0 zero coordinate
+        if p0_x == zero_slice && p0_y == zero_slice {
+            g1_input[1] = 0x40;
+        } else {
+            g1_input[1..=FP_LENGTH].copy_from_slice(p0_x);
+            g1_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_y);
+        }
+
+        g1_input[1 + 2 * FP_LENGTH] = 0;
+        if p1_x == zero_slice && p1_y == zero_slice {
+            g1_input[2 + 2 * FP_LENGTH] = 0x40;
+        } else {
+            g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
+            g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
+        }
+
+        let output = aurora_engine_sdk::bls12381_p2_sum(&g1_input[..]);
+        Ok(padding_g2_result(&output))
     }
 }
 

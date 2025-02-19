@@ -59,8 +59,8 @@ impl BlsG1Add {
         if p0_x == zero_slice && p0_y == zero_slice {
             g1_input[1] = 0x40;
         } else {
-            g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
-            g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
+            g1_input[1..=FP_LENGTH].copy_from_slice(p0_x);
+            g1_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_y);
         }
 
         g1_input[1 + 2 * FP_LENGTH] = 0;

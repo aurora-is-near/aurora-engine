@@ -1,4 +1,4 @@
-use super::{remove_padding, PADDED_FP_LENGTH};
+use super::PADDED_FP_LENGTH;
 use crate::prelude::Borrowed;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -15,7 +15,8 @@ impl BlsMapFpToG1 {
 
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::fp_from_bendian;
+        use super::remove_padding;
+        use super::standalone::{fp_from_bendian, g1};
         use blst::{blst_map_to_g1, blst_p1, blst_p1_affine, blst_p1_to_affine};
 
         let input_p0 = remove_padding(input)?;
@@ -30,11 +31,11 @@ impl BlsMapFpToG1 {
         // SAFETY: p_aff and p are blst values.
         unsafe { blst_p1_to_affine(&mut p_aff, &p) };
 
-        let output = g1::encode_g1_point(&p_aff);
+        Ok(g1::encode_g1_point(&p_aff))
     }
 
     #[cfg(feature = "contract")]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
         todo!()
     }
 }

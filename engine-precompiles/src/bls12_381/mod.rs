@@ -29,9 +29,9 @@ const MSM_MULTIPLIER: u64 = 1000;
 /// Finite field element input length.
 const FP_LENGTH: usize = 48;
 /// Finite field element padded input length.
-const PADDED_FP_LENGTH: usize = 64;
+pub const PADDED_FP_LENGTH: usize = 64;
 /// Quadratic extension of finite field element input length.
-const PADDED_FP2_LENGTH: usize = 128;
+pub const PADDED_FP2_LENGTH: usize = 128;
 /// Input elements padding length.
 const PADDING_LENGTH: usize = 16;
 /// Scalar length.
@@ -76,10 +76,26 @@ pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), 
     Ok((p_x, p_y))
 }
 
-pub fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> Vec<u8> {
+#[cfg(feature = "contract")]
+#[must_use]
+pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> Vec<u8> {
     let mut result = vec![0u8; 2 * PADDED_FP_LENGTH];
     result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[FP_LENGTH..]);
+    result
+}
+
+#[cfg(feature = "contract")]
+#[must_use]
+pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> Vec<u8> {
+    let mut result = vec![0u8; 4 * PADDED_FP_LENGTH];
+    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
+    result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);
+    result[PADDING_LENGTH + 2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[2 * FP_LENGTH..3 * FP_LENGTH]);
+    result[PADDING_LENGTH + 3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[3 * FP_LENGTH..]);
     result
 }
