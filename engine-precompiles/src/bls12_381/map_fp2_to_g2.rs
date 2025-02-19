@@ -1,6 +1,6 @@
 use super::PADDED_FP2_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::Borrowed;
+use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use evm::{Context, ExitError};
 

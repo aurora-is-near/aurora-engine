@@ -1,7 +1,7 @@
 //! # BLS12-381
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
-use crate::prelude::Borrowed;
+use crate::prelude::{vec, Borrowed, Vec};
 use evm::ExitError;
 
 mod g1_add;

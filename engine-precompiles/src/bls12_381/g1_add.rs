@@ -1,8 +1,8 @@
 use super::G1_INPUT_ITEM_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
+use crate::prelude::Borrowed;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 use evm::{Context, ExitError};
-use std::borrow::Cow::Borrowed;
 
 /// Base gas fee for BLS12-381 `g1_add` operation.
 const BASE_GAS_FEE: u64 = 375;

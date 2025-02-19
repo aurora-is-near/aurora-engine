@@ -1,5 +1,5 @@
 use super::PADDED_FP_LENGTH;
-use crate::prelude::Borrowed;
+use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use evm::{Context, ExitError};
