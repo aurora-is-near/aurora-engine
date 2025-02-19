@@ -79,7 +79,7 @@ pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), 
 #[cfg(feature = "contract")]
 #[must_use]
 pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
-    let mut result = vec![0u8; 2 * PADDED_FP_LENGTH];
+    let mut result = crate::vec![0u8; 2 * PADDED_FP_LENGTH];
     result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[FP_LENGTH..]);
@@ -88,8 +88,8 @@ pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> 
 
 #[cfg(feature = "contract")]
 #[must_use]
-pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> Vec<u8> {
-    let mut result = vec![0u8; 4 * PADDED_FP_LENGTH];
+pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
+    let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];
     result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);
