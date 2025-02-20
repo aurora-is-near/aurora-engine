@@ -36,8 +36,17 @@ impl BlsMapFp2ToG2 {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        todo!()
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{padding_g2_result, remove_padding, FP_LENGTH, PADDED_FP_LENGTH};
+
+        let mut p = [0; 2 * FP_LENGTH];
+        let p1 = remove_padding(&input[..PADDED_FP_LENGTH])?;
+        let p2 = remove_padding(&input[PADDED_FP_LENGTH..])?;
+        p[..FP_LENGTH].copy_from_slice(p2);
+        p[FP_LENGTH..].copy_from_slice(p1);
+
+        let output = aurora_engine_sdk::bls12381_map_fp2_to_g2(&p[..]);
+        Ok(padding_g2_result(&output))
     }
 }
 

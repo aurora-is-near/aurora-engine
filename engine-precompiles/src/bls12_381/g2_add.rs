@@ -46,37 +46,28 @@ impl BlsG2Add {
     }
 
     #[cfg(feature = "contract")]
+    #[allow(clippy::range_plus_one)]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g1, padding_g2_result, FP_LENGTH};
+        use super::{extract_g2, padding_g2_result, FP_LENGTH};
 
-        let (p0_part2, p0_part1) = extract_g1(&input[..G2_INPUT_ITEM_LENGTH / 2])?;
-        let (p1_part2, p1_part1) =
-            extract_g1(&input[G2_INPUT_ITEM_LENGTH / 2..G2_INPUT_ITEM_LENGTH])?;
-        let (p3_part2, p3_part1) = extract_g1(
-            &input[G2_INPUT_ITEM_LENGTH..G2_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH / 2],
-        )?;
-        let (p4_part2, p4_part1) = extract_g1(
-            &input[G2_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH / 2..2 * G2_INPUT_ITEM_LENGTH],
-        )?;
+        let (p0_x, p0_y) = extract_g2(&input[..G2_INPUT_ITEM_LENGTH])?;
+        let (p1_x, p1_y) = extract_g2(&input[G2_INPUT_ITEM_LENGTH..])?;
 
         let mut g2_input = [0u8; 8 * FP_LENGTH + 2];
 
+        // Check zero input
         if input[..G2_INPUT_ITEM_LENGTH] == [0; G2_INPUT_ITEM_LENGTH] {
             g2_input[1] |= 0x40;
         } else {
-            g2_input[1..=FP_LENGTH].copy_from_slice(p0_part1);
-            g2_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_part2);
-            g2_input[1 + 2 * FP_LENGTH..=3 * FP_LENGTH].copy_from_slice(p1_part1);
-            g2_input[1 + 3 * FP_LENGTH..=4 * FP_LENGTH].copy_from_slice(p1_part2);
+            g2_input[1..1 + 2 * FP_LENGTH].copy_from_slice(&p0_x);
+            g2_input[1 + 2 * FP_LENGTH..1 + 4 * FP_LENGTH].copy_from_slice(&p0_y);
         }
 
         if input[G2_INPUT_ITEM_LENGTH..] == [0; G2_INPUT_ITEM_LENGTH] {
             g2_input[2 + 4 * FP_LENGTH] |= 0x40;
         } else {
-            g2_input[2 + 4 * FP_LENGTH..2 + 5 * FP_LENGTH].copy_from_slice(p3_part1);
-            g2_input[2 + 5 * FP_LENGTH..2 + 6 * FP_LENGTH].copy_from_slice(p3_part2);
-            g2_input[2 + 6 * FP_LENGTH..2 + 7 * FP_LENGTH].copy_from_slice(p4_part1);
-            g2_input[2 + 7 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(p4_part2);
+            g2_input[2 + 4 * FP_LENGTH..2 + 6 * FP_LENGTH].copy_from_slice(&p1_x);
+            g2_input[2 + 6 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(&p1_y);
         }
 
         let output = aurora_engine_sdk::bls12381_p2_sum(&g2_input[..]);

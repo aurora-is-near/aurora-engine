@@ -35,8 +35,12 @@ impl BlsMapFpToG1 {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        todo!()
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{padding_g1_result, remove_padding};
+
+        let p = remove_padding(input)?;
+        let output = aurora_engine_sdk::bls12381_map_fp_to_g1(&p[..]);
+        Ok(padding_g1_result(&output))
     }
 }
 

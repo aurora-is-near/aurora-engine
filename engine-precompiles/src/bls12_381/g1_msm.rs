@@ -87,21 +87,22 @@ impl BlsG1Msm {
         for i in 0..k {
             let (p0_x, p0_y) =
                 extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
+            // Data offset for the points
+            let offset = i * (2 * FP_LENGTH + SCALAR_LENGTH);
             // Check is p0 zero coordinate
             if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH]
                 == [0; G1_INPUT_ITEM_LENGTH]
             {
-                g1_input[i * 2 * FP_LENGTH] = 0x40;
+                g1_input[offset] = 0x40;
             } else {
-                g1_input[i * 2 * FP_LENGTH..i * 2 * FP_LENGTH + FP_LENGTH].copy_from_slice(p0_x);
-                g1_input[i * 2 * FP_LENGTH + FP_LENGTH..(i + 1) * 2 * FP_LENGTH]
-                    .copy_from_slice(p0_y);
+                g1_input[offset..offset + FP_LENGTH].copy_from_slice(p0_x);
+                g1_input[offset + FP_LENGTH..offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
             }
             // Set scalar
             let mut scalar =
                 input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH].to_vec();
             scalar.reverse();
-            g1_input[(i + 1) * 2 * FP_LENGTH..(i + 1) * 2 * FP_LENGTH + SCALAR_LENGTH]
+            g1_input[offset + 2 * FP_LENGTH..offset + 2 * FP_LENGTH + SCALAR_LENGTH]
                 .copy_from_slice(&scalar);
         }
 

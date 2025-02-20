@@ -1,4 +1,4 @@
-use super::G2_INPUT_ITEM_LENGTH;
+use super::{G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -20,7 +20,6 @@ impl BlsPairingCheck {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{g1, g2};
-        use super::G1_INPUT_ITEM_LENGTH;
         use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
 
         let k = input.len() / INPUT_LENGTH;
@@ -85,9 +84,49 @@ impl BlsPairingCheck {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let _ = G2_INPUT_ITEM_LENGTH;
-        todo!()
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{extract_g1, extract_g2, FP_LENGTH};
+
+        let k = input.len() / INPUT_LENGTH;
+        let mut g_input = crate::vec![0u8; k * (6 * FP_LENGTH )];
+        for i in 0..k {
+            let offset = i * (G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH);
+            let data_offset = i * 6 * FP_LENGTH;
+            let (p0_x, p0_y) = extract_g1(&input[offset..offset + G1_INPUT_ITEM_LENGTH])?;
+            let (p1_x, p1_y) = extract_g2(
+                &input[offset + G1_INPUT_ITEM_LENGTH
+                    ..offset + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH],
+            )?;
+
+            if input[offset..offset + G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
+                g_input[data_offset] |= 0x40;
+            } else {
+                g_input[data_offset..data_offset + FP_LENGTH].copy_from_slice(p0_x);
+                g_input[data_offset + FP_LENGTH..data_offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
+            }
+
+            if input[offset + G1_INPUT_ITEM_LENGTH
+                ..offset + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH]
+                == [0; G2_INPUT_ITEM_LENGTH]
+            {
+                g_input[data_offset + 2 * FP_LENGTH] |= 0x40;
+            } else {
+                g_input[data_offset + 2 * FP_LENGTH..data_offset + 4 * FP_LENGTH]
+                    .copy_from_slice(&p1_x);
+                g_input[data_offset + 4 * FP_LENGTH..data_offset + 6 * FP_LENGTH]
+                    .copy_from_slice(&p1_y);
+            }
+        }
+
+        let output = aurora_engine_sdk::bls12381_pairing_check(&g_input[..]);
+        let output = if output == 2 {
+            crate::vec![0; 32]
+        } else {
+            let mut res = crate::vec![0; 31];
+            res.push(1);
+            res
+        };
+        Ok(output)
     }
 }
 

@@ -1,4 +1,4 @@
-use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH};
+use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -30,7 +30,6 @@ impl BlsG2Msm {
     #[cfg(not(feature = "contract"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{extract_scalar_input, g2, NBITS};
-        use super::SCALAR_LENGTH;
         use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
 
         let k = input.len() / INPUT_LENGTH;
@@ -80,9 +79,36 @@ impl BlsG2Msm {
     }
 
     #[cfg(feature = "contract")]
-    fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        let _ = G2_INPUT_ITEM_LENGTH;
-        todo!()
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{extract_g2, padding_g2_result, FP_LENGTH};
+
+        let k = input.len() / INPUT_LENGTH;
+        let mut g2_input = crate::vec![0u8; k * (4 * FP_LENGTH + SCALAR_LENGTH)];
+        for i in 0..k {
+            let (p0_x, p0_y) =
+                extract_g2(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH])?;
+
+            // Data offset for the points
+            let offset = i * (4 * FP_LENGTH + SCALAR_LENGTH);
+            // Check is p0 zero coordinate
+            if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH]
+                == [0; G2_INPUT_ITEM_LENGTH]
+            {
+                g2_input[offset] = 0x40;
+            } else {
+                g2_input[offset..offset + 2 * FP_LENGTH].copy_from_slice(&p0_x);
+                g2_input[offset + 2 * FP_LENGTH..offset + 4 * FP_LENGTH].copy_from_slice(&p0_y);
+            }
+            // Set scalar
+            let mut scalar =
+                input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH].to_vec();
+            scalar.reverse();
+            g2_input[offset + 4 * FP_LENGTH..offset + 4 * FP_LENGTH + SCALAR_LENGTH]
+                .copy_from_slice(&scalar);
+        }
+
+        let output = aurora_engine_sdk::bls12381_g2_multiexp(&g2_input[..]);
+        Ok(padding_g2_result(&output))
     }
 }
 

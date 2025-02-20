@@ -25,15 +25,15 @@ pub use pairing_check::BlsPairingCheck;
 /// Length of each of the elements in a g1 operation input.
 const G1_INPUT_ITEM_LENGTH: usize = 128;
 /// Length of each of the elements in a g2 operation input.
-pub const G2_INPUT_ITEM_LENGTH: usize = 256;
+const G2_INPUT_ITEM_LENGTH: usize = 256;
 /// Amount used to calculate the multi-scalar-multiplication discount.
 const MSM_MULTIPLIER: u64 = 1000;
 /// Finite field element input length.
 const FP_LENGTH: usize = 48;
 /// Finite field element padded input length.
-pub const PADDED_FP_LENGTH: usize = 64;
+const PADDED_FP_LENGTH: usize = 64;
 /// Quadratic extension of finite field element input length.
-pub const PADDED_FP2_LENGTH: usize = 128;
+const PADDED_FP2_LENGTH: usize = 128;
 /// Input elements padding length.
 const PADDING_LENGTH: usize = 16;
 /// Scalar length.
@@ -78,6 +78,23 @@ pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), 
     Ok((p_x, p_y))
 }
 
+pub fn extract_g2(input: &[u8]) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
+    let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
+    let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
+    let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
+    let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
+
+    let mut p_x = [0u8; 2 * FP_LENGTH];
+    p_x[0..FP_LENGTH].copy_from_slice(p0_first);
+    p_x[FP_LENGTH..].copy_from_slice(p0_last);
+
+    let mut p_y = [0u8; 2 * FP_LENGTH];
+    p_y[0..FP_LENGTH].copy_from_slice(p1_first);
+    p_y[FP_LENGTH..].copy_from_slice(p1_last);
+
+    Ok((p_x, p_y))
+}
+
 #[cfg(feature = "contract")]
 #[must_use]
 pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
@@ -95,15 +112,15 @@ pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> 
 #[must_use]
 pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
     let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];
-    if output[0] == 0x40 && output[1..] == [0u8; 2 * FP_LENGTH - 1] {
+    if output[0] == 0x40 && output[1..] == [0u8; 4 * FP_LENGTH - 1] {
         return result;
     }
-    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
+    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
-        .copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);
+        .copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + 2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH]
-        .copy_from_slice(&output[2 * FP_LENGTH..3 * FP_LENGTH]);
-    result[PADDING_LENGTH + 3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[3 * FP_LENGTH..]);
+    result[PADDING_LENGTH + 3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[2 * FP_LENGTH..3 * FP_LENGTH]);
     result
 }

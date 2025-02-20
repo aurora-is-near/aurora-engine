@@ -46,6 +46,7 @@ impl BlsG1Add {
     }
 
     #[cfg(feature = "contract")]
+    #[allow(clippy::range_plus_one)]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{extract_g1, padding_g1_result, FP_LENGTH};
 
@@ -57,8 +58,8 @@ impl BlsG1Add {
         if input[..G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
             g1_input[1] |= 0x40;
         } else {
-            g1_input[1..=FP_LENGTH].copy_from_slice(p0_x);
-            g1_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_y);
+            g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
+            g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
         }
 
         if input[G1_INPUT_ITEM_LENGTH..] == [0; G1_INPUT_ITEM_LENGTH] {

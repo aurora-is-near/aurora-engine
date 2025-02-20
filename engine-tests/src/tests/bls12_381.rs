@@ -103,9 +103,8 @@ pub struct PrecompileStandalone {
 }
 
 impl PrecompileStandalone {
-    fn new(path: &str) -> Self {
-        let data = fs::read_to_string(path).expect("Unable to read file");
-        serde_json::from_str(&data).unwrap()
+    fn new(data: &str) -> Self {
+        serde_json::from_str(data).unwrap()
     }
 }
 
@@ -173,21 +172,22 @@ fn run_bls12_381_transaction_call(path: &str) {
 ///   1. Run directly and check result with expected output
 ///   2. Call transaction and validation expected output. To avoid NEAR gas limit errors
 ///      we only send input with limited expected size.
-fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, path: &str) {
-    for data in PrecompileStandalone::new(path).precompile_data {
+fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data: &str) {
+    for data in PrecompileStandalone::new(data).precompile_data {
+        // TODO: this tests case skipping related to:
+        // <https://github.com/near/nearcore/issues/12928>
         if &data.input == "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002" {
             continue;
         }
+        // TODO: this tests case skipping related to:
+        // <https://github.com/near/nearcore/issues/12928>
         if data.input == "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaa9" {
             continue;
         }
         let input = hex::decode(data.input.clone()).unwrap();
         let output = hex::decode(data.output.clone()).unwrap();
-        // if input.iter().all(|&x| x == 0) {
-        //     continue;
-        // }
-        println!("--> {} {}", input.len(), output.len());
-        println!("{output:?}");
+        // println!("--> {} {}", input.len(), output.len());
+        // println!("{output:?}");
 
         let ctx = evm::Context {
             address: H160::default(),
@@ -200,15 +200,13 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, path
 
         // To avoid NEAR gas error "GasLimit" it make sense to limit input size.
         // and send transaction.
-        //if input.len() < 800 {
-        check_wasm_submit(address, input, &output);
-        //}
+        if input.len() < 300000 {
+            check_wasm_submit(address, input, &output);
+        }
     }
 }
 
 /// Submit transaction to precompile address and check result with expected output.
-// TODO
-#[allow(dead_code)]
 fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = u64::MAX;
@@ -225,13 +223,20 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
             }
         })
         .unwrap();
-    println!("RES: {:?}", utils::unwrap_success_slice(&wasm_result.0));
-    println!("Gas used: {:?}", wasm_result.1.all_gas() / 1_000_000_000);
+    // println!("RES: {:?}", utils::unwrap_success_slice(&wasm_result.0));
+    #[allow(clippy::as_conversions, clippy::cast_precision_loss)]
+    {
+        println!(
+            "Gas used: {:?}",
+            wasm_result.1.all_gas() as f64 / 1_000_000_000_000.
+        );
+    }
+
     println!(
         "VALID: {}",
         expected_output == utils::unwrap_success_slice(&wasm_result.0),
     );
-    // println!("{:?}", expected_output);
+    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result.0));
 }
 
 #[test]
@@ -240,37 +245,31 @@ fn test_bls12_381_g1_add() {
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_g1_mul() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g1_mul/");
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_g2_add() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g2_add/");
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_g2_mul() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_g2_mul/");
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_pairing() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_pair/");
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_map_fp_to_g1() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_map_fp_to_g1/");
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_map_fp2_to_g2() {
     run_bls12_381_transaction_call("src/tests/res/bls/bls12_381_map_fp2_to_g2/");
 }
@@ -280,7 +279,7 @@ fn test_bls12_381_g1_add_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG1Add,
         bls12_381::BlsG1Add::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_g1_add.json",
+        include_str!("res/bls/standalone/bls12_381_g1_add.json"),
     );
 }
 
@@ -289,56 +288,51 @@ fn test_bls12_381_g1_mul_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG1Msm,
         bls12_381::BlsG1Msm::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_g1_mul.json",
+        include_str!("res/bls/standalone/bls12_381_g1_mul.json"),
     );
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_g2_add_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG2Add,
         bls12_381::BlsG2Add::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_g2_add.json",
+        include_str!("res/bls/standalone/bls12_381_g2_add.json"),
     );
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_g2_mul_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsG2Msm,
         bls12_381::BlsG2Msm::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_g2_mul.json",
+        include_str!("res/bls/standalone/bls12_381_g2_mul.json"),
     );
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_pair_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsPairingCheck,
         bls12_381::BlsPairingCheck::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_pair.json",
+        include_str!("res/bls/standalone/bls12_381_pair.json"),
     );
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_map_fp_to_g1_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsMapFpToG1,
         bls12_381::BlsMapFpToG1::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_map_fp_to_g1.json",
+        include_str!("res/bls/standalone/bls12_381_map_fp_to_g1.json"),
     );
 }
 
 #[test]
-#[ignore]
 fn test_bls12_381_map_fp2_to_g2_standalone() {
     run_bls12_381_standalone(
         &bls12_381::BlsMapFp2ToG2,
         bls12_381::BlsMapFp2ToG2::ADDRESS,
-        "src/tests/res/bls/standalone/bls12_381_map_fp2_to_g2.json",
+        include_str!("res/bls/standalone/bls12_381_map_fp2_to_g2.json"),
     );
 }
