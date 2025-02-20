@@ -51,21 +51,18 @@ impl BlsG1Add {
 
         let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
         let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
-        let zero_slice = &[0; FP_LENGTH];
 
         let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
-        g1_input[0] = 0;
-        // Check is p0 zero coordinate
-        if p0_x == zero_slice && p0_y == zero_slice {
-            g1_input[1] = 0x40;
+
+        if input[..G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
+            g1_input[1] |= 0x40;
         } else {
             g1_input[1..=FP_LENGTH].copy_from_slice(p0_x);
             g1_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_y);
         }
 
-        g1_input[1 + 2 * FP_LENGTH] = 0;
-        if p1_x == zero_slice && p1_y == zero_slice {
-            g1_input[2 + 2 * FP_LENGTH] = 0x40;
+        if input[G1_INPUT_ITEM_LENGTH..] == [0; G1_INPUT_ITEM_LENGTH] {
+            g1_input[2 + 2 * FP_LENGTH] |= 0x40;
         } else {
             g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
             g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);

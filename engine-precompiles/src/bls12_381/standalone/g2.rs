@@ -1,11 +1,8 @@
 use super::{fp_from_bendian, fp_to_bytes, PADDED_FP_LENGTH};
-use crate::bls12_381::{remove_padding, FP_LENGTH};
+use crate::bls12_381::{remove_padding, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
 use crate::prelude::{vec, Borrowed, Vec};
 use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_curve};
 use evm::ExitError;
-
-/// Length of each of the elements in a g2 operation input.
-pub const G2_INPUT_ITEM_LENGTH: usize = 256;
 
 /// Output length of a g2 operation.
 const G2_OUTPUT_LENGTH: usize = 256;

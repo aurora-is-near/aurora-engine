@@ -1,4 +1,4 @@
-use super::msm_required_gas;
+use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -37,7 +37,7 @@ impl BlsG2Msm {
         let mut g2_points: Vec<blst_p2> = Vec::with_capacity(k);
         let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
         for i in 0..k {
-            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + g2::G2_INPUT_ITEM_LENGTH];
+            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH];
             // BLST batch API for p2_affines blows up when you pass it a point at infinity, so we must
             // filter points at infinity (and their corresponding scalars) from the input.
             if slice.iter().all(|i| *i == 0) {
@@ -57,8 +57,8 @@ impl BlsG2Msm {
 
             scalars.extend_from_slice(
                 &extract_scalar_input(
-                    &input[i * INPUT_LENGTH + g2::G2_INPUT_ITEM_LENGTH
-                        ..i * INPUT_LENGTH + g2::G2_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
+                    &input[i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH
+                        ..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
                 )?
                 .b,
             );
@@ -81,6 +81,7 @@ impl BlsG2Msm {
 
     #[cfg(feature = "contract")]
     fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        let _ = G2_INPUT_ITEM_LENGTH;
         todo!()
     }
 }

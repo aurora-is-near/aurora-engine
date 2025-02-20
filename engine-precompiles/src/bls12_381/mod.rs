@@ -24,6 +24,8 @@ pub use pairing_check::BlsPairingCheck;
 
 /// Length of each of the elements in a g1 operation input.
 const G1_INPUT_ITEM_LENGTH: usize = 128;
+/// Length of each of the elements in a g2 operation input.
+pub const G2_INPUT_ITEM_LENGTH: usize = 256;
 /// Amount used to calculate the multi-scalar-multiplication discount.
 const MSM_MULTIPLIER: u64 = 1000;
 /// Finite field element input length.
@@ -80,6 +82,9 @@ pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), 
 #[must_use]
 pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
     let mut result = crate::vec![0u8; 2 * PADDED_FP_LENGTH];
+    if output[0] == 0x40 && output[1..] == [0u8; 2 * FP_LENGTH - 1] {
+        return result;
+    }
     result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[FP_LENGTH..]);
@@ -90,6 +95,9 @@ pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> 
 #[must_use]
 pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
     let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];
+    if output[0] == 0x40 && output[1..] == [0u8; 2 * FP_LENGTH - 1] {
+        return result;
+    }
     result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
     result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
         .copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);

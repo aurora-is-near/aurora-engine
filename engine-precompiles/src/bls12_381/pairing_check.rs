@@ -1,3 +1,4 @@
+use super::G2_INPUT_ITEM_LENGTH;
 use crate::prelude::{Borrowed, Vec};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -39,7 +40,7 @@ impl BlsPairingCheck {
             // So we set the subgroup_check flag to `true`
             let p2_aff = &g2::extract_g2_input(
                 &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
-                    ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + g2::G2_INPUT_ITEM_LENGTH],
+                    ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH],
                 true,
             )?;
 
@@ -85,6 +86,7 @@ impl BlsPairingCheck {
 
     #[cfg(feature = "contract")]
     fn execute(_input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        let _ = G2_INPUT_ITEM_LENGTH;
         todo!()
     }
 }

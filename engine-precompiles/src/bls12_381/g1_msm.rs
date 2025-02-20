@@ -82,26 +82,26 @@ impl BlsG1Msm {
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{extract_g1, padding_g1_result, FP_LENGTH};
 
-        let zero_slice = &[0; FP_LENGTH];
         let k = input.len() / INPUT_LENGTH;
         let mut g1_input = crate::vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
         for i in 0..k {
             let (p0_x, p0_y) =
                 extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
             // Check is p0 zero coordinate
-            if p0_x == zero_slice && p0_y == zero_slice {
-                g1_input[i * INPUT_LENGTH] = 0x40;
+            if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH]
+                == [0; G1_INPUT_ITEM_LENGTH]
+            {
+                g1_input[i * 2 * FP_LENGTH] = 0x40;
             } else {
-                g1_input[i * INPUT_LENGTH..i * INPUT_LENGTH + FP_LENGTH].copy_from_slice(p0_x);
-                g1_input[i * INPUT_LENGTH + FP_LENGTH..i * INPUT_LENGTH + 2 * FP_LENGTH]
+                g1_input[i * 2 * FP_LENGTH..i * 2 * FP_LENGTH + FP_LENGTH].copy_from_slice(p0_x);
+                g1_input[i * 2 * FP_LENGTH + FP_LENGTH..(i + 1) * 2 * FP_LENGTH]
                     .copy_from_slice(p0_y);
             }
             // Set scalar
             let mut scalar =
-                input[i * INPUT_LENGTH..(i + 1) * INPUT_LENGTH - SCALAR_LENGTH].to_vec();
+                input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH].to_vec();
             scalar.reverse();
-            g1_input[i * INPUT_LENGTH + 2 * FP_LENGTH
-                ..i * INPUT_LENGTH + 2 * FP_LENGTH + SCALAR_LENGTH]
+            g1_input[(i + 1) * 2 * FP_LENGTH..(i + 1) * 2 * FP_LENGTH + SCALAR_LENGTH]
                 .copy_from_slice(&scalar);
         }
 

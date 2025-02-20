@@ -1,3 +1,4 @@
+use super::G2_INPUT_ITEM_LENGTH;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -26,8 +27,8 @@ impl BlsG2Add {
         // NB: There is no subgroup check for the G2 addition precompile.
         //
         // So we set the subgroup checks here to `false`
-        let a_aff = &g2::extract_g2_input(&input[..g2::G2_INPUT_ITEM_LENGTH], false)?;
-        let b_aff = &g2::extract_g2_input(&input[g2::G2_INPUT_ITEM_LENGTH..], false)?;
+        let a_aff = &g2::extract_g2_input(&input[..G2_INPUT_ITEM_LENGTH], false)?;
+        let b_aff = &g2::extract_g2_input(&input[G2_INPUT_ITEM_LENGTH..], false)?;
 
         let mut b = blst_p2::default();
         // SAFETY: b and b_aff are blst values.
@@ -46,31 +47,39 @@ impl BlsG2Add {
 
     #[cfg(feature = "contract")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g1, padding_g2_result, FP_LENGTH, G1_INPUT_ITEM_LENGTH};
+        use super::{extract_g1, padding_g2_result, FP_LENGTH};
 
-        let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
-        let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
-        let zero_slice = &[0; FP_LENGTH];
+        let (p0_part2, p0_part1) = extract_g1(&input[..G2_INPUT_ITEM_LENGTH / 2])?;
+        let (p1_part2, p1_part1) =
+            extract_g1(&input[G2_INPUT_ITEM_LENGTH / 2..G2_INPUT_ITEM_LENGTH])?;
+        let (p3_part2, p3_part1) = extract_g1(
+            &input[G2_INPUT_ITEM_LENGTH..G2_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH / 2],
+        )?;
+        let (p4_part2, p4_part1) = extract_g1(
+            &input[G2_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH / 2..2 * G2_INPUT_ITEM_LENGTH],
+        )?;
 
-        let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
-        g1_input[0] = 0;
-        // Check is p0 zero coordinate
-        if p0_x == zero_slice && p0_y == zero_slice {
-            g1_input[1] = 0x40;
+        let mut g2_input = [0u8; 8 * FP_LENGTH + 2];
+
+        if input[..G2_INPUT_ITEM_LENGTH] == [0; G2_INPUT_ITEM_LENGTH] {
+            g2_input[1] |= 0x40;
         } else {
-            g1_input[1..=FP_LENGTH].copy_from_slice(p0_x);
-            g1_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_y);
+            g2_input[1..=FP_LENGTH].copy_from_slice(p0_part1);
+            g2_input[1 + FP_LENGTH..=2 * FP_LENGTH].copy_from_slice(p0_part2);
+            g2_input[1 + 2 * FP_LENGTH..=3 * FP_LENGTH].copy_from_slice(p1_part1);
+            g2_input[1 + 3 * FP_LENGTH..=4 * FP_LENGTH].copy_from_slice(p1_part2);
         }
 
-        g1_input[1 + 2 * FP_LENGTH] = 0;
-        if p1_x == zero_slice && p1_y == zero_slice {
-            g1_input[2 + 2 * FP_LENGTH] = 0x40;
+        if input[G2_INPUT_ITEM_LENGTH..] == [0; G2_INPUT_ITEM_LENGTH] {
+            g2_input[2 + 4 * FP_LENGTH] |= 0x40;
         } else {
-            g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
-            g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
+            g2_input[2 + 4 * FP_LENGTH..2 + 5 * FP_LENGTH].copy_from_slice(p3_part1);
+            g2_input[2 + 5 * FP_LENGTH..2 + 6 * FP_LENGTH].copy_from_slice(p3_part2);
+            g2_input[2 + 6 * FP_LENGTH..2 + 7 * FP_LENGTH].copy_from_slice(p4_part1);
+            g2_input[2 + 7 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(p4_part2);
         }
 
-        let output = aurora_engine_sdk::bls12381_p2_sum(&g1_input[..]);
+        let output = aurora_engine_sdk::bls12381_p2_sum(&g2_input[..]);
         Ok(padding_g2_result(&output))
     }
 }
