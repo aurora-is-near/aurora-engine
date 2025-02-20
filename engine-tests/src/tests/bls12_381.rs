@@ -159,11 +159,8 @@ fn run_bls12_381_transaction_call(path: &str) {
             .unwrap();
         let result =
             SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
-        let ussd_near_gas = outcome.used_gas / 1_000_000_000_000;
-        //assert!(ussd_near_gas < 10, "{ussd_near_gas}  < 10");
-        println!("{ussd_near_gas:?} TGas, len: {}", test_case.data.len());
         assert!(result.status.is_ok());
-        //assert_eq!(result.gas_used, test_case.used_gas);
+        assert_eq!(result.gas_used, test_case.used_gas);
     }
 }
 
@@ -186,8 +183,6 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data
         }
         let input = hex::decode(data.input.clone()).unwrap();
         let output = hex::decode(data.output.clone()).unwrap();
-        // println!("--> {} {}", input.len(), output.len());
-        // println!("{output:?}");
 
         let ctx = evm::Context {
             address: H160::default(),
@@ -198,8 +193,7 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data
         let standalone_result = precompile.run(&input, None, &ctx, false).unwrap();
         assert_eq!(standalone_result.output, output);
 
-        // To avoid NEAR gas error "GasLimit" it make sense to limit input size.
-        // and send transaction.
+        // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
         if input.len() < 300000 {
             check_wasm_submit(address, input, &output);
         }
@@ -223,19 +217,7 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
             }
         })
         .unwrap();
-    // println!("RES: {:?}", utils::unwrap_success_slice(&wasm_result.0));
-    #[allow(clippy::as_conversions, clippy::cast_precision_loss)]
-    {
-        println!(
-            "Gas used: {:?}",
-            wasm_result.1.all_gas() as f64 / 1_000_000_000_000.
-        );
-    }
 
-    println!(
-        "VALID: {}",
-        expected_output == utils::unwrap_success_slice(&wasm_result.0),
-    );
     assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result.0));
 }
 
