@@ -50,7 +50,9 @@ fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
         return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
     }
     // SAFETY: we checked PADDED_FP_LENGTH
-    Ok(unsafe { &*input[PADDING_LENGTH..].as_ptr().cast::<[u8; FP_LENGTH]>() })
+    input[PADDING_LENGTH..]
+        .try_into()
+        .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
 }
 
 /// Implements the gas schedule for G1/G2 Multiscalar-multiplication assuming 30
