@@ -18,7 +18,6 @@ bn.workspace = true
 ethabi.workspace = true
 evm.workspace = true
 hex.workspace = true
-libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 num.workspace = true
 ripemd.workspace = true
 sha2.workspace = true
@@ -33,7 +32,7 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "evm/std", "ripemd/std", "sha2/std", "sha3/std", "ethabi/std"]
 contract = ["aurora-engine-sdk/contract"]
 log = []
 error_refund = []

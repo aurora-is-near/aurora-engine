@@ -1,8 +1,6 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-#[cfg(not(feature = "contract"))]
-use aurora_engine_types::ToString;
 use evm::{Context, ExitError};
 
 mod costs {
@@ -25,38 +23,7 @@ pub fn ecrecover(
     hash: H256,
     signature: &[u8; consts::SIGNATURE_LENGTH],
 ) -> Result<Address, ExitError> {
-    #[cfg(feature = "contract")]
-    return sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())));
-
-    #[cfg(not(feature = "contract"))]
-    internal_impl(hash, signature)
-}
-
-#[cfg(not(feature = "contract"))]
-fn internal_impl(hash: H256, signature: &[u8]) -> Result<Address, ExitError> {
-    use aurora_engine_types::Cow::Owned;
-    use sha3::Digest;
-
-    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes())
-        .map_err(|e| ExitError::Other(Owned(e.to_string())))?;
-    let v = signature[64];
-    let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
-        .map_err(|_| ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))?;
-    let bit = match v {
-        0..=26 => v,
-        _ => v - 27,
-    };
-
-    if let Ok(recovery_id) = libsecp256k1::RecoveryId::parse(bit) {
-        if let Ok(public_key) = libsecp256k1::recover(&hash, &signature, &recovery_id) {
-            // recover returns a 65-byte key, but addresses come from the raw 64-byte key
-            let r = sha3::Keccak256::digest(&public_key.serialize()[1..]);
-            return Address::try_from_slice(&r[12..])
-                .map_err(|_| ExitError::Other(Borrowed("ERR_INCORRECT_ADDRESS")));
-        }
-    }
-
-    Err(ExitError::Other(Borrowed(sdk::ECRecoverErr.as_str())))
+    sdk::ecrecover(hash, signature).map_err(|e| ExitError::Other(Borrowed(e.as_str())))
 }
 
 pub struct ECRecover;
@@ -122,26 +89,6 @@ impl Precompile for ECRecover {
 mod tests {
     use super::*;
     use crate::utils::new_context;
-
-    fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
-        matches!(ecrecover(hash, signature[0..consts::SIGNATURE_LENGTH].try_into().unwrap()), Ok(s) if s == signer)
-    }
-
-    #[test]
-    fn test_ecverify() {
-        let hash = H256::from_slice(
-            &hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
-                .unwrap(),
-        );
-        let signature =
-            &hex::decode("b9f0bb08640d3c1c00761cdd0121209268f6fd3816bc98b9e6f3cc77bf82b69812ac7a61788a0fdc0e19180f14c945a8e1088a27d92a74dce81c0981fb6447441b")
-                .unwrap();
-        let signer = Address::try_from_slice(
-            &hex::decode("1563915e194D8CfBA1943570603F7606A3115508").unwrap(),
-        )
-        .unwrap();
-        assert!(ecverify(hash, signature, signer));
-    }
 
     #[test]
     fn test_ecrecover() {
