@@ -77,7 +77,6 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
-too_long_first_doc_paragraph = "allow"
 
 [workspace]
 resolver = "2"
