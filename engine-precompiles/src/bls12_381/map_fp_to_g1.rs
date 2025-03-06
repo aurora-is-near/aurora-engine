@@ -13,7 +13,7 @@ pub struct BlsMapFpToG1;
 impl BlsMapFpToG1 {
     pub const ADDRESS: Address = make_address(0, 0x10);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::remove_padding;
         use super::standalone::{fp_from_bendian, g1};
@@ -34,7 +34,7 @@ impl BlsMapFpToG1 {
         Ok(g1::encode_g1_point(&p_aff))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{padding_g1_result, remove_padding};
 

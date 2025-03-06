@@ -1,18 +1,9 @@
 //! # BLS12-381
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
-use crate::prelude::Borrowed;
 use evm::ExitError;
 
-mod g1_add;
-mod g1_msm;
-mod g2_add;
-mod g2_msm;
-mod map_fp2_to_g2;
-mod map_fp_to_g1;
-mod pairing_check;
-#[cfg(not(feature = "contract"))]
-mod standalone;
+use crate::prelude::Borrowed;
 
 pub use g1_add::BlsG1Add;
 pub use g1_msm::BlsG1Msm;
@@ -21,6 +12,16 @@ pub use g2_msm::BlsG2Msm;
 pub use map_fp2_to_g2::BlsMapFp2ToG2;
 pub use map_fp_to_g1::BlsMapFpToG1;
 pub use pairing_check::BlsPairingCheck;
+
+mod g1_add;
+mod g1_msm;
+mod g2_add;
+mod g2_msm;
+mod map_fp2_to_g2;
+mod map_fp_to_g1;
+mod pairing_check;
+#[cfg(feature = "std")]
+mod standalone;
 
 /// Length of each of the elements in a g1 operation input.
 const G1_INPUT_ITEM_LENGTH: usize = 128;
@@ -97,7 +98,7 @@ pub fn extract_g2(input: &[u8]) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENG
     Ok((p_x, p_y))
 }
 
-#[cfg(feature = "contract")]
+#[cfg(not(feature = "std"))]
 #[must_use]
 pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
     let mut result = crate::vec![0u8; 2 * PADDED_FP_LENGTH];
@@ -110,7 +111,7 @@ pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> 
     result
 }
 
-#[cfg(feature = "contract")]
+#[cfg(not(feature = "std"))]
 #[must_use]
 pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
     let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];

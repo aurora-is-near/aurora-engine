@@ -27,7 +27,7 @@ pub struct BlsG2Msm;
 impl BlsG2Msm {
     pub const ADDRESS: Address = make_address(0, 0xE);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{extract_scalar_input, g2, NBITS};
         use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
@@ -78,7 +78,7 @@ impl BlsG2Msm {
         Ok(g2::encode_g2_point(&multiexp_aff))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{extract_g2, padding_g2_result, FP_LENGTH};
 

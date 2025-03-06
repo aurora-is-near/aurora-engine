@@ -16,7 +16,7 @@ pub struct BlsG1Add;
 impl BlsG1Add {
     pub const ADDRESS: Address = make_address(0, 0xB);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::g1;
         use blst::{
@@ -45,7 +45,7 @@ impl BlsG1Add {
         Ok(g1::encode_g1_point(&p_aff))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(not(feature = "std"))]
     #[allow(clippy::range_plus_one)]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{extract_g1, padding_g1_result, FP_LENGTH};
