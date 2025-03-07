@@ -444,6 +444,11 @@ pub fn ft_metadata<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     Ok(())
 }
 
+pub fn get_bridge_prover<I: IO + Copy>(io: I) -> Result<(), ContractError> {
+    EthConnectorContract::init(io)?.get_bridge_prover();
+    Ok(())
+}
+
 /// Sets the contract data and returns it back
 fn set_contract_data<I: IO>(
     io: &mut I,
