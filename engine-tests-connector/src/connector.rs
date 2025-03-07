@@ -1339,6 +1339,9 @@ async fn test_storage_deposit() -> anyhow::Result<()> {
         .await?
         .json::<Value>()?;
 
+    // The NEP-141 implementation of ETH intentionally set the storage deposit amount equal to 0
+    // so any non-zero deposit amount is automatically returned to the user, leaving 0 storage
+    // balance behind.
     assert_eq!(res, json!({"available": "0", "total": "0"}));
 
     Ok(())
@@ -1360,6 +1363,23 @@ async fn test_storage_unregister() -> anyhow::Result<()> {
         .transact()
         .await?;
     assert!(res.is_success(), "{res:#?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_bridge_prover() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let prover_account_id = contract
+        .engine_contract
+        .call("get_bridge_prover")
+        .deposit(NearToken::from_yoctonear(0))
+        .max_gas()
+        .transact()
+        .await?
+        .json::<AccountId>()?;
+    assert_eq!(prover_account_id.as_str(), "aurora_eth_connector.root");
     Ok(())
 }
 
