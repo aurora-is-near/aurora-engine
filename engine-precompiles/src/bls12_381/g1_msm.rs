@@ -99,11 +99,10 @@ impl BlsG1Msm {
                 g1_input[offset + FP_LENGTH..offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
             }
             // Set scalar
-            let mut scalar =
-                input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH].to_vec();
-            scalar.reverse();
-            g1_input[offset + 2 * FP_LENGTH..offset + 2 * FP_LENGTH + SCALAR_LENGTH]
-                .copy_from_slice(&scalar);
+            let g1_range = offset + 2 * FP_LENGTH..offset + 2 * FP_LENGTH + SCALAR_LENGTH;
+            let scalar = input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH];
+            g1_input[g1_range].copy_from_slice(scalar);
+            g1_input[g1_range].reverse();
         }
 
         let output = aurora_engine_sdk::bls12381_g1_multiexp(&g1_input[..]);
