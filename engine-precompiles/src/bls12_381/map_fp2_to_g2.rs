@@ -13,7 +13,7 @@ pub struct BlsMapFp2ToG2;
 impl BlsMapFp2ToG2 {
     pub const ADDRESS: Address = make_address(0, 0x11);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::g2;
         use super::{remove_padding, PADDED_FP_LENGTH};
@@ -35,7 +35,7 @@ impl BlsMapFp2ToG2 {
         Ok(g2::encode_g2_point(&p_aff))
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{padding_g2_result, remove_padding, FP_LENGTH, PADDED_FP_LENGTH};
 

@@ -23,6 +23,7 @@ engine-standalone-tracing = { path = "engine-standalone-tracing", default-featur
 anyhow = "1"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
+blst = "0.3"
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
@@ -77,7 +78,6 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
-too_long_first_doc_paragraph = "allow"
 
 [workspace]
 resolver = "2"

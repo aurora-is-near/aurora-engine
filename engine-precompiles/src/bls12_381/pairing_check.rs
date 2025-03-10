@@ -17,7 +17,7 @@ pub struct BlsPairingCheck;
 impl BlsPairingCheck {
     pub const ADDRESS: Address = make_address(0, 0xF);
 
-    #[cfg(not(feature = "contract"))]
+    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::standalone::{g1, g2};
         use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
@@ -83,7 +83,7 @@ impl BlsPairingCheck {
         Ok(output.into())
     }
 
-    #[cfg(feature = "contract")]
+    #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         use super::{extract_g1, extract_g2, FP_LENGTH};
 
