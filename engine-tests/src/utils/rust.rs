@@ -2,7 +2,6 @@ use std::path::Path;
 use std::process::Command;
 
 pub fn compile<P: AsRef<Path>>(source_path: P) {
-    println!("\n#### {:?}", source_path.as_ref());
     let output = Command::new("cargo")
         .current_dir(source_path)
         .env("RUSTFLAGS", "-C link-arg=-s")
