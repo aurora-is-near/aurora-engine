@@ -1,22 +1,9 @@
 //! # BLS12-381
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
-use crate::prelude::Borrowed;
-use crate::utils;
-use blst::{
-    blst_bendian_from_fp, blst_fp, blst_fp_from_bendian, blst_scalar, blst_scalar_from_bendian,
-};
 use evm::ExitError;
 
-mod g1;
-mod g1_add;
-mod g1_msm;
-mod g2;
-mod g2_add;
-mod g2_msm;
-mod map_fp2_to_g2;
-mod map_fp_to_g1;
-mod pairing_check;
+use crate::prelude::Borrowed;
 
 pub use g1_add::BlsG1Add;
 pub use g1_msm::BlsG1Msm;
@@ -26,8 +13,22 @@ pub use map_fp2_to_g2::BlsMapFp2ToG2;
 pub use map_fp_to_g1::BlsMapFpToG1;
 pub use pairing_check::BlsPairingCheck;
 
-/// Number of bits used in the BLS12-381 curve finite field elements.
-const NBITS: usize = 256;
+mod g1_add;
+mod g1_msm;
+mod g2_add;
+mod g2_msm;
+mod map_fp2_to_g2;
+mod map_fp_to_g1;
+mod pairing_check;
+#[cfg(feature = "std")]
+mod standalone;
+
+/// Length of each of the elements in a g1 operation input.
+const G1_INPUT_ITEM_LENGTH: usize = 128;
+/// Length of each of the elements in a g2 operation input.
+const G2_INPUT_ITEM_LENGTH: usize = 256;
+/// Amount used to calculate the multi-scalar-multiplication discount.
+const MSM_MULTIPLIER: u64 = 1000;
 /// Finite field element input length.
 const FP_LENGTH: usize = 48;
 /// Finite field element padded input length.
@@ -38,95 +39,21 @@ const PADDED_FP2_LENGTH: usize = 128;
 const PADDING_LENGTH: usize = 16;
 /// Scalar length.
 const SCALAR_LENGTH: usize = 32;
-// Big-endian non-Montgomery form.
-const MODULUS_REPR: [u8; 48] = [
-    0x1a, 0x01, 0x11, 0xea, 0x39, 0x7f, 0xe6, 0x9a, 0x4b, 0x1b, 0xa7, 0xb6, 0x43, 0x4b, 0xac, 0xd7,
-    0x64, 0x77, 0x4b, 0x84, 0xf3, 0x85, 0x12, 0xbf, 0x67, 0x30, 0xd2, 0xa0, 0xf6, 0xb0, 0xf6, 0x24,
-    0x1e, 0xab, 0xff, 0xfe, 0xb1, 0x53, 0xff, 0xff, 0xb9, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xaa, 0xab,
-];
-/// Amount used to calculate the multi-scalar-multiplication discount.
-const MSM_MULTIPLIER: u64 = 1000;
-
-/// BLS Encodes a single finite field element into byte slice with padding.
-fn fp_to_bytes(out: &mut [u8], input: *const blst_fp) {
-    if out.len() != PADDED_FP_LENGTH {
-        return;
-    }
-    let (padding, rest) = out.split_at_mut(PADDING_LENGTH);
-    padding.fill(0);
-    unsafe { blst_bendian_from_fp(rest.as_mut_ptr(), input) };
-}
-
-/// Checks if the input is a valid big-endian representation of a field element.
-fn is_valid_be(input: &[u8; 48]) -> bool {
-    for (i, modul) in input.iter().zip(MODULUS_REPR.iter()) {
-        match i.cmp(modul) {
-            core::cmp::Ordering::Greater => return false,
-            core::cmp::Ordering::Less => return true,
-            core::cmp::Ordering::Equal => continue,
-        }
-    }
-    // false if matching the modulus
-    false
-}
-
-/// Checks whether or not the input represents a canonical field element, returning the field
-/// element if successful.
-fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
-    if !is_valid_be(input) {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_INVALID_FP_VALUE")));
-    }
-    let mut fp = blst_fp::default();
-    // SAFETY: input has fixed length, and fp is a blst value.
-    unsafe {
-        // This performs the check for canonical field elements
-        blst_fp_from_bendian(&mut fp, input.as_ptr());
-    }
-    Ok(fp)
-}
 
 /// Removes zeros with which the precompile inputs are left padded to 64 bytes.
 fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
     if input.len() != PADDED_FP_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDED_FP_LENGTH")));
+        return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
     }
-    let (padding, unpadded) = input.split_at(PADDING_LENGTH);
-    if !padding.iter().all(|&x| x == 0) {
-        return Err(ExitError::Other(Borrowed(
-            "ERR_BLS12_PADDED_FP_LENGTH_NOT_ZERO",
-        )));
+    // Check is prefix contains only zero elements. As it's known size
+    // 16 bytes for efficiency we validate it via slice with zero elements
+    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
+        return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
     }
-    unpadded
+    // SAFETY: we checked PADDED_FP_LENGTH
+    input[PADDING_LENGTH..]
         .try_into()
-        .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_FAIL_PADDING")))
-}
-
-/// Extracts a scalar from a 32 byte slice representation, decoding the input as a big endian
-/// unsigned integer. If the input is not exactly 32 bytes long, an error is returned.
-///
-/// From [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537):
-/// * A scalar for the multiplication operation is encoded as 32 bytes by performing `BigEndian`
-///   encoding of the corresponding (unsigned) integer.
-///
-/// We do not check that the scalar is a canonical Fr element, because the EIP specifies:
-/// * The corresponding integer is not required to be less than or equal than main subgroup order
-///   `q`.
-fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, ExitError> {
-    if input.len() != SCALAR_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_SCALAR_INPUT")));
-    }
-
-    let mut out = blst_scalar::default();
-    // SAFETY: input length is checked previously, out is a blst value.
-    unsafe {
-        // NOTE: we do not use `blst_scalar_fr_check` here because, from EIP-2537:
-        //
-        // * The corresponding integer is not required to be less than or equal than main subgroup
-        // order `q`.
-        blst_scalar_from_bendian(&mut out, input.as_ptr());
-    };
-
-    Ok(out)
+        .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
 }
 
 /// Implements the gas schedule for G1/G2 Multiscalar-multiplication assuming 30
@@ -143,6 +70,60 @@ fn msm_required_gas(
     let index = core::cmp::min(k - 1, discount_table.len() - 1);
     let discount = u64::from(discount_table[index]);
 
-    let k = u64::try_from(k).map_err(utils::err_usize_conv)?;
+    let k = u64::try_from(k).map_err(crate::utils::err_usize_conv)?;
     Ok((k * discount * multiplication_cost) / MSM_MULTIPLIER)
+}
+
+pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
+    let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
+    let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
+
+    Ok((p_x, p_y))
+}
+
+pub fn extract_g2(input: &[u8]) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
+    let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
+    let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
+    let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
+    let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
+
+    let mut p_x = [0u8; 2 * FP_LENGTH];
+    p_x[0..FP_LENGTH].copy_from_slice(p0_first);
+    p_x[FP_LENGTH..].copy_from_slice(p0_last);
+
+    let mut p_y = [0u8; 2 * FP_LENGTH];
+    p_y[0..FP_LENGTH].copy_from_slice(p1_first);
+    p_y[FP_LENGTH..].copy_from_slice(p1_last);
+
+    Ok((p_x, p_y))
+}
+
+#[cfg(not(feature = "std"))]
+#[must_use]
+pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
+    let mut result = crate::vec![0u8; 2 * PADDED_FP_LENGTH];
+    if output[0] == 0x40 && output[1..] == [0u8; 2 * FP_LENGTH - 1] {
+        return result;
+    }
+    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[..FP_LENGTH]);
+    result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[FP_LENGTH..]);
+    result
+}
+
+#[cfg(not(feature = "std"))]
+#[must_use]
+pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
+    let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];
+    if output[0] == 0x40 && output[1..] == [0u8; 4 * FP_LENGTH - 1] {
+        return result;
+    }
+    result[PADDING_LENGTH..PADDED_FP_LENGTH].copy_from_slice(&output[FP_LENGTH..2 * FP_LENGTH]);
+    result[PADDING_LENGTH + PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[..FP_LENGTH]);
+    result[PADDING_LENGTH + 2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[3 * FP_LENGTH..]);
+    result[PADDING_LENGTH + 3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH]
+        .copy_from_slice(&output[2 * FP_LENGTH..3 * FP_LENGTH]);
+    result
 }

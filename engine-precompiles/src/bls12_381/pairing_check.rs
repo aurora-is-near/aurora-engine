@@ -1,8 +1,7 @@
-use super::{g1, g2};
-use crate::prelude::Borrowed;
+use super::{G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH};
+use crate::prelude::{Borrowed, Vec};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
-use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
 use evm::{Context, ExitError};
 
 /// Multiplier gas fee for BLS12-381 pairing operation.
@@ -17,6 +16,118 @@ pub struct BlsPairingCheck;
 
 impl BlsPairingCheck {
     pub const ADDRESS: Address = make_address(0, 0xF);
+
+    #[cfg(feature = "std")]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::standalone::{g1, g2};
+        use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
+
+        let k = input.len() / INPUT_LENGTH;
+        // Accumulator for the fp12 multiplications of the miller loops.
+        let mut acc = blst_fp12::default();
+        for i in 0..k {
+            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
+            //
+            // So we set the subgroup_check flag to `true`
+            let p1_aff = &g1::extract_g1_input(
+                &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH],
+                true,
+            )?;
+
+            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
+            //
+            // So we set the subgroup_check flag to `true`
+            let p2_aff = &g2::extract_g2_input(
+                &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
+                    ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH],
+                true,
+            )?;
+
+            if i > 0 {
+                // After the first slice (i>0) we use cur_ml to store the current
+                // miller loop and accumulate with the previous results using a fp12
+                // multiplication.
+                let mut cur_ml = blst_fp12::default();
+                let mut res = blst_fp12::default();
+                // SAFETY: res, acc, cur_ml, p1_aff and p2_aff are blst values.
+                unsafe {
+                    blst_miller_loop(&mut cur_ml, p2_aff, p1_aff);
+                    blst_fp12_mul(&mut res, &acc, &cur_ml);
+                }
+                acc = res;
+            } else {
+                // On the first slice (i==0) there is no previous results and no need
+                // to accumulate.
+                // SAFETY: acc, p1_aff and p2_aff are blst values.
+                unsafe {
+                    blst_miller_loop(&mut acc, p2_aff, p1_aff);
+                }
+            }
+        }
+
+        // SAFETY: ret and acc are blst values.
+        let mut ret = blst_fp12::default();
+        unsafe {
+            blst_final_exp(&mut ret, &acc);
+        }
+
+        let mut result: u8 = 0;
+        // SAFETY: ret is a blst value.
+        unsafe {
+            if blst_fp12_is_one(&ret) {
+                result = 1;
+            }
+        }
+        let mut output = [0u8; 32];
+        output[31] = result;
+        Ok(output.into())
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{extract_g1, extract_g2, FP_LENGTH};
+
+        let k = input.len() / INPUT_LENGTH;
+        let mut g_input = crate::vec![0u8; k * (6 * FP_LENGTH )];
+        for i in 0..k {
+            let offset = i * (G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH);
+            let data_offset = i * 6 * FP_LENGTH;
+            let (p0_x, p0_y) = extract_g1(&input[offset..offset + G1_INPUT_ITEM_LENGTH])?;
+            let (p1_x, p1_y) = extract_g2(
+                &input[offset + G1_INPUT_ITEM_LENGTH
+                    ..offset + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH],
+            )?;
+
+            if input[offset..offset + G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
+                g_input[data_offset] |= 0x40;
+            } else {
+                g_input[data_offset..data_offset + FP_LENGTH].copy_from_slice(p0_x);
+                g_input[data_offset + FP_LENGTH..data_offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
+            }
+
+            if input[offset + G1_INPUT_ITEM_LENGTH
+                ..offset + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH]
+                == [0; G2_INPUT_ITEM_LENGTH]
+            {
+                g_input[data_offset + 2 * FP_LENGTH] |= 0x40;
+            } else {
+                g_input[data_offset + 2 * FP_LENGTH..data_offset + 4 * FP_LENGTH]
+                    .copy_from_slice(&p1_x);
+                g_input[data_offset + 4 * FP_LENGTH..data_offset + 6 * FP_LENGTH]
+                    .copy_from_slice(&p1_y);
+            }
+        }
+
+        let output = aurora_engine_sdk::bls12381_pairing_check(&g_input[..]);
+        let output = if output == 2 {
+            crate::vec![0; 32]
+        } else {
+            let mut res = crate::vec![0; 31];
+            res.push(1);
+            res
+        };
+        Ok(output)
+    }
 }
 
 impl Precompile for BlsPairingCheck {
@@ -61,65 +172,8 @@ impl Precompile for BlsPairingCheck {
             }
         }
 
-        let k = input_len / INPUT_LENGTH;
-        // Accumulator for the fp12 multiplications of the miller loops.
-        let mut acc = blst_fp12::default();
-        for i in 0..k {
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p1_aff = &g1::extract_g1_input(
-                &input[i * INPUT_LENGTH..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH],
-                true,
-            )?;
-
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p2_aff = &g2::extract_g2_input(
-                &input[i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH
-                    ..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH + g2::G2_INPUT_ITEM_LENGTH],
-                true,
-            )?;
-
-            if i > 0 {
-                // After the first slice (i>0) we use cur_ml to store the current
-                // miller loop and accumulate with the previous results using a fp12
-                // multiplication.
-                let mut cur_ml = blst_fp12::default();
-                let mut res = blst_fp12::default();
-                // SAFETY: res, acc, cur_ml, p1_aff and p2_aff are blst values.
-                unsafe {
-                    blst_miller_loop(&mut cur_ml, p2_aff, p1_aff);
-                    blst_fp12_mul(&mut res, &acc, &cur_ml);
-                }
-                acc = res;
-            } else {
-                // On the first slice (i==0) there is no previous results and no need
-                // to accumulate.
-                // SAFETY: acc, p1_aff and p2_aff are blst values.
-                unsafe {
-                    blst_miller_loop(&mut acc, p2_aff, p1_aff);
-                }
-            }
-        }
-
-        // SAFETY: ret and acc are blst values.
-        let mut ret = blst_fp12::default();
-        unsafe {
-            blst_final_exp(&mut ret, &acc);
-        }
-
-        let mut result: u8 = 0;
-        // SAFETY: ret is a blst value.
-        unsafe {
-            if blst_fp12_is_one(&ret) {
-                result = 1;
-            }
-        }
-        let mut output = [0u8; 32];
-        output[31] = result;
-        Ok(PrecompileOutput::without_logs(cost, output.into()))
+        let output = Self::execute(input)?;
+        Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
 

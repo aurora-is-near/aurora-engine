@@ -1,8 +1,7 @@
-use super::{extract_scalar_input, g1, msm_required_gas, NBITS, SCALAR_LENGTH};
+use super::{msm_required_gas, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use blst::{blst_p1, blst_p1_affine, blst_p1_from_affine, blst_p1_to_affine, p1_affines};
 use evm::{Context, ExitError};
 
 /// Input length of `g1_mul` operation.
@@ -27,6 +26,88 @@ pub struct BlsG1Msm;
 
 impl BlsG1Msm {
     pub const ADDRESS: Address = make_address(0, 0xC);
+
+    #[cfg(feature = "std")]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::standalone::{extract_scalar_input, g1, NBITS};
+        use blst::{blst_p1, blst_p1_affine, blst_p1_from_affine, blst_p1_to_affine, p1_affines};
+
+        let k = input.len() / INPUT_LENGTH;
+        let mut g1_points: Vec<blst_p1> = Vec::with_capacity(k);
+        let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
+        for i in 0..k {
+            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH];
+
+            // BLST batch API for p1_affines blows up when you pass it a point at infinity, so we must
+            // filter points at infinity (and their corresponding scalars) from the input.
+            if slice.iter().all(|i| *i == 0) {
+                continue;
+            }
+
+            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
+            //
+            // So we set the subgroup_check flag to `true`
+            let p0_aff = &g1::extract_g1_input(slice, true)?;
+
+            let mut p0 = blst_p1::default();
+            // SAFETY: p0 and p0_aff are blst values.
+            unsafe { blst_p1_from_affine(&mut p0, p0_aff) };
+            g1_points.push(p0);
+
+            scalars.extend_from_slice(
+                &extract_scalar_input(
+                    &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
+                        ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
+                )?
+                .b,
+            );
+        }
+
+        // return infinity point if all points are infinity
+        if g1_points.is_empty() {
+            return Ok([0; 128].into());
+        }
+
+        let points = p1_affines::from(&g1_points);
+        let multiexp = points.mult(&scalars, NBITS);
+
+        let mut multiexp_aff = blst_p1_affine::default();
+        // SAFETY: multiexp_aff and multiexp are blst values.
+        unsafe { blst_p1_to_affine(&mut multiexp_aff, &multiexp) };
+
+        Ok(g1::encode_g1_point(&multiexp_aff))
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{extract_g1, padding_g1_result, FP_LENGTH};
+
+        let k = input.len() / INPUT_LENGTH;
+        let mut g1_input = crate::vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
+        for i in 0..k {
+            let (p0_x, p0_y) =
+                extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
+            // Data offset for the points
+            let offset = i * (2 * FP_LENGTH + SCALAR_LENGTH);
+            // Check is p0 zero coordinate
+            if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH]
+                == [0; G1_INPUT_ITEM_LENGTH]
+            {
+                g1_input[offset] = 0x40;
+            } else {
+                g1_input[offset..offset + FP_LENGTH].copy_from_slice(p0_x);
+                g1_input[offset + FP_LENGTH..offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
+            }
+            // Set scalar
+            let g1_range = offset + 2 * FP_LENGTH..offset + 2 * FP_LENGTH + SCALAR_LENGTH;
+            let scalar = &input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH];
+            g1_input[g1_range.clone()].copy_from_slice(scalar);
+            g1_input[g1_range].reverse();
+        }
+
+        let output = aurora_engine_sdk::bls12381_g1_multiexp(&g1_input[..]);
+        Ok(padding_g1_result(&output))
+    }
 }
 
 impl Precompile for BlsG1Msm {
@@ -62,56 +143,14 @@ impl Precompile for BlsG1Msm {
             return Err(ExitError::Other(Borrowed("ERR_BLS_G1MSM_INPUT_LEN")));
         }
 
-        let k = input_len / INPUT_LENGTH;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
                 return Err(ExitError::OutOfGas);
             }
         }
-        let mut g1_points: Vec<blst_p1> = Vec::with_capacity(k);
-        let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
-        for i in 0..k {
-            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH];
 
-            // BLST batch API for p1_affines blows up when you pass it a point at infinity, so we must
-            // filter points at infinity (and their corresponding scalars) from the input.
-            if slice.iter().all(|i| *i == 0) {
-                continue;
-            }
-
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p0_aff = &g1::extract_g1_input(slice, true)?;
-
-            let mut p0 = blst_p1::default();
-            // SAFETY: p0 and p0_aff are blst values.
-            unsafe { blst_p1_from_affine(&mut p0, p0_aff) };
-            g1_points.push(p0);
-
-            scalars.extend_from_slice(
-                &extract_scalar_input(
-                    &input[i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH
-                        ..i * INPUT_LENGTH + g1::G1_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
-                )?
-                .b,
-            );
-        }
-
-        // return infinity point if all points are infinity
-        if g1_points.is_empty() {
-            return Ok(PrecompileOutput::without_logs(cost, [0; 128].into()));
-        }
-
-        let points = p1_affines::from(&g1_points);
-        let multiexp = points.mult(&scalars, NBITS);
-
-        let mut multiexp_aff = blst_p1_affine::default();
-        // SAFETY: multiexp_aff and multiexp are blst values.
-        unsafe { blst_p1_to_affine(&mut multiexp_aff, &multiexp) };
-
-        let output = g1::encode_g1_point(&multiexp_aff);
+        let output = Self::execute(input)?;
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }

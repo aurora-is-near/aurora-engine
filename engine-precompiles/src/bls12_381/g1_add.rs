@@ -1,10 +1,7 @@
-use super::g1;
+use super::G1_INPUT_ITEM_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::Borrowed;
-use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use blst::{
-    blst_p1, blst_p1_add_or_double_affine, blst_p1_affine, blst_p1_from_affine, blst_p1_to_affine,
-};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 use evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g1_add` operation.
@@ -18,6 +15,63 @@ pub struct BlsG1Add;
 
 impl BlsG1Add {
     pub const ADDRESS: Address = make_address(0, 0xB);
+
+    #[cfg(feature = "std")]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::standalone::g1;
+        use blst::{
+            blst_p1, blst_p1_add_or_double_affine, blst_p1_affine, blst_p1_from_affine,
+            blst_p1_to_affine,
+        };
+
+        // NB: There is no subgroup check for the G1 addition precompile.
+        //
+        // We set the subgroup checks here to `false`
+        let a_aff = &g1::extract_g1_input(&input[..G1_INPUT_ITEM_LENGTH], false)?;
+        let b_aff = &g1::extract_g1_input(&input[G1_INPUT_ITEM_LENGTH..], false)?;
+
+        let mut b = blst_p1::default();
+        // SAFETY: b and b_aff are blst values.
+        unsafe { blst_p1_from_affine(&mut b, b_aff) };
+
+        let mut p = blst_p1::default();
+        // SAFETY: p, b and a_aff are blst values.
+        unsafe { blst_p1_add_or_double_affine(&mut p, &b, a_aff) };
+
+        let mut p_aff = blst_p1_affine::default();
+        // SAFETY: p_aff and p are blst values.
+        unsafe { blst_p1_to_affine(&mut p_aff, &p) };
+
+        Ok(g1::encode_g1_point(&p_aff))
+    }
+
+    #[cfg(not(feature = "std"))]
+    #[allow(clippy::range_plus_one)]
+    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
+        use super::{extract_g1, padding_g1_result, FP_LENGTH};
+
+        let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
+        let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
+
+        let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
+
+        if input[..G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
+            g1_input[1] |= 0x40;
+        } else {
+            g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
+            g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
+        }
+
+        if input[G1_INPUT_ITEM_LENGTH..] == [0; G1_INPUT_ITEM_LENGTH] {
+            g1_input[2 + 2 * FP_LENGTH] |= 0x40;
+        } else {
+            g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
+            g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
+        }
+
+        let output = aurora_engine_sdk::bls12381_p1_sum(&g1_input[..]);
+        Ok(padding_g1_result(&output))
+    }
 }
 
 impl Precompile for BlsG1Add {
@@ -40,6 +94,10 @@ impl Precompile for BlsG1Add {
         _context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        if input.len() != INPUT_LENGTH {
+            return Err(ExitError::Other(Borrowed("ERR_BLS_G1ADD_INPUT_LEN")));
+        }
+
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -47,29 +105,7 @@ impl Precompile for BlsG1Add {
             }
         }
 
-        if input.len() != INPUT_LENGTH {
-            return Err(ExitError::Other(Borrowed("ERR_BLS_G1ADD_INPUT_LEN")));
-        }
-
-        // NB: There is no subgroup check for the G1 addition precompile.
-        //
-        // We set the subgroup checks here to `false`
-        let a_aff = &g1::extract_g1_input(&input[..g1::G1_INPUT_ITEM_LENGTH], false)?;
-        let b_aff = &g1::extract_g1_input(&input[g1::G1_INPUT_ITEM_LENGTH..], false)?;
-
-        let mut b = blst_p1::default();
-        // SAFETY: b and b_aff are blst values.
-        unsafe { blst_p1_from_affine(&mut b, b_aff) };
-
-        let mut p = blst_p1::default();
-        // SAFETY: p, b and a_aff are blst values.
-        unsafe { blst_p1_add_or_double_affine(&mut p, &b, a_aff) };
-
-        let mut p_aff = blst_p1_affine::default();
-        // SAFETY: p_aff and p are blst values.
-        unsafe { blst_p1_to_affine(&mut p_aff, &p) };
-
-        let output = g1::encode_g1_point(&p_aff);
+        let output = Self::execute(input)?;
         Ok(PrecompileOutput::without_logs(cost, output))
     }
 }
