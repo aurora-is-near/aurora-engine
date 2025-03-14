@@ -2,7 +2,7 @@ use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::{Address, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::cell::RefCell;
 
@@ -32,6 +32,7 @@ fn test_deploy_code() {
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
     let mut handler = PromiseTracker::default();
     let mut engine: engine::Engine<_, _> =
