@@ -2,7 +2,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: aurora-engine-standalone-tracing
+  name: aurora-engine-transactions
   description: |-
     Aurora engine transactions testing library.
   tags:

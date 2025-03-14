@@ -1,4 +1,5 @@
 use super::{EvmPrecompileResult, Precompile};
+use crate::native::events::{ExitToNearLegacy, ExitToNearOmni};
 use crate::prelude::types::EthGas;
 use crate::prelude::{
     format,
@@ -7,21 +8,20 @@ use crate::prelude::{
     storage::{bytes_to_key, KeyPrefix},
     str,
     types::{Address, Yocto},
-    vec, Cow, ToString, Vec, H256, U256,
+    vec, Cow, String, ToString, Vec, H256, U256,
 };
 #[cfg(feature = "error_refund")]
 use crate::prelude::{parameters::RefundCallArgs, types};
 use crate::xcc::state::get_wnear_address;
 use crate::PrecompileOutput;
-use aurora_engine_types::parameters::connector::WithdrawSerializeType;
-use aurora_engine_types::parameters::WithdrawCallArgs;
-use aurora_engine_types::storage::EthConnectorStorageId;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh,
     parameters::{
-        ExitToNearPrecompileCallbackCallArgs, PromiseWithCallbackArgs, TransferNearCallArgs,
+        connector::WithdrawSerializeType, ExitToNearPrecompileCallbackCallArgs,
+        PromiseWithCallbackArgs, TransferNearCallArgs, WithdrawCallArgs,
     },
+    storage::EthConnectorStorageId,
     types::NEP141Wei,
 };
 use evm::backend::Log;
@@ -29,6 +29,11 @@ use evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 const UNWRAP_WNEAR_MSG: &str = "unwrap";
+#[cfg(not(feature = "error_refund"))]
+const MIN_INPUT_SIZE: usize = 3;
+#[cfg(feature = "error_refund")]
+const MIN_INPUT_SIZE: usize = 21;
+const MAX_INPUT_SIZE: usize = 1_024;
 
 mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -42,6 +47,8 @@ mod costs {
     /// Value determined experimentally based on tests and mainnet data. Example:
     /// `https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S`
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
+
+    pub(super) const FT_TRANSFER_CALL_GAS: NearGas = NearGas::new(70_000_000_000_000);
 
     /// Value determined experimentally based on tests.
     pub(super) const EXIT_TO_NEAR_CALLBACK_GAS: NearGas = NearGas::new(10_000_000_000_000);
@@ -80,14 +87,29 @@ pub mod events {
     /// the ERC-20 contract which calls the exit precompile. However, in the case
     /// of ETH exit the sender will give the true sender (and the `erc20_address`
     /// will not be meaningful because ETH is not an ERC-20 token).
-    pub struct ExitToNear {
+    pub enum ExitToNear {
+        Legacy(ExitToNearLegacy),
+        Omni(ExitToNearOmni),
+    }
+
+    impl ExitToNear {
+        #[must_use]
+        pub fn encode(self) -> ethabi::RawLog {
+            match self {
+                Self::Legacy(legacy) => legacy.encode(),
+                Self::Omni(omni) => omni.encode(),
+            }
+        }
+    }
+
+    pub struct ExitToNearLegacy {
         pub sender: Address,
         pub erc20_address: Address,
         pub dest: String,
         pub amount: U256,
     }
 
-    impl ExitToNear {
+    impl ExitToNearLegacy {
         #[must_use]
         pub fn encode(self) -> ethabi::RawLog {
             let data = ethabi::encode(&[ethabi::Token::Uint(self.amount.to_big_endian().into())]);
@@ -101,6 +123,64 @@ pub mod events {
             ];
 
             ethabi::RawLog { topics, data }
+        }
+    }
+
+    pub struct ExitToNearOmni {
+        pub sender: Address,
+        pub erc20_address: Address,
+        pub dest: String,
+        pub amount: U256,
+        pub msg: String,
+    }
+
+    impl ExitToNearOmni {
+        #[must_use]
+        pub fn encode(self) -> ethabi::RawLog {
+            let data = ethabi::encode(&[
+                ethabi::Token::Uint(self.amount.to_big_endian().into()),
+                ethabi::Token::String(self.msg),
+            ]);
+            let topics = vec![
+                EXIT_TO_NEAR_SIGNATURE.0.into(),
+                encode_address(self.sender),
+                encode_address(self.erc20_address),
+                aurora_engine_sdk::keccak(&ethabi::encode(&[ethabi::Token::String(self.dest)]))
+                    .0
+                    .into(),
+            ];
+
+            ethabi::RawLog { topics, data }
+        }
+    }
+
+    #[must_use]
+    pub fn exit_to_near_schema() -> ethabi::Event {
+        ethabi::Event {
+            name: "ExitToNear".to_string(),
+            inputs: vec![
+                ethabi::EventParam {
+                    name: "sender".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "erc20_address".to_string(),
+                    kind: ethabi::ParamType::Address,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "dest".to_string(),
+                    kind: ethabi::ParamType::String,
+                    indexed: true,
+                },
+                ethabi::EventParam {
+                    name: "amount".to_string(),
+                    kind: ethabi::ParamType::Uint(256),
+                    indexed: false,
+                },
+            ],
+            anonymous: false,
         }
     }
 
@@ -136,42 +216,6 @@ pub mod events {
         }
     }
 
-    fn encode_address(a: Address) -> ethabi::Hash {
-        let mut result = [0u8; 32];
-        result[12..].copy_from_slice(a.as_bytes());
-        result.into()
-    }
-
-    #[must_use]
-    pub fn exit_to_near_schema() -> ethabi::Event {
-        ethabi::Event {
-            name: "ExitToNear".to_string(),
-            inputs: vec![
-                ethabi::EventParam {
-                    name: "sender".to_string(),
-                    kind: ethabi::ParamType::Address,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "erc20_address".to_string(),
-                    kind: ethabi::ParamType::Address,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "dest".to_string(),
-                    kind: ethabi::ParamType::String,
-                    indexed: true,
-                },
-                ethabi::EventParam {
-                    name: "amount".to_string(),
-                    kind: ethabi::ParamType::Uint(256),
-                    indexed: false,
-                },
-            ],
-            anonymous: false,
-        }
-    }
-
     #[must_use]
     pub fn exit_to_eth_schema() -> ethabi::Event {
         ethabi::Event {
@@ -201,9 +245,19 @@ pub mod events {
             anonymous: false,
         }
     }
+
+    fn encode_address(a: Address) -> ethabi::Hash {
+        let mut result = [0u8; 32];
+        result[12..].copy_from_slice(a.as_bytes());
+        result.into()
+    }
 }
 
-//TransferEthToNear
+trait EthConnector {
+    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError>;
+}
+
+/// Transfer ETH(base) or ERC-20 tokens to NEAR.
 pub struct ExitToNear<I> {
     current_account_id: AccountId,
     io: I,
@@ -225,6 +279,17 @@ impl<I> ExitToNear<I> {
             current_account_id,
             io,
         }
+    }
+}
+
+impl<I: IO> EthConnector for ExitToNear<I> {
+    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
+
+        Ok(eth_connector_account_id)
     }
 }
 
@@ -271,17 +336,26 @@ fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
     bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
 }
 
-fn validate_amount(amount: U256) -> Result<(), ExitError> {
+fn parse_amount(input: &[u8]) -> Result<U256, ExitError> {
+    let amount = U256::from_big_endian(input);
+
     if amount > U256::from(u128::MAX) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
     }
-    Ok(())
+
+    Ok(amount)
 }
 
-#[derive(Debug, PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 struct Recipient<'a> {
     receiver_account_id: AccountId,
-    message: Option<&'a str>,
+    message: Option<Message<'a>>,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+enum Message<'a> {
+    UnwrapWnear,
+    Omni(&'a str),
 }
 
 fn parse_recipient(recipient: &[u8]) -> Result<Recipient<'_>, ExitError> {
@@ -289,7 +363,13 @@ fn parse_recipient(recipient: &[u8]) -> Result<Recipient<'_>, ExitError> {
         .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECEIVER_ACCOUNT_ID")))?;
     let (receiver_account_id, message) = recipient.split_once(':').map_or_else(
         || (recipient, None),
-        |(recipient, msg)| (recipient, Some(msg)),
+        |(recipient, msg)| {
+            if msg == UNWRAP_WNEAR_MSG {
+                (recipient, Some(Message::UnwrapWnear))
+            } else {
+                (recipient, Some(Message::Omni(msg)))
+            }
+        },
     );
 
     Ok(Recipient {
@@ -313,29 +393,16 @@ impl<I: IO> Precompile for ExitToNear<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        // ETH transfer input format: (85 bytes)
+        // ETH (base) transfer input format: (85 bytes)
         //  - flag (1 byte)
-        //  - refund_address (20 bytes)
-        //  - recipient_account_id (max 64 bytes)
-        // ERC20 transfer input format: (117 bytes)
+        //  - refund_address (20 bytes), present if the feature "error_refund" is enabled
+        //  - recipient_account_id (max MAX_INPUT_SIZE - 20 - 1 bytes)
+        // ERC-20 transfer input format: (124 bytes)
         //  - flag (1 byte)
-        //  - refund_address (20 bytes)
+        //  - refund_address (20 bytes), present if the feature "error_refund" is enabled.
         //  - amount (32 bytes)
-        //  - recipient_account_id (max 64 bytes)
-        #[cfg(feature = "error_refund")]
-        fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
-            validate_input_size(input, 21, 117)?;
-            let mut buffer = [0; 20];
-            buffer.copy_from_slice(&input[1..21]);
-            let refund_address = Address::from_array(buffer);
-            Ok((refund_address, &input[21..]))
-        }
-        #[cfg(not(feature = "error_refund"))]
-        fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
-            validate_input_size(input, 3, 117)?;
-            Ok(&input[1..])
-        }
-
+        //  - recipient_account_id (max MAX_INPUT_SIZE - 1 - (20) - 32 bytes)
+        //  - `:unwrap` suffix in a case of wNEAR (7 bytes)
         if let Some(target_gas) = target_gas {
             if Self::required_gas(input)? > target_gas {
                 return Err(ExitError::OutOfGas);
@@ -349,144 +416,55 @@ impl<I: IO> Precompile for ExitToNear<I> {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
-        // First byte of the input is a flag, selecting the behavior to be triggered:
-        //      0x0 -> Eth transfer
-        //      0x1 -> Erc20 transfer
-        let flag = input.first().copied().unwrap_or_default();
-        #[cfg(feature = "error_refund")]
-        let (refund_address, mut input) = parse_input(input)?;
-        #[cfg(not(feature = "error_refund"))]
-        let mut input = parse_input(input)?;
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
-        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
+        let exit_to_near_params = ExitToNearParams::try_from(input)?;
 
-        let (nep141_address, args, exit_event, method, transfer_near_args) = match flag {
-            0x0 => {
-                // ETH transfer
+        let (nep141_address, args, exit_event, method, transfer_near_args) =
+            match exit_to_near_params {
+                // ETH(base) token transfer
                 //
                 // Input slice format:
-                // recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 ETH tokens
-
-                if let Ok(dest_account) = AccountId::try_from(input) {
-                    (
-                        eth_connector_account_id,
-                        // There is no way to inject json, given the encoding of both arguments
-                        // as decimal and valid account id respectively.
-                        format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            dest_account,
-                            context.apparent_value.as_u128()
-                        ),
-                        events::ExitToNear {
-                            sender: Address::new(context.caller),
-                            erc20_address: events::ETH_ADDRESS,
-                            dest: dest_account.to_string(),
-                            amount: context.apparent_value,
-                        },
-                        "ft_transfer",
-                        None,
-                    )
-                } else {
-                    return Err(ExitError::Other(Cow::from(
-                        "ERR_INVALID_RECEIVER_ACCOUNT_ID",
-                    )));
+                //  recipient_account_id (bytes) - the NEAR recipient account which will receive
+                //  NEP-141 (base) tokens, or also can contain the `:unwrap` suffix in case of
+                //  withdrawing wNEAR, or other message of JSON in case of OMNI, or address of
+                //  receiver in case of transfer tokens to another engine contract.
+                ExitToNearParams::BaseToken(ref exit_params) => {
+                    let eth_connector_account_id = self.get_eth_connector_contract_account()?;
+                    exit_base_token_to_near(eth_connector_account_id, context, exit_params)?
                 }
-            }
-            0x1 => {
-                // ERC-20 transfer
+                // ERC-20 token transfer
                 //
-                // This precompile branch is expected to be called from the ERC20 burn function.
+                // This precompile branch is expected to be called from the ERC-20 burn function.
                 //
                 // Input slice format:
-                //      amount (U256 big-endian bytes) - the amount that was burned
-                //      recipient_account_id (bytes) - the NEAR recipient account which will receive NEP-141 tokens
-
-                if context.apparent_value != U256::from(0) {
-                    return Err(ExitError::Other(Cow::from(
-                        "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
-                    )));
+                //  amount (U256 big-endian bytes) - the amount that was burned
+                //  recipient_account_id (bytes) - the NEAR recipient account which will receive
+                //  NEP-141 tokens, or also can contain the `:unwrap` suffix in case of withdrawing
+                //  wNEAR, or other message of JSON in case of OMNI, or address of receiver in case
+                //  of transfer tokens to another engine contract.
+                ExitToNearParams::Erc20TokenParams(ref exit_params) => {
+                    exit_erc20_token_to_near(context, exit_params, &self.io)?
                 }
-
-                let erc20_address = context.caller;
-                let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
-
-                let amount = U256::from_big_endian(&input[..32]);
-                input = &input[32..];
-
-                validate_amount(amount)?;
-                let recipient = parse_recipient(input)?;
-
-                let (args, method, transfer_near_args) = if recipient.message
-                    == Some(UNWRAP_WNEAR_MSG)
-                    && erc20_address == get_wnear_address(&self.io).raw()
-                {
-                    (
-                        format!(r#"{{"amount": "{}"}}"#, amount.as_u128()),
-                        "near_withdraw",
-                        Some(TransferNearCallArgs {
-                            target_account_id: recipient.receiver_account_id.clone(),
-                            amount: amount.as_u128(),
-                        }),
-                    )
-                } else {
-                    // There is no way to inject json, given the encoding of both arguments
-                    // as decimal and valid account id respectively.
-                    (
-                        format!(
-                            r#"{{"receiver_id": "{}", "amount": "{}", "memo": null}}"#,
-                            recipient.receiver_account_id,
-                            amount.as_u128()
-                        ),
-                        "ft_transfer",
-                        None,
-                    )
-                };
-
-                (
-                    nep141_address,
-                    args,
-                    events::ExitToNear {
-                        sender: Address::new(erc20_address),
-                        erc20_address: Address::new(erc20_address),
-                        dest: recipient.receiver_account_id.to_string(),
-                        amount,
-                    },
-                    method,
-                    transfer_near_args,
-                )
-            }
-            _ => return Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
-        };
-
-        #[cfg(feature = "error_refund")]
-        let erc20_address = if flag == 0 {
-            None
-        } else {
-            Some(exit_event.erc20_address)
-        };
-        #[cfg(feature = "error_refund")]
-        let refund_args = RefundCallArgs {
-            recipient_address: refund_address,
-            erc20_address,
-            amount: types::u256_to_arr(&exit_event.amount),
-        };
+            };
 
         let callback_args = ExitToNearPrecompileCallbackCallArgs {
             #[cfg(feature = "error_refund")]
-            refund: Some(refund_args),
+            refund: refund_call_args(&exit_to_near_params, &exit_event),
             #[cfg(not(feature = "error_refund"))]
             refund: None,
             transfer_near: transfer_near_args,
         };
+        let attached_gas = if method == "ft_transfer_call" {
+            costs::FT_TRANSFER_CALL_GAS
+        } else {
+            costs::FT_TRANSFER_GAS
+        };
 
         let transfer_promise = PromiseCreateArgs {
             target_account_id: nep141_address,
-            method: method.to_string(),
-            args: args.as_bytes().to_vec(),
+            method,
+            args: args.into_bytes(),
             attached_balance: Yocto::new(1),
-            attached_gas: costs::FT_TRANSFER_GAS,
+            attached_gas,
         };
 
         let promise = if callback_args == ExitToNearPrecompileCallbackCallArgs::default() {
@@ -508,15 +486,11 @@ impl<I: IO> Precompile for ExitToNear<I> {
             topics: Vec::new(),
             data: borsh::to_vec(&promise).unwrap(),
         };
-        let exit_event_log = exit_event.encode();
+        let ethabi::RawLog { topics, data } = exit_event.encode();
         let exit_event_log = Log {
             address: exit_to_near::ADDRESS.raw(),
-            topics: exit_event_log
-                .topics
-                .into_iter()
-                .map(|h| H256::from(h.0))
-                .collect(),
-            data: exit_event_log.data,
+            topics: topics.into_iter().map(|h| H256::from(h.0)).collect(),
+            data,
         };
 
         Ok(PrecompileOutput {
@@ -525,6 +499,300 @@ impl<I: IO> Precompile for ExitToNear<I> {
             output: Vec::new(),
         })
     }
+}
+
+fn exit_base_token_to_near(
+    eth_connector_account_id: AccountId,
+    context: &Context,
+    exit_params: &BaseTokenParams,
+) -> Result<
+    (
+        AccountId,
+        String,
+        events::ExitToNear,
+        String,
+        Option<TransferNearCallArgs>,
+    ),
+    ExitError,
+> {
+    match exit_params.message {
+        Some(Message::Omni(msg)) => Ok((
+            eth_connector_account_id,
+            format!(
+                r#"{{"receiver_id":"{}","amount":"{}","msg":"{msg}"}}"#,
+                exit_params.receiver_account_id,
+                context.apparent_value.as_u128(),
+            ),
+            events::ExitToNear::Omni(ExitToNearOmni {
+                sender: Address::new(context.caller),
+                erc20_address: events::ETH_ADDRESS,
+                dest: exit_params.receiver_account_id.to_string(),
+                amount: context.apparent_value,
+                msg: msg.to_string(),
+            }),
+            "ft_transfer_call".to_string(),
+            None,
+        )),
+        None => Ok((
+            eth_connector_account_id,
+            // There is no way to inject json, given the encoding of both arguments
+            // as decimal and valid account id respectively.
+            format!(
+                r#"{{"receiver_id":"{}","amount":"{}"}}"#,
+                exit_params.receiver_account_id,
+                context.apparent_value.as_u128()
+            ),
+            events::ExitToNear::Legacy(ExitToNearLegacy {
+                sender: Address::new(context.caller),
+                erc20_address: events::ETH_ADDRESS,
+                dest: exit_params.receiver_account_id.to_string(),
+                amount: context.apparent_value,
+            }),
+            "ft_transfer".to_string(),
+            None,
+        )),
+        _ => Err(ExitError::Other(Cow::from("ERR_INVALID_MESSAGE"))),
+    }
+}
+
+fn exit_erc20_token_to_near<I: IO>(
+    context: &Context,
+    exit_params: &Erc20TokenParams,
+    io: &I,
+) -> Result<
+    (
+        AccountId,
+        String,
+        events::ExitToNear,
+        String,
+        Option<TransferNearCallArgs>,
+    ),
+    ExitError,
+> {
+    // In case of withdrawing ERC-20 tokens, the `apparent_value` should be zero. In opposite way
+    // the funds will be locked in the address of the precompile without any possibility
+    // to withdraw them in the future. So, in case if the `apparent_value` is not zero, the error
+    // will be returned to prevent that.
+    if context.apparent_value != U256::zero() {
+        return Err(ExitError::Other(Cow::from(
+            "ERR_ETH_ATTACHED_FOR_ERC20_EXIT",
+        )));
+    }
+
+    let erc20_address = context.caller; // because ERC-20 contract calls the precompile.
+    let nep141_account_id = get_nep141_from_erc20(erc20_address.as_bytes(), io)?;
+
+    let (nep141_account_id, args, method, transfer_near_args, event) = match exit_params.message {
+        Some(Message::UnwrapWnear) => {
+            // The flow is following here:
+            // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
+            // In such way we unwrap wNEAR to NEAR.
+            // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
+            // in which make transfer of unwrapped NEAR to the `target_account_id`.
+            if erc20_address == get_wnear_address(io).raw() {
+                // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
+                (
+                    nep141_account_id,
+                    format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
+                    "near_withdraw",
+                    Some(TransferNearCallArgs {
+                        target_account_id: exit_params.receiver_account_id.clone(),
+                        amount: exit_params.amount.as_u128(),
+                    }),
+                    events::ExitToNear::Legacy(ExitToNearLegacy {
+                        sender: Address::new(erc20_address),
+                        erc20_address: Address::new(erc20_address),
+                        dest: exit_params.receiver_account_id.to_string(),
+                        amount: exit_params.amount,
+                    }),
+                )
+            } else {
+                return Err(ExitError::Other(Cow::from("ERR_INVALID_ERC20_FOR_UNWRAP")));
+            }
+        }
+        // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
+        Some(Message::Omni(msg)) => (
+            nep141_account_id,
+            format!(
+                r#"{{"receiver_id":"{}","amount":"{}","msg":"{msg}"}}"#,
+                exit_params.receiver_account_id, // the locker's account id in case of OMNI
+                exit_params.amount.as_u128(),
+            ),
+            "ft_transfer_call",
+            None,
+            events::ExitToNear::Omni(ExitToNearOmni {
+                sender: Address::new(erc20_address),
+                erc20_address: Address::new(erc20_address),
+                dest: exit_params.receiver_account_id.to_string(),
+                amount: exit_params.amount,
+                msg: msg.to_string(),
+            }),
+        ),
+        // The legacy flow. Just withdraw the tokens to the NEAR account id.
+        None => {
+            // There is no way to inject json, given the encoding of both arguments
+            // as decimal and valid account id respectively.
+            (
+                nep141_account_id,
+                format!(
+                    r#"{{"receiver_id":"{}","amount":"{}"}}"#,
+                    exit_params.receiver_account_id,
+                    exit_params.amount.as_u128()
+                ),
+                "ft_transfer",
+                None,
+                events::ExitToNear::Legacy(ExitToNearLegacy {
+                    sender: Address::new(erc20_address),
+                    erc20_address: Address::new(erc20_address),
+                    dest: exit_params.receiver_account_id.to_string(),
+                    amount: exit_params.amount,
+                }),
+            )
+        }
+    };
+
+    Ok((
+        nep141_account_id,
+        args,
+        event,
+        method.to_string(),
+        transfer_near_args,
+    ))
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn json_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    Ok(format!(
+        r#"{{"amount":"{}","recipient":"{}"}}"#,
+        amount.as_u128(),
+        address.encode(),
+    )
+    .into_bytes())
+}
+
+fn borsh_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
+    borsh::to_vec(&WithdrawCallArgs {
+        recipient_address: address,
+        amount: NEP141Wei::new(amount.as_u128()),
+    })
+    .map_err(|_| ExitError::Other(Cow::from("ERR_BORSH_SERIALIZE")))
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+enum ExitToNearParams<'a> {
+    BaseToken(BaseTokenParams<'a>),
+    Erc20TokenParams(Erc20TokenParams<'a>),
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+struct BaseTokenParams<'a> {
+    #[cfg(feature = "error_refund")]
+    refund_address: Address,
+    receiver_account_id: AccountId,
+    message: Option<Message<'a>>,
+}
+
+#[cfg_attr(test, derive(Debug, PartialEq))]
+struct Erc20TokenParams<'a> {
+    #[cfg(feature = "error_refund")]
+    refund_address: Address,
+    receiver_account_id: AccountId,
+    amount: U256,
+    message: Option<Message<'a>>,
+}
+
+#[cfg(feature = "error_refund")]
+#[allow(clippy::unnecessary_wraps)]
+fn refund_call_args(
+    params: &ExitToNearParams,
+    event: &events::ExitToNear,
+) -> Option<RefundCallArgs> {
+    Some(RefundCallArgs {
+        recipient_address: match params {
+            ExitToNearParams::BaseToken(params) => params.refund_address,
+            ExitToNearParams::Erc20TokenParams(params) => params.refund_address,
+        },
+        erc20_address: match params {
+            ExitToNearParams::BaseToken(_) => None,
+            ExitToNearParams::Erc20TokenParams(_) => {
+                let erc20_address = match event {
+                    events::ExitToNear::Legacy(ref legacy) => legacy.erc20_address,
+                    events::ExitToNear::Omni(ref omni) => omni.erc20_address,
+                };
+                Some(erc20_address)
+            }
+        },
+        amount: types::u256_to_arr(&match event {
+            events::ExitToNear::Legacy(ref legacy) => legacy.amount,
+            events::ExitToNear::Omni(ref omni) => omni.amount,
+        }),
+    })
+}
+
+impl<'a> TryFrom<&'a [u8]> for ExitToNearParams<'a> {
+    type Error = ExitError;
+
+    fn try_from(input: &'a [u8]) -> Result<Self, Self::Error> {
+        // First byte of the input is a flag, selecting the behavior to be triggered:
+        // 0x00 -> Eth(base) token withdrawal
+        // 0x01 -> ERC-20 token withdrawal
+        let flag = input
+            .first()
+            .copied()
+            .ok_or_else(|| ExitError::Other(Cow::from("ERR_MISSING_FLAG")))?;
+
+        #[cfg(feature = "error_refund")]
+        let (refund_address, input) = parse_input(input)?;
+        #[cfg(not(feature = "error_refund"))]
+        let input = parse_input(input)?;
+
+        match flag {
+            0x0 => {
+                let Recipient {
+                    receiver_account_id,
+                    message,
+                } = parse_recipient(input)?;
+
+                Ok(Self::BaseToken(BaseTokenParams {
+                    #[cfg(feature = "error_refund")]
+                    refund_address,
+                    receiver_account_id,
+                    message,
+                }))
+            }
+            0x1 => {
+                let amount = parse_amount(&input[..32])?;
+                let Recipient {
+                    receiver_account_id,
+                    message,
+                } = parse_recipient(&input[32..])?;
+
+                Ok(Self::Erc20TokenParams(Erc20TokenParams {
+                    #[cfg(feature = "error_refund")]
+                    refund_address,
+                    receiver_account_id,
+                    amount,
+                    message,
+                }))
+            }
+            _ => Err(ExitError::Other(Cow::from("ERR_INVALID_FLAG"))),
+        }
+    }
+}
+
+#[cfg(feature = "error_refund")]
+fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
+    validate_input_size(input, MIN_INPUT_SIZE, MAX_INPUT_SIZE)?;
+    let mut buffer = [0; 20];
+    buffer.copy_from_slice(&input[1..21]);
+    let refund_address = Address::from_array(buffer);
+    Ok((refund_address, &input[21..]))
+}
+
+#[cfg(not(feature = "error_refund"))]
+fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
+    validate_input_size(input, MIN_INPUT_SIZE, MAX_INPUT_SIZE)?;
+    Ok(&input[1..])
 }
 
 pub struct ExitToEthereum<I> {
@@ -544,17 +812,32 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    #[cfg(not(feature = "ext-connector"))]
-    pub const fn new(current_account_id: AccountId, io: I) -> Self {
-        Self {
-            io,
-            current_account_id,
+    #[allow(clippy::missing_const_for_fn, clippy::needless_pass_by_value)]
+    pub fn new(current_account_id: AccountId, io: I) -> Self {
+        #[cfg(not(feature = "ext-connector"))]
+        {
+            Self {
+                io,
+                current_account_id,
+            }
+        }
+
+        #[cfg(feature = "ext-connector")]
+        {
+            let _ = current_account_id;
+            Self { io }
         }
     }
+}
 
-    #[cfg(feature = "ext-connector")]
-    pub const fn new(io: I) -> Self {
-        Self { io }
+impl<I: IO> EthConnector for ExitToEthereum<I> {
+    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
+        #[cfg(not(feature = "ext-connector"))]
+        let eth_connector_account_id = self.current_account_id.clone();
+        #[cfg(feature = "ext-connector")]
+        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
+
+        Ok(eth_connector_account_id)
     }
 }
 
@@ -571,10 +854,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         context: &Context,
         is_static: bool,
     ) -> EvmPrecompileResult {
-        // ETH transfer input format (min size 21 bytes)
+        // ETH (Base token) transfer input format (min size 21 bytes)
         //  - flag (1 byte)
         //  - eth_recipient (20 bytes)
-        // ERC20 transfer input format: max 53 bytes
+        // ERC-20 transfer input format: max 53 bytes
         //  - flag (1 byte)
         //  - amount (32 bytes)
         //  - eth_recipient (20 bytes)
@@ -593,22 +876,18 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         }
 
         // First byte of the input is a flag, selecting the behavior to be triggered:
-        //      0x0 -> Eth transfer
-        //      0x1 -> Erc20 transfer
+        //  0x00 -> ETH (Base token) token transfer
+        //  0x01 -> ERC-20 transfer
         let mut input = input;
         let flag = input[0];
         input = &input[1..];
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
-        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
 
         let (nep141_address, serialized_args, exit_event) = match flag {
             0x0 => {
-                // ETH transfer
+                // ETH (base) transfer
                 //
                 // Input slice format:
-                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+                //  eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
                 let recipient_address: Address = input
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
@@ -616,6 +895,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                     WithdrawSerializeType::Json => json_args,
                     WithdrawSerializeType::Borsh => borsh_args,
                 };
+                let eth_connector_account_id = self.get_eth_connector_contract_account()?;
+
                 (
                     eth_connector_account_id,
                     // There is no way to inject json, given the encoding of both arguments
@@ -636,8 +917,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                 // (or burn function with some flag provided that this is expected to be withdrawn)
                 //
                 // Input slice format:
-                //      amount (U256 big-endian bytes) - the amount that was burned
-                //      eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
+                //  amount (U256 big-endian bytes) - the amount that was burned
+                //  eth_recipient (20 bytes) - the address of recipient which will receive ETH on Ethereum
 
                 if context.apparent_value != U256::from(0) {
                     return Err(ExitError::Other(Cow::from(
@@ -647,11 +928,9 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
                 let erc20_address = context.caller;
                 let nep141_address = get_nep141_from_erc20(erc20_address.as_bytes(), &self.io)?;
+                let amount = parse_amount(&input[..32])?;
 
-                let amount = U256::from_big_endian(&input[..32]);
                 input = &input[32..];
-
-                validate_amount(amount)?;
 
                 if input.len() == 20 {
                     // Parse ethereum address in hex
@@ -707,15 +986,11 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             topics: Vec::new(),
             data: promise,
         };
-        let exit_event_log = exit_event.encode();
+        let ethabi::RawLog { topics, data } = exit_event.encode();
         let exit_event_log = Log {
             address: exit_to_ethereum::ADDRESS.raw(),
-            topics: exit_event_log
-                .topics
-                .into_iter()
-                .map(|h| H256::from(h.0))
-                .collect(),
-            data: exit_event_log.data,
+            topics: topics.into_iter().map(|h| H256::from(h.0)).collect(),
+            data,
         };
 
         Ok(PrecompileOutput {
@@ -726,30 +1001,15 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
-fn json_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
-    Ok(format!(
-        r#"{{"amount": "{}", "recipient": "{}"}}"#,
-        amount.as_u128(),
-        address.encode(),
-    )
-    .into_bytes())
-}
-
-fn borsh_args(address: Address, amount: U256) -> Result<Vec<u8>, ExitError> {
-    borsh::to_vec(&WithdrawCallArgs {
-        recipient_address: address,
-        amount: NEP141Wei::new(amount.as_u128()),
-    })
-    .map_err(|_| ExitError::Other(Cow::from("ERR_BORSH_SERIALIZE")))
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        exit_to_ethereum, exit_to_near, parse_recipient, validate_amount, validate_input_size,
+        exit_to_ethereum, exit_to_near, parse_amount, parse_input, parse_recipient,
+        validate_input_size, BaseTokenParams, Erc20TokenParams, ExitToNearParams, Message,
     };
     use crate::{native::Recipient, prelude::sdk::types::near_account_to_evm_address};
+    #[cfg(feature = "error_refund")]
+    use aurora_engine_types::types::Address;
     use aurora_engine_types::U256;
 
     #[test]
@@ -808,12 +1068,17 @@ mod tests {
     #[test]
     #[should_panic(expected = "ERR_INVALID_AMOUNT")]
     fn test_exit_with_invalid_amount() {
-        validate_amount(U256::MAX).unwrap();
+        let input = (U256::from(u128::MAX) + 1).to_big_endian();
+        parse_amount(input.as_slice()).unwrap();
     }
 
     #[test]
     fn test_exit_with_valid_amount() {
-        validate_amount(U256::from(u128::MAX)).unwrap();
+        let input = U256::from(u128::MAX).to_big_endian();
+        assert_eq!(
+            parse_amount(input.as_slice()).unwrap(),
+            U256::from(u128::MAX)
+        );
     }
 
     #[test]
@@ -830,7 +1095,21 @@ mod tests {
             parse_recipient(b"test.near:unwrap").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("unwrap"),
+                message: Some(Message::UnwrapWnear),
+            }
+        );
+
+        assert_eq!(
+            parse_recipient(
+                b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2:unwrap"
+            )
+            .unwrap(),
+            Recipient {
+                receiver_account_id:
+                    "e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2"
+                        .parse()
+                        .unwrap(),
+                message: Some(Message::UnwrapWnear),
             }
         );
 
@@ -838,7 +1117,7 @@ mod tests {
             parse_recipient(b"test.near:some_msg:with_extra_colon").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some("some_msg:with_extra_colon"),
+                message: Some(Message::Omni("some_msg:with_extra_colon")),
             }
         );
 
@@ -846,7 +1125,7 @@ mod tests {
             parse_recipient(b"test.near:").unwrap(),
             Recipient {
                 receiver_account_id: "test.near".parse().unwrap(),
-                message: Some(""),
+                message: Some(Message::Omni("")),
             }
         );
     }
@@ -856,5 +1135,143 @@ mod tests {
         assert!(parse_recipient(b"test@.near").is_err());
         assert!(parse_recipient(b"test@.near:msg").is_err());
         assert!(parse_recipient(&[0xc2]).is_err());
+    }
+
+    #[test]
+    fn test_parse_input() {
+        #[cfg(feature = "error_refund")]
+        let refund_address = Address::zero();
+        let amount = U256::from(100);
+        let input = [
+            &[1],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(),
+            b"test.near",
+        ]
+        .concat();
+        assert!(parse_input(&input).is_ok());
+
+        let input = [
+            &[0],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            b"test.near:unwrap".as_slice(),
+        ]
+        .concat();
+        assert!(parse_input(&input).is_ok());
+
+        let input = [
+            &[1],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(),
+            b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2:unwrap",
+        ]
+        .concat();
+        assert!(parse_input(&input).is_ok());
+
+        let input = [
+            &[1], // flag
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(), // amount
+            b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2:unwrap",
+        ]
+        .concat();
+        assert!(parse_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_parse_exit_to_near_params() {
+        let amount = U256::from(100);
+        #[cfg(feature = "error_refund")]
+        let refund_address = Address::from_array([1; 20]);
+
+        let assert_input = |input: Vec<u8>, expected| {
+            let actual = ExitToNearParams::try_from(input.as_slice()).unwrap();
+            assert_eq!(actual, expected);
+        };
+
+        let input = [
+            &[0],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            b"test.near".as_slice(),
+        ]
+        .concat();
+        assert_input(
+            input,
+            ExitToNearParams::BaseToken(BaseTokenParams {
+                #[cfg(feature = "error_refund")]
+                refund_address,
+                receiver_account_id: "test.near".parse().unwrap(),
+                message: None,
+            }),
+        );
+
+        let input = [
+            &[1],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(),
+            b"test.near:unwrap",
+        ]
+        .concat();
+        assert_input(
+            input,
+            ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
+                #[cfg(feature = "error_refund")]
+                refund_address,
+                receiver_account_id: "test.near".parse().unwrap(),
+                amount,
+                message: Some(Message::UnwrapWnear),
+            }),
+        );
+
+        let input = [
+            &[1],
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(),
+            b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2:unwrap",
+        ]
+        .concat();
+        assert_input(
+            input,
+            ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
+                #[cfg(feature = "error_refund")]
+                refund_address,
+                receiver_account_id:
+                    "e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2"
+                        .parse()
+                        .unwrap(),
+                amount,
+                message: Some(Message::UnwrapWnear),
+            }),
+        );
+
+        let input = [
+            &[1], // flag
+            #[cfg(feature = "error_refund")]
+            refund_address.as_bytes(),
+            amount.to_big_endian().as_slice(), // amount
+            b"e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2",
+            b":",
+            "{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}".as_bytes(),
+        ]
+        .concat();
+        assert_input(input,
+            ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
+                #[cfg(feature = "error_refund")]
+                refund_address,
+                receiver_account_id:
+                    "e523efec9b66c4c8f6e708f1cf56be1399181e5b7c1e35f845670429faf143c2"
+                        .parse()
+                        .unwrap(),
+                amount,
+                message: Some(Message::Omni("{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}")),
+            })
+        );
     }
 }

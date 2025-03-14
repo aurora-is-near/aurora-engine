@@ -1,6 +1,6 @@
 use crate::eip_2930::AccessTuple;
 use crate::Error;
-use aurora_engine_precompiles::secp256k1::ecrecover;
+use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
@@ -87,11 +87,11 @@ impl SignedTransaction1559 {
         rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);
         let message_hash = aurora_engine_sdk::keccak(rlp_stream.as_raw());
-        ecrecover(
+        sdk::ecrecover(
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
-        .map_err(|_e| Error::EcRecover)
+        .map_err(|_| Error::EcRecover)
     }
 }
 

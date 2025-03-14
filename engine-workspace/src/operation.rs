@@ -82,7 +82,7 @@ impl_view_return![
     (ViewFtMetadata => FungibleTokenMetadata, View::FtMetadata, json),
     (ViewVersion => String, View::Version, borsh),
     (ViewOwner => AccountId, View::Owner, from_bytes),
-    (ViewBridgeProver => AccountId, View::BridgeProver, borsh),
+    (ViewBridgeProver => AccountId, View::BridgeProver, from_bytes),
     (ViewChainId => U256, View::ChainId, borsh_U256),
     (ViewUpgradeIndex => u64, View::UpgradeIndex, borsh),
     (ViewPausedPrecompiles => u32, View::PausedPrecompiles, borsh),

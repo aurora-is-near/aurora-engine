@@ -11,7 +11,6 @@ publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-precompiles.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
 evm.workspace = true
@@ -25,6 +24,6 @@ hex.workspace = true
 workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "evm/std", "rlp/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
-contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
+contract = ["aurora-engine-sdk/contract"]

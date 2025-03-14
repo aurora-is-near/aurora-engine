@@ -48,7 +48,7 @@ near-primitives = "0.27"
 near-primitives-core = "0.27"
 near-sdk = "5"
 near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.16"
+near-workspaces = "0.17"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -77,7 +77,6 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
-too_long_first_doc_paragraph = "allow"
 
 [workspace]
 resolver = "2"
