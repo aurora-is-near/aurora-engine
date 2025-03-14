@@ -7,7 +7,7 @@ use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::io::IO;
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_types::types::{Address, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H256, U256};
 use engine_standalone_storage::{BlockMetadata, Storage};
 
@@ -45,6 +45,7 @@ pub fn default_env(block_height: u64) -> aurora_engine_sdk::env::Fixed {
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     }
 }
 
