@@ -117,15 +117,6 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Get bridge prover id for this contract.
-    #[no_mangle]
-    pub extern "C" fn get_bridge_prover() {
-        let io = Runtime;
-        contract_methods::admin::get_bridge_prover(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
     /// Get chain id for this contract.
     #[no_mangle]
     pub extern "C" fn get_chain_id() {
@@ -597,6 +588,15 @@ mod contract {
         let env = Runtime;
         let mut handler = Runtime;
         contract_methods::connector::finish_deposit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Get bridge prover id for this contract.
+    #[no_mangle]
+    pub extern "C" fn get_bridge_prover() {
+        let io = Runtime;
+        contract_methods::connector::get_bridge_prover(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }

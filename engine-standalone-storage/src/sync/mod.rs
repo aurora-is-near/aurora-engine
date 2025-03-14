@@ -10,6 +10,7 @@ use aurora_engine_sdk::{
     io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh::BorshDeserialize,
@@ -406,6 +407,7 @@ where
         attached_deposit: transaction_message.attached_near,
         random_seed,
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
 
     let (tx_hash, result) = match &transaction_message.transaction {

@@ -8,7 +8,7 @@ use aurora_engine_types::{
     H256, U256,
 };
 use byte_slice_cast::AsByteSlice;
-use near_sdk::serde_json::json;
+use near_sdk::serde_json::{json, Value};
 use near_sdk::{json_types::U128, serde};
 use near_workspaces::types::NearToken;
 use near_workspaces::AccountId;
@@ -55,7 +55,7 @@ async fn test_aurora_ft_transfer() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let balance = contract
         .eth_connector_contract
@@ -107,7 +107,7 @@ async fn test_ft_transfer() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -139,7 +139,7 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -233,7 +233,7 @@ async fn test_ft_transfer_call_eth() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -393,7 +393,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     // some-test-acc does not implement `ft_on_transfer` therefore the call fails and the transfer is reverted.
     assert_eq!(
@@ -436,7 +436,7 @@ async fn test_ft_transfer_call_without_message() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -525,7 +525,7 @@ async fn test_deposit_with_0x_prefix() -> anyhow::Result<()> {
     };
 
     let res = contract.deposit_with_proof(&proof).await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let balance = contract
         .get_eth_on_near_balance(contract.engine_contract.id())
@@ -596,7 +596,7 @@ async fn test_ft_transfer_call_without_relayer() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -639,7 +639,7 @@ async fn test_ft_transfer_call_fee_greater_than_amount() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -681,7 +681,7 @@ async fn test_admin_controlled_only_admin_can_pause() -> anyhow::Result<()> {
         .args_json(args)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     Ok(())
 }
 
@@ -725,7 +725,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let res = contract
         .eth_connector_contract
@@ -741,7 +741,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -775,7 +775,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     // 1st deposit call - should fail.
     // Because `owner_id` check related to `predecessor_account_id`
@@ -803,7 +803,7 @@ async fn test_deposit_pausability_eth_connector() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert_eq!(contract.total_supply().await?, DEPOSITED_AMOUNT);
 
     Ok(())
@@ -822,7 +822,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     // 1st deposit call - should fail.
     // Because `owner_id` check related to `predecessor_account_id`
@@ -849,7 +849,7 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     // 3rd deposit call - should succeed
     let res = contract
@@ -859,12 +859,12 @@ async fn test_deposit_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let res = contract
         .user_deposit_with_proof(&user_acc, &contract.get_proof(PROOF_DATA_NEAR))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract
@@ -901,7 +901,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -916,7 +916,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     // 2nd withdraw - should be failed
     let res = user_acc
@@ -937,7 +937,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -952,7 +952,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let res = user_acc
         .call(contract.engine_contract.id(), "withdraw")
@@ -961,7 +961,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -982,7 +982,7 @@ async fn test_deposit_to_near_with_zero_fee() -> anyhow::Result<()> {
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
 
     let deposited_amount = 3000;
@@ -1011,7 +1011,7 @@ async fn test_deposit_to_aurora_with_zero_fee() -> anyhow::Result<()> {
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
 
     let deposited_amount = 2000;
@@ -1033,7 +1033,7 @@ async fn test_deposit_to_near_amount_less_fee() -> anyhow::Result<()> {
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1046,7 +1046,7 @@ async fn test_deposit_to_aurora_amount_less_fee() -> anyhow::Result<()> {
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1059,7 +1059,7 @@ async fn test_deposit_to_near_amount_zero_fee_non_zero() -> anyhow::Result<()> {
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1085,7 +1085,7 @@ async fn test_deposit_to_near_amount_equal_fee_non_zero() -> anyhow::Result<()> 
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1098,7 +1098,7 @@ async fn test_deposit_to_aurora_amount_equal_fee_non_zero() -> anyhow::Result<()
     let res = contract
         .deposit_with_proof(&contract.get_proof(proof_str))
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert!(contract.call_is_used_proof(proof_str).await?);
     Ok(())
 }
@@ -1198,7 +1198,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -1222,7 +1222,7 @@ async fn test_ft_transfer_user() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
     assert_eq!(
         contract.get_eth_on_near_balance(receiver_id.id()).await?.0,
         transfer_amount.0 + transfer_amount2.0,
@@ -1251,7 +1251,7 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_success());
+    assert!(res.is_success(), "{res:#?}");
 
     let data: WithdrawResult = res.borsh()?;
     let custodian_addr = validate_eth_address(CUSTODIAN_ADDRESS);
@@ -1308,6 +1308,78 @@ async fn test_ft_metadata() -> anyhow::Result<()> {
     assert_eq!(metadata.reference, m.reference);
     assert_eq!(metadata.reference_hash, reference_hash);
     assert_eq!(metadata.symbol, m.symbol);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_storage_deposit() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let res = contract
+        .engine_contract
+        .call("storage_deposit")
+        .args_json(json!({
+            "account_id": "account.near",
+        }))
+        .deposit(NearToken::from_yoctonear(1250000000000000000000))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(res.is_success(), "{res:#?}");
+
+    let res = contract
+        .engine_contract
+        .call("storage_balance_of")
+        .args_json(json!({
+            "account_id": "account.near",
+        }))
+        .max_gas()
+        .transact()
+        .await?
+        .json::<Value>()?;
+
+    // The NEP-141 implementation of ETH intentionally set the storage deposit amount equal to 0
+    // so any non-zero deposit amount is automatically returned to the user, leaving 0 storage
+    // balance behind.
+    assert_eq!(res, json!({"available": "0", "total": "0"}));
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_storage_unregister() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let res = contract
+        .engine_contract
+        .call("storage_unregister")
+        .args_json(json!({
+            "force": true,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(res.is_success(), "{res:#?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_bridge_prover() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+    contract.call_deposit_eth_to_near().await?;
+
+    let prover_account_id = contract
+        .engine_contract
+        .call("get_bridge_prover")
+        .deposit(NearToken::from_yoctonear(0))
+        .max_gas()
+        .transact()
+        .await?
+        .json::<AccountId>()?;
+    assert_eq!(prover_account_id.as_str(), "aurora_eth_connector.root");
     Ok(())
 }
 
