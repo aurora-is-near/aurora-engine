@@ -379,6 +379,10 @@ impl crate::env::Env for Runtime {
     fn prepaid_gas(&self) -> NearGas {
         NearGas::new(unsafe { exports::prepaid_gas() })
     }
+
+    fn used_gas(&self) -> NearGas {
+        NearGas::new(unsafe { exports::used_gas() })
+    }
 }
 
 impl crate::promise::PromiseHandler for Runtime {
@@ -594,6 +598,10 @@ impl crate::env::Env for ViewEnv {
     fn prepaid_gas(&self) -> NearGas {
         NearGas::new(300)
     }
+
+    fn used_gas(&self) -> NearGas {
+        NearGas::new(0)
+    }
 }
 
 pub(crate) mod exports {
@@ -623,7 +631,7 @@ pub(crate) mod exports {
         fn account_balance(balance_ptr: u64);
         pub(crate) fn attached_deposit(balance_ptr: u64);
         pub(crate) fn prepaid_gas() -> u64;
-        fn used_gas() -> u64;
+        pub(crate) fn used_gas() -> u64;
         // ############
         // # Math API #
         // ############

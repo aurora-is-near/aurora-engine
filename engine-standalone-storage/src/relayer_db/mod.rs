@@ -3,6 +3,7 @@ use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
@@ -83,6 +84,7 @@ where
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
     // We use the Noop handler here since the relayer DB does not contain any promise information.
     let mut handler = aurora_engine_sdk::promise::Noop;

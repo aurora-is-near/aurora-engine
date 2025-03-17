@@ -74,7 +74,7 @@ pub fn set_eth_connector_contract_data<I: IO + Copy, E: Env>(
 
 pub fn withdraw<
     #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
-    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler,
+    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler + Env,
     E: Env,
 >(
     io: I,
@@ -88,7 +88,12 @@ pub fn withdraw<
     Ok(())
 }
 
-pub fn deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn deposit<
+    #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
+    #[cfg(feature = "ext-connector")] I: IO + Copy + Env,
+    E: Env,
+    H: PromiseHandler,
+>(
     io: I,
     env: &E,
     handler: &mut H,
@@ -201,7 +206,7 @@ pub fn finish_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
 
 pub fn ft_transfer<
     #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
-    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler,
+    #[cfg(feature = "ext-connector")] I: IO + Env + Copy + PromiseHandler,
     E: Env,
 >(
     io: I,
@@ -215,7 +220,12 @@ pub fn ft_transfer<
     Ok(())
 }
 
-pub fn ft_transfer_call<I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn ft_transfer_call<
+    #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
+    #[cfg(feature = "ext-connector")] I: IO + Env + Copy,
+    E: Env,
+    H: PromiseHandler,
+>(
     io: I,
     env: &E,
     handler: &mut H,
@@ -241,7 +251,12 @@ pub fn ft_resolve_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     Ok(())
 }
 
-pub fn storage_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn storage_deposit<
+    #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
+    #[cfg(feature = "ext-connector")] I: IO + Copy + Env,
+    E: Env,
+    H: PromiseHandler,
+>(
     io: I,
     env: &E,
     handler: &mut H,
@@ -254,7 +269,12 @@ pub fn storage_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
     Ok(())
 }
 
-pub fn storage_unregister<I: IO + Copy, E: Env, H: PromiseHandler>(
+pub fn storage_unregister<
+    #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
+    #[cfg(feature = "ext-connector")] I: IO + Copy + Env,
+    E: Env,
+    H: PromiseHandler,
+>(
     io: I,
     env: &E,
     handler: &mut H,
@@ -269,7 +289,7 @@ pub fn storage_unregister<I: IO + Copy, E: Env, H: PromiseHandler>(
 
 pub fn storage_withdraw<
     #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
-    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler,
+    #[cfg(feature = "ext-connector")] I: IO + Env + PromiseHandler + Copy,
     E: Env,
 >(
     io: I,
@@ -283,7 +303,7 @@ pub fn storage_withdraw<
     Ok(())
 }
 
-pub fn storage_balance_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+pub fn storage_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
     internal::storage_balance_of(io)?;
     #[cfg(feature = "ext-connector")]
@@ -301,7 +321,7 @@ pub fn set_paused_flags<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), Cont
     Ok(())
 }
 
-pub fn get_paused_flags<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+pub fn get_paused_flags<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
     internal::get_paused_flags(io)?;
     #[cfg(feature = "ext-connector")]
@@ -310,7 +330,7 @@ pub fn get_paused_flags<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Cont
     Ok(())
 }
 
-pub fn is_used_proof<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+pub fn is_used_proof<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
     internal::is_used_proof(io)?;
     #[cfg(feature = "ext-connector")]
@@ -319,7 +339,7 @@ pub fn is_used_proof<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Contrac
     Ok(())
 }
 
-pub fn ft_total_eth_supply_on_near<I: IO + Copy + PromiseHandler>(
+pub fn ft_total_eth_supply_on_near<I: IO + Copy + PromiseHandler + Env>(
     io: I,
 ) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
@@ -339,7 +359,7 @@ pub fn ft_total_eth_supply_on_aurora<I: IO + Copy>(io: I) -> Result<(), Contract
     Ok(())
 }
 
-pub fn ft_balance_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), ContractError> {
+pub fn ft_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
     internal::ft_balance_of(io)?;
     #[cfg(feature = "ext-connector")]
@@ -354,7 +374,7 @@ pub fn ft_balances_of<I: IO + Copy + PromiseHandler>(io: I) -> Result<(), Contra
     Ok(())
 }
 
-pub fn ft_balance_of_eth<I: IO + Copy>(io: I) -> Result<(), ContractError> {
+pub fn ft_balance_of_eth<I: IO + Copy + Env>(io: I) -> Result<(), ContractError> {
     let args = io.read_input_borsh()?;
     EthConnectorContract::init(io)?.ft_balance_of_eth_on_aurora(&args)?;
     Ok(())
@@ -438,7 +458,7 @@ pub fn get_eth_connector_contract_account<I: IO + Copy>(io: I) -> Result<(), Con
 
 pub fn ft_metadata<
     #[cfg(not(feature = "ext-connector"))] I: IO + Copy,
-    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler,
+    #[cfg(feature = "ext-connector")] I: IO + Copy + PromiseHandler + Env,
 >(
     io: I,
 ) -> Result<(), ContractError> {
@@ -446,6 +466,15 @@ pub fn ft_metadata<
     internal::ft_metadata(io)?;
     #[cfg(feature = "ext-connector")]
     external::ft_metadata(io)?;
+
+    Ok(())
+}
+
+pub fn get_bridge_prover<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
+    #[cfg(not(feature = "ext-connector"))]
+    internal::get_bridge_prover(io)?;
+    #[cfg(feature = "ext-connector")]
+    external::get_bridge_prover(io)?;
 
     Ok(())
 }

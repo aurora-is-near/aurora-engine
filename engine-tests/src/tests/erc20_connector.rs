@@ -830,6 +830,14 @@ pub mod workspace {
 
     #[cfg(not(feature = "ext-connector"))]
     #[tokio::test]
+    async fn test_get_bridge_prover() {
+        let aurora = deploy_engine().await;
+        let prover = aurora.get_bridge_prover().await.unwrap().result;
+        assert_eq!(prover.as_ref(), "prover.root");
+    }
+
+    #[cfg(not(feature = "ext-connector"))]
+    #[tokio::test]
     async fn test_pause_ft_transfer() {
         use aurora_engine::contract_methods::connector::internal::{PAUSE_FT, UNPAUSE_ALL};
         use aurora_engine::parameters::FungibleTokenMetadata;

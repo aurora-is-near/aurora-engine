@@ -1,5 +1,4 @@
 use crate::Error;
-use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, U256};
@@ -79,8 +78,8 @@ impl LegacyEthSignedTransaction {
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s))
-            .map_err(|_e| Error::EcRecover)
+        sdk::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s))
+            .map_err(|_| Error::EcRecover)
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
