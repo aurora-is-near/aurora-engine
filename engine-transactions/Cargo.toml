@@ -1,14 +1,16 @@
 [package]
 name = "aurora-engine-transactions"
-version = "1.0.0"
+version = "1.2.0"
+description = "EVM transactions that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
+keywords.workspace = true
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
 autobenches = false
+publish = true
 
 [dependencies]
 aurora-engine-sdk.workspace = true
