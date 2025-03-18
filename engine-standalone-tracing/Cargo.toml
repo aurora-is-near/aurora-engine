@@ -15,10 +15,7 @@ crate-type = ["lib"]
 
 [dependencies]
 aurora-engine-types = { workspace = true, features = ["std"] }
-evm-core.workspace = true
-evm = { workspace = true, features = ["std", "tracing"] }
-evm-runtime.workspace = true
-evm-gasometer.workspace = true
+aurora-evm = { workspace = true, features = ["std", "tracing"] }
 hex = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["std"], optional = true }
 

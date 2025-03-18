@@ -28,7 +28,7 @@ criterion.workspace = true
 engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true
 ethabi = { workspace = true, features = ["full-serde"] }
-evm = { workspace = true, features = ["std", "tracing"] }
+aurora-evm = { workspace = true, features = ["std", "tracing"] }
 git2.workspace = true
 hex.workspace = true
 libsecp256k1.workspace = true

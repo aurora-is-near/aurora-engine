@@ -285,7 +285,7 @@ fn test_deploy_largest_contract() {
     // NEAR gas limit of 200 Tgas.
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let len = evm::Config::berlin().create_contract_limit.unwrap();
+    let len = aurora_evm::Config::berlin().create_contract_limit.unwrap();
     let code = generate_code(len);
 
     // Deploy that code
