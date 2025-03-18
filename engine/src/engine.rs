@@ -626,6 +626,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
+            Vec::new(),
         );
 
         let used_gas = executor.used_gas();
@@ -673,6 +674,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value.raw(),
             input,
             executor_params.gas_limit,
+            Vec::new(),
             Vec::new(),
         );
         status.into_result(result)
