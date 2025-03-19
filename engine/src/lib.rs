@@ -866,7 +866,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::prelude::{NEP141Wei, U256};
-        use evm::backend::ApplyBackend;
+        use aurora_evm::backend::ApplyBackend;
 
         #[cfg(not(feature = "ext-connector"))]
         let mut io = Runtime;
@@ -879,9 +879,9 @@ mod contract {
         let current_account_id = io.current_account_id();
         let mut engine: Engine<_, _> =
             Engine::new(address, current_account_id, io, &io).sdk_unwrap();
-        let state_change = evm::backend::Apply::Modify {
+        let state_change = aurora_evm::backend::Apply::Modify {
             address: address.raw(),
-            basic: evm::backend::Basic {
+            basic: aurora_evm::backend::Basic {
                 balance: U256::from(balance.as_u128()),
                 nonce,
             },

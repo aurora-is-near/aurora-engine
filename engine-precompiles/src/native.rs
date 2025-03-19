@@ -24,8 +24,8 @@ use aurora_engine_types::{
     storage::EthConnectorStorageId,
     types::NEP141Wei,
 };
-use evm::backend::Log;
-use evm::{Context, ExitError};
+use aurora_evm::backend::Log;
+use aurora_evm::{Context, ExitError};
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 const UNWRAP_WNEAR_MSG: &str = "unwrap";

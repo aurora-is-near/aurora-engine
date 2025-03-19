@@ -49,7 +49,7 @@ fn test_executing_paused_precompile_throws_error() {
 
     assert!(matches!(
         error.kind,
-        EngineErrorKind::EvmFatal(evm::ExitFatal::Other(e)) if e == "ERR_PAUSED"
+        EngineErrorKind::EvmFatal(aurora_evm::ExitFatal::Other(e)) if e == "ERR_PAUSED"
     ));
 }
 

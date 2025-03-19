@@ -49,7 +49,7 @@ fn test_ecrecover_standalone() {
 
     let input = construct_input(&hash, &sig);
 
-    let ctx = evm::Context {
+    let ctx = aurora_evm::Context {
         address: H160::default(),
         caller: H160::default(),
         apparent_value: U256::zero(),
