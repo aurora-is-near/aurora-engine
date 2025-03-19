@@ -1,7 +1,7 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{sdk, vec::Vec, Borrowed, H256};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 mod costs {
     use crate::prelude::types::EthGas;

@@ -3,9 +3,9 @@ use crate::parameters::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Opcode};
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use aurora_evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
+use aurora_evm::{executor, Opcode};
+use aurora_evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -423,7 +423,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::cancun();
+pub(crate) const CONFIG: &Config = &Config::prague();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -906,7 +906,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let env = self.env;
         let ro_promise_handler = handler.read_only();
 
-        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+        let precompiles = Precompiles::new_prague(PrecompileConstructorContext {
             current_account_id,
             random_seed,
             io,
@@ -2749,7 +2749,7 @@ mod tests {
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
         let expected_result =
-            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21344, Vec::new());
+            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21860, Vec::new());
 
         assert_eq!(expected_result, actual_result);
     }

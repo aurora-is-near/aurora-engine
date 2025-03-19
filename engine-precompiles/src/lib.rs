@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![forbid(unsafe_code)]
 
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
+pub mod bls12_381;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
@@ -34,12 +34,12 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
-use evm::backend::Log;
-use evm::executor::{
+use aurora_evm::backend::Log;
+use aurora_evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{Context, ExitError, ExitFatal, ExitSucceed};
+use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
@@ -344,6 +344,61 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::new_berlin(ctx)
     }
 
+    /// Prague hard fork includes `BLS12-381` precompiles.
+    ///
+    /// [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
+    pub fn new_prague<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
+        let addresses = vec![
+            ECRecover::ADDRESS,
+            SHA256::ADDRESS,
+            RIPEMD160::ADDRESS,
+            Identity::ADDRESS,
+            ModExp::<Berlin, M>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
+            Blake2F::ADDRESS,
+            RandomSeed::ADDRESS,
+            CurrentAccount::ADDRESS,
+            bls12_381::BlsG1Add::ADDRESS,
+            bls12_381::BlsG1Msm::ADDRESS,
+            bls12_381::BlsG2Add::ADDRESS,
+            bls12_381::BlsG2Msm::ADDRESS,
+            bls12_381::BlsPairingCheck::ADDRESS,
+            bls12_381::BlsMapFpToG1::ADDRESS,
+            bls12_381::BlsMapFp2ToG2::ADDRESS,
+        ];
+        let fun: Vec<Box<dyn Precompile>> = vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Berlin, M>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
+            Box::new(Blake2F),
+            Box::new(RandomSeed::new(ctx.random_seed)),
+            Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
+            Box::new(bls12_381::BlsG1Add),
+            Box::new(bls12_381::BlsG1Msm),
+            Box::new(bls12_381::BlsG2Add),
+            Box::new(bls12_381::BlsG2Msm),
+            Box::new(bls12_381::BlsPairingCheck),
+            Box::new(bls12_381::BlsMapFpToG1),
+            Box::new(bls12_381::BlsMapFp2ToG2),
+        ];
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
+
+        Self::with_generic_precompiles(map, ctx)
+    }
+
     fn with_generic_precompiles<M: ModExpAlgorithm + 'static>(
         mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
@@ -463,8 +518,8 @@ mod tests {
         use aurora_engine_sdk::promise::Noop;
         use aurora_engine_test_doubles::io::StoragePointer;
         use aurora_engine_types::types::EthGas;
-        use evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
-        use evm::{ExitFatal, ExitReason, Transfer};
+        use aurora_evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
+        use aurora_evm::{ExitFatal, ExitReason, Transfer};
 
         struct MockPrecompile;
 

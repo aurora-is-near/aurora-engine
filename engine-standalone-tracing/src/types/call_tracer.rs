@@ -24,7 +24,7 @@ pub struct CallTracer {
 }
 
 impl CallTracer {
-    fn end(&mut self, output: Vec<u8>, error: Option<&evm::ExitReason>) {
+    fn end(&mut self, output: Vec<u8>, error: Option<&aurora_evm::ExitReason>) {
         if self.call_stack.is_empty() {
             debug_assert!(
                 error.is_some(),
@@ -94,7 +94,7 @@ impl CallTracer {
         self.call_stack.push(frame);
     }
 
-    fn exit(&mut self, output: Vec<u8>, error: Option<&evm::ExitReason>) {
+    fn exit(&mut self, output: Vec<u8>, error: Option<&aurora_evm::ExitReason>) {
         if self.call_stack.len() <= 1 {
             return self.end(output, error);
         }
@@ -117,7 +117,7 @@ impl CallTracer {
         self.call_stack.last_mut().unwrap().calls.push(frame);
     }
 
-    fn update_gas_from_snapshot(&mut self, snapshot: Option<evm_gasometer::Snapshot>) {
+    fn update_gas_from_snapshot(&mut self, snapshot: Option<aurora_evm::gasometer::Snapshot>) {
         if let Some(snapshot) = snapshot {
             if let Some(frame) = self.call_stack.last_mut() {
                 frame.gas = snapshot.gas_limit;
@@ -165,33 +165,33 @@ impl AsRef<str> for CallType {
     }
 }
 
-impl evm_gasometer::tracing::EventListener for CallTracer {
-    fn event(&mut self, event: evm_gasometer::tracing::Event) {
+impl aurora_evm::gasometer::tracing::EventListener for CallTracer {
+    fn event(&mut self, event: aurora_evm::gasometer::tracing::Event) {
         match event {
             // RecordRefund always comes at the end of an internal transaction and has all the gas information we need.
-            evm_gasometer::tracing::Event::RecordRefund {
+            aurora_evm::gasometer::tracing::Event::RecordRefund {
                 refund: _,
                 snapshot,
             } => self.update_gas_from_snapshot(snapshot),
 
             // Not useful
-            evm_gasometer::tracing::Event::RecordCost { .. }
-            | evm_gasometer::tracing::Event::RecordDynamicCost { .. }
-            | evm_gasometer::tracing::Event::RecordStipend { .. }
-            | evm_gasometer::tracing::Event::RecordTransaction { .. } => (),
+            aurora_evm::gasometer::tracing::Event::RecordCost { .. }
+            | aurora_evm::gasometer::tracing::Event::RecordDynamicCost { .. }
+            | aurora_evm::gasometer::tracing::Event::RecordStipend { .. }
+            | aurora_evm::gasometer::tracing::Event::RecordTransaction { .. } => (),
         }
     }
 }
 
-impl evm_runtime::tracing::EventListener for CallTracer {
-    fn event(&mut self, _event: evm_runtime::tracing::Event) {}
+impl aurora_evm::runtime::tracing::EventListener for CallTracer {
+    fn event(&mut self, _event: aurora_evm::runtime::tracing::Event) {}
 }
 
-impl evm::tracing::EventListener for CallTracer {
+impl aurora_evm::tracing::EventListener for CallTracer {
     #[allow(clippy::too_many_lines)]
-    fn event(&mut self, event: evm::tracing::Event) {
+    fn event(&mut self, event: aurora_evm::tracing::Event) {
         match event {
-            evm::tracing::Event::Call {
+            aurora_evm::tracing::Event::Call {
                 code_address,
                 transfer,
                 input,
@@ -218,7 +218,7 @@ impl evm::tracing::EventListener for CallTracer {
                     context.apparent_value,
                 );
             }
-            evm::tracing::Event::Create {
+            aurora_evm::tracing::Event::Create {
                 caller,
                 address,
                 scheme,
@@ -227,10 +227,9 @@ impl evm::tracing::EventListener for CallTracer {
                 target_gas,
             } => {
                 let call_type = match scheme {
-                    evm::CreateScheme::Create2 { .. } => CallType::Create2,
-                    evm::CreateScheme::Legacy { .. } | evm::CreateScheme::Fixed(_) => {
-                        CallType::Create
-                    } // Is Fixed even possible in production? With high probability not.
+                    aurora_evm::CreateScheme::Create2 { .. } => CallType::Create2,
+                    aurora_evm::CreateScheme::Legacy { .. }
+                    | aurora_evm::CreateScheme::Fixed(_) => CallType::Create, // Is Fixed even possible in production? With high probability not.
                 };
 
                 self.enter(
@@ -242,7 +241,7 @@ impl evm::tracing::EventListener for CallTracer {
                     value,
                 );
             }
-            evm::tracing::Event::CreateOutput { address, code } => {
+            aurora_evm::tracing::Event::CreateOutput { address, code } => {
                 // `to` field should have been set to the address of the contract being created
                 debug_assert_eq!(
                     Some(address),
@@ -255,7 +254,7 @@ impl evm::tracing::EventListener for CallTracer {
                     frame.output = code.to_vec();
                 }
             }
-            evm::tracing::Event::Suicide {
+            aurora_evm::tracing::Event::Suicide {
                 address,
                 target,
                 balance,
@@ -272,18 +271,18 @@ impl evm::tracing::EventListener for CallTracer {
                 self.exit(Vec::new(), None);
             }
             // Exit event always comes after RecordRefund, so we don't need to worry about gas here (it's handled in RecordRefund)
-            evm::tracing::Event::Exit {
+            aurora_evm::tracing::Event::Exit {
                 reason,
                 return_value,
             } => {
                 let error = match reason {
-                    evm::ExitReason::Succeed(_) => None,
+                    aurora_evm::ExitReason::Succeed(_) => None,
                     other => Some(other),
                 };
                 self.exit(return_value.to_vec(), error);
             }
 
-            evm::tracing::Event::TransactCall {
+            aurora_evm::tracing::Event::TransactCall {
                 caller,
                 address,
                 value,
@@ -305,7 +304,7 @@ impl evm::tracing::EventListener for CallTracer {
                 self.top_level_transact = Some(frame);
             }
 
-            evm::tracing::Event::TransactCreate {
+            aurora_evm::tracing::Event::TransactCreate {
                 caller,
                 value,
                 init_code,
@@ -327,7 +326,7 @@ impl evm::tracing::EventListener for CallTracer {
                 self.top_level_transact = Some(frame);
             }
 
-            evm::tracing::Event::TransactCreate2 {
+            aurora_evm::tracing::Event::TransactCreate2 {
                 caller,
                 value,
                 init_code,
@@ -351,7 +350,7 @@ impl evm::tracing::EventListener for CallTracer {
             }
 
             // not useful
-            evm::tracing::Event::PrecompileSubcall { .. } => (),
+            aurora_evm::tracing::Event::PrecompileSubcall { .. } => (),
         }
     }
 }

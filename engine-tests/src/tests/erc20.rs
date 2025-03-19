@@ -65,7 +65,7 @@ fn erc20_mint_out_of_gas() {
 
     // not enough gas to cover intrinsic cost
     let intrinsic_gas = erc20::legacy_into_normalized_tx(mint_tx.clone())
-        .intrinsic_gas(&evm::Config::shanghai())
+        .intrinsic_gas(&aurora_evm::Config::shanghai())
         .unwrap();
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
     let error = runner
@@ -220,7 +220,7 @@ fn deploy_erc_20_out_of_gas() {
 
     // not enough gas to cover intrinsic cost
     let intrinsic_gas = erc20::legacy_into_normalized_tx(deploy_transaction.clone())
-        .intrinsic_gas(&evm::Config::shanghai())
+        .intrinsic_gas(&aurora_evm::Config::shanghai())
         .unwrap();
     deploy_transaction.gas_limit = (intrinsic_gas - 1).into();
     let error = runner
