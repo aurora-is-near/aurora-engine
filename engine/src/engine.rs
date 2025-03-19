@@ -906,7 +906,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let env = self.env;
         let ro_promise_handler = handler.read_only();
 
-        let precompiles = Precompiles::new_london(PrecompileConstructorContext {
+        let precompiles = Precompiles::new_prague(PrecompileConstructorContext {
             current_account_id,
             random_seed,
             io,
