@@ -28,7 +28,7 @@ use aurora_engine_transactions::eip_2930;
 use aurora_engine_transactions::eip_2930::{AccessTuple, Transaction2930};
 use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::engine::SubmitResult;
-use evm::backend::MemoryAccount;
+use aurora_evm::backend::MemoryAccount;
 use libsecp256k1::SecretKey;
 use std::collections::BTreeMap;
 use std::{fs, iter};
@@ -184,7 +184,7 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data
         let input = hex::decode(data.input.clone()).unwrap();
         let output = hex::decode(data.output.clone()).unwrap();
 
-        let ctx = evm::Context {
+        let ctx = aurora_evm::Context {
             address: H160::default(),
             caller: H160::default(),
             apparent_value: U256::zero(),

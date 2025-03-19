@@ -2,7 +2,7 @@ use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_mul` operation.
 const BASE_GAS_FEE: u64 = 22500;

@@ -1,9 +1,9 @@
 use super::{PADDED_FP_LENGTH, PADDING_LENGTH, SCALAR_LENGTH};
 use crate::prelude::Borrowed;
+use aurora_evm::ExitError;
 use blst::{
     blst_bendian_from_fp, blst_fp, blst_fp_from_bendian, blst_scalar, blst_scalar_from_bendian,
 };
-use evm::ExitError;
 
 pub mod g1;
 pub mod g2;

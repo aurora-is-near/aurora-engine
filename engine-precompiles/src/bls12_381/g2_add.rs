@@ -2,7 +2,7 @@ use super::G2_INPUT_ITEM_LENGTH;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_add` operation.
 const BASE_GAS_FEE: u64 = 600;

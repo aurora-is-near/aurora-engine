@@ -1,7 +1,7 @@
 //! # BLS12-381
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
-use evm::ExitError;
+use aurora_evm::ExitError;
 
 use crate::prelude::Borrowed;
 

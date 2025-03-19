@@ -2,7 +2,7 @@ use super::{msm_required_gas, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Input length of `g1_mul` operation.
 const INPUT_LENGTH: usize = 160;

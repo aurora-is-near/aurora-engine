@@ -2,7 +2,7 @@ use super::PADDED_FP2_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `map_fp2_to_g2` operation.
 const BASE_GAS_FEE: u64 = 23800;
