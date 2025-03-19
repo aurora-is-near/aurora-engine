@@ -3,9 +3,9 @@ use crate::parameters::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Opcode};
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use aurora_evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
+use aurora_evm::{executor, Opcode};
+use aurora_evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};

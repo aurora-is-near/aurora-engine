@@ -4,7 +4,7 @@ use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 use num::{Integer, Zero};
 
 #[derive(Default)]

@@ -29,7 +29,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 122 Tgas
+    // near total gas = 117 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {

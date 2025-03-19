@@ -3,7 +3,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::account_id::AccountId;
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 mod costs {
     use crate::prelude::types::EthGas;
