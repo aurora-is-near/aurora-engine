@@ -3,20 +3,20 @@ pub struct Listener {
     pub events: Vec<String>,
 }
 
-impl evm_gasometer::tracing::EventListener for Listener {
-    fn event(&mut self, event: evm_gasometer::tracing::Event) {
+impl aurora_evm::gasometer::tracing::EventListener for Listener {
+    fn event(&mut self, event: aurora_evm::gasometer::tracing::Event) {
         self.events.push(format!("{event:?}"));
     }
 }
 
-impl evm_runtime::tracing::EventListener for Listener {
-    fn event(&mut self, event: evm_runtime::tracing::Event) {
+impl aurora_evm::runtime::tracing::EventListener for Listener {
+    fn event(&mut self, event: aurora_evm::runtime::tracing::Event) {
         self.events.push(format!("{event:?}"));
     }
 }
 
-impl evm::tracing::EventListener for Listener {
-    fn event(&mut self, event: evm::tracing::Event) {
+impl aurora_evm::tracing::EventListener for Listener {
+    fn event(&mut self, event: aurora_evm::tracing::Event) {
         self.events.push(format!("{event:?}"));
     }
 }
