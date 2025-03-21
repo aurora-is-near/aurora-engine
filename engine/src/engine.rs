@@ -41,6 +41,7 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use aurora_engine_types::types::EthGas;
+use aurora_evm::executor::stack::Authorization;
 use core::cell::RefCell;
 use core::iter::once;
 
@@ -583,6 +584,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     input,
                     u64::MAX,
                     Vec::new(),
+                    Vec::new(),
                     handler,
                 )
             }
@@ -596,6 +598,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                     value,
                     input,
                     u64::MAX,
+                    Vec::new(),
                     Vec::new(),
                     handler,
                 )
@@ -611,7 +614,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         value: Wei,
         input: Vec<u8>,
         gas_limit: u64,
-        access_list: Vec<(H160, Vec<H256>)>, // See EIP-2930
+        access_list: Vec<(H160, Vec<H256>)>,    // See EIP-2930
+        authorization_list: Vec<Authorization>, // See EIP-7702
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
         let pause_flags = EnginePrecompilesPauser::from_io(self.io).paused();
@@ -626,7 +630,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
-            Vec::new(),
+            authorization_list,
         );
 
         let used_gas = executor.used_gas();
@@ -737,6 +741,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Vec::new(),
             gas_limit,
             Vec::new(),
+            Vec::new(),
             handler,
         )
     }
@@ -810,6 +815,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
                 setup_receive_erc20_tokens_input(args, &recipient),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
+                Vec::new(),
                 handler,
             )
             .and_then(submit_result_or_err)
@@ -1030,6 +1036,7 @@ pub fn submit_with_alt_modexp<
         tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
+
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
 
@@ -1092,6 +1099,7 @@ pub fn submit_with_alt_modexp<
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
+
     let result = if let Some(receiver) = transaction.to {
         engine.call(
             &sender,
@@ -1100,6 +1108,7 @@ pub fn submit_with_alt_modexp<
             transaction.data,
             gas_limit,
             access_list,
+            transaction.authorization_list,
             handler,
         )
         // TODO: charge for storage
@@ -1176,6 +1185,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
             input,
             u64::MAX,
             Vec::new(),
+            Vec::new(),
             handler,
         )
     } else {
@@ -1195,6 +1205,7 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
                 (exit_address.raw(), Vec::new()),
                 (refund_address.raw(), Vec::new()),
             ],
+            Vec::new(),
             handler,
         )
     }
@@ -2504,6 +2515,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
@@ -2540,6 +2552,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
@@ -2749,7 +2762,7 @@ mod tests {
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
         let expected_result =
-            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21860, Vec::new());
+            SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 21344, Vec::new());
 
         //TODO
         assert_eq!(expected_result, actual_result);
