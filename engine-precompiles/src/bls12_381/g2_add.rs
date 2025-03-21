@@ -24,7 +24,8 @@ impl BlsG2Add {
     #[cfg(not(feature = "std"))]
     #[allow(clippy::range_plus_one)]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g2, padding_g2_result, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
+        use super::padding_g2_result;
+        use super::utils::{extract_g2, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
 
         let (p0_x, p0_y) = extract_g2(&input[..G2_INPUT_ITEM_LENGTH])?;
         let (p1_x, p1_y) = extract_g2(&input[G2_INPUT_ITEM_LENGTH..])?;

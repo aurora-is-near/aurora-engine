@@ -19,65 +19,65 @@ mod map_fp2_to_g2;
 mod map_fp_to_g1;
 mod pairing_check;
 
-// #[cfg(not(feature = "std"))]
-// mod utils {
-//     use super::{PADDED_FP_LENGTH, PADDING_LENGTH};
-//     use crate::prelude::Borrowed;
-//     use aurora_evm::ExitError;
-//
-//     /// Length of each of the elements in a g1 operation input.
-//     pub const G1_INPUT_ITEM_LENGTH: usize = 128;
-//     /// Length of each of the elements in a g2 operation input.
-//     pub const G2_INPUT_ITEM_LENGTH: usize = 256;
-//     /// Finite field element input length.
-//     pub const FP_LENGTH: usize = 48;
-//     /// Input elements padding length.
-//     pub const PADDING_LENGTH: usize = 16;
-//     // Scalar length.
-//     // pub const SCALAR_LENGTH: usize = 32;
-//
-//     pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
-//         let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
-//         let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
-//
-//         Ok((p_x, p_y))
-//     }
-//
-//     pub fn extract_g2(
-//         input: &[u8],
-//     ) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
-//         let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
-//         let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
-//         let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
-//         let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
-//
-//         let mut p_x = [0u8; 2 * FP_LENGTH];
-//         p_x[0..FP_LENGTH].copy_from_slice(p0_first);
-//         p_x[FP_LENGTH..].copy_from_slice(p0_last);
-//
-//         let mut p_y = [0u8; 2 * FP_LENGTH];
-//         p_y[0..FP_LENGTH].copy_from_slice(p1_first);
-//         p_y[FP_LENGTH..].copy_from_slice(p1_last);
-//
-//         Ok((p_x, p_y))
-//     }
-//
-//     /// Removes zeros with which the precompile inputs are left padded to 64 bytes.
-//     pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
-//         if input.len() != PADDED_FP_LENGTH {
-//             return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
-//         }
-//         // Check is prefix contains only zero elements. As it's known size
-//         // 16 bytes for efficiency we validate it via slice with zero elements
-//         if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
-//             return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
-//         }
-//         // SAFETY: we checked PADDED_FP_LENGTH
-//         input[PADDING_LENGTH..]
-//             .try_into()
-//             .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
-//     }
-// }
+#[cfg(not(feature = "std"))]
+mod utils {
+    use super::PADDED_FP_LENGTH;
+    use crate::prelude::Borrowed;
+    use aurora_evm::ExitError;
+
+    /// Length of each of the elements in a g1 operation input.
+    pub const G1_INPUT_ITEM_LENGTH: usize = 128;
+    /// Length of each of the elements in a g2 operation input.
+    pub const G2_INPUT_ITEM_LENGTH: usize = 256;
+    /// Finite field element input length.
+    pub const FP_LENGTH: usize = 48;
+    /// Input elements padding length.
+    pub const PADDING_LENGTH: usize = 16;
+    // Scalar length.
+    pub const SCALAR_LENGTH: usize = 32;
+
+    pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
+        let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
+        let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
+
+        Ok((p_x, p_y))
+    }
+
+    pub fn extract_g2(
+        input: &[u8],
+    ) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
+        let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
+        let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
+        let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
+        let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
+
+        let mut p_x = [0u8; 2 * FP_LENGTH];
+        p_x[0..FP_LENGTH].copy_from_slice(p0_first);
+        p_x[FP_LENGTH..].copy_from_slice(p0_last);
+
+        let mut p_y = [0u8; 2 * FP_LENGTH];
+        p_y[0..FP_LENGTH].copy_from_slice(p1_first);
+        p_y[FP_LENGTH..].copy_from_slice(p1_last);
+
+        Ok((p_x, p_y))
+    }
+
+    /// Removes zeros with which the precompile inputs are left padded to 64 bytes.
+    pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
+        if input.len() != PADDED_FP_LENGTH {
+            return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
+        }
+        // Check is prefix contains only zero elements. As it's known size
+        // 16 bytes for efficiency we validate it via slice with zero elements
+        if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
+            return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
+        }
+        // SAFETY: we checked PADDED_FP_LENGTH
+        input[PADDING_LENGTH..]
+            .try_into()
+            .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
+    }
+}
 
 /// Amount used to calculate the multi-scalar-multiplication discount.
 const MSM_MULTIPLIER: u64 = 1000;
@@ -106,7 +106,9 @@ fn msm_required_gas(
 
 #[cfg(not(feature = "std"))]
 #[must_use]
-pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> {
+pub(super) fn padding_g1_result(output: &[u8; 2 * utils::FP_LENGTH]) -> crate::Vec<u8> {
+    use utils::{FP_LENGTH, PADDING_LENGTH};
+
     let mut result = crate::vec![0u8; 2 * PADDED_FP_LENGTH];
     if output[0] == 0x40 && output[1..] == [0u8; 2 * FP_LENGTH - 1] {
         return result;
@@ -119,7 +121,9 @@ pub(super) fn padding_g1_result(output: &[u8; 2 * FP_LENGTH]) -> crate::Vec<u8> 
 
 #[cfg(not(feature = "std"))]
 #[must_use]
-pub(super) fn padding_g2_result(output: &[u8; 4 * FP_LENGTH]) -> crate::Vec<u8> {
+pub(super) fn padding_g2_result(output: &[u8; 4 * utils::FP_LENGTH]) -> crate::Vec<u8> {
+    use utils::{FP_LENGTH, PADDING_LENGTH};
+
     let mut result = crate::vec![0u8; 4 * PADDED_FP_LENGTH];
     if output[0] == 0x40 && output[1..] == [0u8; 4 * FP_LENGTH - 1] {
         return result;

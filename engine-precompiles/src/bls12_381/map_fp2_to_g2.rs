@@ -21,7 +21,8 @@ impl BlsMapFp2ToG2 {
 
     #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{padding_g2_result, remove_padding, FP_LENGTH, PADDED_FP_LENGTH};
+        use super::utils::{remove_padding, FP_LENGTH};
+        use super::{padding_g2_result, PADDED_FP_LENGTH};
 
         let mut p = [0; 2 * FP_LENGTH];
         let p1 = remove_padding(&input[..PADDED_FP_LENGTH])?;

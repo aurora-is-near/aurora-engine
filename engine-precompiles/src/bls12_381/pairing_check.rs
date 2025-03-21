@@ -24,7 +24,7 @@ impl BlsPairingCheck {
 
     #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{
+        use super::utils::{
             extract_g1, extract_g2, FP_LENGTH, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH,
         };
 

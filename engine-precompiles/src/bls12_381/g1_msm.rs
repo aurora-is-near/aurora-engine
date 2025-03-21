@@ -35,9 +35,8 @@ impl BlsG1Msm {
 
     #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{
-            extract_g1, padding_g1_result, FP_LENGTH, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH,
-        };
+        use super::padding_g1_result;
+        use super::utils::{extract_g1, FP_LENGTH, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
 
         let k = input.len() / INPUT_LENGTH;
         let mut g1_input = crate::vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
