@@ -49,6 +49,9 @@ impl EthTransactionKindAdapter {
                         tx.transaction.to = None;
                     }
                 }
+                EthTransactionKind::Eip7702(_) => {
+                    // For Prague hard fork `tx.transaction.to` can't be `None`
+                }
             }
         }
 
