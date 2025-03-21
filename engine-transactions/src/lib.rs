@@ -3,8 +3,8 @@
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
+use aurora_evm::executor::stack::Authorization;
 use eip_2930::AccessTuple;
-use evm::executor::stack::Authorization;
 use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod backwards_compatibility;

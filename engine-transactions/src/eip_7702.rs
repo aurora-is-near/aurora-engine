@@ -1,9 +1,9 @@
 use crate::eip_2930::AccessTuple;
 use crate::Error;
-use aurora_engine_precompiles::secp256k1::ecrecover;
+use aurora_engine_sdk::ecrecover;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, H160, U256};
-use evm::executor::stack::Authorization;
+use aurora_evm::executor::stack::Authorization;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

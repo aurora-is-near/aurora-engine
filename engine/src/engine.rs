@@ -41,9 +41,9 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
 use aurora_engine_types::types::EthGas;
+use aurora_evm::executor::stack::Authorization;
 use core::cell::RefCell;
 use core::iter::once;
-use evm::executor::stack::Authorization;
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
