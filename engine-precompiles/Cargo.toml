@@ -16,7 +16,6 @@ publish = true
 aurora-engine-modexp.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
-blst = { workspace = true, optional = true }
 bn.workspace = true
 ethabi.workspace = true
 aurora-evm.workspace = true
@@ -34,7 +33,7 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "blst", "bn/std", "aurora-evm/std", "ripemd/std", "sha2/std", "ethabi/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "bn/std", "aurora-evm/std", "ripemd/std", "sha2/std", "ethabi/std"]
 contract = ["aurora-engine-sdk/contract"]
 log = []
 error_refund = []

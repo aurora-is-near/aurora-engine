@@ -329,7 +329,6 @@ dependencies = [
  "aurora-engine-test-doubles",
  "aurora-engine-types",
  "aurora-evm",
- "blst",
  "ethabi",
  "hex",
  "num",
@@ -345,6 +344,7 @@ version = "1.2.0"
 dependencies = [
  "aurora-engine-types",
  "base64 0.22.1",
+ "blst",
  "hex",
  "libsecp256k1",
  "sha2 0.10.8",

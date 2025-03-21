@@ -1,4 +1,3 @@
-use super::{G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH};
 use crate::prelude::{Borrowed, Vec};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -19,73 +18,15 @@ impl BlsPairingCheck {
 
     #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::{g1, g2};
-        use blst::{blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_miller_loop};
-
-        let k = input.len() / INPUT_LENGTH;
-        // Accumulator for the fp12 multiplications of the miller loops.
-        let mut acc = blst_fp12::default();
-        for i in 0..k {
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p1_aff = &g1::extract_g1_input(
-                &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH],
-                true,
-            )?;
-
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p2_aff = &g2::extract_g2_input(
-                &input[i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH
-                    ..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH + G2_INPUT_ITEM_LENGTH],
-                true,
-            )?;
-
-            if i > 0 {
-                // After the first slice (i>0) we use cur_ml to store the current
-                // miller loop and accumulate with the previous results using a fp12
-                // multiplication.
-                let mut cur_ml = blst_fp12::default();
-                let mut res = blst_fp12::default();
-                // SAFETY: res, acc, cur_ml, p1_aff and p2_aff are blst values.
-                unsafe {
-                    blst_miller_loop(&mut cur_ml, p2_aff, p1_aff);
-                    blst_fp12_mul(&mut res, &acc, &cur_ml);
-                }
-                acc = res;
-            } else {
-                // On the first slice (i==0) there is no previous results and no need
-                // to accumulate.
-                // SAFETY: acc, p1_aff and p2_aff are blst values.
-                unsafe {
-                    blst_miller_loop(&mut acc, p2_aff, p1_aff);
-                }
-            }
-        }
-
-        // SAFETY: ret and acc are blst values.
-        let mut ret = blst_fp12::default();
-        unsafe {
-            blst_final_exp(&mut ret, &acc);
-        }
-
-        let mut result: u8 = 0;
-        // SAFETY: ret is a blst value.
-        unsafe {
-            if blst_fp12_is_one(&ret) {
-                result = 1;
-            }
-        }
-        let mut output = [0u8; 32];
-        output[31] = result;
-        Ok(output.into())
+        aurora_engine_sdk::bls12_381::pairing_check(input)
+            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 
     #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g1, extract_g2, FP_LENGTH};
+        use super::{
+            extract_g1, extract_g2, FP_LENGTH, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH,
+        };
 
         let k = input.len() / INPUT_LENGTH;
         let mut g_input = crate::vec![0u8; k * (6 * FP_LENGTH )];

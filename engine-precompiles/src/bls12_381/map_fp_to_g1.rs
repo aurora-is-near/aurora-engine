@@ -15,23 +15,8 @@ impl BlsMapFpToG1 {
 
     #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::remove_padding;
-        use super::standalone::{fp_from_bendian, g1};
-        use blst::{blst_map_to_g1, blst_p1, blst_p1_affine, blst_p1_to_affine};
-
-        let input_p0 = remove_padding(input)?;
-        let fp = fp_from_bendian(input_p0)?;
-
-        let mut p = blst_p1::default();
-        // SAFETY: p and fp are blst values.
-        // third argument is unused if null.
-        unsafe { blst_map_to_g1(&mut p, &fp, core::ptr::null()) };
-
-        let mut p_aff = blst_p1_affine::default();
-        // SAFETY: p_aff and p are blst values.
-        unsafe { blst_p1_to_affine(&mut p_aff, &p) };
-
-        Ok(g1::encode_g1_point(&p_aff))
+        aurora_engine_sdk::bls12_381::map_fp_to_g1(input)
+            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 
     #[cfg(not(feature = "std"))]

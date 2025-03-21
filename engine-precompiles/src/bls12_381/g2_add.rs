@@ -1,4 +1,3 @@
-use super::G2_INPUT_ITEM_LENGTH;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -18,37 +17,14 @@ impl BlsG2Add {
 
     #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::g2;
-        use blst::{
-            blst_p2, blst_p2_add_or_double_affine, blst_p2_affine, blst_p2_from_affine,
-            blst_p2_to_affine,
-        };
-
-        // NB: There is no subgroup check for the G2 addition precompile.
-        //
-        // So we set the subgroup checks here to `false`
-        let a_aff = &g2::extract_g2_input(&input[..G2_INPUT_ITEM_LENGTH], false)?;
-        let b_aff = &g2::extract_g2_input(&input[G2_INPUT_ITEM_LENGTH..], false)?;
-
-        let mut b = blst_p2::default();
-        // SAFETY: b and b_aff are blst values.
-        unsafe { blst_p2_from_affine(&mut b, b_aff) };
-
-        let mut p = blst_p2::default();
-        // SAFETY: p, b and a_aff are blst values.
-        unsafe { blst_p2_add_or_double_affine(&mut p, &b, a_aff) };
-
-        let mut p_aff = blst_p2_affine::default();
-        // SAFETY: p_aff and p are blst values.
-        unsafe { blst_p2_to_affine(&mut p_aff, &p) };
-
-        Ok(g2::encode_g2_point(&p_aff))
+        aurora_engine_sdk::bls12_381::g2_add(input)
+            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 
     #[cfg(not(feature = "std"))]
     #[allow(clippy::range_plus_one)]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g2, padding_g2_result, FP_LENGTH};
+        use super::{extract_g2, padding_g2_result, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
 
         let (p0_x, p0_y) = extract_g2(&input[..G2_INPUT_ITEM_LENGTH])?;
         let (p1_x, p1_y) = extract_g2(&input[G2_INPUT_ITEM_LENGTH..])?;

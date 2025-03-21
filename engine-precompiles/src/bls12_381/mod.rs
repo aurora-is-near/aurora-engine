@@ -3,8 +3,6 @@
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
 use aurora_evm::ExitError;
 
-use crate::prelude::Borrowed;
-
 pub use g1_add::BlsG1Add;
 pub use g1_msm::BlsG1Msm;
 pub use g2_add::BlsG2Add;
@@ -20,41 +18,73 @@ mod g2_msm;
 mod map_fp2_to_g2;
 mod map_fp_to_g1;
 mod pairing_check;
-#[cfg(feature = "std")]
-mod standalone;
 
-/// Length of each of the elements in a g1 operation input.
-const G1_INPUT_ITEM_LENGTH: usize = 128;
-/// Length of each of the elements in a g2 operation input.
-const G2_INPUT_ITEM_LENGTH: usize = 256;
+// #[cfg(not(feature = "std"))]
+// mod utils {
+//     use super::{PADDED_FP_LENGTH, PADDING_LENGTH};
+//     use crate::prelude::Borrowed;
+//     use aurora_evm::ExitError;
+//
+//     /// Length of each of the elements in a g1 operation input.
+//     pub const G1_INPUT_ITEM_LENGTH: usize = 128;
+//     /// Length of each of the elements in a g2 operation input.
+//     pub const G2_INPUT_ITEM_LENGTH: usize = 256;
+//     /// Finite field element input length.
+//     pub const FP_LENGTH: usize = 48;
+//     /// Input elements padding length.
+//     pub const PADDING_LENGTH: usize = 16;
+//     // Scalar length.
+//     // pub const SCALAR_LENGTH: usize = 32;
+//
+//     pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
+//         let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
+//         let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
+//
+//         Ok((p_x, p_y))
+//     }
+//
+//     pub fn extract_g2(
+//         input: &[u8],
+//     ) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
+//         let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
+//         let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
+//         let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
+//         let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
+//
+//         let mut p_x = [0u8; 2 * FP_LENGTH];
+//         p_x[0..FP_LENGTH].copy_from_slice(p0_first);
+//         p_x[FP_LENGTH..].copy_from_slice(p0_last);
+//
+//         let mut p_y = [0u8; 2 * FP_LENGTH];
+//         p_y[0..FP_LENGTH].copy_from_slice(p1_first);
+//         p_y[FP_LENGTH..].copy_from_slice(p1_last);
+//
+//         Ok((p_x, p_y))
+//     }
+//
+//     /// Removes zeros with which the precompile inputs are left padded to 64 bytes.
+//     pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
+//         if input.len() != PADDED_FP_LENGTH {
+//             return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
+//         }
+//         // Check is prefix contains only zero elements. As it's known size
+//         // 16 bytes for efficiency we validate it via slice with zero elements
+//         if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
+//             return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
+//         }
+//         // SAFETY: we checked PADDED_FP_LENGTH
+//         input[PADDING_LENGTH..]
+//             .try_into()
+//             .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
+//     }
+// }
+
 /// Amount used to calculate the multi-scalar-multiplication discount.
 const MSM_MULTIPLIER: u64 = 1000;
-/// Finite field element input length.
-const FP_LENGTH: usize = 48;
 /// Finite field element padded input length.
 const PADDED_FP_LENGTH: usize = 64;
 /// Quadratic extension of finite field element input length.
 const PADDED_FP2_LENGTH: usize = 128;
-/// Input elements padding length.
-const PADDING_LENGTH: usize = 16;
-/// Scalar length.
-const SCALAR_LENGTH: usize = 32;
-
-/// Removes zeros with which the precompile inputs are left padded to 64 bytes.
-fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], ExitError> {
-    if input.len() != PADDED_FP_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
-    }
-    // Check is prefix contains only zero elements. As it's known size
-    // 16 bytes for efficiency we validate it via slice with zero elements
-    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_PADDING")));
-    }
-    // SAFETY: we checked PADDED_FP_LENGTH
-    input[PADDING_LENGTH..]
-        .try_into()
-        .map_err(|_| ExitError::Other(Borrowed("ERR_BLS12_PADDING")))
-}
 
 /// Implements the gas schedule for G1/G2 Multiscalar-multiplication assuming 30
 /// MGas/second, see also: <https://eips.ethereum.org/EIPS/eip-2537#g1g2-multiexponentiation>
@@ -72,30 +102,6 @@ fn msm_required_gas(
 
     let k = u64::try_from(k).map_err(crate::utils::err_usize_conv)?;
     Ok((k * discount * multiplication_cost) / MSM_MULTIPLIER)
-}
-
-pub fn extract_g1(input: &[u8]) -> Result<(&[u8; FP_LENGTH], &[u8; FP_LENGTH]), ExitError> {
-    let p_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
-    let p_y = remove_padding(&input[PADDED_FP_LENGTH..G1_INPUT_ITEM_LENGTH])?;
-
-    Ok((p_x, p_y))
-}
-
-pub fn extract_g2(input: &[u8]) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH]), ExitError> {
-    let p0_last = remove_padding(&input[..PADDED_FP_LENGTH])?;
-    let p0_first = remove_padding(&input[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH])?;
-    let p1_last = remove_padding(&input[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH])?;
-    let p1_first = remove_padding(&input[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH])?;
-
-    let mut p_x = [0u8; 2 * FP_LENGTH];
-    p_x[0..FP_LENGTH].copy_from_slice(p0_first);
-    p_x[FP_LENGTH..].copy_from_slice(p0_last);
-
-    let mut p_y = [0u8; 2 * FP_LENGTH];
-    p_y[0..FP_LENGTH].copy_from_slice(p1_first);
-    p_y[FP_LENGTH..].copy_from_slice(p1_last);
-
-    Ok((p_x, p_y))
 }
 
 #[cfg(not(feature = "std"))]

@@ -1,4 +1,4 @@
-use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
+use super::msm_required_gas;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::types::{make_address, Address, EthGas};
@@ -29,58 +29,15 @@ impl BlsG2Msm {
 
     #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::{extract_scalar_input, g2, NBITS};
-        use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
-
-        let k = input.len() / INPUT_LENGTH;
-        let mut g2_points: Vec<blst_p2> = Vec::with_capacity(k);
-        let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
-        for i in 0..k {
-            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH];
-            // BLST batch API for p2_affines blows up when you pass it a point at infinity, so we must
-            // filter points at infinity (and their corresponding scalars) from the input.
-            if slice.iter().all(|i| *i == 0) {
-                continue;
-            }
-
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p0_aff = &g2::extract_g2_input(slice, true)?;
-
-            let mut p0 = blst_p2::default();
-            // SAFETY: p0 and p0_aff are blst values.
-            unsafe { blst_p2_from_affine(&mut p0, p0_aff) };
-
-            g2_points.push(p0);
-
-            scalars.extend_from_slice(
-                &extract_scalar_input(
-                    &input[i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH
-                        ..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
-                )?
-                .b,
-            );
-        }
-
-        // return infinity point if all points are infinity
-        if g2_points.is_empty() {
-            return Ok([0; 256].into());
-        }
-
-        let points = p2_affines::from(&g2_points);
-        let multiexp = points.mult(&scalars, NBITS);
-
-        let mut multiexp_aff = blst_p2_affine::default();
-        // SAFETY: multiexp_aff and multiexp are blst values.
-        unsafe { blst_p2_to_affine(&mut multiexp_aff, &multiexp) };
-
-        Ok(g2::encode_g2_point(&multiexp_aff))
+        aurora_engine_sdk::bls12_381::g2_msm(input)
+            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 
     #[cfg(not(feature = "std"))]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g2, padding_g2_result, FP_LENGTH};
+        use super::{
+            extract_g2, padding_g2_result, FP_LENGTH, G2_INPUT_ITEM_LENGTH, SCALAR_LENGTH,
+        };
 
         let k = input.len() / INPUT_LENGTH;
         let mut g2_input = crate::vec![0u8; k * (4 * FP_LENGTH + SCALAR_LENGTH)];
