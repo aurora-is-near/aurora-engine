@@ -198,7 +198,6 @@ fn test_eip_7702_tx_encoding_decoding() {
 
 #[test]
 fn test_eip_7702_success() {
-    // 0xa52a8a2229e3c512d6ed27b6e6e7d39958ca9fb3,
     let mut runner = utils::deploy_runner();
     let signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -232,10 +231,10 @@ fn test_eip_7702_success() {
     assert_eq!(runner.get_balance(contract_address), CONTRACT_BALANCE);
     assert_eq!(runner.get_nonce(contract_address), CONTRACT_NONCE.into());
     assert_eq!(runner.get_code(contract_address), contract_code);
-    // `EXTCODESIZE` should return size of `EF01` = 2 for delegated designator
+    // `EXTCODESIZE` should return size of `EF0100`+20 = 23 for delegated designator
     assert_eq!(
         runner.get_storage(contract_address, H256::zero()),
-        H256::from(H160::from_low_u64_be(2))
+        H256::from(H160::from_low_u64_be(23))
     );
 
     // Authority address should increase Nonce
