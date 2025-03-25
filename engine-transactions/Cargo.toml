@@ -20,6 +20,7 @@ rlp.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
+aurora-engine-types = { workspace = true, features = ["byteorder"] }
 hex.workspace = true
 
 [lints]
