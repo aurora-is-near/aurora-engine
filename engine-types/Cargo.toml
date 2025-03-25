@@ -17,7 +17,7 @@ base64.workspace = true
 borsh.workspace = true
 bs58.workspace = true
 hex.workspace = true
-primitive-types.workspace = true
+primitive-types = { workspace = true, features = ["byteorder"] }
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
