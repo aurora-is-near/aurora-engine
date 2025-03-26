@@ -1,15 +1,9 @@
-use super::{PADDED_FP_LENGTH, PADDING_LENGTH, SCALAR_LENGTH};
-use crate::prelude::Borrowed;
-use aurora_evm::ExitError;
+use crate::bls12_381::standalone::SCALAR_LENGTH;
+use crate::bls12_381::{Bls12381Error, FP_LENGTH, PADDED_FP_LENGTH, PADDING_LENGTH};
 use blst::{
     blst_bendian_from_fp, blst_fp, blst_fp_from_bendian, blst_scalar, blst_scalar_from_bendian,
 };
 
-pub mod g1;
-pub mod g2;
-
-/// Number of bits used in the BLS12-381 curve finite field elements.
-pub(super) const NBITS: usize = 256;
 /// Big-endian non-Montgomery form.
 const MODULUS_REPR: [u8; 48] = [
     0x1a, 0x01, 0x11, 0xea, 0x39, 0x7f, 0xe6, 0x9a, 0x4b, 0x1b, 0xa7, 0xb6, 0x43, 0x4b, 0xac, 0xd7,
@@ -18,7 +12,7 @@ const MODULUS_REPR: [u8; 48] = [
 ];
 
 /// BLS Encodes a single finite field element into byte slice with padding.
-fn fp_to_bytes(out: &mut [u8], input: *const blst_fp) {
+pub fn fp_to_bytes(out: &mut [u8], input: *const blst_fp) {
     if out.len() != PADDED_FP_LENGTH {
         return;
     }
@@ -28,7 +22,7 @@ fn fp_to_bytes(out: &mut [u8], input: *const blst_fp) {
 }
 
 /// Checks if the input is a valid big-endian representation of a field element.
-fn is_valid_be(input: &[u8; 48]) -> bool {
+pub fn is_valid_be(input: &[u8; 48]) -> bool {
     for (i, modul) in input.iter().zip(MODULUS_REPR.iter()) {
         match i.cmp(modul) {
             core::cmp::Ordering::Greater => return false,
@@ -42,9 +36,9 @@ fn is_valid_be(input: &[u8; 48]) -> bool {
 
 /// Checks whether or not the input represents a canonical field element, returning the field
 /// element if successful.
-pub(super) fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
+pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, Bls12381Error> {
     if !is_valid_be(input) {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_INVALID_FP_VALUE")));
+        return Err(Bls12381Error::ElementNotInG2);
     }
     let mut fp = blst_fp::default();
     // SAFETY: input has fixed length, and fp is a blst value.
@@ -65,9 +59,9 @@ pub(super) fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, ExitError> {
 /// We do not check that the scalar is a canonical Fr element, because the EIP specifies:
 /// * The corresponding integer is not required to be less than or equal than main subgroup order
 ///   `q`.
-pub(super) fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, ExitError> {
+pub fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, Bls12381Error> {
     if input.len() != SCALAR_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_SCALAR_INPUT")));
+        return Err(Bls12381Error::ScalarLength);
     }
 
     let mut out = blst_scalar::default();
@@ -81,4 +75,20 @@ pub(super) fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, ExitErro
     };
 
     Ok(out)
+}
+
+/// Removes zeros with which the precompile inputs are left padded to 64 bytes.
+pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], Bls12381Error> {
+    if input.len() != PADDED_FP_LENGTH {
+        return Err(Bls12381Error::Padding);
+    }
+    // Check is prefix contains only zero elements. As it's known size
+    // 16 bytes for efficiency we validate it via slice with zero elements
+    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
+        return Err(Bls12381Error::Padding);
+    }
+    // SAFETY: we checked PADDED_FP_LENGTH
+    input[PADDING_LENGTH..]
+        .try_into()
+        .map_err(|_| Bls12381Error::Padding)
 }

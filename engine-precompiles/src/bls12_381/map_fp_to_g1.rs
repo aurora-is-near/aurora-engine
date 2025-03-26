@@ -1,6 +1,6 @@
-use super::PADDED_FP_LENGTH;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381::PADDED_FP_LENGTH;
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
@@ -13,20 +13,9 @@ pub struct BlsMapFpToG1;
 impl BlsMapFpToG1 {
     pub const ADDRESS: Address = make_address(0, 0x10);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         aurora_engine_sdk::bls12_381::map_fp_to_g1(input)
             .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::padding_g1_result;
-        use super::utils::remove_padding;
-
-        let p = remove_padding(input)?;
-        let output = aurora_engine_sdk::bls12381_map_fp_to_g1(&p[..]);
-        Ok(padding_g1_result(&output))
     }
 }
 

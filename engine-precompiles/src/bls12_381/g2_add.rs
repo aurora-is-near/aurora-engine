@@ -15,40 +15,9 @@ pub struct BlsG2Add;
 impl BlsG2Add {
     pub const ADDRESS: Address = make_address(0, 0xD);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         aurora_engine_sdk::bls12_381::g2_add(input)
             .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
-    }
-
-    #[cfg(not(feature = "std"))]
-    #[allow(clippy::range_plus_one)]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::padding_g2_result;
-        use super::utils::{extract_g2, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
-
-        let (p0_x, p0_y) = extract_g2(&input[..G2_INPUT_ITEM_LENGTH])?;
-        let (p1_x, p1_y) = extract_g2(&input[G2_INPUT_ITEM_LENGTH..])?;
-
-        let mut g2_input = [0u8; 8 * FP_LENGTH + 2];
-
-        // Check zero input
-        if input[..G2_INPUT_ITEM_LENGTH] == [0; G2_INPUT_ITEM_LENGTH] {
-            g2_input[1] |= 0x40;
-        } else {
-            g2_input[1..1 + 2 * FP_LENGTH].copy_from_slice(&p0_x);
-            g2_input[1 + 2 * FP_LENGTH..1 + 4 * FP_LENGTH].copy_from_slice(&p0_y);
-        }
-
-        if input[G2_INPUT_ITEM_LENGTH..] == [0; G2_INPUT_ITEM_LENGTH] {
-            g2_input[2 + 4 * FP_LENGTH] |= 0x40;
-        } else {
-            g2_input[2 + 4 * FP_LENGTH..2 + 6 * FP_LENGTH].copy_from_slice(&p1_x);
-            g2_input[2 + 6 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(&p1_y);
-        }
-
-        let output = aurora_engine_sdk::bls12381_p2_sum(&g2_input[..]);
-        Ok(padding_g2_result(&output))
     }
 }
 

@@ -1,7 +1,6 @@
-use super::{
-    fp_from_bendian, fp_to_bytes, remove_padding, Bls12381Error, FP_LENGTH, G2_INPUT_ITEM_LENGTH,
-    PADDED_FP_LENGTH,
-};
+use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
+use super::Bls12381Error;
+use crate::bls12_381::{FP_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
 use crate::prelude::{vec, Vec};
 use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_curve};
 
@@ -9,7 +8,7 @@ use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_cur
 const G2_OUTPUT_LENGTH: usize = 256;
 
 /// Encodes a G2 point in affine format into byte slice with padded elements.
-pub(crate) fn encode_g2_point(input: &blst_p2_affine) -> Vec<u8> {
+pub fn encode_g2_point(input: &blst_p2_affine) -> Vec<u8> {
     let mut out = vec![0u8; G2_OUTPUT_LENGTH];
     fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &input.x.fp[0]);
     fp_to_bytes(
@@ -28,7 +27,7 @@ pub(crate) fn encode_g2_point(input: &blst_p2_affine) -> Vec<u8> {
 }
 
 /// Convert the following field elements from byte slices into a `blst_p2_affine` point.
-pub(crate) fn decode_and_check_g2(
+pub fn decode_and_check_g2(
     x1: &[u8; 48],
     x2: &[u8; 48],
     y1: &[u8; 48],
@@ -42,7 +41,7 @@ pub(crate) fn decode_and_check_g2(
 
 /// Checks whether or not the input represents a canonical fp2 field element, returning the field
 /// element if successful.
-pub(crate) fn check_canonical_fp2(
+pub fn check_canonical_fp2(
     input_1: &[u8; 48],
     input_2: &[u8; 48],
 ) -> Result<blst_fp2, Bls12381Error> {
@@ -56,7 +55,7 @@ pub(crate) fn check_canonical_fp2(
 /// Extracts a G2 point in Affine format from a 256 byte slice representation.
 ///
 /// NOTE: This function will perform a G2 subgroup check if `subgroup_check` is set to `true`.
-pub(crate) fn extract_g2_input(
+pub fn extract_g2_input(
     input: &[u8],
     subgroup_check: bool,
 ) -> Result<blst_p2_affine, Bls12381Error> {

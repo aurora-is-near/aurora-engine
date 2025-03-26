@@ -15,39 +15,9 @@ pub struct BlsG1Add;
 impl BlsG1Add {
     pub const ADDRESS: Address = make_address(0, 0xB);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         aurora_engine_sdk::bls12_381::g1_add(input)
             .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
-    }
-
-    #[cfg(not(feature = "std"))]
-    #[allow(clippy::range_plus_one)]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::padding_g1_result;
-        use super::utils::{extract_g1, FP_LENGTH, G1_INPUT_ITEM_LENGTH};
-
-        let (p0_x, p0_y) = extract_g1(&input[..G1_INPUT_ITEM_LENGTH])?;
-        let (p1_x, p1_y) = extract_g1(&input[G1_INPUT_ITEM_LENGTH..])?;
-
-        let mut g1_input = [0u8; 4 * FP_LENGTH + 2];
-
-        if input[..G1_INPUT_ITEM_LENGTH] == [0; G1_INPUT_ITEM_LENGTH] {
-            g1_input[1] |= 0x40;
-        } else {
-            g1_input[1..1 + FP_LENGTH].copy_from_slice(p0_x);
-            g1_input[1 + FP_LENGTH..1 + 2 * FP_LENGTH].copy_from_slice(p0_y);
-        }
-
-        if input[G1_INPUT_ITEM_LENGTH..] == [0; G1_INPUT_ITEM_LENGTH] {
-            g1_input[2 + 2 * FP_LENGTH] |= 0x40;
-        } else {
-            g1_input[2 + 2 * FP_LENGTH..2 + 3 * FP_LENGTH].copy_from_slice(p1_x);
-            g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
-        }
-
-        let output = aurora_engine_sdk::bls12381_p1_sum(&g1_input[..]);
-        Ok(padding_g1_result(&output))
     }
 }
 

@@ -2,10 +2,8 @@ use super::msm_required_gas;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381::G1_MUL_INPUT_LENGTH;
 use aurora_evm::{Context, ExitError};
-
-/// Input length of `g1_mul` operation.
-const INPUT_LENGTH: usize = 160;
 
 /// Base gas fee for BLS12-381 `g1_mul` operation.
 pub const BASE_GAS_FEE: u64 = 12000;
@@ -27,42 +25,9 @@ pub struct BlsG1Msm;
 impl BlsG1Msm {
     pub const ADDRESS: Address = make_address(0, 0xC);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
         aurora_engine_sdk::bls12_381::g1_msm(input)
             .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::padding_g1_result;
-        use super::utils::{extract_g1, FP_LENGTH, G1_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
-
-        let k = input.len() / INPUT_LENGTH;
-        let mut g1_input = crate::vec![0u8; k * (2 * FP_LENGTH + SCALAR_LENGTH)];
-        for i in 0..k {
-            let (p0_x, p0_y) =
-                extract_g1(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH])?;
-            // Data offset for the points
-            let offset = i * (2 * FP_LENGTH + SCALAR_LENGTH);
-            // Check is p0 zero coordinate
-            if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G1_INPUT_ITEM_LENGTH]
-                == [0; G1_INPUT_ITEM_LENGTH]
-            {
-                g1_input[offset] = 0x40;
-            } else {
-                g1_input[offset..offset + FP_LENGTH].copy_from_slice(p0_x);
-                g1_input[offset + FP_LENGTH..offset + 2 * FP_LENGTH].copy_from_slice(p0_y);
-            }
-            // Set scalar
-            let g1_range = offset + 2 * FP_LENGTH..offset + 2 * FP_LENGTH + SCALAR_LENGTH;
-            let scalar = &input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH];
-            g1_input[g1_range.clone()].copy_from_slice(scalar);
-            g1_input[g1_range].reverse();
-        }
-
-        let output = aurora_engine_sdk::bls12381_g1_multiexp(&g1_input[..]);
-        Ok(padding_g1_result(&output))
     }
 }
 
@@ -71,7 +36,7 @@ impl Precompile for BlsG1Msm {
     where
         Self: Sized,
     {
-        let k = input.len() / INPUT_LENGTH;
+        let k = input.len() / G1_MUL_INPUT_LENGTH;
         Ok(EthGas::new(msm_required_gas(
             k,
             &DISCOUNT_TABLE,
@@ -95,7 +60,7 @@ impl Precompile for BlsG1Msm {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let input_len = input.len();
-        if input_len == 0 || input_len % INPUT_LENGTH != 0 {
+        if input_len == 0 || input_len % G1_MUL_INPUT_LENGTH != 0 {
             return Err(ExitError::Other(Borrowed("ERR_BLS_G1MSM_INPUT_LEN")));
         }
 

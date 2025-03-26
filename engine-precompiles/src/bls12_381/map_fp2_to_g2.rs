@@ -1,7 +1,7 @@
-use super::PADDED_FP2_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381::PADDED_FP2_LENGTH;
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `map_fp2_to_g2` operation.
@@ -13,25 +13,9 @@ pub struct BlsMapFp2ToG2;
 impl BlsMapFp2ToG2 {
     pub const ADDRESS: Address = make_address(0, 0x11);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::map_fp2_to_g12(input)
+        aurora_engine_sdk::bls12_381::map_fp2_to_g2(input)
             .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::utils::{remove_padding, FP_LENGTH};
-        use super::{padding_g2_result, PADDED_FP_LENGTH};
-
-        let mut p = [0; 2 * FP_LENGTH];
-        let p1 = remove_padding(&input[..PADDED_FP_LENGTH])?;
-        let p2 = remove_padding(&input[PADDED_FP_LENGTH..])?;
-        p[..FP_LENGTH].copy_from_slice(p2);
-        p[FP_LENGTH..].copy_from_slice(p1);
-
-        let output = aurora_engine_sdk::bls12381_map_fp2_to_g2(&p[..]);
-        Ok(padding_g2_result(&output))
     }
 }
 
