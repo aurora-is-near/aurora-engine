@@ -41,11 +41,6 @@ pub fn set_silo_params<I: IO>(io: &mut I, args: Option<SiloParamsArgs>) {
     set_erc20_fallback_address(io, address);
 }
 
-/// Return true if the Silo mode is on (`fixed_gas` is set).
-pub fn is_silo_mode_on<I: IO>(io: &I) -> bool {
-    get_fixed_gas(io).is_some()
-}
-
 /// Return gas amount per transaction.
 pub fn get_fixed_gas<I: IO>(io: &I) -> Option<EthGas> {
     let key = fixed_gas_key();
@@ -108,9 +103,32 @@ pub fn set_whitelist_status<I: IO + Copy>(io: &I, args: &WhitelistStatusArgs) {
     whitelist::set_whitelist_status(io, args);
 }
 
+/// Set status of the provided white lists.
+pub fn set_whitelists_statuses<I: IO + Copy, A: IntoIterator<Item = WhitelistStatusArgs>>(
+    io: &I,
+    args: A,
+) {
+    for arg in args {
+        whitelist::set_whitelist_status(io, &arg);
+    }
+}
+
 /// Return status of the provided white list.
 pub fn get_whitelist_status<I: IO + Copy>(io: &I, args: &WhitelistKindArgs) -> WhitelistStatusArgs {
     whitelist::get_whitelist_status(io, args)
+}
+
+/// Return status of the all white list.
+pub fn get_whitelists_statuses<I: IO + Copy>(io: &I) -> Vec<WhitelistStatusArgs> {
+    [
+        WhitelistKind::Admin,
+        WhitelistKind::EvmAdmin,
+        WhitelistKind::Account,
+        WhitelistKind::Address,
+    ]
+    .into_iter()
+    .map(|kind| whitelist::get_whitelist_status(io, &WhitelistKindArgs { kind }))
+    .collect()
 }
 
 /// Check if the calling user is admin or owner of the contract.
@@ -205,12 +223,15 @@ mod access_test {
         let account_id = "some-account.near".parse().unwrap();
         let address = Address::zero();
         let mut list = Whitelist::init(&io, WhitelistKind::Account);
+        list.enable();
 
         assert!(!is_account_allowed(&io, &account_id));
         list.add(&account_id);
         assert!(is_account_allowed(&io, &account_id));
 
         let mut list = Whitelist::init(&io, WhitelistKind::Address);
+        list.enable();
+
         assert!(!is_address_allowed(&io, &address));
         list.add(&address);
         assert!(is_address_allowed(&io, &address));
@@ -230,13 +251,13 @@ mod access_test {
             },
         );
 
-        assert!(status.active);
+        assert!(!status.active);
 
         set_whitelist_status(
             &io,
             &WhitelistStatusArgs {
                 kind: WhitelistKind::Admin,
-                active: false,
+                active: true,
             },
         );
 
@@ -247,6 +268,6 @@ mod access_test {
             },
         );
 
-        assert!(!status.active);
+        assert!(status.active);
     }
 }

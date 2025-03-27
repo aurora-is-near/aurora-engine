@@ -39,10 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    #[cfg(not(feature = "ext-connector"))]
     assert_eq!(108, profile.all_gas() / 1_000_000_000_000);
-    #[cfg(feature = "ext-connector")]
-    assert_eq!(107, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]

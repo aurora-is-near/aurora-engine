@@ -488,10 +488,6 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
     // TODO: Add an admin access list of accounts allowed to do it.
     require_owner_only(&state, &io.predecessor_account_id())?;
 
-    if !crate::contract_methods::silo::is_silo_mode_on(&io) {
-        return Err(crate::errors::ERR_ALLOWED_IN_SILO_MODE_ONLY.into());
-    }
-
     let input = io.read_input().to_vec();
     let args = MirrorErc20TokenArgs::try_from_slice(&input)
         .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;

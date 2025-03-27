@@ -10,7 +10,6 @@ use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
     WithdrawSerializeType,
 };
-use aurora_engine_types::parameters::silo::{SiloParamsArgs, WhitelistKind, WhitelistStatusArgs};
 use aurora_engine_workspace::account::Account;
 use aurora_engine_workspace::types::NearToken;
 use aurora_engine_workspace::{EngineContract, RawContract};
@@ -40,26 +39,6 @@ async fn test_mirroring_erc20_token() {
             },
             metadata: erc20_metadata.clone(),
         })
-        .max_gas()
-        .transact()
-        .await
-        .unwrap();
-    assert!(result.is_success());
-
-    // Try to mirror ERC-20 with silo mode off.
-    let result = silo_contract
-        .mirror_erc20_token(MirrorErc20TokenArgs {
-            contract_id: main_contract.id(),
-            nep141: nep141.id(),
-        })
-        .max_gas()
-        .transact()
-        .await;
-    assert!(result.is_err());
-
-    // Turn on silo mode by setting default params.
-    let result = silo_contract
-        .set_silo_params(Some(SiloParamsArgs::default()))
         .max_gas()
         .transact()
         .await
@@ -198,15 +177,6 @@ async fn test_transfer_from_silo_to_silo() {
         .unwrap();
     assert!(result.is_success());
 
-    // Turn on silo mode by setting default params.
-    let result = silo_contract
-        .set_silo_params(Some(SiloParamsArgs::default()))
-        .max_gas()
-        .transact()
-        .await
-        .unwrap();
-    assert!(result.is_success());
-
     // Should get ERC-20 address of mirrored contract.
     let result = silo_contract
         .mirror_erc20_token(MirrorErc20TokenArgs {
@@ -218,19 +188,6 @@ async fn test_transfer_from_silo_to_silo() {
         .await;
     let erc20_address = result.unwrap().into_value();
     assert_eq!(erc20_address, erc20.0.address);
-
-    // Disable whitelist Address to disable check if the addresses allow to receive tokens
-    // from outside.
-    let result = silo_contract
-        .set_whitelist_status(WhitelistStatusArgs {
-            kind: WhitelistKind::Address,
-            active: false,
-        })
-        .max_gas()
-        .transact()
-        .await
-        .unwrap();
-    assert!(result.is_success());
 
     let silo_erc20_metadata = silo_contract
         .get_erc20_metadata(Erc20Identifier::Erc20 {
