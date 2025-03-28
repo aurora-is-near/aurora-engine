@@ -25,7 +25,7 @@ where
         Self { io: *io, kind }
     }
 
-    /// Enable a whitelist. (A whitelist is enabled after creation).
+    /// Enable a whitelist. (A whitelist is disabled after creation).
     pub fn enable(&mut self) {
         let key = self.key(STATUS);
         self.io.write_storage(&key, &[1]);
@@ -39,11 +39,11 @@ where
 
     /// Check if the whitelist is enabled.
     pub fn is_enabled(&self) -> bool {
-        // White list is enabled by default. So return `true` if the key doesn't exist.
+        // White list is disabled by default. So return `false` if the key doesn't exist.
         let key = self.key(STATUS);
         self.io
             .read_storage(&key)
-            .map_or(true, |value| value.to_vec() == [1])
+            .map_or(false, |value| value.to_vec() == [1])
     }
 
     fn key(&self, value: &[u8]) -> Vec<u8> {
@@ -140,8 +140,8 @@ mod tests {
         let io = StoragePointer(&storage);
         let mut white_list = Whitelist::init(&io, WhitelistKind::Account);
         // Whitelist is enabled after creation.
-        assert!(white_list.is_enabled());
-        white_list.disable();
         assert!(!white_list.is_enabled());
+        white_list.enable();
+        assert!(white_list.is_enabled());
     }
 }

@@ -87,6 +87,7 @@ category = "Check"
 command = "${CARGO}"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--",
     "-D",
@@ -99,6 +100,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "ext-connector",
@@ -113,6 +115,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "contract",
@@ -127,6 +130,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "contract,error_refund",

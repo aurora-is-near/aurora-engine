@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changes
+
+- Reworked the logic related to the silo mode by [@aleksuss]. ([#1005])
+
+[#1005]: https://github.com/aurora-is-near/aurora-engine/pull/1005
+
 ## [3.8.0] 2025-02-05
 
 ### Changes
