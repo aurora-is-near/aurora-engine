@@ -289,6 +289,8 @@ fn test_admin_access_right() {
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_whitelist(&mut runner, WhitelistKind::Admin);
+
     // Allow to submit transactions.
 
     let account = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
@@ -332,6 +334,7 @@ fn test_submit_access_right() {
     );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
         .unwrap();
@@ -387,6 +390,7 @@ fn test_submit_access_right_via_batch() {
     );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
         .unwrap();
@@ -451,6 +455,7 @@ fn test_submit_with_disabled_whitelist() {
     );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
         .unwrap();
@@ -515,6 +520,7 @@ fn test_submit_with_removing_entries() {
     );
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     // Allow to submit transactions.
     add_account_to_whitelist(&mut runner, caller.clone());
@@ -586,6 +592,7 @@ fn test_deploy_access_rights() {
     assert_eq!(balance, INITIAL_BALANCE);
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -642,6 +649,7 @@ fn test_deploy_with_disabled_whitelist() {
     assert_eq!(balance, INITIAL_BALANCE);
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
+    enable_all_whitelists(&mut runner);
 
     // Try to deploy code without adding to admins white list.
     let err = runner
@@ -831,6 +839,29 @@ fn enable_whitelist(runner: &mut AuroraRunner, kind: WhitelistKind) {
 }
 
 #[allow(dead_code)]
+fn enable_all_whitelists(runner: &mut AuroraRunner) {
+    let args = vec![
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Admin,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::EvmAdmin,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Account,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Address,
+            active: true,
+        },
+    ];
+    call_function(runner, "set_whitelists_statuses", args);
+}
+
+#[allow(dead_code)]
 fn disable_whitelist(runner: &mut AuroraRunner, kind: WhitelistKind) {
     let args = WhitelistStatusArgs {
         kind,
@@ -900,7 +931,7 @@ pub mod workspace {
         deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
     };
     use aurora_engine_types::parameters::silo::{
-        SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind,
+        SiloParamsArgs, WhitelistAddressArgs, WhitelistArgs, WhitelistKind, WhitelistStatusArgs,
     };
     use aurora_engine_types::types::Address;
     use aurora_engine_workspace::types::NearToken;
@@ -1118,6 +1149,17 @@ pub mod workspace {
         });
 
         let result = aurora.set_silo_params(params).transact().await.unwrap();
+        assert!(result.is_success());
+
+        // We have to enable the `Address` whitelist.
+        let result = aurora
+            .set_whitelist_status(WhitelistStatusArgs {
+                kind: WhitelistKind::Address,
+                active: true,
+            })
+            .transact()
+            .await
+            .unwrap();
         assert!(result.is_success());
 
         // Create `ft_owner` account and evm address

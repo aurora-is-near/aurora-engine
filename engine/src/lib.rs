@@ -994,6 +994,16 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn set_whitelists_statuses() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Vec<WhitelistStatusArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::set_whitelists_statuses(&io, args);
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_whitelist_status() {
         let mut io = Runtime;
         let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
@@ -1002,6 +1012,16 @@ mod contract {
             .sdk_unwrap();
 
         io.return_output(&status);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_whitelists_statuses() {
+        let mut io = Runtime;
+        let statuses = borsh::to_vec(&silo::get_whitelists_statuses(&io))
+            .map_err(|e| e.to_string())
+            .sdk_unwrap();
+
+        io.return_output(&statuses);
     }
 
     #[no_mangle]

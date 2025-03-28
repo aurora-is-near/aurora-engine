@@ -248,6 +248,11 @@ pub fn parse_transaction_kind(
             let args = silo_params::WhitelistStatusArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetWhitelistStatus(args)
         }
+        TransactionKindTag::SetWhitelistsStatuses => {
+            let args: Vec<silo_params::WhitelistStatusArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetWhitelistsStatuses(args)
+        }
         TransactionKindTag::AddEntryToWhitelist => {
             let args = silo_params::WhitelistArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddEntryToWhitelist(args)
@@ -749,6 +754,10 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::SetWhitelistStatus(args) => {
             silo::set_whitelist_status(&io, args);
+            None
+        }
+        TransactionKind::SetWhitelistsStatuses(args) => {
+            silo::set_whitelists_statuses(&io, args.clone());
             None
         }
         TransactionKind::MirrorErc20TokenCallback(_) => {
