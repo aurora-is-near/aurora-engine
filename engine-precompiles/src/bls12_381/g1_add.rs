@@ -1,6 +1,7 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::Borrowed;
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
+use aurora_engine_sdk::bls12_381;
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g1_add` operation.
@@ -16,8 +17,7 @@ impl BlsG1Add {
     pub const ADDRESS: Address = make_address(0, 0xB);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::g1_add(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::g1_add(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

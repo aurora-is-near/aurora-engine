@@ -1,7 +1,7 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::PADDED_FP2_LENGTH;
+use aurora_engine_sdk::bls12_381::{self, PADDED_FP2_LENGTH};
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `map_fp2_to_g2` operation.
@@ -14,8 +14,7 @@ impl BlsMapFp2ToG2 {
     pub const ADDRESS: Address = make_address(0, 0x11);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::map_fp2_to_g2(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::map_fp2_to_g2(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

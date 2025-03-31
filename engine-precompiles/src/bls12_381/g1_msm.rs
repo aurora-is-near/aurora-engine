@@ -2,7 +2,7 @@ use super::msm_required_gas;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::G1_MUL_INPUT_LENGTH;
+use aurora_engine_sdk::bls12_381::{self, G1_MUL_INPUT_LENGTH};
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g1_mul` operation.
@@ -26,8 +26,7 @@ impl BlsG1Msm {
     pub const ADDRESS: Address = make_address(0, 0xC);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::g1_msm(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::g1_msm(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

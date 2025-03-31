@@ -1,6 +1,6 @@
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::PADDED_FP_LENGTH;
+use aurora_engine_sdk::bls12_381::{self, PADDED_FP_LENGTH};
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
@@ -14,8 +14,7 @@ impl BlsMapFpToG1 {
     pub const ADDRESS: Address = make_address(0, 0x10);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::map_fp_to_g1(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::map_fp_to_g1(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

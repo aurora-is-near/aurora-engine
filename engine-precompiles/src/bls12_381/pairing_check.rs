@@ -1,6 +1,6 @@
 use crate::prelude::{Borrowed, Vec};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::PAIRING_INPUT_LENGTH;
+use aurora_engine_sdk::bls12_381::{self, PAIRING_INPUT_LENGTH};
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
@@ -16,8 +16,7 @@ impl BlsPairingCheck {
     pub const ADDRESS: Address = make_address(0, 0xF);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::pairing_check(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::pairing_check(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

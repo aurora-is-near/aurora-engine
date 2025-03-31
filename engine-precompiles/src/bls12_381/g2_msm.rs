@@ -1,7 +1,7 @@
 use super::msm_required_gas;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::G2_MUL_INPUT_LENGTH;
+use aurora_engine_sdk::bls12_381::{self, G2_MUL_INPUT_LENGTH};
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
@@ -26,8 +26,7 @@ impl BlsG2Msm {
     pub const ADDRESS: Address = make_address(0, 0xE);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::g2_msm(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::g2_msm(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

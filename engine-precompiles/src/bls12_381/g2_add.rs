@@ -1,5 +1,6 @@
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381;
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
@@ -16,8 +17,7 @@ impl BlsG2Add {
     pub const ADDRESS: Address = make_address(0, 0xD);
 
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        aurora_engine_sdk::bls12_381::g2_add(input)
-            .map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
+        bls12_381::g2_add(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 
