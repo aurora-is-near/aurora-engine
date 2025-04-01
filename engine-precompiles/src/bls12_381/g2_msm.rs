@@ -1,14 +1,12 @@
-use super::{msm_required_gas, G2_INPUT_ITEM_LENGTH, SCALAR_LENGTH};
+use super::msm_required_gas;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381::{self, G2_MUL_INPUT_LENGTH};
 use aurora_engine_types::types::{make_address, Address, EthGas};
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_mul` operation.
 const BASE_GAS_FEE: u64 = 22500;
-
-/// Input length of `g2_mul` operation.
-const INPUT_LENGTH: usize = 288;
 
 // Discounts table for G2 MSM as a vector of pairs `[k, discount]`:
 const DISCOUNT_TABLE: [u16; 128] = [
@@ -27,87 +25,8 @@ pub struct BlsG2Msm;
 impl BlsG2Msm {
     pub const ADDRESS: Address = make_address(0, 0xE);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::{extract_scalar_input, g2, NBITS};
-        use blst::{blst_p2, blst_p2_affine, blst_p2_from_affine, blst_p2_to_affine, p2_affines};
-
-        let k = input.len() / INPUT_LENGTH;
-        let mut g2_points: Vec<blst_p2> = Vec::with_capacity(k);
-        let mut scalars: Vec<u8> = Vec::with_capacity(k * SCALAR_LENGTH);
-        for i in 0..k {
-            let slice = &input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH];
-            // BLST batch API for p2_affines blows up when you pass it a point at infinity, so we must
-            // filter points at infinity (and their corresponding scalars) from the input.
-            if slice.iter().all(|i| *i == 0) {
-                continue;
-            }
-
-            // NB: Scalar multiplications, MSMs and pairings MUST perform a subgroup check.
-            //
-            // So we set the subgroup_check flag to `true`
-            let p0_aff = &g2::extract_g2_input(slice, true)?;
-
-            let mut p0 = blst_p2::default();
-            // SAFETY: p0 and p0_aff are blst values.
-            unsafe { blst_p2_from_affine(&mut p0, p0_aff) };
-
-            g2_points.push(p0);
-
-            scalars.extend_from_slice(
-                &extract_scalar_input(
-                    &input[i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH
-                        ..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH + SCALAR_LENGTH],
-                )?
-                .b,
-            );
-        }
-
-        // return infinity point if all points are infinity
-        if g2_points.is_empty() {
-            return Ok([0; 256].into());
-        }
-
-        let points = p2_affines::from(&g2_points);
-        let multiexp = points.mult(&scalars, NBITS);
-
-        let mut multiexp_aff = blst_p2_affine::default();
-        // SAFETY: multiexp_aff and multiexp are blst values.
-        unsafe { blst_p2_to_affine(&mut multiexp_aff, &multiexp) };
-
-        Ok(g2::encode_g2_point(&multiexp_aff))
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{extract_g2, padding_g2_result, FP_LENGTH};
-
-        let k = input.len() / INPUT_LENGTH;
-        let mut g2_input = crate::vec![0u8; k * (4 * FP_LENGTH + SCALAR_LENGTH)];
-        for i in 0..k {
-            let (p0_x, p0_y) =
-                extract_g2(&input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH])?;
-
-            // Data offset for the points
-            let offset = i * (4 * FP_LENGTH + SCALAR_LENGTH);
-            // Check is p0 zero coordinate
-            if input[i * INPUT_LENGTH..i * INPUT_LENGTH + G2_INPUT_ITEM_LENGTH]
-                == [0; G2_INPUT_ITEM_LENGTH]
-            {
-                g2_input[offset] = 0x40;
-            } else {
-                g2_input[offset..offset + 2 * FP_LENGTH].copy_from_slice(&p0_x);
-                g2_input[offset + 2 * FP_LENGTH..offset + 4 * FP_LENGTH].copy_from_slice(&p0_y);
-            }
-            // Set scalar
-            let g2_range = offset + 4 * FP_LENGTH..offset + 4 * FP_LENGTH + SCALAR_LENGTH;
-            let scalar = &input[(i + 1) * INPUT_LENGTH - SCALAR_LENGTH..(i + 1) * INPUT_LENGTH];
-            g2_input[g2_range.clone()].copy_from_slice(scalar);
-            g2_input[g2_range].reverse();
-        }
-
-        let output = aurora_engine_sdk::bls12381_g2_multiexp(&g2_input[..]);
-        Ok(padding_g2_result(&output))
+        bls12_381::g2_msm(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 
@@ -116,7 +35,7 @@ impl Precompile for BlsG2Msm {
     where
         Self: Sized,
     {
-        let k = input.len() / INPUT_LENGTH;
+        let k = input.len() / G2_MUL_INPUT_LENGTH;
         Ok(EthGas::new(msm_required_gas(
             k,
             &DISCOUNT_TABLE,
@@ -140,7 +59,7 @@ impl Precompile for BlsG2Msm {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let input_len = input.len();
-        if input_len == 0 || input_len % INPUT_LENGTH != 0 {
+        if input_len == 0 || input_len % G2_MUL_INPUT_LENGTH != 0 {
             return Err(ExitError::Other(Borrowed("ERR_BLS_G2MSM_INPUT_LEN")));
         }
 

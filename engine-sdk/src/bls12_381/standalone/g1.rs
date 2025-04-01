@@ -1,8 +1,7 @@
-use super::{fp_from_bendian, fp_to_bytes, PADDED_FP_LENGTH};
-use crate::bls12_381::{remove_padding, G1_INPUT_ITEM_LENGTH};
-use crate::prelude::Borrowed;
+use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
+use super::Bls12381Error;
+use crate::bls12_381::{G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
 use crate::prelude::{vec, Vec};
-use aurora_evm::ExitError;
 use blst::{blst_p1_affine, blst_p1_affine_in_g1, blst_p1_affine_on_curve};
 
 /// Encodes a G1 point in affine format into byte slice with padded elements.
@@ -22,7 +21,10 @@ pub fn encode_g1_point(input: *const blst_p1_affine) -> Vec<u8> {
 /// If the x or y coordinate do not represent a canonical field element, an error is returned.
 ///
 /// See [`fp_from_bendian`] for more information.
-pub fn decode_and_check_g1(p0_x: &[u8; 48], p0_y: &[u8; 48]) -> Result<blst_p1_affine, ExitError> {
+pub fn decode_and_check_g1(
+    p0_x: &[u8; 48],
+    p0_y: &[u8; 48],
+) -> Result<blst_p1_affine, Bls12381Error> {
     let out = blst_p1_affine {
         x: fp_from_bendian(p0_x)?,
         y: fp_from_bendian(p0_y)?,
@@ -34,9 +36,12 @@ pub fn decode_and_check_g1(p0_x: &[u8; 48], p0_y: &[u8; 48]) -> Result<blst_p1_a
 /// Extracts a G1 point in Affine format from a 128 byte slice representation.
 ///
 /// NOTE: This function will perform a G1 subgroup check if `subgroup_check` is set to `true`.
-pub fn extract_g1_input(input: &[u8], subgroup_check: bool) -> Result<blst_p1_affine, ExitError> {
+pub fn extract_g1_input(
+    input: &[u8],
+    subgroup_check: bool,
+) -> Result<blst_p1_affine, Bls12381Error> {
     if input.len() != G1_INPUT_ITEM_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_G1_INPUT_LEN")));
+        return Err(Bls12381Error::G1InputLength);
     }
 
     let input_p0_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
@@ -57,7 +62,7 @@ pub fn extract_g1_input(input: &[u8], subgroup_check: bool) -> Result<blst_p1_af
         // As endomorphism acceleration requires input on the correct subgroup, implementers MAY
         // use endomorphism acceleration.
         if unsafe { !blst_p1_affine_in_g1(&out) } {
-            return Err(ExitError::Other(Borrowed("ERR_BLS12_ELEMENT_NOT_IN_G1")));
+            return Err(Bls12381Error::ElementNotInG1);
         }
     } else {
         // From EIP-2537:
@@ -73,7 +78,7 @@ pub fn extract_g1_input(input: &[u8], subgroup_check: bool) -> Result<blst_p1_af
         //
         // SAFETY: out is a blst value.
         if unsafe { !blst_p1_affine_on_curve(&out) } {
-            return Err(ExitError::Other(Borrowed("ERR_BLS12_ELEMENT_NOT_IN_G1")));
+            return Err(Bls12381Error::ElementNotInG1);
         }
     }
 

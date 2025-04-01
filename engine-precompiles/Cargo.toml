@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-precompiles"
-version = "1.2.0"
+version = "1.3.0"
 description = "Set of precompiles that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
@@ -16,7 +16,6 @@ publish = true
 aurora-engine-modexp.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
-blst = { workspace = true, optional = true }
 bn.workspace = true
 ethabi.workspace = true
 aurora-evm.workspace = true
@@ -34,8 +33,8 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "blst", "bn/std", "aurora-evm/std", "ripemd/std", "sha2/std", "ethabi/std"]
-contract = ["aurora-engine-sdk/contract"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-sdk/bls", "bn/std", "aurora-evm/std", "ripemd/std", "sha2/std", "ethabi/std"]
+contract = ["aurora-engine-sdk/contract", "aurora-engine-sdk/bls"]
 log = []
 error_refund = []
 ext-connector = []

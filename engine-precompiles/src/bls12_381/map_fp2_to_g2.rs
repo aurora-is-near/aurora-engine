@@ -1,7 +1,7 @@
-use super::PADDED_FP2_LENGTH;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bls12_381::{self, PADDED_FP2_LENGTH};
 use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `map_fp2_to_g2` operation.
@@ -13,40 +13,8 @@ pub struct BlsMapFp2ToG2;
 impl BlsMapFp2ToG2 {
     pub const ADDRESS: Address = make_address(0, 0x11);
 
-    #[cfg(feature = "std")]
     fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::standalone::g2;
-        use super::{remove_padding, PADDED_FP_LENGTH};
-        use blst::{blst_map_to_g2, blst_p2, blst_p2_affine, blst_p2_to_affine};
-
-        let input_p0_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
-        let input_p0_y = remove_padding(&input[PADDED_FP_LENGTH..PADDED_FP2_LENGTH])?;
-        let fp2 = g2::check_canonical_fp2(input_p0_x, input_p0_y)?;
-
-        let mut p = blst_p2::default();
-        // SAFETY: p and fp2 are blst values.
-        // third argument is unused if null.
-        unsafe { blst_map_to_g2(&mut p, &fp2, core::ptr::null()) };
-
-        let mut p_aff = blst_p2_affine::default();
-        // SAFETY: p_aff and p are blst values.
-        unsafe { blst_p2_to_affine(&mut p_aff, &p) };
-
-        Ok(g2::encode_g2_point(&p_aff))
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn execute(input: &[u8]) -> Result<Vec<u8>, ExitError> {
-        use super::{padding_g2_result, remove_padding, FP_LENGTH, PADDED_FP_LENGTH};
-
-        let mut p = [0; 2 * FP_LENGTH];
-        let p1 = remove_padding(&input[..PADDED_FP_LENGTH])?;
-        let p2 = remove_padding(&input[PADDED_FP_LENGTH..])?;
-        p[..FP_LENGTH].copy_from_slice(p2);
-        p[FP_LENGTH..].copy_from_slice(p1);
-
-        let output = aurora_engine_sdk::bls12381_map_fp2_to_g2(&p[..]);
-        Ok(padding_g2_result(&output))
+        bls12_381::map_fp2_to_g2(input).map_err(|e| ExitError::Other(Borrowed(e.as_ref())))
     }
 }
 

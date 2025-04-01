@@ -322,14 +322,13 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-precompiles"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-sdk",
  "aurora-engine-test-doubles",
  "aurora-engine-types",
  "aurora-evm",
- "blst",
  "ethabi",
  "hex",
  "num",
@@ -341,10 +340,11 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-sdk"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-types",
  "base64 0.22.1",
+ "blst",
  "hex",
  "libsecp256k1",
  "sha2 0.10.8",
@@ -421,7 +421,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-transactions"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
@@ -462,9 +462,9 @@ dependencies = [
 
 [[package]]
 name = "aurora-evm"
-version = "2.0.0-rc.1"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2d1d78d023cbd87fd374952dea2f537c7d3d11632f5fb277332f202ce928690"
+checksum = "c137cde01ce10801a70dc5352117a77fdab62281032b4536b646cf1044c38564"
 dependencies = [
  "auto_impl",
  "environmental",

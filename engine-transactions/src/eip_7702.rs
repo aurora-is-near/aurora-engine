@@ -258,6 +258,7 @@ impl Decodable for SignedTransaction7702 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::vec;
     use rlp::RlpStream;
 
     #[test]

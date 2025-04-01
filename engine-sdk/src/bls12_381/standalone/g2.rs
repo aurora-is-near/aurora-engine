@@ -1,7 +1,7 @@
-use super::{fp_from_bendian, fp_to_bytes, PADDED_FP_LENGTH};
-use crate::bls12_381::{remove_padding, FP_LENGTH, G2_INPUT_ITEM_LENGTH};
-use crate::prelude::{vec, Borrowed, Vec};
-use aurora_evm::ExitError;
+use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
+use super::Bls12381Error;
+use crate::bls12_381::{FP_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
+use crate::prelude::{vec, Vec};
 use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_curve};
 
 /// Output length of a g2 operation.
@@ -32,7 +32,7 @@ pub fn decode_and_check_g2(
     x2: &[u8; 48],
     y1: &[u8; 48],
     y2: &[u8; 48],
-) -> Result<blst_p2_affine, ExitError> {
+) -> Result<blst_p2_affine, Bls12381Error> {
     Ok(blst_p2_affine {
         x: check_canonical_fp2(x1, x2)?,
         y: check_canonical_fp2(y1, y2)?,
@@ -41,7 +41,10 @@ pub fn decode_and_check_g2(
 
 /// Checks whether or not the input represents a canonical fp2 field element, returning the field
 /// element if successful.
-pub fn check_canonical_fp2(input_1: &[u8; 48], input_2: &[u8; 48]) -> Result<blst_fp2, ExitError> {
+pub fn check_canonical_fp2(
+    input_1: &[u8; 48],
+    input_2: &[u8; 48],
+) -> Result<blst_fp2, Bls12381Error> {
     let fp_1 = fp_from_bendian(input_1)?;
     let fp_2 = fp_from_bendian(input_2)?;
 
@@ -52,9 +55,12 @@ pub fn check_canonical_fp2(input_1: &[u8; 48], input_2: &[u8; 48]) -> Result<bls
 /// Extracts a G2 point in Affine format from a 256 byte slice representation.
 ///
 /// NOTE: This function will perform a G2 subgroup check if `subgroup_check` is set to `true`.
-pub fn extract_g2_input(input: &[u8], subgroup_check: bool) -> Result<blst_p2_affine, ExitError> {
+pub fn extract_g2_input(
+    input: &[u8],
+    subgroup_check: bool,
+) -> Result<blst_p2_affine, Bls12381Error> {
     if input.len() != G2_INPUT_ITEM_LENGTH {
-        return Err(ExitError::Other(Borrowed("ERR_BLS12_G2_INPUT_LEN")));
+        return Err(Bls12381Error::G1InputLength);
     }
 
     let mut input_fps = [&[0; FP_LENGTH]; 4];
@@ -78,7 +84,7 @@ pub fn extract_g2_input(input: &[u8], subgroup_check: bool) -> Result<blst_p2_af
         // As endomorphism acceleration requires input on the correct subgroup, implementers MAY
         // use endomorphism acceleration.
         if unsafe { !blst_p2_affine_in_g2(&out) } {
-            return Err(ExitError::Other(Borrowed("ERR_BLS12_ELEMENT_NOT_IN_G2")));
+            return Err(Bls12381Error::ElementNotInG2);
         }
     } else {
         // From EIP-2537:
@@ -94,7 +100,7 @@ pub fn extract_g2_input(input: &[u8], subgroup_check: bool) -> Result<blst_p2_af
         //
         // SAFETY: out is a blst value.
         if unsafe { !blst_p2_affine_on_curve(&out) } {
-            return Err(ExitError::Other(Borrowed("ERR_BLS12_ELEMENT_NOT_IN_G2")));
+            return Err(Bls12381Error::ElementNotInG2);
         }
     }
 
