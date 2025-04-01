@@ -1042,8 +1042,8 @@ pub fn submit_with_alt_modexp<
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
-    // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, fixed_gas, &transaction)?;
+    // Check if the sender has rights to submit transactions or deploy code.
+    assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
@@ -1750,22 +1750,19 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
-    if fixed_gas.is_some() {
-        let allowed = if transaction.to.is_some() {
-            silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
-        } else {
-            silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
-        };
+    let allowed = if transaction.to.is_some() {
+        silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
+    } else {
+        silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
+    };
 
-        if !allowed {
-            return Err(EngineError {
-                kind: EngineErrorKind::NotAllowed,
-                gas_used: 0,
-            });
-        }
+    if !allowed {
+        return Err(EngineError {
+            kind: EngineErrorKind::NotAllowed,
+            gas_used: 0,
+        });
     }
 
     Ok(())

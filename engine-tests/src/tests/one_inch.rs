@@ -19,11 +19,11 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR TGas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 12); // less than 12 NEAR Tgas used
+    assert_gas_bound(profile.all_gas(), 11); // less than 11 NEAR TGas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);

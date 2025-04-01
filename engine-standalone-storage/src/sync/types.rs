@@ -172,6 +172,7 @@ pub enum TransactionKind {
     AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
     RemoveEntryFromWhitelist(silo::WhitelistArgs),
     SetWhitelistStatus(silo::WhitelistStatusArgs),
+    SetWhitelistsStatuses(Vec<silo::WhitelistStatusArgs>),
     /// Callback which mirrors existed ERC-20 contract deployed on the main contract.
     MirrorErc20TokenCallback(parameters::MirrorErc20TokenArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
@@ -460,6 +461,7 @@ impl TransactionKind {
                 Self::no_evm_execution("remove_entry_from_whitelist")
             }
             Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
+            Self::SetWhitelistsStatuses(_) => Self::no_evm_execution("set_whitelists_statuses"),
             Self::MirrorErc20TokenCallback(_) => {
                 Self::no_evm_execution("mirror_erc20_token_callback")
             }
@@ -587,6 +589,8 @@ pub enum TransactionKindTag {
     SetSiloParams,
     #[strum(serialize = "set_whitelist_status")]
     SetWhitelistStatus,
+    #[strum(serialize = "set_whitelists_statuses")]
+    SetWhitelistsStatuses,
     #[strum(serialize = "add_entry_to_whitelist")]
     AddEntryToWhitelist,
     #[strum(serialize = "add_entry_to_whitelist_batch")]
@@ -650,6 +654,7 @@ impl TransactionKind {
             }
             Self::AddEntryToWhitelistBatch(args) => to_borsh(args),
             Self::SetWhitelistStatus(args) => to_borsh(args),
+            Self::SetWhitelistsStatuses(args) => to_borsh(args),
             Self::SetEthConnectorContractAccount(args) => to_borsh(args),
             Self::MirrorErc20TokenCallback(args) => to_borsh(args),
         }
@@ -715,6 +720,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::AddEntryToWhitelistBatch(_) => Self::AddEntryToWhitelistBatch,
             TransactionKind::RemoveEntryFromWhitelist(_) => Self::RemoveEntryFromWhitelist,
             TransactionKind::SetWhitelistStatus(_) => Self::SetWhitelistStatus,
+            TransactionKind::SetWhitelistsStatuses(_) => Self::SetWhitelistsStatuses,
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::MirrorErc20TokenCallback(_) => Self::MirrorErc20TokenCallback,
         }
@@ -948,6 +954,7 @@ enum BorshableTransactionKind<'a> {
     MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
     WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
     StoreRelayerKeyCallback(Cow<'a, parameters::RelayerKeyArgs>),
+    SetWhitelistsStatuses(Cow<'a, Vec<silo::WhitelistStatusArgs>>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -1022,6 +1029,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetWhitelistStatus(x) => Self::SetWhitelistStatus(Cow::Borrowed(x)),
             TransactionKind::MirrorErc20TokenCallback(x) => {
                 Self::MirrorErc20TokenCallback(Cow::Borrowed(x))
+            }
+            TransactionKind::SetWhitelistsStatuses(x) => {
+                Self::SetWhitelistsStatuses(Cow::Borrowed(x))
             }
         }
     }
@@ -1124,6 +1134,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::WithdrawWnearToRouter(x) => {
                 Ok(Self::WithdrawWnearToRouter(x.into_owned()))
+            }
+            BorshableTransactionKind::SetWhitelistsStatuses(x) => {
+                Ok(Self::SetWhitelistsStatuses(x.into_owned()))
             }
         }
     }
