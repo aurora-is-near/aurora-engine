@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-transactions"
-version = "1.2.0"
+version = "1.3.0"
 description = "EVM transactions that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
@@ -20,6 +20,7 @@ rlp.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
+aurora-engine-types = { workspace = true, features = ["byteorder"] }
 hex.workspace = true
 
 [lints]

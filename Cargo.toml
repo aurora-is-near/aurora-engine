@@ -24,6 +24,7 @@ engine-standalone-tracing = { path = "engine-standalone-tracing", default-featur
 anyhow = "1"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
+blst = "0.3"
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
@@ -31,7 +32,7 @@ bstr = "1"
 byte-slice-cast = { version = "1", default-features = false }
 criterion = "0.5"
 ethabi = { version = "18", default-features = false }
-aurora-evm = { version = "2.0.0-rc.1", default-features = false }
+aurora-evm = { version = "2.0.0", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.20"

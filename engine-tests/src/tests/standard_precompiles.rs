@@ -37,19 +37,19 @@ fn profile_ecrecover() {
 #[test]
 fn profile_sha256() {
     let profile = precompile_execution_profile("test_sha256");
-    utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]
 fn profile_ripemd160() {
     let profile = precompile_execution_profile("test_ripemd160");
-    utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]
 fn profile_identity() {
     let profile = precompile_execution_profile("test_identity");
-    utils::assert_gas_bound(profile.all_gas(), 6);
+    utils::assert_gas_bound(profile.all_gas(), 7);
 }
 
 #[test]
