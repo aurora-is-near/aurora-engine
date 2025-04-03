@@ -10,6 +10,9 @@ license.workspace = true
 publish.workspace = true
 autobenches = false
 
+[dependencies]
+cargo-near-build = { workspace = true, optional = true }
+
 [dev-dependencies]
 aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-hashchain = { workspace = true, features = ["std"] }
@@ -24,7 +27,6 @@ aurora-engine-workspace.workspace = true
 anyhow.workspace = true
 borsh.workspace = true
 bstr.workspace = true
-cargo-near-build.workspace = true
 criterion.workspace = true
 engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true
@@ -56,4 +58,10 @@ workspace = true
 mainnet-test = ["aurora-engine-workspace/mainnet-test"]
 testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
-ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector", "engine-standalone-storage/ext-connector", "aurora-engine-workspace/ext-connector"]
+ext-connector = [
+    "aurora-engine/ext-connector",
+    "aurora-engine-precompiles/ext-connector",
+    "engine-standalone-storage/ext-connector",
+    "aurora-engine-workspace/ext-connector",
+    "dep:cargo-near-build"
+]

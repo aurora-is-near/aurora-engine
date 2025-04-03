@@ -410,12 +410,8 @@ dependencies = [
  "aurora-engine",
  "aurora-engine-types",
  "cargo-near-build",
- "ethabi",
- "hex",
- "near-gas",
  "near-sdk",
  "near-workspaces",
- "rlp",
  "serde",
  "tokio",
 ]
