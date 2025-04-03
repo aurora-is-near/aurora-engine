@@ -57,7 +57,6 @@ async fn inner_deploy_engine(code: Vec<u8>) -> EngineContract {
 /// Deploy and init external eth connector
 #[cfg(feature = "ext-connector")]
 async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
-    let contract_bytes = get_aurora_eth_connector_contract();
     let contract_account = aurora
         .root()
         .create_subaccount(
@@ -66,15 +65,13 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
         )
         .await
         .unwrap();
-    let contract = contract_account.deploy(&contract_bytes).await.unwrap();
+    let contract = contract_account.deploy(&ETH_CONNECTOR_WASM).await.unwrap();
     let metadata = FungibleTokenMetadata::default();
     let init_args = json!({
-        "prover_account": contract_account.id(),
-        "eth_custodian_address": "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E",
         "metadata": metadata,
-        "account_with_access_right": aurora.id(),
-        "owner_id": aurora.id(),
-        "min_proof_acceptance_height": 0
+        "aurora_engine_account_id": aurora.id(),
+        "owner_id": contract_account.id(),
+        "controller": aurora.id()
     });
 
     let result = contract
@@ -287,8 +284,22 @@ pub async fn transfer_call_nep_141(
 }
 
 #[cfg(feature = "ext-connector")]
-fn get_aurora_eth_connector_contract() -> Vec<u8> {
-    use std::path::Path;
-    let contract_path = Path::new("../engine-tests-connector/etc/aurora-eth-connector");
-    std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
-}
+static ETH_CONNECTOR_WASM: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
+    let manifest_path = std::env::current_dir()
+        .unwrap()
+        .join("../engine-tests-connector/etc/aurora-eth-connector")
+        .join("eth-connector")
+        .join("Cargo.toml");
+    let artifact = cargo_near_build::build(cargo_near_build::BuildOpts {
+        manifest_path: Some(manifest_path.try_into().unwrap()),
+        no_abi: true,
+        no_locked: true,
+        features: Some("integration-test,migration".to_owned()),
+        ..Default::default()
+    })
+    .unwrap();
+
+    std::fs::read(artifact.path.into_std_path_buf())
+        .map_err(|e| anyhow::anyhow!("failed read wasm file: {e}"))
+        .unwrap()
+});

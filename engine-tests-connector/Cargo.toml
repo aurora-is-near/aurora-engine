@@ -15,7 +15,7 @@ aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] 
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
 
 anyhow.workspace = true
-byte-slice-cast.workspace = true
+cargo-near-build.workspace = true
 near-gas.workspace = true
 near-sdk.workspace = true
 near-workspaces.workspace = true

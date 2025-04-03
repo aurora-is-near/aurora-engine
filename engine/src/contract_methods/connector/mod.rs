@@ -28,7 +28,7 @@ use aurora_engine_types::types::{Address, NearGas, PromiseResult, Yocto};
 use function_name::named;
 
 #[cfg(feature = "ext-connector")]
-pub use external::{AdminControlled, EthConnector, EthConnectorContract};
+pub use external::{AdminControlled, EthConnectorContract};
 #[cfg(not(feature = "ext-connector"))]
 pub use internal::{EthConnector, EthConnectorContract};
 
@@ -101,7 +101,10 @@ pub fn deposit<
     #[cfg(not(feature = "ext-connector"))]
     let result = internal::deposit(io, env, handler)?;
     #[cfg(feature = "ext-connector")]
-    let result = external::deposit(io, env, handler)?;
+    let result = {
+        let (_, _, _) = (io, env, handler);
+        None
+    };
 
     Ok(result)
 }
@@ -199,7 +202,10 @@ pub fn finish_deposit<I: IO + Copy, E: Env, H: PromiseHandler>(
     #[cfg(not(feature = "ext-connector"))]
     let result = internal::finish_deposit(io, env, handler)?;
     #[cfg(feature = "ext-connector")]
-    let result = external::finish_deposit(io, env, handler)?;
+    let result = {
+        let (_, _, _) = (io, env, handler);
+        None
+    };
 
     Ok(result)
 }
@@ -325,7 +331,7 @@ pub fn get_paused_flags<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<()
     #[cfg(not(feature = "ext-connector"))]
     internal::get_paused_flags(io)?;
     #[cfg(feature = "ext-connector")]
-    external::get_paused_flags(io)?;
+    let _ = io;
 
     Ok(())
 }
@@ -334,7 +340,7 @@ pub fn is_used_proof<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), C
     #[cfg(not(feature = "ext-connector"))]
     internal::is_used_proof(io)?;
     #[cfg(feature = "ext-connector")]
-    external::is_used_proof(io)?;
+    let _ = io;
 
     Ok(())
 }
@@ -474,7 +480,7 @@ pub fn get_bridge_prover<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(
     #[cfg(not(feature = "ext-connector"))]
     internal::get_bridge_prover(io)?;
     #[cfg(feature = "ext-connector")]
-    external::get_bridge_prover(io)?;
+    let _ = io;
 
     Ok(())
 }

@@ -71,9 +71,6 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        #[cfg(feature = "ext-connector")]
-        near_gas_used: 163,
-        #[cfg(not(feature = "ext-connector"))]
         near_gas_used: 164,
     });
 }
@@ -109,7 +106,10 @@ fn repro_D98vwmi() {
         block_timestamp: 1_651_753_443_421_003_245,
         input_path: "src/tests/res/input_D98vwmi.hex",
         evm_gas_used: 1_035_348,
+        #[cfg(feature = "ext-connector")]
         near_gas_used: 164,
+        #[cfg(not(feature = "ext-connector"))]
+        near_gas_used: 165,
     });
 }
 

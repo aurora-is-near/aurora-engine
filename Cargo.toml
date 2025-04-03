@@ -28,7 +28,7 @@ bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
-byte-slice-cast = { version = "1", default-features = false }
+cargo-near-build = "0.4"
 criterion = "0.5"
 ethabi = { version = "18", default-features = false }
 aurora-evm = { version = "2.0.0-rc.1", default-features = false }
