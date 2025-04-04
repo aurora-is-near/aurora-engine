@@ -54,8 +54,6 @@ const MIRROR_ERC20_TOKEN_CALLBACK_ATTACHED_GAS: NearGas = NearGas::new(10_000_00
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
     #[cfg(not(feature = "ext-connector"))]
     internal::new_eth_connector(io, env)?;
-    #[cfg(feature = "ext-connector")]
-    let (_, _) = (io, env);
 
     Ok(())
 }
