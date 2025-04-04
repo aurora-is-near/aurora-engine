@@ -120,11 +120,8 @@ async fn test_withdraw_eth_from_near() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
+    assert!(res.is_success());
 
-    // The fail is fine here because the controller doesn't have correspondent code.
-    assert!(res.is_failure(), "{res:#?}");
-    // But balances must be changed in any way because we assume that the controller finishes the
-    // withdrawal successfully.
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
         DEPOSITED_AMOUNT - withdraw_amount.as_u128(),
@@ -463,8 +460,7 @@ async fn test_access_right() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_failure()); // it's ok, the controller doesn't have a correspondent code
-    assert!(contract.check_error_message(&res, "CodeDoesNotExist")?);
+    assert!(res.is_success());
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,
@@ -507,8 +503,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(&res, "CodeDoesNotExist")?);
+    assert!(res.is_success());
 
     // Pause withdraw
     let res = contract
@@ -544,8 +539,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(&res, "CodeDoesNotExist")?);
+    assert!(res.is_success());
 
     // Unpause all
     let res = contract
@@ -566,8 +560,7 @@ async fn test_withdraw_from_near_pausability() -> anyhow::Result<()> {
         .deposit(ONE_YOCTO)
         .transact()
         .await?;
-    assert!(res.is_failure());
-    assert!(contract.check_error_message(&res, "CodeDoesNotExist")?);
+    assert!(res.is_success());
 
     assert_eq!(
         contract.total_supply().await?,
@@ -735,8 +728,7 @@ async fn test_withdraw_from_user() -> anyhow::Result<()> {
         .max_gas()
         .transact()
         .await?;
-    assert!(res.is_failure()); // it's ok, the controller doesn't have a correspondent code
-    assert!(contract.check_error_message(&res, "CodeDoesNotExist")?);
+    assert!(res.is_success());
 
     assert_eq!(
         contract.get_eth_on_near_balance(user_acc.id()).await?.0,

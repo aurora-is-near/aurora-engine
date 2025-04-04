@@ -27,7 +27,7 @@ pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 /// Admin control flow flag indicates that ft transfers are paused.
 pub const PAUSE_FT: PausedMask = 1 << 2;
 
-pub static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
+static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     let manifest_path = std::env::current_dir()
         .unwrap()
         .join("etc")
@@ -46,6 +46,13 @@ pub static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     std::fs::read(artifact.path.into_std_path_buf())
         .map_err(|e| anyhow::anyhow!("failed read wasm file: {e}"))
         .unwrap()
+});
+
+static MOCK_CONTROLLER_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
+    let base_path = Path::new("../etc").join("tests").join("mock-controller");
+    let output_path = base_path.join("target/wasm32-unknown-unknown/release/mock_controller.wasm");
+    crate::rust::compile(base_path);
+    std::fs::read(output_path).unwrap()
 });
 
 pub struct TestContract {
@@ -80,6 +87,7 @@ impl TestContract {
             .as_account()
             .batch(&controller)
             .create_account()
+            .deploy(&MOCK_CONTROLLER_WASM)
             .add_key(sk.public_key(), AccessKey::full_access())
             .transfer(NearToken::from_near(100))
             .transact()
