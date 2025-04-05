@@ -307,7 +307,7 @@ fn deploy_router() -> AuroraRunner {
 
 fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
     let engine_account = runner.aurora_account_id.clone();
-    let args = aurora_engine::parameters::DeployErc20TokenArgs {
+    let args = aurora_engine::parameters::DeployErc20TokenArgsLegacy {
         nep141: "wrap.near".parse().unwrap(),
     };
     let outcome = runner
@@ -946,7 +946,8 @@ pub mod workspace {
 
         // Setup wNEAR contract and bridge it to Aurora
         let wnear_contract = deploy_wnear(&aurora).await?;
-        let wnear_erc20 = deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora).await?;
+        let wnear_erc20 =
+            deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora, None).await?;
 
         transfer_nep_141_to_erc_20(
             &wnear_contract,

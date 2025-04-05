@@ -127,8 +127,9 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
 ) -> Result<Address, ContractError> {
     with_hashchain(io, env, function_name!(), |mut io| {
         require_running(&state::get_state(&io)?)?;
-        // AccountId of NEP-141 token on NEAR
-        let args: DeployErc20TokenArgs = io.read_input_borsh()?;
+        let bytes = io.read_input().to_vec();
+        let args = DeployErc20TokenArgs::deserialize(&bytes)
+            .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
         let address = engine::deploy_erc20_token(args, io, env, handler)?;
 
         io.return_output(

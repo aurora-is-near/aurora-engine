@@ -4,6 +4,7 @@ use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::parameters::engine::DeployErc20TokenArgsLegacy;
 use aurora_engine_types::types::{Address, Balance, Wei};
 #[cfg(not(feature = "ext-connector"))]
 use aurora_engine_types::types::{Fee, NEP141Wei};
@@ -214,9 +215,10 @@ fn test_consume_deploy_erc20_message() {
     let mint_amount: u128 = 555_555;
     let dest_address = Address::new(H160([170u8; 20]));
 
-    let args = aurora_engine::parameters::DeployErc20TokenArgs {
-        nep141: token.clone(),
-    };
+    let args =
+        aurora_engine::parameters::DeployErc20TokenArgs::Legacy(DeployErc20TokenArgsLegacy {
+            nep141: token.clone(),
+        });
     let tx_kind = sync::types::TransactionKind::DeployErc20(args);
     let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {

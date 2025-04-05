@@ -1,3 +1,4 @@
+use crate::parameters::connector::Erc20Metadata;
 use crate::{
     account_id::AccountId,
     public_key::PublicKey,
@@ -347,13 +348,36 @@ pub struct ViewCallArgs {
 }
 
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Eq, PartialEq, Clone)]
+pub enum DeployErc20TokenArgs {
+    Legacy(DeployErc20TokenArgsLegacy),
+    WithMetadata(DeployErc20TokenArgsWithMetadata),
+}
+
+impl DeployErc20TokenArgs {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, io::Error> {
+        Self::try_from_slice(bytes)
+            .or_else(|_| DeployErc20TokenArgsLegacy::try_from_slice(bytes).map(Self::Legacy))
+    }
+}
+
+/// Borsh-encoded legacy parameters for `deploy_erc20_token` function.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
-pub struct DeployErc20TokenArgs {
+pub struct DeployErc20TokenArgsLegacy {
     pub nep141: AccountId,
 }
 
 /// Borsh-encoded parameters for `get_erc20_from_nep141` function.
-pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
+pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgsLegacy;
+
+/// Borsh-encoded parameters with metadata for `deploy_erc20_token` function.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct DeployErc20TokenArgsWithMetadata {
+    /// The account id  of the corresponding NEP-141 token.
+    pub nep141: AccountId,
+    /// The ERC-20 metadata.
+    pub metadata: Erc20Metadata,
+}
 
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -580,6 +604,44 @@ mod tests {
         let actual = Vec::<TransactionStatus>::try_from_slice(&bytes).unwrap();
         let expected = transaction_status_variants();
 
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_read_deploy_erc20_args() {
+        let expected = DeployErc20TokenArgs::Legacy(DeployErc20TokenArgsLegacy {
+            nep141: "nep141.near".parse().unwrap(),
+        });
+
+        // Legacy args
+        let bytes = borsh::to_vec(&DeployErc20TokenArgsLegacy {
+            nep141: "nep141.near".parse().unwrap(),
+        })
+        .unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        // Args from just account id
+        let bytes = borsh::to_vec("nep141.near").unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let expected = DeployErc20TokenArgs::WithMetadata(DeployErc20TokenArgsWithMetadata {
+            nep141: "nep141.near".parse().unwrap(),
+            metadata: Erc20Metadata {
+                name: "Token".to_string(),
+                symbol: "TKN".to_string(),
+                decimals: 18,
+            },
+        });
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
         assert_eq!(actual, expected);
     }
 

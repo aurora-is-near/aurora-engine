@@ -71,8 +71,7 @@ pub fn parse_transaction_kind(
         }
         TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
         TransactionKindTag::DeployErc20 => {
-            let deploy_args =
-                parameters::DeployErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            let deploy_args = parameters::DeployErc20TokenArgs::deserialize(&bytes).map_err(f)?;
             TransactionKind::DeployErc20(deploy_args)
         }
         TransactionKindTag::FtOnTransfer => {

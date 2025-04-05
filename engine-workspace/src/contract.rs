@@ -2,23 +2,24 @@ use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
     CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
-    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
-    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
-    CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
-    CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
-    CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
-    CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
-    CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
-    CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
-    CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance,
-    ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
-    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtBalancesOf, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
-    ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
-    ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
-    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
-    ViewVersion, ViewView,
+    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token,
+    CallDeployErc20TokenLegacy, CallDeployUpgrade, CallDeposit, CallFactorySetWNearAddress,
+    CallFactoryUpdate, CallFactoryUpdateAddressVersion, CallFtOnTransfer, CallFtTransfer,
+    CallFtTransferCall, CallFundXccSubAccount, CallMintAccount, CallMirrorErc20Token, CallNew,
+    CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
+    CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
+    CallResumePrecompiles, CallSetErc20Metadata, CallSetEthConnectorContractAccount,
+    CallSetEthConnectorContractData, CallSetFixedGas, CallSetKeyManager, CallSetOwner,
+    CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
+    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
+    CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance, ViewBlockHash, ViewBridgeProver,
+    ViewChainId, ViewCode, ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf,
+    ViewFtBalanceOfEth, ViewFtBalancesOf, ViewFtMetadata, ViewFtTotalEthSupplyOnAurora,
+    ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply, ViewGetErc20Metadata,
+    ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams, ViewGetWhitelistStatus,
+    ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
+    ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
+    ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -27,8 +28,8 @@ use aurora_engine_types::parameters::connector::{
     SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs,
-    RelayerKeyManagerArgs,
+    CallArgs, DeployErc20TokenArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs,
+    NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
     FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
@@ -238,8 +239,13 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn deploy_erc20_token(&self, account_id: AccountId) -> CallDeployErc20Token {
-        CallDeployErc20Token::call(&self.contract).args_borsh(account_id)
+    pub fn deploy_erc20_token(&self, args: DeployErc20TokenArgs) -> CallDeployErc20Token {
+        CallDeployErc20Token::call(&self.contract).args_borsh(args)
+    }
+
+    #[must_use]
+    pub fn deploy_erc20_token_legacy(&self, account_id: AccountId) -> CallDeployErc20TokenLegacy {
+        CallDeployErc20TokenLegacy::call(&self.contract).args_borsh(account_id)
     }
 
     #[must_use]

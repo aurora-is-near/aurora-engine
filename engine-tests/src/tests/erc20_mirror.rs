@@ -22,7 +22,7 @@ async fn test_mirroring_erc20_token() {
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
-    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract, None)
         .await
         .unwrap();
     let erc20_metadata = Erc20Metadata {
@@ -154,7 +154,7 @@ async fn test_transfer_from_silo_to_silo() {
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
-    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract, None)
         .await
         .unwrap();
     let erc20_metadata = Erc20Metadata {

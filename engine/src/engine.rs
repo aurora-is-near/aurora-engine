@@ -18,7 +18,7 @@ use crate::accounting;
 #[cfg(not(feature = "ext-connector"))]
 use crate::contract_methods::connector;
 use crate::contract_methods::silo;
-use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
+use crate::parameters::TransactionStatus;
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
@@ -39,7 +39,7 @@ use aurora_engine_precompiles::PrecompileConstructorContext;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
 };
-use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
+use aurora_engine_types::parameters::engine::{DeployErc20TokenArgs, FunctionCallArgsV2};
 use aurora_engine_types::types::EthGas;
 use core::cell::RefCell;
 use core::iter::once;
@@ -1323,7 +1323,11 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id, None);
+    let (nep141, metadata) = match args {
+        DeployErc20TokenArgs::Legacy(args) => (args.nep141, None),
+        DeployErc20TokenArgs::WithMetadata(args) => (args.nep141, Some(args.metadata)),
+    };
+    let input = setup_deploy_erc20_input(&current_account_id, metadata);
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1346,7 +1350,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
     engine
-        .register_token(address, args.nep141)
+        .register_token(address, nep141)
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
@@ -2173,7 +2177,9 @@ mod tests {
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
-    use aurora_engine_types::parameters::engine::RelayerKeyArgs;
+    use aurora_engine_types::parameters::engine::{
+        DeployErc20TokenArgs, DeployErc20TokenArgsLegacy, RelayerKeyArgs,
+    };
     use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
     use std::cell::RefCell;
 
@@ -2441,9 +2447,9 @@ mod tests {
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs {
+        let args = DeployErc20TokenArgs::Legacy(DeployErc20TokenArgsLegacy {
             nep141: nep141_token,
-        };
+        });
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce);
         let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
@@ -2468,7 +2474,7 @@ mod tests {
             Engine::new_with_state(state, origin, current_account_id, io, &env);
         let nep141 = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs { nep141 };
+        let args = DeployErc20TokenArgs::Legacy(DeployErc20TokenArgsLegacy { nep141 });
         let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
         let metadata = engine
             .get_erc20_metadata(&Erc20Identifier::Erc20 {
