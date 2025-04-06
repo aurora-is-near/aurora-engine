@@ -43,8 +43,9 @@ use serde_json::json;
 
 #[derive(Debug, Clone)]
 pub struct EngineContract {
-    contract: RawContract,
-    public_key: PublicKey,
+    pub account: Account,
+    pub contract: RawContract,
+    pub public_key: PublicKey,
     pub node: Node,
 }
 
@@ -79,15 +80,24 @@ impl EngineContract {
 
         Account::from_inner(inner)
     }
-}
 
-impl From<(RawContract, PublicKey, Node)> for EngineContract {
-    fn from((contract, public_key, node): (RawContract, PublicKey, Node)) -> Self {
-        Self {
-            contract,
-            public_key,
-            node,
-        }
+    #[cfg(feature = "ext-connector")]
+    pub async fn deposit_to_near(
+        &self,
+        receipient_id: &AccountId,
+        amount: u64,
+    ) -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
+        let eth_connector_id = self.get_eth_connector_contract_account().await?.result;
+        self.account
+            .call(&eth_connector_id, "mint") // The 'mint' works here, because
+            // the engine account id is set as controller for the eth connector.
+            .args_json(json!( {
+                "account_id": receipient_id,
+                "amount": U128(u128::from(amount)),
+            }))
+            .max_gas()
+            .transact()
+            .await
     }
 }
 

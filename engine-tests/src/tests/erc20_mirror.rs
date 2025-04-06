@@ -272,12 +272,19 @@ async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract 
     let silo_bytes = AuroraRunner::get_engine_code();
     let contract = silo_account.deploy(&silo_bytes).await.unwrap();
     let public_key = silo_account.public_key().unwrap();
-    let silo = EngineContract::from((contract, public_key, main_contract.node.clone()));
+    let silo_account_id = silo_account.id();
+
+    let silo = EngineContract {
+        account: silo_account,
+        contract,
+        public_key,
+        node: main_contract.node.clone(),
+    };
 
     let result = silo
         .new(
             U256::from(AuroraRunner::get_default_chain_id() + 1).to_big_endian(),
-            silo_account.id(),
+            silo_account_id,
             1,
         )
         .max_gas()
