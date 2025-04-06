@@ -114,18 +114,27 @@ impl EngineContractBuilder {
         let owner_id = self.owner_id.as_ref();
         let (owner, root) = owner_id.split_once('.').unwrap_or((owner_id, owner_id));
         let node = Node::new(root, self.root_balance).await?;
-        let owner_acc = if owner == root {
+        let account = if owner == root {
             node.root()
         } else {
             node.root()
                 .create_subaccount(owner, self.contract_balance)
                 .await?
         };
-        let public_key = owner_acc.public_key()?;
-        let contract = owner_acc
-            .deploy(&self.code.expect("WASM wasn't set"))
+        let public_key = account.public_key()?;
+        let contract = account
+            .deploy(
+                &self
+                    .code
+                    .ok_or_else(|| anyhow::anyhow!("WASM wasn't set"))?,
+            )
             .await?;
-        let engine: EngineContract = (contract, public_key, node).into();
+        let engine = EngineContract {
+            account,
+            contract,
+            public_key,
+            node,
+        };
 
         engine
             .new(self.chain_id, self.owner_id, self.upgrade_delay_blocks)

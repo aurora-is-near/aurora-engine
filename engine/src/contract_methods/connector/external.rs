@@ -15,7 +15,7 @@ use crate::state;
 use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
-use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh;
 use aurora_engine_types::parameters::connector::{
     EngineWithdrawCallArgs, InitCallArgs, SetEthConnectorContractAccountArgs,
     StorageDepositCallArgs, StorageUnregisterCallArgs, StorageWithdrawCallArgs, TransferCallArgs,
@@ -28,6 +28,7 @@ use function_name::named;
 
 /// NEAR Gas needed to create promise.
 const GAS_FOR_PROMISE_CREATION: NearGas = NearGas::new(2_000_000_000_000);
+const ONE_YOCTO: Yocto = Yocto::new(1);
 
 pub fn withdraw<I: IO + Copy + PromiseHandler + Env, E>(
     mut io: I,
@@ -44,29 +45,6 @@ pub fn withdraw<I: IO + Copy + PromiseHandler + Env, E>(
     .unwrap();
 
     let promise_args = EthConnectorContract::init_with_env(io)?.withdraw_eth_from_near(input);
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-    io.promise_return(promise_id);
-
-    Ok(())
-}
-
-pub fn deposit<I: IO + Env + Copy, E, H: PromiseHandler>(
-    io: I,
-    _env: &E,
-    handler: &mut H,
-) -> Result<Option<PromiseWithCallbackArgs>, ContractError> {
-    require_running(&state::get_state(&io)?)?;
-    let input = io.read_input().to_vec();
-    let promise_args = EthConnectorContract::init_with_env(io)?.deposit(input);
-    let promise_id = unsafe { handler.promise_create_call(&promise_args) };
-    handler.promise_return(promise_id);
-
-    Ok(None)
-}
-
-pub fn is_used_proof<I: IO + Copy + PromiseHandler + Env>(mut io: I) -> Result<(), ContractError> {
-    let input = io.read_input().to_vec();
-    let promise_args = EthConnectorContract::init_with_env(io)?.is_used_proof(input);
     let promise_id = unsafe { io.promise_create_call(&promise_args) };
     io.promise_return(promise_id);
 
@@ -171,15 +149,6 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     };
 
     Ok(output)
-}
-
-#[allow(clippy::missing_const_for_fn)]
-pub fn finish_deposit<I, E, H>(
-    _: I,
-    _: E,
-    _: H,
-) -> Result<Option<PromiseWithCallbackArgs>, ContractError> {
-    Ok(None)
 }
 
 pub fn storage_deposit<I: IO + Env + Copy, E: Env, H: PromiseHandler>(
@@ -288,28 +257,8 @@ pub fn get_eth_connector_account_id<I: IO + Copy>(mut io: I) -> Result<(), Contr
     Ok(())
 }
 
-pub fn get_paused_flags<I: IO + Copy + PromiseHandler + Env>(
-    mut io: I,
-) -> Result<(), ContractError> {
-    let promise_args = EthConnectorContract::init_with_env(io)?.get_paused_flags();
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-    io.promise_return(promise_id);
-
-    Ok(())
-}
-
 pub fn ft_metadata<I: IO + Copy + PromiseHandler + Env>(mut io: I) -> Result<(), ContractError> {
     let promise_args = EthConnectorContract::init_with_env(io)?.get_metadata();
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-    io.promise_return(promise_id);
-
-    Ok(())
-}
-
-pub fn get_bridge_prover<I: IO + Copy + PromiseHandler + Env>(
-    mut io: I,
-) -> Result<(), ContractError> {
-    let promise_args = EthConnectorContract::init_with_env(io)?.get_bridge_prover();
     let promise_id = unsafe { io.promise_create_call(&promise_args) };
     io.promise_return(promise_id);
 
@@ -324,18 +273,6 @@ pub fn get_bridge_prover<I: IO + Copy + PromiseHandler + Env>(
 /// * io - I/O trait handler
 pub struct EthConnectorContract<I: IO> {
     io: I,
-}
-
-/// Eth connector specific data. It always must contain `prover_account` - account id of the smart
-/// contract which is used for verifying a proof used in the deposit flow.
-#[derive(BorshSerialize, BorshDeserialize)]
-#[borsh(crate = "aurora_engine_types::borsh")]
-pub struct EthConnector {
-    /// The account id of the Prover NEAR smart contract. It used in the Deposit flow for verifying
-    /// a log entry from incoming proof.
-    pub prover_account: AccountId,
-    /// It is Ethereum address used in the Deposit and Withdraw logic.
-    pub eth_custodian_address: Address,
 }
 
 impl<I: IO + Copy> EthConnectorContract<I> {
@@ -422,18 +359,6 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
         Ok(Self { io })
     }
 
-    /// Deposit all types of tokens
-    pub fn deposit(&self, data: Vec<u8>) -> PromiseCreateArgs {
-        sdk::log!("Call Deposit");
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "deposit".to_string(),
-            args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: self.calculate_attached_gas(),
-        }
-    }
-
     /// Withdraw `nETH` from NEAR accounts
     /// NOTE: it should be without any log data
     pub fn withdraw_eth_from_near(&self, data: Vec<u8>) -> PromiseCreateArgs {
@@ -441,7 +366,7 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_withdraw".to_string(),
             args: data,
-            attached_balance: Yocto::new(1),
+            attached_balance: ONE_YOCTO,
             attached_gas: self.calculate_attached_gas(),
         }
     }
@@ -474,7 +399,7 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_ft_transfer".to_string(),
             args: data,
-            attached_balance: Yocto::new(1),
+            attached_balance: ONE_YOCTO,
             attached_gas: self.calculate_attached_gas(),
         }
     }
@@ -488,7 +413,7 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_ft_transfer_call".to_string(),
             args: data,
-            attached_balance: Yocto::new(1),
+            attached_balance: ONE_YOCTO,
             attached_gas: self.calculate_attached_gas(),
         }
     }
@@ -510,7 +435,7 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "engine_storage_unregister".to_string(),
             args: data,
-            attached_balance: Yocto::new(1),
+            attached_balance: ONE_YOCTO,
             attached_gas: self.calculate_attached_gas(),
         }
     }
@@ -531,27 +456,6 @@ impl<I: IO + Env + Copy> EthConnectorContract<I> {
         PromiseCreateArgs {
             target_account_id: self.get_eth_connector_contract_account(),
             method: "storage_balance_of".to_string(),
-            args: data,
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: self.calculate_attached_gas(),
-        }
-    }
-
-    pub fn get_bridge_prover(&self) -> PromiseCreateArgs {
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "get_bridge_prover".to_string(),
-            args: Vec::new(),
-            attached_balance: ZERO_ATTACHED_BALANCE,
-            attached_gas: self.calculate_attached_gas(),
-        }
-    }
-
-    /// Checks whether the provided proof was already used
-    pub fn is_used_proof(&self, data: Vec<u8>) -> PromiseCreateArgs {
-        PromiseCreateArgs {
-            target_account_id: self.get_eth_connector_contract_account(),
-            method: "is_used_proof".to_string(),
             args: data,
             attached_balance: ZERO_ATTACHED_BALANCE,
             attached_gas: self.calculate_attached_gas(),

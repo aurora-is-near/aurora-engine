@@ -1,0 +1,20 @@
+[package]
+name = "mock-controller"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+aurora-engine-types = { version = "1", default-features = false }
+near-sdk = "5"
+near-token = "0.3"
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
