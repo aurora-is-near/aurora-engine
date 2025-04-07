@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] 2025-04-07
+
 ### Additions
 
 - Added a new transaction `set_erc20_fallback_address` by [@aleksuss]. ([#1009])
