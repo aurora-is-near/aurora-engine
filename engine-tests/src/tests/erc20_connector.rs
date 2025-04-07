@@ -4,10 +4,7 @@ use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
 use aurora_engine_types::borsh::BorshDeserialize;
-use aurora_engine_types::parameters::connector::Erc20Metadata;
-use aurora_engine_types::parameters::engine::{
-    DeployErc20TokenArgs, DeployErc20TokenArgsWithMetadata, SubmitResult, TransactionStatus,
-};
+use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
 use ethabi::Token;
 use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
@@ -93,27 +90,7 @@ impl AuroraRunner {
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
-        self.deploy_erc20_token_with_meta(nep141, None)
-    }
-
-    pub fn deploy_erc20_token_with_meta(
-        &mut self,
-        nep141: &str,
-        metadata: Option<Erc20Metadata>,
-    ) -> Address {
-        let args = metadata
-            .map_or_else(
-                || borsh::to_vec(nep141),
-                |metadata| {
-                    borsh::to_vec(&DeployErc20TokenArgs::WithMetadata(
-                        DeployErc20TokenArgsWithMetadata {
-                            nep141: nep141.parse().unwrap(),
-                            metadata,
-                        },
-                    ))
-                },
-            )
-            .unwrap();
+        let args = borsh::to_vec(nep141).unwrap();
         let result = self
             .make_call("deploy_erc20_token", DEFAULT_AURORA_ACCOUNT_ID, args)
             .unwrap();
@@ -1062,7 +1039,7 @@ pub mod workspace {
         // 3. Deploy wnear and set wnear address
 
         let wnear = crate::tests::xcc::workspace::deploy_wnear(&aurora).await?;
-        let wnear_erc20 = deploy_erc20_from_nep_141(wnear.id().as_ref(), &aurora, None).await?;
+        let wnear_erc20 = deploy_erc20_from_nep_141(wnear.id().as_ref(), &aurora).await?;
         aurora
             .factory_set_wnear_address(wnear_erc20.0.address)
             .transact()
@@ -1113,7 +1090,7 @@ pub mod workspace {
         );
 
         // 6. Deploy ERC-20 from NEP-141 and bridge value to Aurora
-        let erc20 = deploy_erc20_from_nep_141(nep_141.id().as_ref(), &aurora, None)
+        let erc20 = deploy_erc20_from_nep_141(nep_141.id().as_ref(), &aurora)
             .await
             .map_err(|e| anyhow::anyhow!("Couldn't deploy ERC-20 from NEP-141: {e}"))?;
 

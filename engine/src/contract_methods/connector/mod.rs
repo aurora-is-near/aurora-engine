@@ -14,22 +14,20 @@ use aurora_engine_sdk::io::{StorageIntermediate, IO};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::borsh::{self, BorshDeserialize};
 use aurora_engine_types::parameters::connector::{
-    Erc20Identifier, MirrorErc20TokenArgs, SetErc20MetadataArgs,
+    Erc20Identifier, Erc20Metadata, FungibleTokenMetadata, MirrorErc20TokenArgs,
+    SetErc20MetadataArgs,
 };
 use aurora_engine_types::parameters::engine::errors::ParseArgsError;
-use aurora_engine_types::parameters::engine::{
-    DeployErc20TokenArgs, GetErc20FromNep141CallArgs, SubmitResult,
-};
+use aurora_engine_types::parameters::engine::{DeployErc20TokenArgs, SubmitResult};
 use aurora_engine_types::parameters::{
-    ExitToNearPrecompileCallbackCallArgs, PromiseAction, PromiseBatchAction,
+    ExitToNearPrecompileCallbackCallArgs, PromiseAction, PromiseBatchAction, PromiseOrValue,
 };
 use aurora_engine_types::parameters::{PromiseCreateArgs, PromiseWithCallbackArgs};
 use aurora_engine_types::storage::{EthConnectorStorageId, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Yocto};
-use function_name::named;
-
 #[cfg(feature = "ext-connector")]
 pub use external::{AdminControlled, EthConnectorContract};
+use function_name::named;
 #[cfg(not(feature = "ext-connector"))]
 pub use internal::{EthConnector, EthConnectorContract};
 
@@ -49,6 +47,8 @@ pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
 const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(6_000_000_000_000);
 /// Amount of attached gas for the `mirror_erc20_token_callback`.
 const MIRROR_ERC20_TOKEN_CALLBACK_ATTACHED_GAS: NearGas = NearGas::new(10_000_000_000_000);
+/// Amount of attached gas for the `deploy_erc20_token_callback`.
+const DEPLOY_ERC20_TOKEN_CALLBACK_ATTACHED_GAS: NearGas = NearGas::new(30_000_000_000_000);
 
 /// Create new eth-connector;
 pub fn new_eth_connector<I: IO + Copy, E: Env>(io: I, env: &E) -> Result<(), ContractError> {
@@ -116,13 +116,79 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<Address, ContractError> {
+) -> Result<PromiseOrValue<Address>, ContractError> {
     with_hashchain(io, env, function_name!(), |mut io| {
         require_running(&state::get_state(&io)?)?;
         let bytes = io.read_input().to_vec();
         let args = DeployErc20TokenArgs::deserialize(&bytes)
             .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
-        let address = engine::deploy_erc20_token(args, io, env, handler)?;
+
+        match args {
+            DeployErc20TokenArgs::Legacy(nep141) => {
+                let address = engine::deploy_erc20_token(nep141, None, io, env, handler)?;
+
+                io.return_output(
+                    &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
+                );
+                Ok(PromiseOrValue::Value(address))
+            }
+            DeployErc20TokenArgs::WithMetadata(nep141) => {
+                let args = borsh::to_vec(&nep141).map_err(|_| crate::errors::ERR_SERIALIZE)?;
+                let base = PromiseCreateArgs {
+                    target_account_id: nep141,
+                    method: "ft_metadata".to_string(),
+                    args: vec![],
+                    attached_balance: ZERO_ATTACHED_BALANCE,
+                    attached_gas: READ_PROMISE_ATTACHED_GAS,
+                };
+                let callback = PromiseCreateArgs {
+                    target_account_id: env.current_account_id(),
+                    method: "deploy_erc20_token_callback".to_string(),
+                    args,
+                    attached_balance: ZERO_ATTACHED_BALANCE,
+                    attached_gas: DEPLOY_ERC20_TOKEN_CALLBACK_ATTACHED_GAS,
+                };
+                // Safe because these promises are read-only calls to the main engine contract
+                // and this transaction could be executed by the owner of the contract only.
+                let promise_args = PromiseWithCallbackArgs { base, callback };
+                let promise_id = unsafe { handler.promise_create_with_callback(&promise_args) };
+
+                handler.promise_return(promise_id);
+
+                Ok(PromiseOrValue::Promise(promise_args))
+            }
+        }
+    })
+}
+
+#[named]
+pub fn deploy_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<Address, ContractError> {
+    with_hashchain(io, env, function_name!(), |mut io| {
+        require_running(&state::get_state(&io)?)?;
+        env.assert_private_call()?;
+
+        if handler.promise_results_count() != 1 {
+            return Err(crate::errors::ERR_PROMISE_COUNT.into());
+        }
+
+        let nep141 = io.read_input_borsh()?;
+        let erc20_metadata =
+            if let Some(PromiseResult::Successful(bytes)) = handler.promise_result(0) {
+                serde_json::from_slice::<FungibleTokenMetadata>(&bytes)
+                    .map(|metadata| Erc20Metadata {
+                        name: metadata.name,
+                        symbol: metadata.symbol,
+                        decimals: metadata.decimals,
+                    })
+                    .map_err(Into::<ParseArgsError>::into)?
+            } else {
+                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+            };
+        let address = engine::deploy_erc20_token(nep141, Some(erc20_metadata), io, env, handler)?;
 
         io.return_output(
             &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
@@ -477,10 +543,7 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
         PromiseCreateArgs {
             target_account_id: args.contract_id.clone(),
             method: "get_erc20_from_nep141".to_string(),
-            args: borsh::to_vec(&GetErc20FromNep141CallArgs {
-                nep141: args.nep141.clone(),
-            })
-            .map_err(|_| crate::errors::ERR_SERIALIZE)?,
+            args: borsh::to_vec(&args.nep141).map_err(|_| crate::errors::ERR_SERIALIZE)?,
             attached_balance: Yocto::new(0),
             attached_gas: READ_PROMISE_ATTACHED_GAS,
         },

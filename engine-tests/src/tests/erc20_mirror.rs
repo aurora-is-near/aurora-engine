@@ -22,7 +22,7 @@ async fn test_mirroring_erc20_token() {
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
-    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract, None)
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
         .await
         .unwrap();
     let erc20_metadata = Erc20Metadata {
@@ -154,7 +154,7 @@ async fn test_transfer_from_silo_to_silo() {
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
-    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract, None)
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
         .await
         .unwrap();
     let erc20_metadata = Erc20Metadata {
@@ -256,6 +256,27 @@ async fn test_transfer_from_silo_to_silo() {
         erc20_balance(&erc20, address, &silo_contract).await,
         withdraw_amount.into()
     );
+}
+
+#[tokio::test]
+async fn test_deploy_erc20_token_with_meta() {
+    let main_contract = deploy_main_contract().await;
+    let (nep141, _) = deploy_nep141(&main_contract).await;
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
+        .await
+        .unwrap();
+
+    let metadata = main_contract
+        .get_erc20_metadata(Erc20Identifier::Erc20 {
+            address: erc20.0.address,
+        })
+        .await
+        .unwrap()
+        .result;
+
+    assert_eq!(metadata.name, "Example NEAR fungible token");
+    assert_eq!(metadata.symbol, "EXAMPLE");
+    assert_eq!(metadata.decimals, 24);
 }
 
 async fn deploy_main_contract() -> EngineContract {

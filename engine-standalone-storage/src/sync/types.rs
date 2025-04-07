@@ -103,6 +103,8 @@ pub enum TransactionKind {
     Deploy(Vec<u8>),
     /// New bridged token
     DeployErc20(parameters::DeployErc20TokenArgs),
+    /// Callback for the `deploy_erc20_token` method
+    DeployErc20Callback(AccountId),
     /// This type of transaction can impact the aurora state because of the bridge
     FtOnTransfer(parameters::NEP141FtOnTransferArgs),
     /// Bytes here will be parsed into `aurora_engine::proof::Proof`
@@ -242,7 +244,7 @@ impl TransactionKind {
                     access_list: Vec::new(),
                 }
             }
-            Self::DeployErc20(_) => {
+            Self::DeployErc20(_) | Self::DeployErc20Callback(_) => {
                 let from = Self::get_implicit_address(caller);
                 let nonce =
                     Self::get_implicit_nonce(&from, block_height, transaction_position, storage);
@@ -515,6 +517,8 @@ pub enum TransactionKindTag {
     Deploy,
     #[strum(serialize = "deploy_erc20_token")]
     DeployErc20,
+    #[strum(serialize = "deploy_erc20_token_callback")]
+    DeployErc20Callback,
     #[strum(serialize = "ft_on_transfer")]
     FtOnTransfer,
     #[strum(serialize = "deposit")]
@@ -614,6 +618,7 @@ impl TransactionKind {
                 bytes.clone()
             }
             Self::DeployErc20(args) => to_borsh(args),
+            Self::DeployErc20Callback(args) => to_borsh(args),
             Self::FtOnTransfer(args) => to_json(args),
             Self::FtTransferCall(args) => to_json(args),
             Self::FinishDeposit(args) => to_borsh(args),
@@ -678,6 +683,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::ResumePrecompiles(_) => Self::ResumePrecompiles,
             TransactionKind::Deploy(_) => Self::Deploy,
             TransactionKind::DeployErc20(_) => Self::DeployErc20,
+            TransactionKind::DeployErc20Callback(_) => Self::DeployErc20Callback,
             TransactionKind::FtOnTransfer(_) => Self::FtOnTransfer,
             TransactionKind::Deposit(_) => Self::Deposit,
             TransactionKind::FtTransferCall(_) => Self::FtTransferCall,
@@ -956,6 +962,7 @@ enum BorshableTransactionKind<'a> {
     StoreRelayerKeyCallback(Cow<'a, parameters::RelayerKeyArgs>),
     SetWhitelistsStatuses(Cow<'a, Vec<silo::WhitelistStatusArgs>>),
     SetErc20FallbackAddress(Cow<'a, silo::Erc20FallbackAddressArgs>),
+    DeployErc20Callback(Cow<'a, AccountId>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -969,6 +976,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::Call(x) => Self::Call(Cow::Borrowed(x)),
             TransactionKind::Deploy(x) => Self::Deploy(Cow::Borrowed(x)),
             TransactionKind::DeployErc20(x) => Self::DeployErc20(Cow::Borrowed(x)),
+            TransactionKind::DeployErc20Callback(x) => Self::DeployErc20Callback(Cow::Borrowed(x)),
             TransactionKind::FtOnTransfer(x) => Self::FtOnTransfer(Cow::Borrowed(x)),
             TransactionKind::Deposit(x) => Self::Deposit(Cow::Borrowed(x)),
             TransactionKind::FtTransferCall(x) => Self::FtTransferCall(Cow::Borrowed(x)),
@@ -1044,6 +1052,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
 impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
     type Error = aurora_engine_transactions::Error;
 
+    #[allow(clippy::too_many_lines)]
     fn try_from(t: BorshableTransactionKind<'a>) -> Result<Self, Self::Error> {
         match t {
             BorshableTransactionKind::Submit(tx_bytes) => {
@@ -1057,6 +1066,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::Call(x) => Ok(Self::Call(x.into_owned())),
             BorshableTransactionKind::Deploy(x) => Ok(Self::Deploy(x.into_owned())),
             BorshableTransactionKind::DeployErc20(x) => Ok(Self::DeployErc20(x.into_owned())),
+            BorshableTransactionKind::DeployErc20Callback(x) => {
+                Ok(Self::DeployErc20Callback(x.into_owned()))
+            }
             BorshableTransactionKind::FtOnTransfer(x) => Ok(Self::FtOnTransfer(x.into_owned())),
             BorshableTransactionKind::Deposit(x) => Ok(Self::Deposit(x.into_owned())),
             BorshableTransactionKind::FtTransferCall(x) => Ok(Self::FtTransferCall(x.into_owned())),

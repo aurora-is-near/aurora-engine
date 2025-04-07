@@ -2,7 +2,7 @@ use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
-use aurora_engine_types::parameters::engine::{DeployErc20TokenArgsLegacy, TransactionStatus};
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
@@ -344,9 +344,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::DeployErc20(
-            aurora_engine::parameters::DeployErc20TokenArgs::Legacy(DeployErc20TokenArgsLegacy {
-                nep141: "wrap.near".parse().unwrap(),
-            }),
+            aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
         let mut tx = standalone::StandaloneRunner::template_tx_msg(
             storage,

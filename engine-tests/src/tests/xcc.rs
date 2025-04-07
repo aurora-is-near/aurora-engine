@@ -307,9 +307,7 @@ fn deploy_router() -> AuroraRunner {
 
 fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
     let engine_account = runner.aurora_account_id.clone();
-    let args = aurora_engine::parameters::DeployErc20TokenArgsLegacy {
-        nep141: "wrap.near".parse().unwrap(),
-    };
+    let args: AccountId = "wrap.near".parse().unwrap();
     let outcome = runner
         .call(
             "deploy_erc20_token",
@@ -408,7 +406,8 @@ pub mod workspace {
     use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_engine_v331, deploy_erc20_from_nep_141,
-        deploy_nep_141, get_xcc_router_version, nep_141_balance_of, transfer_nep_141_to_erc_20,
+        deploy_erc20_from_nep_141_legacy, deploy_nep_141, get_xcc_router_version,
+        nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
@@ -946,8 +945,11 @@ pub mod workspace {
 
         // Setup wNEAR contract and bridge it to Aurora
         let wnear_contract = deploy_wnear(&aurora).await?;
-        let wnear_erc20 =
-            deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora, None).await?;
+        let wnear_erc20 = if use_v331 {
+            deploy_erc20_from_nep_141_legacy(wnear_contract.id().as_ref(), &aurora).await?
+        } else {
+            deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora).await?
+        };
 
         transfer_nep_141_to_erc_20(
             &wnear_contract,

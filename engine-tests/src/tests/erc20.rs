@@ -364,33 +364,6 @@ fn test_erc20_get_and_set_metadata_by_owner() {
     assert_eq!(metadata, new_metadata);
 }
 
-#[test]
-fn test_deploy_erc20_with_metadata() {
-    let mut runner = utils::deploy_runner();
-    let token_account_id = "token";
-    let metadata = Erc20Metadata {
-        name: "USD Token".to_string(),
-        symbol: "USDT".to_string(),
-        decimals: 18,
-    };
-    let erc20_address =
-        runner.deploy_erc20_token_with_meta(token_account_id, Some(metadata.clone()));
-    let caller = runner.aurora_account_id.clone();
-
-    // Getting ERC-20 metadata by Address.
-    let result = runner.one_shot().call(
-        "get_erc20_metadata",
-        &caller,
-        serde_json::to_vec::<Erc20Identifier>(&erc20_address.into()).unwrap(),
-    );
-
-    assert!(result.is_ok());
-
-    let received_meta: Erc20Metadata =
-        serde_json::from_slice(&result.unwrap().return_data.as_value().unwrap()).unwrap();
-    assert_eq!(metadata, received_meta);
-}
-
 fn get_address_erc20_balance(
     runner: &utils::AuroraRunner,
     signer: &Signer,

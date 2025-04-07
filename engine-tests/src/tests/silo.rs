@@ -1295,7 +1295,7 @@ pub mod workspace {
         assert!(result.is_success());
 
         // Deploy erc20 token
-        let erc20 = deploy_erc20_from_nep_141(nep_141_account.id().as_ref(), &aurora, None)
+        let erc20 = deploy_erc20_from_nep_141(nep_141_account.id().as_ref(), &aurora)
             .await
             .unwrap();
 
