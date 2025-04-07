@@ -7,7 +7,7 @@ use crate::operation::{
     CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
     CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
     CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
-    CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
+    CallResumeContract, CallResumePrecompiles, CallSetErc20FallbackAddress, CallSetErc20Metadata,
     CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
     CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
@@ -31,7 +31,8 @@ use aurora_engine_types::parameters::engine::{
     RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
-    FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+    Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
+    WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::public_key::PublicKey;
@@ -388,6 +389,14 @@ impl EngineContract {
     #[must_use]
     pub fn set_fixed_gas(&self, cost: FixedGasArgs) -> CallSetFixedGas {
         CallSetFixedGas::call(&self.contract).args_borsh(cost)
+    }
+
+    #[must_use]
+    pub fn set_erc20_fallback_address(
+        &self,
+        args: Erc20FallbackAddressArgs,
+    ) -> CallSetErc20FallbackAddress {
+        CallSetErc20FallbackAddress::call(&self.contract).args_borsh(args)
     }
 
     #[must_use]
