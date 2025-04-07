@@ -239,6 +239,10 @@ pub fn parse_transaction_kind(
             let args = silo_params::FixedGasArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetFixedGas(args)
         }
+        TransactionKindTag::SetErc20FallbackAddress => {
+            let args = silo_params::Erc20FallbackAddressArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetErc20FallbackAddress(args)
+        }
         TransactionKindTag::SetSiloParams => {
             let args: Option<silo_params::SiloParamsArgs> =
                 BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
@@ -734,6 +738,10 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::SetFixedGas(args) => {
             silo::set_fixed_gas(&mut io, args.fixed_gas);
+            None
+        }
+        TransactionKind::SetErc20FallbackAddress(args) => {
+            silo::set_erc20_fallback_address(&mut io, args.address);
             None
         }
         TransactionKind::SetSiloParams(args) => {

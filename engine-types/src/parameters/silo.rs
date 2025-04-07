@@ -7,6 +7,11 @@ pub struct FixedGasArgs {
     pub fixed_gas: Option<EthGas>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct Erc20FallbackAddressArgs {
+    pub address: Option<Address>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct SiloParamsArgs {
     /// Fixed amount of gas per transaction.
