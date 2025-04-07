@@ -1,4 +1,4 @@
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
 use crate::prelude::{

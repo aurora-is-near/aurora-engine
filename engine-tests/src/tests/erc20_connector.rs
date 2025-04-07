@@ -395,6 +395,7 @@ pub mod workspace {
         nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
+    #[cfg(not(feature = "ext-connector"))]
     use aurora_engine::proof::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
@@ -408,6 +409,7 @@ pub mod workspace {
     const FT_ACCOUNT: &str = "test_token";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
+    #[cfg(not(feature = "ext-connector"))]
     const ETH_CUSTODIAN_ADDRESS: &str = "096de9c2b8a5b8c22cee3289b101f6960d68e51e";
     #[cfg(not(feature = "ext-connector"))]
     const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
@@ -710,7 +712,7 @@ pub mod workspace {
 
         assert_eq!(
             nep_141_balance_of(aurora.as_raw_contract(), &exit_account_id.parse().unwrap()).await,
-            ETH_EXIT_AMOUNT.into()
+            u128::from(ETH_EXIT_AMOUNT)
         );
 
         assert_eq!(
@@ -826,6 +828,14 @@ pub mod workspace {
         let accounts = balances.keys().cloned().collect();
         let result = aurora.ft_balances_of(&accounts).await.unwrap().result;
         assert_eq!(result, balances);
+    }
+
+    #[cfg(not(feature = "ext-connector"))]
+    #[tokio::test]
+    async fn test_get_bridge_prover() {
+        let aurora = deploy_engine().await;
+        let prover = aurora.get_bridge_prover().await.unwrap().result;
+        assert_eq!(prover.as_ref(), "prover.root");
     }
 
     #[cfg(not(feature = "ext-connector"))]
@@ -1171,6 +1181,7 @@ pub mod workspace {
         }
     }
 
+    #[cfg(not(feature = "ext-connector"))]
     async fn deposit_balance(aurora: &EngineContract) {
         let proof = create_test_proof(
             INITIAL_ETH_BALANCE,
@@ -1178,6 +1189,15 @@ pub mod workspace {
             ETH_CUSTODIAN_ADDRESS,
         );
         let result = aurora.deposit(proof).max_gas().transact().await.unwrap();
+        assert!(result.is_success());
+    }
+
+    #[cfg(feature = "ext-connector")]
+    async fn deposit_balance(aurora: &EngineContract) {
+        let result = aurora
+            .deposit_to_near(&aurora.id(), INITIAL_ETH_BALANCE)
+            .await
+            .unwrap();
         assert!(result.is_success());
     }
 
@@ -1199,6 +1219,7 @@ pub mod workspace {
         aurora: EngineContract,
     }
 
+    #[cfg(not(feature = "ext-connector"))]
     fn create_test_proof(
         deposit_amount: u64,
         recipient_id: &str,

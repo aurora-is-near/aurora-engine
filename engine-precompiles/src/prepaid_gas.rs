@@ -3,7 +3,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::U256;
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// `prepaid_gas` precompile address
 ///

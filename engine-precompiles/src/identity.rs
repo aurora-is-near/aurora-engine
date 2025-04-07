@@ -1,6 +1,6 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Identity precompile costs.
 mod costs {
@@ -60,7 +60,7 @@ impl Precompile for Identity {
 
 #[cfg(test)]
 mod tests {
-    use evm::ExitError;
+    use aurora_evm::ExitError;
 
     use crate::utils::new_context;
 

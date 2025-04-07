@@ -11,7 +11,7 @@ use aurora_engine_types::parameters::connector::{
 use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
-use evm::ExitFatal;
+use aurora_evm::ExitFatal;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;

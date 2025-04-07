@@ -10,6 +10,7 @@ use aurora_engine_sdk::{
     io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh::BorshDeserialize,
@@ -238,6 +239,10 @@ pub fn parse_transaction_kind(
             let args = silo_params::FixedGasArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetFixedGas(args)
         }
+        TransactionKindTag::SetErc20FallbackAddress => {
+            let args = silo_params::Erc20FallbackAddressArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetErc20FallbackAddress(args)
+        }
         TransactionKindTag::SetSiloParams => {
             let args: Option<silo_params::SiloParamsArgs> =
                 BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
@@ -246,6 +251,11 @@ pub fn parse_transaction_kind(
         TransactionKindTag::SetWhitelistStatus => {
             let args = silo_params::WhitelistStatusArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetWhitelistStatus(args)
+        }
+        TransactionKindTag::SetWhitelistsStatuses => {
+            let args: Vec<silo_params::WhitelistStatusArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetWhitelistsStatuses(args)
         }
         TransactionKindTag::AddEntryToWhitelist => {
             let args = silo_params::WhitelistArgs::try_from_slice(&bytes).map_err(f)?;
@@ -406,6 +416,7 @@ where
         attached_deposit: transaction_message.attached_near,
         random_seed,
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
 
     let (tx_hash, result) = match &transaction_message.transaction {
@@ -729,6 +740,10 @@ fn non_submit_execute<I: IO + Copy>(
             silo::set_fixed_gas(&mut io, args.fixed_gas);
             None
         }
+        TransactionKind::SetErc20FallbackAddress(args) => {
+            silo::set_erc20_fallback_address(&mut io, args.address);
+            None
+        }
         TransactionKind::SetSiloParams(args) => {
             silo::set_silo_params(&mut io, args.clone());
             None
@@ -747,6 +762,10 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::SetWhitelistStatus(args) => {
             silo::set_whitelist_status(&io, args);
+            None
+        }
+        TransactionKind::SetWhitelistsStatuses(args) => {
+            silo::set_whitelists_statuses(&io, args.clone());
             None
         }
         TransactionKind::MirrorErc20TokenCallback(_) => {

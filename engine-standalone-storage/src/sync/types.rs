@@ -167,11 +167,13 @@ pub enum TransactionKind {
     SetErc20Metadata(parameters::SetErc20MetadataArgs),
     /// Silo operations
     SetFixedGas(silo::FixedGasArgs),
+    SetErc20FallbackAddress(silo::Erc20FallbackAddressArgs),
     SetSiloParams(Option<silo::SiloParamsArgs>),
     AddEntryToWhitelist(silo::WhitelistArgs),
     AddEntryToWhitelistBatch(Vec<silo::WhitelistArgs>),
     RemoveEntryFromWhitelist(silo::WhitelistArgs),
     SetWhitelistStatus(silo::WhitelistStatusArgs),
+    SetWhitelistsStatuses(Vec<silo::WhitelistStatusArgs>),
     /// Callback which mirrors existed ERC-20 contract deployed on the main contract.
     MirrorErc20TokenCallback(parameters::MirrorErc20TokenArgs),
     /// Sentinel kind for cases where a NEAR receipt caused a
@@ -444,6 +446,9 @@ impl TransactionKind {
             Self::StartHashchain(_) => Self::no_evm_execution("start_hashchain"),
             Self::SetErc20Metadata(_) => Self::no_evm_execution("set_erc20_metadata"),
             Self::SetFixedGas(_) => Self::no_evm_execution("set_fixed_gas"),
+            Self::SetErc20FallbackAddress(_) => {
+                Self::no_evm_execution("set_erc20_fallback_address")
+            }
             Self::SetSiloParams(_) => Self::no_evm_execution("set_silo_params"),
             Self::AddEntryToWhitelist(_) => Self::no_evm_execution("add_entry_to_whitelist"),
             Self::AddEntryToWhitelistBatch(_) => {
@@ -453,6 +458,7 @@ impl TransactionKind {
                 Self::no_evm_execution("remove_entry_from_whitelist")
             }
             Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
+            Self::SetWhitelistsStatuses(_) => Self::no_evm_execution("set_whitelists_statuses"),
             Self::MirrorErc20TokenCallback(_) => {
                 Self::no_evm_execution("mirror_erc20_token_callback")
             }
@@ -575,10 +581,14 @@ pub enum TransactionKindTag {
     SetEthConnectorContractAccount,
     #[strum(serialize = "set_fixed_gas")]
     SetFixedGas,
+    #[strum(serialize = "set_erc20_fallback_address")]
+    SetErc20FallbackAddress,
     #[strum(serialize = "set_silo_params")]
     SetSiloParams,
     #[strum(serialize = "set_whitelist_status")]
     SetWhitelistStatus,
+    #[strum(serialize = "set_whitelists_statuses")]
+    SetWhitelistsStatuses,
     #[strum(serialize = "add_entry_to_whitelist")]
     AddEntryToWhitelist,
     #[strum(serialize = "add_entry_to_whitelist_batch")]
@@ -636,12 +646,14 @@ impl TransactionKind {
             Self::StartHashchain(args) => to_borsh(args),
             Self::SetErc20Metadata(args) => to_json(args),
             Self::SetFixedGas(args) => to_borsh(args),
+            Self::SetErc20FallbackAddress(args) => to_borsh(args),
             Self::SetSiloParams(args) => to_borsh(args),
             Self::AddEntryToWhitelist(args) | Self::RemoveEntryFromWhitelist(args) => {
                 to_borsh(args)
             }
             Self::AddEntryToWhitelistBatch(args) => to_borsh(args),
             Self::SetWhitelistStatus(args) => to_borsh(args),
+            Self::SetWhitelistsStatuses(args) => to_borsh(args),
             Self::SetEthConnectorContractAccount(args) => to_borsh(args),
             Self::MirrorErc20TokenCallback(args) => to_borsh(args),
         }
@@ -702,11 +714,13 @@ impl From<&TransactionKind> for TransactionKindTag {
                 Self::SetEthConnectorContractAccount
             }
             TransactionKind::SetFixedGas(_) => Self::SetFixedGas,
+            TransactionKind::SetErc20FallbackAddress(_) => Self::SetErc20FallbackAddress,
             TransactionKind::SetSiloParams(_) => Self::SetSiloParams,
             TransactionKind::AddEntryToWhitelist(_) => Self::AddEntryToWhitelist,
             TransactionKind::AddEntryToWhitelistBatch(_) => Self::AddEntryToWhitelistBatch,
             TransactionKind::RemoveEntryFromWhitelist(_) => Self::RemoveEntryFromWhitelist,
             TransactionKind::SetWhitelistStatus(_) => Self::SetWhitelistStatus,
+            TransactionKind::SetWhitelistsStatuses(_) => Self::SetWhitelistsStatuses,
             TransactionKind::Unknown => Self::Unknown,
             TransactionKind::MirrorErc20TokenCallback(_) => Self::MirrorErc20TokenCallback,
         }
@@ -940,6 +954,8 @@ enum BorshableTransactionKind<'a> {
     MirrorErc20TokenCallback(Cow<'a, parameters::MirrorErc20TokenArgs>),
     WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
     StoreRelayerKeyCallback(Cow<'a, parameters::RelayerKeyArgs>),
+    SetWhitelistsStatuses(Cow<'a, Vec<silo::WhitelistStatusArgs>>),
+    SetErc20FallbackAddress(Cow<'a, silo::Erc20FallbackAddressArgs>),
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -1003,6 +1019,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::StartHashchain(x) => Self::StartHashchain(Cow::Borrowed(x)),
             TransactionKind::SetErc20Metadata(x) => Self::SetErc20Metadata(Cow::Borrowed(x)),
             TransactionKind::SetFixedGas(x) => Self::SetFixedGas(Cow::Borrowed(x)),
+            TransactionKind::SetErc20FallbackAddress(x) => {
+                Self::SetErc20FallbackAddress(Cow::Borrowed(x))
+            }
             TransactionKind::SetSiloParams(x) => Self::SetSiloParams(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelist(x) => Self::AddEntryToWhitelist(Cow::Borrowed(x)),
             TransactionKind::AddEntryToWhitelistBatch(x) => {
@@ -1014,6 +1033,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::SetWhitelistStatus(x) => Self::SetWhitelistStatus(Cow::Borrowed(x)),
             TransactionKind::MirrorErc20TokenCallback(x) => {
                 Self::MirrorErc20TokenCallback(Cow::Borrowed(x))
+            }
+            TransactionKind::SetWhitelistsStatuses(x) => {
+                Self::SetWhitelistsStatuses(Cow::Borrowed(x))
             }
         }
     }
@@ -1116,6 +1138,12 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::WithdrawWnearToRouter(x) => {
                 Ok(Self::WithdrawWnearToRouter(x.into_owned()))
+            }
+            BorshableTransactionKind::SetWhitelistsStatuses(x) => {
+                Ok(Self::SetWhitelistsStatuses(x.into_owned()))
+            }
+            BorshableTransactionKind::SetErc20FallbackAddress(x) => {
+                Ok(Self::SetErc20FallbackAddress(x.into_owned()))
             }
         }
     }

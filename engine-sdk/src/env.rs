@@ -51,6 +51,8 @@ pub trait Env {
     fn random_seed(&self) -> H256;
     /// Prepaid NEAR Gas
     fn prepaid_gas(&self) -> NearGas;
+    /// Used NEAR Gas
+    fn used_gas(&self) -> NearGas;
 
     fn assert_private_call(&self) -> Result<(), PrivateCallError> {
         if self.predecessor_account_id() == self.current_account_id() {
@@ -81,6 +83,7 @@ pub struct Fixed {
     pub attached_deposit: u128,
     pub random_seed: H256,
     pub prepaid_gas: NearGas,
+    pub used_gas: NearGas,
 }
 
 impl Env for Fixed {
@@ -114,5 +117,9 @@ impl Env for Fixed {
 
     fn prepaid_gas(&self) -> NearGas {
         self.prepaid_gas
+    }
+
+    fn used_gas(&self) -> NearGas {
+        self.used_gas
     }
 }

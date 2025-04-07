@@ -1,20 +1,21 @@
 [package]
 name = "aurora-engine-transactions"
-version = "1.0.0"
+version = "1.2.0"
+description = "EVM transactions that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
+keywords.workspace = true
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
 autobenches = false
+publish = true
 
 [dependencies]
-aurora-engine-precompiles.workspace = true
 aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
-evm.workspace = true
+aurora-evm.workspace = true
 rlp.workspace = true
 serde = { workspace = true, optional = true }
 
@@ -25,6 +26,6 @@ hex.workspace = true
 workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "evm/std", "rlp/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-evm/std", "rlp/std"]
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
-contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
+contract = ["aurora-engine-sdk/contract"]

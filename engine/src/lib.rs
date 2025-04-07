@@ -70,7 +70,8 @@ mod contract {
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::borsh;
     use aurora_engine_types::parameters::silo::{
-        FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
+        WhitelistStatusArgs,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
@@ -113,15 +114,6 @@ mod contract {
         let io = Runtime;
         let env = Runtime;
         contract_methods::admin::set_owner(io, &env)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    /// Get bridge prover id for this contract.
-    #[no_mangle]
-    pub extern "C" fn get_bridge_prover() {
-        let io = Runtime;
-        contract_methods::admin::get_bridge_prover(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -602,6 +594,15 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Get bridge prover id for this contract.
+    #[no_mangle]
+    pub extern "C" fn get_bridge_prover() {
+        let io = Runtime;
+        contract_methods::connector::get_bridge_prover(io)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     #[no_mangle]
     pub extern "C" fn is_used_proof() {
         let io = Runtime;
@@ -866,7 +867,7 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn mint_account() {
         use crate::prelude::{NEP141Wei, U256};
-        use evm::backend::ApplyBackend;
+        use aurora_evm::backend::ApplyBackend;
 
         #[cfg(not(feature = "ext-connector"))]
         let mut io = Runtime;
@@ -879,9 +880,9 @@ mod contract {
         let current_account_id = io.current_account_id();
         let mut engine: Engine<_, _> =
             Engine::new(address, current_account_id, io, &io).sdk_unwrap();
-        let state_change = evm::backend::Apply::Modify {
+        let state_change = aurora_evm::backend::Apply::Modify {
             address: address.raw(),
-            basic: evm::backend::Basic {
+            basic: aurora_evm::backend::Basic {
                 balance: U256::from(balance.as_u128()),
                 nonce,
             },
@@ -942,11 +943,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_fixed_gas() {
         let mut io = Runtime;
-        let cost = FixedGasArgs {
+        let args = FixedGasArgs {
             fixed_gas: silo::get_fixed_gas(&io),
         };
 
-        io.return_output(&borsh::to_vec(&cost).map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
     #[no_mangle]
@@ -956,9 +957,27 @@ mod contract {
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
-        args.fixed_gas.sdk_expect("FIXED_GAS_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
-        silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
         silo::set_fixed_gas(&mut io, args.fixed_gas);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_fallback_address() {
+        let mut io = Runtime;
+        let args = Erc20FallbackAddressArgs {
+            address: silo::get_erc20_fallback_address(&io),
+        };
+
+        io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_erc20_fallback_address() {
+        let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Erc20FallbackAddressArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_erc20_fallback_address(&mut io, args.address);
     }
 
     #[no_mangle]
@@ -994,6 +1013,16 @@ mod contract {
     }
 
     #[no_mangle]
+    pub extern "C" fn set_whitelists_statuses() {
+        let io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Vec<WhitelistStatusArgs> = io.read_input_borsh().sdk_unwrap();
+        silo::set_whitelists_statuses(&io, args);
+    }
+
+    #[no_mangle]
     pub extern "C" fn get_whitelist_status() {
         let mut io = Runtime;
         let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
@@ -1002,6 +1031,16 @@ mod contract {
             .sdk_unwrap();
 
         io.return_output(&status);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_whitelists_statuses() {
+        let mut io = Runtime;
+        let statuses = borsh::to_vec(&silo::get_whitelists_statuses(&io))
+            .map_err(|e| e.to_string())
+            .sdk_unwrap();
+
+        io.return_output(&statuses);
     }
 
     #[no_mangle]
