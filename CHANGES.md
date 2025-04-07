@@ -7,11 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] 2025-04-07
+
+### Additions
+
+- Added a new transaction `set_erc20_fallback_address` by [@aleksuss]. ([#1009])
+
 ### Changes
 
-- Reworked the logic related to the silo mode by [@aleksuss]. ([#1005])
+- The `ecrecover` implementation was moved to the `aurora-engine-sdk` by [@aleksuss]. ([#996])
+- Updated the catalog info by [@diegofigs]. ([#1002]) 
+- Usage of the `aurora-evm` crate from `crates.io` by [@mrLSD]. ([#1003])
+- The white lists don't require the fixed gas per transaction (silo mode) by [@aleksuss]. ([#1005])
+- Made the API compatible with the latest version of the eth connector by [@aleksuss]. ([#1006])
 
+### Fixes
+
+- Fixed the incorrect amount of gas provided to promises to eth connector by [@aleksuss]. ([#1000])
+
+[#996]: https://github.com/aurora-is-near/aurora-engine/pull/996
+[#1000]: https://github.com/aurora-is-near/aurora-engine/pull/1000
+[#1002]: https://github.com/aurora-is-near/aurora-engine/pull/1002
+[#1003]: https://github.com/aurora-is-near/aurora-engine/pull/1003
 [#1005]: https://github.com/aurora-is-near/aurora-engine/pull/1005
+[#1006]: https://github.com/aurora-is-near/aurora-engine/pull/1006
+[#1009]: https://github.com/aurora-is-near/aurora-engine/pull/1009
 
 ## [3.8.0] 2025-02-05
 
@@ -736,7 +756,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...develop
+[3.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...3.7.0
 [3.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...3.6.4
@@ -795,6 +816,7 @@ struct SubmitResult {
 [@birchmd]: https://github.com/birchmd
 [@Casuso]: https://github.com/Casuso
 [@DemoYeti]: https://github.com/DemoYeti
+[@diegofigs]: https://github.com/diegofigs
 [@dwiekawki]: https://github.com/dwiekawki
 [@guidovranken]: https://github.com/guidovranken
 [@hskang9]: https://github.com/hskang9
