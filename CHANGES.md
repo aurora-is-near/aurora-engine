@@ -11,12 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added a possibility to deploy ERC-20 token with metadata by [@aleksuss]. ([#1008])
 
+[#1008]: https://github.com/aurora-is-near/aurora-engine/pull/1008
+
+## [3.9.0] 2025-04-07
+
+### Additions
+
+- Added a new transaction `set_erc20_fallback_address` by [@aleksuss]. ([#1009])
+
 ### Changes
 
-- Reworked the logic related to the silo mode by [@aleksuss]. ([#1005])
+- The `ecrecover` implementation was moved to the `aurora-engine-sdk` by [@aleksuss]. ([#996])
+- Updated the catalog info by [@diegofigs]. ([#1002]) 
+- Usage of the `aurora-evm` crate from `crates.io` by [@mrLSD]. ([#1003])
+- The white lists don't require the fixed gas per transaction (silo mode) by [@aleksuss]. ([#1005])
+- Made the API compatible with the latest version of the eth connector by [@aleksuss]. ([#1006])
 
+### Fixes
+
+- Fixed the incorrect amount of gas provided to promises to eth connector by [@aleksuss]. ([#1000])
+
+[#996]: https://github.com/aurora-is-near/aurora-engine/pull/996
+[#1000]: https://github.com/aurora-is-near/aurora-engine/pull/1000
+[#1002]: https://github.com/aurora-is-near/aurora-engine/pull/1002
+[#1003]: https://github.com/aurora-is-near/aurora-engine/pull/1003
 [#1005]: https://github.com/aurora-is-near/aurora-engine/pull/1005
-[#1008]: https://github.com/aurora-is-near/aurora-engine/pull/1008
+[#1006]: https://github.com/aurora-is-near/aurora-engine/pull/1006
+[#1009]: https://github.com/aurora-is-near/aurora-engine/pull/1009
 
 ## [3.8.0] 2025-02-05
 
@@ -814,3 +835,4 @@ struct SubmitResult {
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
 [@spilin]: https://github.com/spilin
+[@diegofigs]: https://github.com/diegofigs
