@@ -70,7 +70,8 @@ mod contract {
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::borsh;
     use aurora_engine_types::parameters::silo::{
-        FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+        Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
+        WhitelistStatusArgs,
     };
 
     const CODE_KEY: &[u8; 4] = b"CODE";
@@ -941,11 +942,11 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_fixed_gas() {
         let mut io = Runtime;
-        let cost = FixedGasArgs {
+        let args = FixedGasArgs {
             fixed_gas: silo::get_fixed_gas(&io),
         };
 
-        io.return_output(&borsh::to_vec(&cost).map_err(|e| e.to_string()).sdk_unwrap());
+        io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
     #[no_mangle]
@@ -955,9 +956,27 @@ mod contract {
         silo::assert_admin(&io).sdk_unwrap();
 
         let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
-        args.fixed_gas.sdk_expect("FIXED_GAS_IS_NONE"); // Use `set_silo_params` to disable the silo mode.
-        silo::get_silo_params(&io).sdk_expect("SILO_MODE_IS_OFF"); // Use `set_silo_params` to enable the silo mode.
         silo::set_fixed_gas(&mut io, args.fixed_gas);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn get_erc20_fallback_address() {
+        let mut io = Runtime;
+        let args = Erc20FallbackAddressArgs {
+            address: silo::get_erc20_fallback_address(&io),
+        };
+
+        io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
+    }
+
+    #[no_mangle]
+    pub extern "C" fn set_erc20_fallback_address() {
+        let mut io = Runtime;
+        require_running(&state::get_state(&io).sdk_unwrap());
+        silo::assert_admin(&io).sdk_unwrap();
+
+        let args: Erc20FallbackAddressArgs = io.read_input_borsh().sdk_unwrap();
+        silo::set_erc20_fallback_address(&mut io, args.address);
     }
 
     #[no_mangle]
