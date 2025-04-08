@@ -6,10 +6,9 @@ use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo;
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
-use aurora_engine_types::types::Address;
 use aurora_engine_types::{
     borsh::{self, BorshDeserialize, BorshSerialize},
-    types::{self, Wei},
+    types::{self, Address, Wei},
     H256, U256,
 };
 use serde::Serialize;
@@ -184,6 +183,9 @@ pub enum TransactionKind {
 }
 
 impl TransactionKind {
+    // TODO: The method is used nowhere now. It should be actualized and then potentially, used
+    // TODO: in the borealis-refiner or removed at all, because now the borealis-refiner includes
+    // TODO: its custom logic for creating the `NormalizedEthTransaction`s.
     #[must_use]
     #[allow(clippy::too_many_lines)]
     pub fn eth_repr(
@@ -462,6 +464,9 @@ impl TransactionKind {
             Self::SetWhitelistStatus(_) => Self::no_evm_execution("set_whitelist_status"),
             Self::SetWhitelistsStatuses(_) => Self::no_evm_execution("set_whitelists_statuses"),
             Self::MirrorErc20TokenCallback(_) => {
+                // TODO: Basically, the transaction involves EVM execution because it deploys
+                // TODO: ERC-20 contract, therefore it should be fixed before using in the
+                // TODO: borealis-refiner.
                 Self::no_evm_execution("mirror_erc20_token_callback")
             }
         }
