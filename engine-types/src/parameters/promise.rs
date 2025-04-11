@@ -312,3 +312,8 @@ pub enum CrossContractCallArgs {
     /// and executed in a separate transaction with a fresh 300 Tgas available for it.
     Delayed(PromiseArgs),
 }
+
+pub enum PromiseOrValue<T> {
+    Value(T),
+    Promise(PromiseWithCallbackArgs),
+}

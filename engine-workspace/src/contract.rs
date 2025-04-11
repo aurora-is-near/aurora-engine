@@ -2,12 +2,13 @@ use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
     CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
-    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
-    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
-    CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
-    CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
-    CallResumeContract, CallResumePrecompiles, CallSetErc20FallbackAddress, CallSetErc20Metadata,
+    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token,
+    CallDeployErc20TokenLegacy, CallDeployUpgrade, CallDeposit, CallFactorySetWNearAddress,
+    CallFactoryUpdate, CallFactoryUpdateAddressVersion, CallFtOnTransfer, CallFtTransfer,
+    CallFtTransferCall, CallFundXccSubAccount, CallMintAccount, CallMirrorErc20Token, CallNew,
+    CallNewEthConnector, CallPauseContract, CallPausePrecompiles, CallRefundOnError,
+    CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract,
+    CallResumePrecompiles, CallSetErc20FallbackAddress, CallSetErc20Metadata,
     CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
     CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
     CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
@@ -27,8 +28,8 @@ use aurora_engine_types::parameters::connector::{
     SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs,
-    RelayerKeyManagerArgs,
+    CallArgs, DeployErc20TokenArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs,
+    NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
     Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
@@ -249,8 +250,13 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn deploy_erc20_token(&self, account_id: AccountId) -> CallDeployErc20Token {
-        CallDeployErc20Token::call(&self.contract).args_borsh(account_id)
+    pub fn deploy_erc20_token(&self, args: DeployErc20TokenArgs) -> CallDeployErc20Token {
+        CallDeployErc20Token::call(&self.contract).args_borsh(args)
+    }
+
+    #[must_use]
+    pub fn deploy_erc20_token_legacy(&self, account_id: AccountId) -> CallDeployErc20TokenLegacy {
+        CallDeployErc20TokenLegacy::call(&self.contract).args_borsh(account_id)
     }
 
     #[must_use]
