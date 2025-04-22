@@ -3,9 +3,9 @@ use crate::parameters::{
 };
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::PhantomData;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Opcode};
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use aurora_evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
+use aurora_evm::{executor, Opcode};
+use aurora_evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
 
 use crate::map::BijectionMap;
 use crate::{errors, state};
@@ -30,7 +30,7 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
     Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
-    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    Vec, Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
     ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
 use crate::state::EngineState;
@@ -776,7 +776,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // Parse message to determine recipient
         let mut recipient = {
             // Message format:
-            //      Recipient of the transaction - 40 characters (Address in hex)
+            // Recipient of the transaction - 40 characters (Address in hex)
             let message = args.msg.as_bytes();
             if message.len() < 40 {
                 return Err(engine_err(INVALID_MESSAGE));
@@ -853,7 +853,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let decimals = self
             .view_with_selector(
                 erc20_address,
-                ERC20_DIGITS_SELECTOR,
+                ERC20_DECIMALS_SELECTOR,
                 &[ethabi::ParamType::Uint(8)],
             )?
             .into_uint()
@@ -1035,8 +1035,8 @@ pub fn submit_with_alt_modexp<
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
-    // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, &fixed_gas, &transaction)?;
+    // Check if the sender has rights to submit transactions or deploy code.
+    assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
@@ -1050,7 +1050,7 @@ pub fn submit_with_alt_modexp<
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check that fixed gas is not greater than gasLimit from the transaction.
-    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
+    if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
@@ -1739,28 +1739,25 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: &Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
-    if fixed_gas.is_some() {
-        let allowed = if transaction.to.is_some() {
-            silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
-        } else {
-            silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
-        };
+    let allowed = if transaction.to.is_some() {
+        silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
+    } else {
+        silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
+    };
 
-        if !allowed {
-            return Err(EngineError {
-                kind: EngineErrorKind::NotAllowed,
-                gas_used: 0,
-            });
-        }
+    if !allowed {
+        return Err(EngineError {
+            kind: EngineErrorKind::NotAllowed,
+            gas_used: 0,
+        });
     }
 
     Ok(())
 }
 
-impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
+impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1958,7 +1955,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     }
 }
 
-impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
+impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,

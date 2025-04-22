@@ -349,7 +349,7 @@ impl Storage {
 
             // move to the next key by skipping all other DB keys corresponding to the same engine key
             while iter.valid()
-                && iter.key().map_or(false, |db_key| {
+                && iter.key().is_some_and(|db_key| {
                     db_key[0..engine_prefix_len] == engine_prefix
                         && &db_key[engine_prefix_len..(db_key.len() - ENGINE_KEY_SUFFIX_LEN)]
                             == *engine_key

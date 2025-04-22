@@ -3,7 +3,7 @@ use crate::prelude::sdk;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::vec;
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -31,6 +31,8 @@ impl SHA256 {
 }
 
 impl Precompile for SHA256 {
+    // TODO: should be enable from `RUst 1.84`
+    // #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
@@ -105,6 +107,8 @@ impl RIPEMD160 {
 }
 
 impl Precompile for RIPEMD160 {
+    // TODO: should be enable from `RUst 1.84`
+    // #[allow(clippy::manual_div_ceil)]
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(

@@ -65,7 +65,7 @@ impl<T: StorageIntermediate> StorageIntermediate for WrappedInput<T> {
     }
 }
 
-impl<'cache, I: IO> IO for CachedIO<'cache, I> {
+impl<I: IO> IO for CachedIO<'_, I> {
     type StorageValue = WrappedInput<I::StorageValue>;
 
     fn read_input(&self) -> Self::StorageValue {

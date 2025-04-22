@@ -3,8 +3,8 @@ use aurora_engine_types::U256;
 use core::num::TryFromIntError;
 
 #[cfg(test)]
-use evm::Context;
-use evm::ExitError;
+use aurora_evm::Context;
+use aurora_evm::ExitError;
 
 #[cfg(test)]
 pub fn new_context() -> Context {

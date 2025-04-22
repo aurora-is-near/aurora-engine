@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-VERSION=121
+VERSION=123
 
 if [[ ! -f wasm-opt ]]; then
   mkdir binaryen

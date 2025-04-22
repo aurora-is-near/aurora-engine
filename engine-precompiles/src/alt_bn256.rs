@@ -2,9 +2,9 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
+use aurora_evm::{Context, ExitError};
 use bn::Group;
 use core::num::{NonZeroU64, NonZeroUsize};
-use evm::{Context, ExitError};
 
 /// bn128 costs.
 mod costs {
@@ -38,7 +38,7 @@ mod costs {
 /// bn128 constants.
 mod consts {
     use crate::prelude::Borrowed;
-    use evm::ExitError;
+    use aurora_evm::ExitError;
 
     /// Input length for the add operation.
     pub(super) const ADD_INPUT_LEN: usize = 128;

@@ -30,7 +30,7 @@ impl PrecompileFlags {
     /// Checks if the precompile belonging to the `address` is marked as paused.
     #[must_use]
     pub fn is_paused_by_address(&self, address: &Address) -> bool {
-        Self::from_address(address).map_or(false, |precompile_flag| self.contains(precompile_flag))
+        Self::from_address(address).is_some_and(|precompile_flag| self.contains(precompile_flag))
     }
 }
 

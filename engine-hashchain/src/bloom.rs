@@ -3,6 +3,8 @@
 //!
 //! Reimplemented here since there is a large mismatch in types and dependencies.
 #![allow(clippy::expl_impl_clone_on_copy, clippy::non_canonical_clone_impl)]
+// NOTE: `fixed_hash` crate has clippy issue
+#![allow(unexpected_cfgs)]
 
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};

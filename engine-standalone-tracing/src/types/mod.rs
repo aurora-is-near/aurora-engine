@@ -1,6 +1,6 @@
 use aurora_engine_types::types::EthGas;
 use aurora_engine_types::BTreeMap;
-use evm_core::Opcode;
+use aurora_evm::core::Opcode;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::Index;
@@ -335,7 +335,7 @@ impl StepTransactionTrace {
 #[cfg(feature = "serde")]
 mod opcode_serde {
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn serialize<S>(opcode: &evm_core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(opcode: &aurora_evm::core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -344,7 +344,7 @@ mod opcode_serde {
 
     struct U8Visitor;
 
-    impl<'de> serde::de::Visitor<'de> for U8Visitor {
+    impl serde::de::Visitor<'_> for U8Visitor {
         type Value = u8;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -359,10 +359,12 @@ mod opcode_serde {
         }
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<evm_core::Opcode, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<aurora_evm::core::Opcode, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(evm_core::Opcode(deserializer.deserialize_u8(U8Visitor)?))
+        Ok(aurora_evm::core::Opcode(
+            deserializer.deserialize_u8(U8Visitor)?,
+        ))
     }
 }

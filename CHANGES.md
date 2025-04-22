@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.0] 2025-04-07
+
+### Additions
+
+- Added a new transaction `set_erc20_fallback_address` by [@aleksuss]. ([#1009])
+
+### Changes
+
+- The `ecrecover` implementation was moved to the `aurora-engine-sdk` by [@aleksuss]. ([#996])
+- Updated the catalog info by [@diegofigs]. ([#1002]) 
+- Usage of the `aurora-evm` crate from `crates.io` by [@mrLSD]. ([#1003])
+- The white lists don't require the fixed gas per transaction (silo mode) by [@aleksuss]. ([#1005])
+- Made the API compatible with the latest version of the eth connector by [@aleksuss]. ([#1006])
+
+### Fixes
+
+- Fixed the incorrect amount of gas provided to promises to eth connector by [@aleksuss]. ([#1000])
+
+[#996]: https://github.com/aurora-is-near/aurora-engine/pull/996
+[#1000]: https://github.com/aurora-is-near/aurora-engine/pull/1000
+[#1002]: https://github.com/aurora-is-near/aurora-engine/pull/1002
+[#1003]: https://github.com/aurora-is-near/aurora-engine/pull/1003
+[#1005]: https://github.com/aurora-is-near/aurora-engine/pull/1005
+[#1006]: https://github.com/aurora-is-near/aurora-engine/pull/1006
+[#1009]: https://github.com/aurora-is-near/aurora-engine/pull/1009
+
+## [3.8.0] 2025-02-05
+
+### Changes
+
+- Bumped the SputnikVM up to 0.46.1-aurora by [@mrLSD]. ([#966])
+- The nightly rust compiler has been replaced with stable by [@aleksuss]. ([#977])
+- Added changes regarding bumping the `primitive-types` crate by [@mrLSD]. ([#982])
+- The code coverage by clippy has been extended by [@aleksuss]. ([#984])
+- The code is changed by the clippy suggestions from the toolchain 1.84.0 by [@mrLSD]. ([#986])
+- The precompile `exitToNear` now is compatible with the OMNI bridge by [@aleksuss]. ([#992])
+
+### Fixes
+
+- Added optimisations to the `AccountId` creation methods by [@aleksuss]. ([#985])
+- The `README.md` has been actualized by [@aleksuss]. ([#978])
+- Modified CI scripts by [@aleksuss]. ([#969], [#973], [#975], [#976], [#981])
+- Fixed the vulnerability in the `remove_relayer_key` transaction by [@aleksuss]. ([#972]) 
+
+[#966]: https://github.com/aurora-is-near/aurora-engine/pull/966
+[#969]: https://github.com/aurora-is-near/aurora-engine/pull/969
+[#972]: https://github.com/aurora-is-near/aurora-engine/pull/972
+[#973]: https://github.com/aurora-is-near/aurora-engine/pull/973
+[#975]: https://github.com/aurora-is-near/aurora-engine/pull/975
+[#976]: https://github.com/aurora-is-near/aurora-engine/pull/976
+[#977]: https://github.com/aurora-is-near/aurora-engine/pull/977
+[#978]: https://github.com/aurora-is-near/aurora-engine/pull/978
+[#981]: https://github.com/aurora-is-near/aurora-engine/pull/981
+[#982]: https://github.com/aurora-is-near/aurora-engine/pull/982
+[#984]: https://github.com/aurora-is-near/aurora-engine/pull/984
+[#985]: https://github.com/aurora-is-near/aurora-engine/pull/985
+[#986]: https://github.com/aurora-is-near/aurora-engine/pull/986
+[#992]: https://github.com/aurora-is-near/aurora-engine/pull/992
+
 ## [3.7.0] 2024-10-09
 
 ### Additions
@@ -28,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed duplicated `test` task in the `README.md` by [@dwiekawki]. ([#943])
 - Fixed some typos in the `README.md` and `Cargo.toml` by [@DemoYeti]. ([#945]) ([#946])
 - Fixed exceeded prepaid gas error in the `mirror_erc20_token` transaction by [@aleksuss] ([#951])
-- Modified `hardhat.config.js` to support contract verification by [@spilin] ([#958])q
+- Modified `hardhat.config.js` to support contract verification by [@spilin] ([#958])
 
 [#926]: https://github.com/aurora-is-near/aurora-engine/pull/926
 [#930]: https://github.com/aurora-is-near/aurora-engine/pull/930
@@ -697,7 +756,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...develop
+[3.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...3.7.0
 [3.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...3.6.4
 [3.6.3]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.2...3.6.3
@@ -769,3 +829,4 @@ struct SubmitResult {
 [@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
 [@spilin]: https://github.com/spilin
+[@diegofigs]: https://github.com/diegofigs

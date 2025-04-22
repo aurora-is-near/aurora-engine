@@ -87,6 +87,7 @@ category = "Check"
 command = "${CARGO}"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--",
     "-D",
@@ -99,6 +100,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "ext-connector",
@@ -113,6 +115,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "contract",
@@ -127,6 +130,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--workspace",
     "--all-targets",
     "--features",
     "contract,error_refund",
@@ -343,7 +347,7 @@ yarn test
 condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
 category = "Test"
 command = "${CARGO}"
-dependencies = ["build-test", "build-aurora-eth-connector"]
+dependencies = ["build-test", "clone-aurora-eth-connector"]
 args = [
     "test",
     "--workspace",
@@ -381,7 +385,7 @@ args = [
     "--ignored",
 ]
 
-[tasks.build-aurora-eth-connector]
+[tasks.clone-aurora-eth-connector]
 category = "Build"
 condition = { profiles = ["mainnet-silo", "testnet-silo"] }
 script = '''
@@ -398,12 +402,7 @@ else
   cd $AURORA_ETH_CONNECTOR_ETC
   echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
   git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
-  cd $AURORA_ETH_CONNECTOR_REPO_NAME
 fi
-RUST_VERSION=$(cat rust-toolchain | grep channel | cut -d'"' -f 2)
-rustup toolchain add $RUST_VERSION
-rustup target add wasm32-unknown-unknown --toolchain $RUST_VERSION
-cargo +$RUST_VERSION make --profile mainnet build-test
 '''
 
 [tasks.test-flow]

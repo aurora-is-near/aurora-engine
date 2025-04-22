@@ -9,12 +9,13 @@ use aurora_engine_types::{
     borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
+    str,
     types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
     vec, Cow, Vec, H160, H256, U256,
 };
-use evm::backend::Log;
-use evm::executor::stack::{PrecompileFailure, PrecompileHandle};
-use evm::ExitError;
+use aurora_evm::backend::Log;
+use aurora_evm::executor::stack::{PrecompileFailure, PrecompileHandle};
+use aurora_evm::ExitError;
 
 pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -188,7 +189,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 required_near.as_u128().into(),
             );
             let wnear_address = state::get_wnear_address(&self.io);
-            let context = evm::Context {
+            let context = aurora_evm::Context {
                 address: wnear_address.raw(),
                 caller: cross_contract_call::ADDRESS.raw(),
                 apparent_value: U256::zero(),
@@ -197,17 +198,17 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 handle.call(wnear_address.raw(), None, tx_data, None, false, &context);
             match exit_reason {
                 // Transfer successful, nothing to do
-                evm::ExitReason::Succeed(_) => (),
-                evm::ExitReason::Revert(r) => {
+                aurora_evm::ExitReason::Succeed(_) => (),
+                aurora_evm::ExitReason::Revert(r) => {
                     return Err(PrecompileFailure::Revert {
                         exit_status: r,
                         output: return_value,
                     });
                 }
-                evm::ExitReason::Error(e) => {
+                aurora_evm::ExitReason::Error(e) => {
                     return Err(PrecompileFailure::Error { exit_status: e });
                 }
-                evm::ExitReason::Fatal(f) => {
+                aurora_evm::ExitReason::Fatal(f) => {
                     return Err(PrecompileFailure::Fatal { exit_status: f });
                 }
             };
@@ -299,14 +300,19 @@ fn create_target_account_id(
     sender: H160,
     engine_account_id: &str,
 ) -> Result<AccountId, PrecompileFailure> {
-    format!("{}.{}", hex::encode(sender.as_bytes()), engine_account_id)
-        .parse()
+    let mut buffer = [0; 40];
+    hex::encode_to_slice(sender.as_bytes(), &mut buffer)
+        .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+    let sender_in_hex =
+        str::from_utf8(&buffer).map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))?;
+
+    AccountId::try_from(format!("{sender_in_hex}.{engine_account_id}"))
         .map_err(|_| revert_with_message(consts::ERR_XCC_ACCOUNT_ID))
 }
 
 fn revert_with_message(message: &str) -> PrecompileFailure {
     PrecompileFailure::Revert {
-        exit_status: evm::ExitRevert::Reverted,
+        exit_status: aurora_evm::ExitRevert::Reverted,
         output: message.as_bytes().to_vec(),
     }
 }

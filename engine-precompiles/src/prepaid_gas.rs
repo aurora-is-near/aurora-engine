@@ -3,7 +3,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::U256;
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// `prepaid_gas` precompile address
 ///
@@ -28,7 +28,7 @@ impl<'a, E> PrepaidGas<'a, E> {
     }
 }
 
-impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
+impl<E: Env> Precompile for PrepaidGas<'_, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREPAID_GAS_COST)
     }

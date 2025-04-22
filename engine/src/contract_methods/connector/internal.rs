@@ -444,6 +444,11 @@ pub fn ft_metadata<I: IO + Copy>(mut io: I) -> Result<(), ContractError> {
     Ok(())
 }
 
+pub fn get_bridge_prover<I: IO + Copy>(io: I) -> Result<(), ContractError> {
+    EthConnectorContract::init(io)?.get_bridge_prover();
+    Ok(())
+}
+
 /// Sets the contract data and returns it back
 fn set_contract_data<I: IO>(
     io: &mut I,
@@ -1047,8 +1052,9 @@ impl<I: IO + Copy> EthConnectorContract<I> {
     }
 
     /// Return account id of the prover smart contract.
-    pub const fn get_bridge_prover(&self) -> &AccountId {
-        &self.contract.prover_account
+    pub fn get_bridge_prover(&mut self) {
+        self.io
+            .return_output(self.contract.prover_account.as_bytes());
     }
 
     /// Save eth-connector fungible token contract data in the storage.

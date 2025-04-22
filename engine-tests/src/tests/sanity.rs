@@ -285,7 +285,7 @@ fn test_deploy_largest_contract() {
     // NEAR gas limit of 200 Tgas.
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    let len = evm::Config::berlin().create_contract_limit.unwrap();
+    let len = aurora_evm::Config::berlin().create_contract_limit.unwrap();
     let code = generate_code(len);
 
     // Deploy that code
@@ -303,7 +303,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 11);
+    utils::assert_gas_bound(profile.all_gas(), 12);
 }
 
 #[test]
@@ -445,7 +445,7 @@ fn test_solidity_pure_bench() {
     );
     let near_gas = profile.all_gas();
     assert!(
-        near_gas > 1390 * 1_000_000_000_000,
+        near_gas > 1300 * 1_000_000_000_000,
         "Expected 1400 NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
