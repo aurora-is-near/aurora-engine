@@ -29,7 +29,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 108 Tgas
+    // near total gas = 103 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
@@ -39,7 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(108, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(103, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -53,8 +53,8 @@ fn test_uniswap_exact_output() {
     utils::assert_gas_bound(profile.all_gas(), 32);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (38..=48).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 38% and 48%",
+        (30..=40).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 30% and 40%",
     );
 
     let (_amount_in, profile) =
@@ -62,8 +62,8 @@ fn test_uniswap_exact_output() {
     utils::assert_gas_bound(profile.all_gas(), 17);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (38..=48).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 38% and 48%",
+        (30..=40).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 30% and 40%",
     );
 }
 

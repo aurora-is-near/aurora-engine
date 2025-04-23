@@ -106,7 +106,7 @@ exclude = [
 ]
 
 [profile.release]
-opt-level = 3
+opt-level = 3 # "z" level decreases contract size, but at the same time, increases NEAR gas consumption in some cases
 debug = false
 debug-assertions = false
 overflow-checks = true
