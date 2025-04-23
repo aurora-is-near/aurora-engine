@@ -445,8 +445,8 @@ fn test_solidity_pure_bench() {
     );
     let near_gas = profile.all_gas();
     assert!(
-        near_gas > 1400 * 1_000_000_000_000,
-        "Expected 1500 NEAR Tgas to be used, but only consumed {}",
+        near_gas > 1300 * 1_000_000_000_000,
+        "Expected 1400 NEAR Tgas to be used, but only consumed {}",
         near_gas / 1_000_000_000_000,
     );
 

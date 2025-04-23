@@ -264,6 +264,7 @@ dependencies = [
     "build-engine",
     "make-bin-directory",
     "copy-engine-build",
+    "wasm-opt",
     "post-engine-build-env",
 ]
 
@@ -273,6 +274,7 @@ dependencies = [
     "build-engine",
     "make-bin-directory",
     "copy-engine-build",
+    "wasm-opt",
     "post-engine-build-env",
 ]
 
@@ -290,6 +292,16 @@ condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", 
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
+
+[tasks.wasm-opt]
+condition = { profiles = ["mainnet", "testnet", "mainnet-silo", "testnet-silo", "custom"] }
+category = "Build"
+script = '''
+  filesize_before=$(wc -c bin/${WASM_FILE} | awk '{print $1}')
+  wasm-opt -O4 bin/${WASM_FILE} -o bin/${WASM_FILE} --strip-debug --vacuum
+  filesize_after=$(wc -c bin/${WASM_FILE} | awk '{print $1}')
+  echo "File size before: [$filesize_before] and after: [$filesize_after]"
+'''
 
 [tasks.build]
 condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
