@@ -583,32 +583,29 @@ fn exit_erc20_token_to_near<I: IO>(
     let nep141_account_id = get_nep141_from_erc20(erc20_address.as_bytes(), io)?;
 
     let (nep141_account_id, args, method, transfer_near_args, event) = match exit_params.message {
-        Some(Message::UnwrapWnear) => {
-            // The flow is following here:
-            // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
-            // In such way we unwrap wNEAR to NEAR.
-            // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
-            // in which make transfer of unwrapped NEAR to the `target_account_id`.
-            if erc20_address == get_wnear_address(io).raw() {
-                // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
-                (
-                    nep141_account_id,
-                    format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
-                    "near_withdraw",
-                    Some(TransferNearCallArgs {
-                        target_account_id: exit_params.receiver_account_id.clone(),
-                        amount: exit_params.amount.as_u128(),
-                    }),
-                    events::ExitToNear::Legacy(ExitToNearLegacy {
-                        sender: Address::new(erc20_address),
-                        erc20_address: Address::new(erc20_address),
-                        dest: exit_params.receiver_account_id.to_string(),
-                        amount: exit_params.amount,
-                    }),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_ERC20_FOR_UNWRAP")));
-            }
+        // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
+        Some(Message::UnwrapWnear) if erc20_address == get_wnear_address(io).raw() =>
+        // The flow is following here:
+        // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
+        // In such way we unwrap wNEAR to NEAR.
+        // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
+        // in which make transfer of unwrapped NEAR to the `target_account_id`.
+        {
+            (
+                nep141_account_id,
+                format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
+                "near_withdraw",
+                Some(TransferNearCallArgs {
+                    target_account_id: exit_params.receiver_account_id.clone(),
+                    amount: exit_params.amount.as_u128(),
+                }),
+                events::ExitToNear::Legacy(ExitToNearLegacy {
+                    sender: Address::new(erc20_address),
+                    erc20_address: Address::new(erc20_address),
+                    dest: exit_params.receiver_account_id.to_string(),
+                    amount: exit_params.amount,
+                }),
+            )
         }
         // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
         Some(Message::Omni(msg)) => (
@@ -625,7 +622,9 @@ fn exit_erc20_token_to_near<I: IO>(
             }),
         ),
         // The legacy flow. Just withdraw the tokens to the NEAR account id.
-        None => {
+        // P.S. We use underscore here instead of `None` to handle the case when a user
+        // could add the `unwrap` suffix for non wNEAR ERC-20 token by mistake.
+        _ => {
             // There is no way to inject json, given the encoding of both arguments
             // as decimal and valid account id respectively.
             (
