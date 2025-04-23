@@ -276,7 +276,7 @@ fn test_xcc_exec_gas() {
                     assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes());
                 }
                 other => panic!("Unexpected action {other:?}"),
-            };
+            }
         }
 
         router.ext.underlying.action_log.clear();
@@ -359,9 +359,8 @@ fn approve_erc20(
 
 pub fn contract_bytes() -> Vec<u8> {
     let base_path = Path::new(XCC_ROUTER_BASE_PATH);
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
-    utils::rust::compile(base_path);
-    fs::read(output_path).unwrap()
+    let artifact_path = utils::rust::compile(base_path);
+    fs::read(artifact_path).unwrap()
 }
 
 pub fn router_version() -> u32 {
@@ -1015,7 +1014,7 @@ pub mod workspace {
             .await?;
         if !result.is_success() {
             return Err(anyhow::Error::msg("Failed Approve transaction"));
-        };
+        }
         Ok(())
     }
 
@@ -1103,10 +1102,8 @@ pub mod workspace {
     async fn deploy_fibonacci(aurora: &EngineContract) -> anyhow::Result<AccountId> {
         let fib_contract_bytes = {
             let base_path = Path::new("..").join("etc").join("tests").join("fibonacci");
-            let output_path =
-                base_path.join("target/wasm32-unknown-unknown/release/fibonacci_on_near.wasm");
-            utils::rust::compile(base_path);
-            std::fs::read(output_path)?
+            let artifact_path = utils::rust::compile(base_path);
+            std::fs::read(artifact_path)?
         };
         let fib_account =
             create_sub_account(&aurora.root(), "fib", NearToken::from_near(50)).await?;

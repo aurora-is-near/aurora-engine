@@ -808,7 +808,7 @@ impl TransactionIncludedOutcome {
         match self.maybe_result.as_ref() {
             Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
             _ => storage.set_transaction_included(self.hash, &self.info, &self.diff)?,
-        };
+        }
         Ok(())
     }
 }
