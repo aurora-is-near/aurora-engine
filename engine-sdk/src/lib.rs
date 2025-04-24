@@ -78,6 +78,17 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     }
 }
 
+#[cfg(not(feature = "contract"))]
+#[must_use]
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    use ripemd::{Digest, Ripemd160};
+
+    let hash = Ripemd160::digest(input);
+    let mut output = [0u8; 20];
+    output.copy_from_slice(&hash);
+    output
+}
+
 #[cfg(feature = "contract")]
 #[must_use]
 pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
