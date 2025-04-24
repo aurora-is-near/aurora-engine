@@ -445,17 +445,15 @@ fn test_solidity_pure_bench() {
     );
     let near_gas = profile.all_gas();
     assert!(
-        near_gas > 1300 * 1_000_000_000_000,
-        "Expected 1400 NEAR Tgas to be used, but only consumed {}",
+        near_gas > 1200 * 1_000_000_000_000 && near_gas < 1300 * 1_000_000_000_000,
+        "Expected between 1200 and 1300 NEAR TGas to be used, but consumed {}",
         near_gas / 1_000_000_000_000,
     );
 
     // Pure rust version of the same contract
     let base_path = Path::new("../etc").join("tests").join("benchmark-contract");
-    let output_path =
-        base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
-    utils::rust::compile(base_path);
-    let contract_bytes = std::fs::read(output_path).unwrap();
+    let artifact_path = utils::rust::compile(base_path);
+    let contract_bytes = std::fs::read(artifact_path).unwrap();
     runner.set_code(ContractCode::new(contract_bytes, None));
     let mut context = runner.context.clone();
     context.input = loop_limit.to_le_bytes().to_vec();

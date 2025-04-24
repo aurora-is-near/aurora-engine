@@ -132,7 +132,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
         env,
     )?;
 
-    let args: NEP141FtOnTransferArgs = read_json_args(&io).map_err(Into::<ParseArgsError>::into)?;
+    let args: NEP141FtOnTransferArgs = read_json_args(&io)?;
     let mut eth_connector = EthConnectorContract::init(io)?;
 
     let output = if predecessor_account_id == eth_connector.get_eth_connector_contract_account() {

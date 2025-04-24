@@ -28,7 +28,7 @@ bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
-cargo-near-build = "0.4"
+cargo-near-build = "0.5"
 criterion = "0.5"
 ethabi = { version = "18", default-features = false }
 aurora-evm = { version = "2.0.0-rc.1", default-features = false }
@@ -39,14 +39,14 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.27"
+near-crypto = "0.29"
 near-gas = "0.3"
-near-parameters = "0.27"
-near-primitives = "0.27"
-near-primitives-core = "0.27"
+near-parameters = "0.29"
+near-primitives = "0.29"
+near-primitives-core = "0.29"
 near-sdk = "5"
-near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.17"
+near-vm-runner = { version = "0.29", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
+near-workspaces = "0.18"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
@@ -59,7 +59,7 @@ serde = { version = "1", default-features = false, features = ["alloc", "derive"
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
@@ -75,6 +75,7 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
+too_long_first_doc_paragraph = "allow"
 
 [workspace]
 resolver = "2"

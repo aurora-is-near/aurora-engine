@@ -197,7 +197,7 @@ fn test_consume_deploy_message() {
                 deployed_address = Address::try_from_slice(&key[2..22]).unwrap();
                 break;
             }
-            _ => continue,
+            _ => {}
         }
     }
 
