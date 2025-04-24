@@ -1,4 +1,3 @@
-#[cfg(feature = "contract")]
 use crate::prelude::sdk;
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::vec;
@@ -42,31 +41,6 @@ impl Precompile for SHA256 {
     /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
     /// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
     /// See: `https://etherscan.io/address/0000000000000000000000000000000000000002`
-    #[cfg(not(feature = "contract"))]
-    fn run(
-        &self,
-        input: &[u8],
-        target_gas: Option<EthGas>,
-        _context: &Context,
-        _is_static: bool,
-    ) -> EvmPrecompileResult {
-        use sha2::Digest;
-
-        let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
-        }
-
-        let output = sha2::Sha256::digest(input).to_vec();
-        Ok(PrecompileOutput::without_logs(cost, output))
-    }
-
-    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
-    /// See: `https://docs.soliditylang.org/en/develop/units-and-global-variables.html#mathematical-and-cryptographic-functions`
-    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000002`
-    #[cfg(feature = "contract")]
     fn run(
         &self,
         input: &[u8],
@@ -91,16 +65,6 @@ pub struct RIPEMD160;
 
 impl RIPEMD160 {
     pub const ADDRESS: Address = make_address(0, 3);
-
-    #[cfg(not(feature = "contract"))]
-    fn internal_impl(input: &[u8]) -> [u8; 20] {
-        use ripemd::{Digest, Ripemd160};
-
-        let hash = Ripemd160::digest(input);
-        let mut output = [0u8; 20];
-        output.copy_from_slice(&hash);
-        output
-    }
 }
 
 impl Precompile for RIPEMD160 {
@@ -129,9 +93,6 @@ impl Precompile for RIPEMD160 {
             }
         }
 
-        #[cfg(not(feature = "contract"))]
-        let hash = Self::internal_impl(input);
-        #[cfg(feature = "contract")]
         let hash = sdk::ripemd160(input);
         // The result needs to be padded with leading zeros because it is only 20 bytes, but
         // the evm works with 32-byte words.

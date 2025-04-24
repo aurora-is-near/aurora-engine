@@ -324,9 +324,6 @@ dependencies = [
  "hex",
  "num",
  "rand 0.8.5",
- "ripemd",
- "sha2 0.10.8",
- "sha3",
  "zeropool-bn",
 ]
 
@@ -338,6 +335,7 @@ dependencies = [
  "base64 0.22.1",
  "hex",
  "libsecp256k1",
+ "ripemd",
  "sha2 0.10.8",
  "sha3",
 ]
