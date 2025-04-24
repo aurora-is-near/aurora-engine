@@ -19,11 +19,11 @@ impl Depth {
         self.0
     }
 
-    pub fn increment(&mut self) {
+    pub const fn increment(&mut self) {
         self.0 += 1;
     }
 
-    pub fn decrement(&mut self) {
+    pub const fn decrement(&mut self) {
         self.0 = self.0.saturating_sub(1);
     }
 

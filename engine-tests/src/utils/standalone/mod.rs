@@ -187,7 +187,7 @@ impl StandaloneRunner {
                 }
             }
             _ => unreachable!(),
-        };
+        }
 
         Ok(outcome)
     }

@@ -211,7 +211,7 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
                 aurora_evm::ExitReason::Fatal(f) => {
                     return Err(PrecompileFailure::Fatal { exit_status: f });
                 }
-            };
+            }
         }
 
         let topics = vec![

@@ -43,7 +43,7 @@ where
         let key = self.key(STATUS);
         self.io
             .read_storage(&key)
-            .map_or(false, |value| value.to_vec() == [1])
+            .is_some_and(|value| value.to_vec() == [1])
     }
 
     fn key(&self, value: &[u8]) -> Vec<u8> {

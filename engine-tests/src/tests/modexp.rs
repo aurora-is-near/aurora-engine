@@ -313,10 +313,8 @@ impl Default for ModExpBenchContext {
             let base_path = std::path::Path::new("../etc")
                 .join("tests")
                 .join("modexp-bench");
-            let output_path =
-                base_path.join("target/wasm32-unknown-unknown/release/modexp_bench.wasm");
-            utils::rust::compile(base_path);
-            std::fs::read(output_path).unwrap()
+            let artifact_path = utils::rust::compile(base_path);
+            std::fs::read(artifact_path).unwrap()
         };
 
         // Standalone not relevant here because this is not an Aurora Engine instance

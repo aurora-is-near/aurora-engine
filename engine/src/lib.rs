@@ -91,7 +91,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Get version of the contract.
+    /// Get a version of the contract.
     #[no_mangle]
     pub extern "C" fn get_version() {
         let io = Runtime;

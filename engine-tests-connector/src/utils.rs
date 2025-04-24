@@ -44,15 +44,14 @@ static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     .unwrap();
 
     std::fs::read(artifact.path.into_std_path_buf())
-        .map_err(|e| anyhow::anyhow!("failed read wasm file: {e}"))
+        .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
         .unwrap()
 });
 
 static MOCK_CONTROLLER_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     let base_path = Path::new("../etc").join("tests").join("mock-controller");
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/mock_controller.wasm");
-    crate::rust::compile(base_path);
-    std::fs::read(output_path).unwrap()
+    let artifact_path = crate::rust::compile(base_path);
+    std::fs::read(artifact_path).unwrap()
 });
 
 pub struct TestContract {
@@ -342,7 +341,6 @@ fn get_engine_contract() -> Vec<u8> {
 #[must_use]
 pub fn dummy_ft_receiver_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("tests").join("ft-receiver");
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/ft_receiver.wasm");
-    crate::rust::compile(base_path);
-    std::fs::read(output_path).unwrap()
+    let artifact_path = crate::rust::compile(base_path);
+    std::fs::read(artifact_path).unwrap()
 }

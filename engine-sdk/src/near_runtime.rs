@@ -69,7 +69,7 @@ impl Runtime {
                     );
                 }
                 _ => panic!("ERR_NO_CODE_STAGED"),
-            };
+            }
         }
     }
 

@@ -1660,7 +1660,7 @@ where
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
                             }
-                        };
+                        }
                     }
                     // do not pass on these "internal logs" to caller
                     None
