@@ -51,6 +51,8 @@ jobs:
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Test ${{ matrix.profile }}
         run: cargo make --profile ${{ matrix.profile }} test-flow
       - uses: 8398a7/action-slack@v3
@@ -77,6 +79,8 @@ jobs:
           nvm install 18 && nvm alias default 18
           npm install -g yarn
           echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Run checks
         run: cargo make check
       - name: Run build XCC router

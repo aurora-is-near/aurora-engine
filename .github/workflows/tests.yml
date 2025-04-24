@@ -109,6 +109,8 @@ jobs:
           key: cargo-build-xcc-router
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
       - name: Build
         run: cargo make build-xcc-router
 
