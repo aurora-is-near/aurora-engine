@@ -35,4 +35,3 @@ std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-evm/std", "bn
 contract = ["aurora-engine-sdk/contract"]
 log = []
 error_refund = []
-ext-connector = []

@@ -11,15 +11,14 @@ pub mod base64;
 pub mod caching;
 pub mod env;
 pub mod error;
+#[cfg(feature = "contract")]
+mod exports;
 pub mod io;
 #[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;
 pub mod types;
-
-#[cfg(feature = "contract")]
-use near_runtime::exports;
 
 #[cfg(feature = "contract")]
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;

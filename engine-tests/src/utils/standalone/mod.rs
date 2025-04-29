@@ -46,10 +46,7 @@ impl StandaloneRunner {
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
-            #[cfg(feature = "ext-connector")]
             mocks::init_connector(io);
-            #[cfg(not(feature = "ext-connector"))]
-            mocks::init_connector(io, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
