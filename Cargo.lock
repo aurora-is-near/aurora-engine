@@ -1812,10 +1812,14 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "hex",
+ "libsecp256k1",
  "postgres",
+ "ripemd",
  "rocksdb",
  "serde",
  "serde_json",
+ "sha2 0.10.8",
+ "sha3",
  "strum 0.27.1",
 ]
 
