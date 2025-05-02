@@ -31,6 +31,7 @@ struct StateInner {
     env: Option<Fixed>,
     input: Vec<u8>,
     output: Vec<u8>,
+    promise_data: Box<[Option<Vec<u8>>]>,
 }
 
 const REGISTERS_NUMBER: usize = 6;
@@ -44,6 +45,7 @@ impl Default for StateInner {
             env: None,
             input: vec![],
             output: vec![],
+            promise_data: Box::new([]),
         }
     }
 }
@@ -62,6 +64,21 @@ impl State {
     #[allow(dead_code)]
     pub fn set_env(&self, env: Fixed) {
         self.inner.lock().expect("poisoned").env = Some(env);
+    }
+
+    #[allow(dead_code)]
+    pub fn set_promise_handler(&self, promise_data: Box<[Option<Vec<u8>>]>) {
+        self.inner.lock().expect("poisoned").promise_data = promise_data;
+    }
+
+    #[allow(dead_code)]
+    pub fn set_input(&self, input: Vec<u8>) {
+        self.inner.lock().expect("poisoned").input = input;
+    }
+
+    #[allow(dead_code)]
+    pub fn take_output(&self) -> Vec<u8> {
+        self.inner.lock().expect("poisoned").output.clone()
     }
 
     fn read_reg<F, T>(&self, register_id: u64, mut op: F) -> T
@@ -223,6 +240,23 @@ impl State {
     fn value_return(&self, value_len: u64, value_ptr: u64) {
         let data = self.get_data(value_ptr, value_len);
         self.inner.lock().expect("poisoned").output = data.into_owned();
+    }
+
+    fn promise_results_count(&self) -> u64 {
+        u64::try_from(self.inner.lock().expect("poisoned").promise_data.len()).unwrap_or_default()
+    }
+
+    fn promise_result(&self, result_idx: u64, register_id: u64) -> u64 {
+        let i = usize::try_from(result_idx).expect("index too big");
+        let lock = self.inner.lock().expect("poisoned");
+        let Some(data) = lock.promise_data.get(i) else {
+            return 3;
+        };
+        let Some(data) = data else {
+            return 2;
+        };
+        self.set_reg(register_id, data.as_slice().into());
+        1
     }
 
     fn storage_write(
@@ -649,13 +683,12 @@ extern "C" fn promise_batch_action_delete_account(
 
 #[unsafe(no_mangle)]
 extern "C" fn promise_results_count() -> u64 {
-    unimplemented!()
+    STATE.promise_results_count()
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
-    let _ = (result_idx, register_id);
-    unimplemented!()
+    STATE.promise_result(result_idx, register_id)
 }
 
 #[unsafe(no_mangle)]
