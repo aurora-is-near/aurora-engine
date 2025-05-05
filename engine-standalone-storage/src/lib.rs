@@ -93,6 +93,24 @@ impl Storage {
         self.block_read(rocksdb::IteratorMode::Start)
     }
 
+    fn read_by_key(
+        &self,
+        key: &[u8],
+        bound_block_height: u64,
+        transaction_position: u16,
+    ) -> Result<DiffValue, Error> {
+        let upper_bound = construct_engine_key(key, bound_block_height, transaction_position);
+        let lower_bound = construct_storage_key(StoragePrefix::Engine, key);
+        let mut opt = rocksdb::ReadOptions::default();
+        opt.set_iterate_upper_bound(upper_bound);
+        opt.set_iterate_lower_bound(lower_bound);
+
+        let mut iter = self.db.iterator_opt(rocksdb::IteratorMode::End, opt);
+        // TODO: error kind
+        let (_, value) = iter.next().ok_or(Error::NoBlockAtHeight(0))??;
+        Ok(DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
+    }
+
     fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), Error> {
         let upper_bound = construct_storage_key(StoragePrefix::BlockHash, &u64::MAX.to_be_bytes());
         let lower_bound = construct_storage_key(StoragePrefix::BlockHash, &[]);
