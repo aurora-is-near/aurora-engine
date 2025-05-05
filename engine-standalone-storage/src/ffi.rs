@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     env, iter,
+    ops::DerefMut,
     path::Path,
     slice,
     sync::{LazyLock, Mutex},
@@ -8,9 +9,9 @@ use std::{
 
 use sha2::digest::{FixedOutput, Update};
 
-use rocksdb::DB;
-
 use aurora_engine_sdk::env::Fixed;
+
+use super::{Diff, Storage};
 
 pub static STATE: LazyLock<State> = LazyLock::new(|| {
     let path = env::var("storage_path").unwrap_or_else(|_| "target/storage".to_owned());
@@ -20,7 +21,7 @@ pub static STATE: LazyLock<State> = LazyLock::new(|| {
 pub struct State {
     inner: Mutex<StateInner>,
     #[allow(dead_code)]
-    db: DB,
+    db: Storage,
 }
 
 #[derive(Default)]
@@ -32,6 +33,10 @@ struct StateInner {
     input: Vec<u8>,
     output: Vec<u8>,
     promise_data: Box<[Option<Vec<u8>>]>,
+
+    bound_block_height: u64,
+    bound_tx_position: u16,
+    transaction_diff: Diff,
 }
 
 const REGISTERS_NUMBER: usize = 6;
@@ -46,6 +51,9 @@ impl Default for StateInner {
             input: vec![],
             output: vec![],
             promise_data: Box::new([]),
+            bound_block_height: 0,
+            bound_tx_position: 0,
+            transaction_diff: Diff::default(),
         }
     }
 }
@@ -57,28 +65,46 @@ impl State {
     {
         Ok(State {
             inner: Mutex::new(StateInner::default()),
-            db: DB::open_default(path)?,
+            db: Storage::open(path)?,
         })
+    }
+
+    fn inner(&self) -> impl DerefMut<Target = StateInner> + use<'_> {
+        self.inner.lock().expect("poisoned")
     }
 
     #[allow(dead_code)]
     pub fn set_env(&self, env: Fixed) {
-        self.inner.lock().expect("poisoned").env = Some(env);
+        self.inner().env = Some(env);
     }
 
     #[allow(dead_code)]
     pub fn set_promise_handler(&self, promise_data: Box<[Option<Vec<u8>>]>) {
-        self.inner.lock().expect("poisoned").promise_data = promise_data;
+        self.inner().promise_data = promise_data;
     }
 
     #[allow(dead_code)]
     pub fn set_input(&self, input: Vec<u8>) {
-        self.inner.lock().expect("poisoned").input = input;
+        self.inner().input = input;
     }
 
     #[allow(dead_code)]
+    #[must_use]
     pub fn take_output(&self) -> Vec<u8> {
-        self.inner.lock().expect("poisoned").output.clone()
+        self.inner().output.clone()
+    }
+
+    #[allow(dead_code)]
+    #[must_use]
+    pub fn get_transaction_diff(&self) -> Diff {
+        self.inner().transaction_diff.clone()
+    }
+
+    #[allow(dead_code)]
+    pub fn init(&self, block_height: u64, transaction_position: u16) {
+        let mut lock = self.inner();
+        lock.bound_block_height = block_height;
+        lock.bound_tx_position = transaction_position;
     }
 
     fn read_reg<F, T>(&self, register_id: u64, mut op: F) -> T
@@ -86,7 +112,7 @@ impl State {
         F: FnMut(&Register) -> T,
     {
         let index = register_id as usize;
-        let lock = self.inner.lock().expect("poisoned");
+        let lock = self.inner();
         let reg = lock
             .registers
             .get(index)
@@ -96,7 +122,7 @@ impl State {
 
     fn set_reg<'a>(&self, register_id: u64, data: Cow<'a, [u8]>) {
         let index = register_id as usize;
-        let mut lock = self.inner.lock().expect("poisoned");
+        let mut lock = self.inner();
         *lock
             .registers
             .get_mut(index)
@@ -134,68 +160,68 @@ impl State {
     }
 
     fn current_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.current_account_id.as_bytes().into());
     }
 
     fn signer_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.signer_account_id.as_bytes().into());
     }
 
     fn predecessor_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.predecessor_account_id.as_bytes().into());
     }
 
     fn input(&self, register_id: u64) {
-        let input = &self.inner.lock().expect("poisoned").input;
+        let input = &self.inner().input;
         self.set_reg(register_id, input.into());
     }
 
     fn block_index(&self) -> u64 {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         env.block_height
     }
 
     fn block_timestamp(&self) -> u64 {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         env.block_timestamp.nanos()
     }
 
     fn attached_deposit(&self, balance_ptr: u64) {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         unsafe { (balance_ptr as *mut u128).write(env.attached_deposit) }
     }
 
     fn prepaid_gas(&self) -> u64 {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         env.prepaid_gas.as_u64()
     }
 
     fn used_gas(&self) -> u64 {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         env.used_gas.as_u64()
     }
 
     fn random_seed(&self, register_id: u64) {
-        let Some(env) = &self.inner.lock().expect("poisoned").env else {
+        let Some(env) = &self.inner().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.random_seed.as_bytes().into());
@@ -239,16 +265,16 @@ impl State {
 
     fn value_return(&self, value_len: u64, value_ptr: u64) {
         let data = self.get_data(value_ptr, value_len);
-        self.inner.lock().expect("poisoned").output = data.into_owned();
+        self.inner().output = data.into_owned();
     }
 
     fn promise_results_count(&self) -> u64 {
-        u64::try_from(self.inner.lock().expect("poisoned").promise_data.len()).unwrap_or_default()
+        u64::try_from(self.inner().promise_data.len()).unwrap_or_default()
     }
 
     fn promise_result(&self, result_idx: u64, register_id: u64) -> u64 {
         let i = usize::try_from(result_idx).expect("index too big");
-        let lock = self.inner.lock().expect("poisoned");
+        let lock = self.inner();
         let Some(data) = lock.promise_data.get(i) else {
             return 3;
         };
@@ -267,36 +293,60 @@ impl State {
         value_ptr: u64,
         register_id: u64,
     ) -> u64 {
+        // fetch original value into register
+        self.storage_read(key_len, key_ptr, register_id);
+
         let key = self.get_data(key_ptr, key_len);
         let value = self.get_data(value_ptr, value_len);
-        if value_ptr != register_id {
-            self.set_reg(register_id, value.as_ref().into());
-        }
-        self.db.put(key, value).is_ok().into()
+
+        self.inner()
+            .transaction_diff
+            .modify(key.to_vec(), value.to_vec());
+        1
     }
 
     fn storage_read(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
-        let Ok(value) = self.db.get(key) else {
-            return 0;
-        };
-        if let Some(data) = value {
-            self.set_reg(register_id, Cow::Owned(data));
+        let lock = self.inner();
+        if let Some(diff) = self.inner().transaction_diff.get(&key) {
+            if let Some(bytes) = diff.value() {
+                self.set_reg(register_id, bytes.into());
+            }
         }
-        1
+
+        let value = self
+            .db
+            .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
+        if let Ok(diff) = &value {
+            if let Some(bytes) = diff.value() {
+                self.set_reg(register_id, bytes.into());
+            }
+            1
+        } else {
+            0
+        }
     }
 
     fn storage_remove(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
+        // fetch original value into register
+        self.storage_read(key_len, key_ptr, register_id);
+
         let key = self.get_data(key_ptr, key_len);
-        if let Ok(Some(value)) = self.db.get(&key) {
-            self.set_reg(register_id, value.into());
-        }
-        self.db.delete(key).is_ok().into()
+        self.inner().transaction_diff.delete(key.into_owned());
+        1
     }
 
     fn storage_has_key(&self, key_len: u64, key_ptr: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
-        self.db.get(key).map_or(false, |x| x.is_some()).into()
+        let lock = self.inner();
+        if self.inner().transaction_diff.get(&key).is_some() {
+            return 1;
+        }
+
+        self.db
+            .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
+            .is_ok()
+            .into()
     }
 }
 
