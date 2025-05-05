@@ -20,7 +20,7 @@ pub mod sync;
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
 
-mod ffi;
+mod state;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
