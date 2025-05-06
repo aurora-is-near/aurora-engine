@@ -226,7 +226,6 @@ async fn test_transfer_from_silo_to_silo() {
         .transact()
         .await
         .unwrap();
-    dbg!(&result);
     assert!(result.is_success());
 
     assert_eq!(

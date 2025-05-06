@@ -395,7 +395,6 @@ name = "aurora-engine-tests-connector"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aurora-engine",
  "aurora-engine-types",
  "cargo-near-build",
  "near-sdk",

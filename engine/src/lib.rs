@@ -13,7 +13,6 @@ pub mod engine;
 pub mod errors;
 pub mod hashchain;
 pub mod parameters {
-    // pub use aurora_engine_types::parameters::connector::*;
     pub use aurora_engine_types::parameters::engine::*;
 }
 pub mod pausables;
