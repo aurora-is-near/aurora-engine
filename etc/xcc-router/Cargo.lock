@@ -48,7 +48,6 @@ dependencies = [
 name = "aurora-engine-types"
 version = "1.2.0"
 dependencies = [
- "base64 0.22.1",
  "borsh",
  "bs58 0.5.1",
  "hex",
