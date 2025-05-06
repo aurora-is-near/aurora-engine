@@ -90,12 +90,9 @@ impl AuroraRunner {
     }
 
     pub fn deploy_erc20_token(&mut self, nep141: &str) -> Address {
+        let args = borsh::to_vec(nep141).unwrap();
         let result = self
-            .make_call(
-                "deploy_erc20_token",
-                DEFAULT_AURORA_ACCOUNT_ID,
-                borsh::to_vec(&nep141).unwrap(),
-            )
+            .make_call("deploy_erc20_token", DEFAULT_AURORA_ACCOUNT_ID, args)
             .unwrap();
 
         Vec::try_from_slice(&result.return_data.as_value().unwrap())

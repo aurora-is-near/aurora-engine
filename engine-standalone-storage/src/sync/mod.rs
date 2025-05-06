@@ -10,6 +10,7 @@ use aurora_engine_sdk::{
     io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::parameters::PromiseOrValue;
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -71,9 +72,12 @@ pub fn parse_transaction_kind(
         }
         TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
         TransactionKindTag::DeployErc20 => {
-            let deploy_args =
-                parameters::DeployErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            let deploy_args = parameters::DeployErc20TokenArgs::deserialize(&bytes).map_err(f)?;
             TransactionKind::DeployErc20(deploy_args)
+        }
+        TransactionKindTag::DeployErc20Callback => {
+            let args = AccountId::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::DeployErc20Callback(args)
         }
         TransactionKindTag::FtOnTransfer => {
             let transfer_args: parameters::NEP141FtOnTransferArgs =
@@ -500,9 +504,21 @@ fn non_submit_execute<I: IO + Copy>(
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::DeployErc20(_) => {
-            // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::NoScheduler { promise_data };
             let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
+
+            Some(match result {
+                PromiseOrValue::Value(address) => TransactionExecutionResult::DeployErc20(address),
+                PromiseOrValue::Promise(promise_args) => {
+                    TransactionExecutionResult::Promise(promise_args)
+                }
+            })
+        }
+        TransactionKind::DeployErc20Callback(_) => {
+            // No promises can be created by `deploy_erc20_token_callback`
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result =
+                contract_methods::connector::deploy_erc20_token_callback(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
