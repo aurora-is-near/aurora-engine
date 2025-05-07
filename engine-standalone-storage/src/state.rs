@@ -1,10 +1,9 @@
 use std::{
     borrow::Cow,
-    env, iter,
+    iter,
     ops::DerefMut,
-    path::Path,
     slice,
-    sync::{LazyLock, Mutex},
+    sync::{Mutex, OnceLock},
 };
 
 use sha2::digest::{FixedOutput, Update};
@@ -13,14 +12,11 @@ use aurora_engine_sdk::env::Fixed;
 
 use super::{Diff, Storage};
 
-pub static STATE: LazyLock<State> = LazyLock::new(|| {
-    let path = env::var("storage_path").unwrap_or_else(|_| "target/storage".to_owned());
-    State::open(path).expect("bad DB")
-});
+pub static STATE: OnceLock<State> = OnceLock::new();
 
 pub struct State {
     inner: Mutex<StateInner>,
-    #[allow(dead_code)]
+    registers: Mutex<Vec<Register>>,
     db: Storage,
 }
 
@@ -28,7 +24,6 @@ pub struct State {
 struct Register(Option<Vec<u8>>);
 
 struct StateInner {
-    registers: Vec<Register>,
     env: Option<Fixed>,
     input: Vec<u8>,
     output: Vec<u8>,
@@ -44,9 +39,6 @@ const REGISTERS_NUMBER: usize = 6;
 impl Default for StateInner {
     fn default() -> Self {
         StateInner {
-            registers: iter::repeat_with(|| Register::default())
-                .take(REGISTERS_NUMBER)
-                .collect(),
             env: None,
             input: vec![],
             output: vec![],
@@ -59,52 +51,50 @@ impl Default for StateInner {
 }
 
 impl State {
-    pub fn open<P>(path: P) -> Result<Self, rocksdb::Error>
-    where
-        P: AsRef<Path>,
-    {
-        Ok(State {
+    pub fn new(storage: Storage) -> Self {
+        State {
             inner: Mutex::new(StateInner::default()),
-            db: Storage::open(path)?,
-        })
+            registers: Mutex::new(
+                iter::repeat_with(|| Register::default())
+                    .take(REGISTERS_NUMBER)
+                    .collect(),
+            ),
+            db: storage,
+        }
     }
 
     fn inner(&self) -> impl DerefMut<Target = StateInner> + use<'_> {
         self.inner.lock().expect("poisoned")
     }
 
-    #[allow(dead_code)]
     pub fn set_env(&self, env: Fixed) {
         self.inner().env = Some(env);
     }
 
-    #[allow(dead_code)]
     pub fn set_promise_handler(&self, promise_data: Box<[Option<Vec<u8>>]>) {
         self.inner().promise_data = promise_data;
     }
 
-    #[allow(dead_code)]
     pub fn set_input(&self, input: Vec<u8>) {
         self.inner().input = input;
     }
 
-    #[allow(dead_code)]
     #[must_use]
     pub fn take_output(&self) -> Vec<u8> {
         self.inner().output.clone()
     }
 
-    #[allow(dead_code)]
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
         self.inner().transaction_diff.clone()
     }
 
-    #[allow(dead_code)]
     pub fn init(&self, block_height: u64, transaction_position: u16) {
         let mut lock = self.inner();
         lock.bound_block_height = block_height;
         lock.bound_tx_position = transaction_position;
+        lock.output.clear();
+        lock.transaction_diff.clear();
     }
 
     fn read_reg<F, T>(&self, register_id: u64, mut op: F) -> T
@@ -112,9 +102,8 @@ impl State {
         F: FnMut(&Register) -> T,
     {
         let index = register_id as usize;
-        let lock = self.inner();
+        let lock = self.registers.lock().expect("poisoned");
         let reg = lock
-            .registers
             .get(index)
             .unwrap_or_else(|| panic!("no such register {register_id}"));
         op(reg)
@@ -122,9 +111,8 @@ impl State {
 
     fn set_reg<'a>(&self, register_id: u64, data: Cow<'a, [u8]>) {
         let index = register_id as usize;
-        let mut lock = self.inner();
+        let mut lock = self.registers.lock().expect("poisoned");
         *lock
-            .registers
             .get_mut(index)
             .unwrap_or_else(|| panic!("no such register {register_id}")) =
             Register(Some(data.into_owned()));
@@ -308,10 +296,11 @@ impl State {
     fn storage_read(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
         let lock = self.inner();
-        if let Some(diff) = self.inner().transaction_diff.get(&key) {
+        if let Some(diff) = lock.transaction_diff.get(&key) {
             if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
             }
+            return 1;
         }
 
         let value = self
@@ -339,7 +328,7 @@ impl State {
     fn storage_has_key(&self, key_len: u64, key_ptr: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
         let lock = self.inner();
-        if self.inner().transaction_diff.get(&key).is_some() {
+        if lock.transaction_diff.get(&key).is_some() {
             return 1;
         }
 
@@ -350,18 +339,86 @@ impl State {
     }
 }
 
+mod io {
+    use aurora_engine_sdk::io::IO;
+
+    use crate::engine_state::EngineStorageValue;
+
+    impl<'a> IO for &'a super::State {
+        type StorageValue = EngineStorageValue<'a>;
+
+        fn read_input(&self) -> Self::StorageValue {
+            EngineStorageValue::Vec(self.inner().input.clone())
+        }
+
+        fn return_output(&mut self, value: &[u8]) {
+            #[cfg(any(feature = "mainnet", feature = "testnet"))]
+            assert!(
+                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
+                "ERR_ILLEGAL_RETURN"
+            );
+            super::value_return(value.len() as u64, value.as_ptr() as u64);
+        }
+
+        fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
+            let lock = self.inner();
+            let db_value;
+            let value = if let Some(diff) = lock.transaction_diff.get(&key) {
+                diff.value()
+            } else {
+                db_value =
+                    self.db
+                        .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
+                if let Ok(diff) = &db_value {
+                    diff.value()
+                } else {
+                    None
+                }
+            };
+
+            value.map(ToOwned::to_owned).map(EngineStorageValue::Vec)
+        }
+
+        fn storage_has_key(&self, key: &[u8]) -> bool {
+            super::storage_has_key(key.len() as _, key.as_ptr() as _) == 1
+        }
+
+        fn write_storage(&mut self, key: &[u8], value: &[u8]) -> Option<Self::StorageValue> {
+            let old = self.read_storage(key);
+            self.inner()
+                .transaction_diff
+                .modify(key.to_vec(), value.to_vec());
+            old
+        }
+
+        fn write_storage_direct(
+            &mut self,
+            key: &[u8],
+            value: Self::StorageValue,
+        ) -> Option<Self::StorageValue> {
+            self.write_storage(key, value.as_ref())
+        }
+
+        fn remove_storage(&mut self, key: &[u8]) -> Option<Self::StorageValue> {
+            let v = self.read_storage(key);
+            self.inner().transaction_diff.delete(key.to_vec());
+            v
+        }
+    }
+}
+
 // #############
 // # Registers #
 // #############
 
 #[unsafe(no_mangle)]
 extern "C" fn read_register(register_id: u64, ptr: u64) {
-    STATE.read_register(register_id, ptr)
+    STATE.get().unwrap().read_register(register_id, ptr)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn register_len(register_id: u64) -> u64 {
-    STATE.register_len(register_id)
+    STATE.get().unwrap().register_len(register_id)
 }
 
 // ###############
@@ -370,12 +427,12 @@ extern "C" fn register_len(register_id: u64) -> u64 {
 
 #[unsafe(no_mangle)]
 extern "C" fn current_account_id(register_id: u64) {
-    STATE.current_account_id(register_id)
+    STATE.get().unwrap().current_account_id(register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn signer_account_id(register_id: u64) {
-    STATE.signer_account_id(register_id)
+    STATE.get().unwrap().signer_account_id(register_id)
 }
 
 #[unsafe(no_mangle)]
@@ -386,22 +443,22 @@ extern "C" fn signer_account_pk(register_id: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn predecessor_account_id(register_id: u64) {
-    STATE.predecessor_account_id(register_id)
+    STATE.get().unwrap().predecessor_account_id(register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn input(register_id: u64) {
-    STATE.input(register_id)
+    STATE.get().unwrap().input(register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn block_index() -> u64 {
-    STATE.block_index()
+    STATE.get().unwrap().block_index()
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn block_timestamp() -> u64 {
-    STATE.block_timestamp()
+    STATE.get().unwrap().block_timestamp()
 }
 
 #[unsafe(no_mangle)]
@@ -426,17 +483,17 @@ extern "C" fn account_balance(balance_ptr: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn attached_deposit(balance_ptr: u64) {
-    STATE.attached_deposit(balance_ptr)
+    STATE.get().unwrap().attached_deposit(balance_ptr)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn prepaid_gas() -> u64 {
-    STATE.prepaid_gas()
+    STATE.get().unwrap().prepaid_gas()
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn used_gas() -> u64 {
-    STATE.used_gas()
+    STATE.get().unwrap().used_gas()
 }
 
 // ############
@@ -445,22 +502,31 @@ extern "C" fn used_gas() -> u64 {
 
 #[unsafe(no_mangle)]
 extern "C" fn random_seed(register_id: u64) {
-    STATE.random_seed(register_id)
+    STATE.get().unwrap().random_seed(register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.digest::<sha2::Sha256>(value_len, value_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .digest::<sha2::Sha256>(value_len, value_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.digest::<sha3::Keccak256>(value_len, value_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .digest::<sha3::Keccak256>(value_len, value_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
@@ -475,6 +541,8 @@ extern "C" fn ecrecover(
 ) -> u64 {
     if malleability_flag == 0 {
         STATE
+            .get()
+            .unwrap()
             .ecrecover(hash_len, hash_ptr, sig_len, sig_ptr, v, register_id)
             .is_ok()
             .into()
@@ -507,7 +575,7 @@ extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn value_return(value_len: u64, value_ptr: u64) {
-    STATE.value_return(value_len, value_ptr)
+    STATE.get().unwrap().value_return(value_len, value_ptr)
 }
 
 #[unsafe(no_mangle)]
@@ -540,7 +608,6 @@ extern "C" fn log_utf16(len: u64, ptr: u64) {
 #[unsafe(no_mangle)]
 extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
     let _ = (msg_ptr, filename_ptr, line, col);
-    unimplemented!()
 }
 
 // ################
@@ -733,12 +800,12 @@ extern "C" fn promise_batch_action_delete_account(
 
 #[unsafe(no_mangle)]
 extern "C" fn promise_results_count() -> u64 {
-    STATE.promise_results_count()
+    STATE.get().unwrap().promise_results_count()
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
-    STATE.promise_result(result_idx, register_id)
+    STATE.get().unwrap().promise_result(result_idx, register_id)
 }
 
 #[unsafe(no_mangle)]
@@ -759,22 +826,31 @@ extern "C" fn storage_write(
     value_ptr: u64,
     register_id: u64,
 ) -> u64 {
-    STATE.storage_write(key_len, key_ptr, value_len, value_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .storage_write(key_len, key_ptr, value_len, value_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE.storage_read(key_len, key_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .storage_read(key_len, key_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE.storage_remove(key_len, key_ptr, register_id)
+    STATE
+        .get()
+        .unwrap()
+        .storage_remove(key_len, key_ptr, register_id)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn storage_has_key(key_len: u64, key_ptr: u64) -> u64 {
-    STATE.storage_has_key(key_len, key_ptr)
+    STATE.get().unwrap().storage_has_key(key_len, key_ptr)
 }
 
 #[unsafe(no_mangle)]

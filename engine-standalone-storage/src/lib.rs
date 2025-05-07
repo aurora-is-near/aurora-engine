@@ -1,9 +1,9 @@
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
-use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
@@ -21,6 +21,7 @@ pub use diff::{Diff, DiffValue};
 pub use error::Error;
 
 mod state;
+pub use self::state::State as GlobalState;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
@@ -60,12 +61,16 @@ impl From<StoragePrefix> for u8 {
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
-    db: DB,
+    db: Arc<DB>,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
-        let db = DB::open_default(path)?;
+        let db = Arc::new(DB::open_default(path)?);
+        state::STATE
+            .set(state::State::new(Storage { db: db.clone() }))
+            .unwrap_or_default();
+
         Ok(Self { db })
     }
 
@@ -389,31 +394,27 @@ impl Storage {
     /// with the engine, but not to make any immediate changes to storage; only return the diff and outcome.
     /// Note the closure is allowed to mutate the `EngineStateAccess` object, but this does not impact the `Storage`
     /// because all changes are held in the diff in memory.
-    pub fn with_engine_access<'db, 'input, R, F>(
-        &'db self,
+    pub fn with_engine_access<R, F>(
+        &self,
         block_height: u64,
         transaction_position: u16,
-        input: &'input [u8],
+        input: &[u8],
         f: F,
     ) -> EngineAccessResult<R>
     where
-        F: for<'output> FnOnce(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
+        F: FnOnce(&state::State) -> R,
     {
-        let diff = RefCell::new(Diff::default());
-        let engine_output = Cell::new(Vec::new());
+        let state = state::STATE.get_or_init(|| {
+            state::State::new(Storage {
+                db: self.db.clone(),
+            })
+        });
+        state.set_input(input.to_vec());
+        state.init(block_height, transaction_position);
 
-        let engine_state = engine_state::EngineStateAccess::new(
-            input,
-            block_height,
-            transaction_position,
-            &diff,
-            &engine_output,
-            &self.db,
-        );
-
-        let result = f(engine_state);
-        let diff = engine_state.get_transaction_diff();
-        let engine_output = engine_output.into_inner();
+        let result = f(state);
+        let diff = state.get_transaction_diff();
+        let engine_output = state.take_output();
 
         EngineAccessResult {
             result,
@@ -527,4 +528,60 @@ fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16
         .concat()
         .as_slice(),
     )
+}
+
+pub mod contract {
+    use std::{ffi, sync::Mutex};
+
+    use libloading::os::unix::{self, Library};
+
+    use aurora_engine::{contract_methods::ContractError, parameters::SubmitResult};
+
+    static CONTRACT: Mutex<Option<DynamicContract>> = Mutex::new(None);
+
+    struct DynamicContract {
+        library: Library,
+        submit_fn: extern "C" fn() -> *mut ffi::c_void,
+        submit_with_args_fn: extern "C" fn() -> *mut ffi::c_void,
+    }
+
+    pub fn load(path: &str) {
+        if let Some(old) = CONTRACT.lock().expect("poisoned").take() {
+            if let Err(err) = old.library.close() {
+                eprintln!("unload library: {err}");
+            }
+        }
+
+        let library = unsafe { Library::open(Some(path), unix::RTLD_GLOBAL | unix::RTLD_LAZY) }
+            .expect("cannot load contract library");
+        let submit_fn = *unsafe { library.get(b"submit") }
+            .expect("cannot load `submit` function from the contract");
+        let submit_with_args_fn = *unsafe { library.get(b"submit_with_args") }
+            .expect("cannot load `submit_with_args` function from the contract");
+        *CONTRACT.lock().expect("poisoned") = Some(DynamicContract {
+            library,
+            submit_fn,
+            submit_with_args_fn,
+        });
+    }
+
+    pub(crate) fn submit() -> Result<SubmitResult, ContractError> {
+        let f = CONTRACT
+            .lock()
+            .expect("poisoned")
+            .as_ref()
+            .expect("must load `contract::load`")
+            .submit_fn;
+        *unsafe { Box::from_raw(f().cast()) }
+    }
+
+    pub(crate) fn submit_with_args() -> Result<SubmitResult, ContractError> {
+        let f = CONTRACT
+            .lock()
+            .expect("poisoned")
+            .as_ref()
+            .expect("must load `contract::load`")
+            .submit_with_args_fn;
+        *unsafe { Box::from_raw(f().cast()) }
+    }
 }
