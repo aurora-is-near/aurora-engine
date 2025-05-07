@@ -1812,6 +1812,7 @@ dependencies = [
  "aurora-engine-transactions",
  "aurora-engine-types",
  "hex",
+ "libloading",
  "libsecp256k1",
  "postgres",
  "ripemd",

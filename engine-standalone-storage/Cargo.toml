@@ -14,7 +14,7 @@ autobenches = false
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine = { workspace = true, features = ["std"] }
+aurora-engine = { workspace = true, features = ["std", "contract"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
@@ -30,6 +30,7 @@ sha2.workspace = true
 sha3.workspace = true
 ripemd.workspace = true
 libsecp256k1.workspace = true
+libloading = "0.8.6"
 
 [lints]
 workspace = true

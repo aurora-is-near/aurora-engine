@@ -1,4 +1,4 @@
-use crate::engine_state::EngineStateAccess;
+use crate::{contract, state};
 use aurora_engine::contract_methods::silo;
 use aurora_engine::{contract_methods, parameters::SubmitResult};
 use aurora_engine_modexp::ModExpAlgorithm;
@@ -330,7 +330,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                             &block_metadata,
                             engine_account_id,
                             io,
-                            EngineStateAccess::get_transaction_diff,
+                            |s| s.get_transaction_diff(),
                         )
                     },
                 )
@@ -368,7 +368,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 &block_metadata,
                 engine_account_id,
                 io,
-                EngineStateAccess::get_transaction_diff,
+                |s| s.get_transaction_diff(),
             )
         },
     );
@@ -419,32 +419,28 @@ where
         used_gas: NearGas::new(0),
     };
 
+    let global_state = state::STATE.get().expect("must init global state");
+    global_state.set_env(env.clone());
+
     let (tx_hash, result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
+            global_state
+                .set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
+            let result = contract::submit()
                 .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
                 .map_err(Into::into);
 
             (tx_hash, result)
         }
         TransactionKind::SubmitWithArgs(args) => {
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let result =
-                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
-                    .map(|submit_result| {
-                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
-                    })
-                    .map_err(Into::into);
+            let result = contract::submit_with_args()
+                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
+                .map_err(Into::into);
 
             (tx_hash, result)
         }
