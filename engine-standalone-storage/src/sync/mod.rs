@@ -421,13 +421,12 @@ where
 
     let global_state = state::STATE.get().expect("must init global state");
     global_state.set_env(env.clone());
+    // We can ignore promises in the standalone engine because it processes each receipt separately
+    // and it is fed a stream of receipts (it does not schedule them)
+    global_state.set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
 
     let (tx_hash, result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
-            // We can ignore promises in the standalone engine because it processes each receipt separately
-            // and it is fed a stream of receipts (it does not schedule them)
-            global_state
-                .set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
             let result = contract::submit()
