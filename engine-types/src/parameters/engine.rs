@@ -1,11 +1,12 @@
+use borsh::{io, BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     account_id::AccountId,
     public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
 };
-use borsh::{io, BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 
 /// Parameters for the `new` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -248,7 +249,7 @@ impl AsRef<[u8]> for TransactionStatus {
         match self {
             Self::Succeed(_) => b"SUCCESS",
             Self::Revert(_) => errors::ERR_REVERT,
-            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUND,
             Self::OutOfGas => errors::ERR_OUT_OF_GAS,
             Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
             Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
@@ -362,11 +363,6 @@ pub struct GetStorageAtArgs {
     pub key: RawH256,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-pub struct StorageUnregisterArgs {
-    pub force: bool,
-}
-
 pub fn parse_json_args<'de, T: Deserialize<'de>>(
     bytes: &'de [u8],
 ) -> Result<T, errors::ParseArgsError> {
@@ -422,7 +418,7 @@ pub mod errors {
 
     pub const ERR_REVERT: &[u8] = b"ERR_REVERT";
     pub const ERR_NOT_ALLOWED: &[u8] = b"ERR_NOT_ALLOWED";
-    pub const ERR_OUT_OF_FUNDS: &[u8] = b"ERR_OUT_OF_FUNDS";
+    pub const ERR_OUT_OF_FUND: &[u8] = b"ERR_OUT_OF_FUND";
     pub const ERR_CALL_TOO_DEEP: &[u8] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8] = b"ERR_OUT_OF_GAS";

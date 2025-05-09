@@ -395,8 +395,6 @@ pub mod workspace {
         nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
-    #[cfg(not(feature = "ext-connector"))]
-    use aurora_engine::proof::Proof;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_workspace::account::Account;
     use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
@@ -409,10 +407,6 @@ pub mod workspace {
     const FT_ACCOUNT: &str = "test_token";
     const INITIAL_ETH_BALANCE: u64 = 777_777_777;
     const ETH_EXIT_AMOUNT: u64 = 111_111_111;
-    #[cfg(not(feature = "ext-connector"))]
-    const ETH_CUSTODIAN_ADDRESS: &str = "096de9c2b8a5b8c22cee3289b101f6960d68e51e";
-    #[cfg(not(feature = "ext-connector"))]
-    const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
     #[tokio::test]
     async fn test_ghsa_5c82_x4m4_hcj6_exploit() {
@@ -777,7 +771,7 @@ pub mod workspace {
 
         #[cfg(feature = "error_refund")]
         let expected_balance = Wei::new_u64(INITIAL_ETH_BALANCE);
-        // If the refund feature is not enabled then there is no refund in the EVM
+        // If the refund feature is not enabled, then there is no refund in the EVM
         #[cfg(not(feature = "error_refund"))]
         let expected_balance = Wei::new_u64(INITIAL_ETH_BALANCE - ETH_EXIT_AMOUNT);
 
@@ -785,196 +779,6 @@ pub mod workspace {
             eth_balance_of(signer_address, &aurora).await,
             expected_balance
         );
-    }
-
-    #[cfg(not(feature = "ext-connector"))]
-    #[tokio::test]
-    async fn test_ft_balances_of() {
-        use aurora_engine::parameters::FungibleTokenMetadata;
-        use aurora_engine_types::account_id::AccountId;
-        use aurora_engine_types::HashMap;
-
-        let aurora = deploy_engine().await;
-        let metadata = FungibleTokenMetadata::default();
-        aurora
-            .set_eth_connector_contract_data(
-                aurora.id(),
-                ETH_CUSTODIAN_ADDRESS.to_string(),
-                metadata,
-            )
-            .transact()
-            .await
-            .unwrap();
-
-        deposit_balance(&aurora).await;
-
-        let balances: HashMap<AccountId, u128> = HashMap::from([
-            (AccountId::new("account1").unwrap(), 10),
-            (AccountId::new("account2").unwrap(), 20),
-            (AccountId::new("account3").unwrap(), 30),
-        ]);
-
-        for (account_id, amount) in &balances {
-            aurora
-                .ft_transfer(account_id, (*amount).into(), &None)
-                .deposit(ONE_YOCTO)
-                .transact()
-                .await
-                .unwrap();
-            let blanace = aurora.ft_balance_of(account_id).await.unwrap().result;
-            assert_eq!(blanace.0, *amount);
-        }
-
-        let accounts = balances.keys().cloned().collect();
-        let result = aurora.ft_balances_of(&accounts).await.unwrap().result;
-        assert_eq!(result, balances);
-    }
-
-    #[cfg(not(feature = "ext-connector"))]
-    #[tokio::test]
-    async fn test_get_bridge_prover() {
-        let aurora = deploy_engine().await;
-        let prover = aurora.get_bridge_prover().await.unwrap().result;
-        assert_eq!(prover.as_ref(), "prover.root");
-    }
-
-    #[cfg(not(feature = "ext-connector"))]
-    #[tokio::test]
-    async fn test_pause_ft_transfer() {
-        use aurora_engine::contract_methods::connector::internal::{PAUSE_FT, UNPAUSE_ALL};
-        use aurora_engine::parameters::FungibleTokenMetadata;
-        use aurora_engine_types::account_id::AccountId;
-
-        use crate::utils::workspace::storage_deposit_nep141;
-
-        let aurora = deploy_engine().await;
-        let metadata = FungibleTokenMetadata::default();
-        aurora
-            .set_eth_connector_contract_data(
-                aurora.id(),
-                ETH_CUSTODIAN_ADDRESS.to_string(),
-                metadata,
-            )
-            .transact()
-            .await
-            .unwrap();
-
-        deposit_balance(&aurora).await;
-
-        let recipient_id = AccountId::new("account1").unwrap();
-        let transfer_amount = 10;
-
-        // Pause ft transfers
-        aurora.set_paused_flags(PAUSE_FT).transact().await.unwrap();
-        // Verify that the storage deposit is paused
-        let result = storage_deposit_nep141(&aurora.id(), &aurora.root(), recipient_id.as_ref())
-            .await
-            .unwrap()
-            .into_result();
-        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
-        // Try to transfer tokens
-        let result = aurora
-            .ft_transfer(&recipient_id, transfer_amount.into(), &None)
-            .deposit(ONE_YOCTO)
-            .transact()
-            .await;
-        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
-        // Verify that no tokens were transferred
-        let blanace = aurora.ft_balance_of(&recipient_id).await.unwrap().result;
-        assert_eq!(blanace.0, 0);
-
-        // Unpause ft transfers
-        aurora
-            .set_paused_flags(UNPAUSE_ALL)
-            .transact()
-            .await
-            .unwrap();
-        // Transfer tokens
-        aurora
-            .ft_transfer(&recipient_id, transfer_amount.into(), &None)
-            .deposit(ONE_YOCTO)
-            .transact()
-            .await
-            .unwrap();
-        // Verify that the tokens has been transferred
-        let blanace = aurora.ft_balance_of(&recipient_id).await.unwrap().result;
-        assert_eq!(blanace.0, transfer_amount);
-    }
-
-    #[cfg(not(feature = "ext-connector"))]
-    #[tokio::test]
-    async fn test_pause_ft_transfer_call() {
-        use crate::utils::workspace::transfer_call_nep_141;
-        use aurora_engine::contract_methods::connector::internal::{PAUSE_FT, UNPAUSE_ALL};
-        use aurora_engine::parameters::FungibleTokenMetadata;
-
-        let aurora = deploy_engine().await;
-        let metadata = FungibleTokenMetadata::default();
-        aurora
-            .set_eth_connector_contract_data(
-                aurora.id(),
-                ETH_CUSTODIAN_ADDRESS.to_string(),
-                metadata,
-            )
-            .transact()
-            .await
-            .unwrap();
-
-        deposit_balance(&aurora).await;
-
-        let ft_owner = create_sub_account(&aurora.root(), "ft_owner", BALANCE)
-            .await
-            .unwrap();
-        let transfer_amount = 10;
-        // Transfer tokens to the `ft_owner` account
-        aurora
-            .ft_transfer(&ft_owner.id(), transfer_amount.into(), &None)
-            .deposit(ONE_YOCTO)
-            .transact()
-            .await
-            .unwrap();
-        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
-        assert_eq!(blanace.0, transfer_amount);
-
-        // Pause ft transfers
-        aurora.set_paused_flags(PAUSE_FT).transact().await.unwrap();
-        // Try to transfer tokens from `ft_owner` to `aurora` contract by `ft_transfer_call`
-        let transfer_call_msg = "000000000000000000000000000000000000dead";
-        let result = transfer_call_nep_141(
-            &aurora.id(),
-            &ft_owner,
-            aurora.id().as_ref(),
-            transfer_amount,
-            transfer_call_msg,
-        )
-        .await
-        .unwrap()
-        .into_result();
-        assert!(result.unwrap_err().to_string().contains("ERR_FT_PAUSED"));
-        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
-        assert_eq!(blanace.0, transfer_amount);
-
-        // Unpause ft transfers
-        aurora
-            .set_paused_flags(UNPAUSE_ALL)
-            .transact()
-            .await
-            .unwrap();
-        // Transfer tokens from `ft_owner` to `aurora` contract by `ft_transfer_call`
-        transfer_call_nep_141(
-            &aurora.id(),
-            &ft_owner,
-            aurora.id().as_ref(),
-            transfer_amount,
-            transfer_call_msg,
-        )
-        .await
-        .unwrap()
-        .into_result()
-        .unwrap();
-        // Verify that the tokens has been transferred
-        let blanace = aurora.ft_balance_of(&ft_owner.id()).await.unwrap().result;
-        assert_eq!(blanace.0, 0);
     }
 
     async fn test_exit_to_near_eth_common() -> anyhow::Result<TestExitToNearEthContext> {
@@ -990,7 +794,6 @@ pub mod workspace {
             .await?;
         assert!(result.is_success());
 
-        #[cfg(feature = "ext-connector")]
         deposit_balance(&aurora).await;
 
         let balance = nep_141_balance_of(aurora.as_raw_contract(), &aurora.id()).await;
@@ -1181,18 +984,6 @@ pub mod workspace {
         }
     }
 
-    #[cfg(not(feature = "ext-connector"))]
-    async fn deposit_balance(aurora: &EngineContract) {
-        let proof = create_test_proof(
-            INITIAL_ETH_BALANCE,
-            aurora.id().as_ref(),
-            ETH_CUSTODIAN_ADDRESS,
-        );
-        let result = aurora.deposit(proof).max_gas().transact().await.unwrap();
-        assert!(result.is_success());
-    }
-
-    #[cfg(feature = "ext-connector")]
     async fn deposit_balance(aurora: &EngineContract) {
         let result = aurora
             .deposit_to_near(&aurora.id(), INITIAL_ETH_BALANCE)
@@ -1217,59 +1008,5 @@ pub mod workspace {
         chain_id: u64,
         tester_address: Address,
         aurora: EngineContract,
-    }
-
-    #[cfg(not(feature = "ext-connector"))]
-    fn create_test_proof(
-        deposit_amount: u64,
-        recipient_id: &str,
-        custodian_address: &str,
-    ) -> Proof {
-        use aurora_engine::contract_methods::connector::deposit_event::{
-            DepositedEvent, TokenMessageData, DEPOSITED_EVENT,
-        };
-        use aurora_engine_types::types::{Fee, NEP141Wei};
-
-        let eth_custodian_address: Address = Address::decode(custodian_address).unwrap();
-
-        let message = recipient_id.to_string();
-        let fee: Fee = Fee::new(NEP141Wei::new(0));
-        let token_message_data =
-            TokenMessageData::parse_event_message_and_prepare_token_message_data(&message).unwrap();
-
-        let deposit_event = DepositedEvent {
-            eth_custodian_address,
-            sender: Address::zero(),
-            token_message_data,
-            amount: NEP141Wei::new(deposit_amount.into()),
-            fee,
-        };
-
-        let event_schema = ethabi::Event {
-            name: DEPOSITED_EVENT.into(),
-            inputs: DepositedEvent::event_params(),
-            anonymous: false,
-        };
-        let log_entry = aurora_engine_types::parameters::connector::LogEntry {
-            address: eth_custodian_address.raw(),
-            topics: vec![
-                event_schema.signature().0.into(),
-                // the sender is not important
-                crate::prelude::H256::zero(),
-            ],
-            data: ethabi::encode(&[
-                ethabi::Token::String(message),
-                ethabi::Token::Uint(deposit_event.amount.as_u128().into()),
-                ethabi::Token::Uint(deposit_event.fee.as_u128().into()),
-            ]),
-        };
-        Proof {
-            log_index: 1,
-            log_entry_data: rlp::encode(&log_entry).to_vec(),
-            receipt_index: 1,
-            receipt_data: Vec::new(),
-            header_data: Vec::new(),
-            proof: Vec::new(),
-        }
     }
 }

@@ -205,9 +205,7 @@ mod test {
     use super::FallibleIterator;
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::contract_methods::connector::EthConnectorContract;
-    use aurora_engine::{parameters, state};
-    use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+    use aurora_engine::state;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -242,17 +240,7 @@ mod test {
                 .unwrap();
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
                 let mut local_io = io;
-                state::set_state(&mut local_io, &engine_state).unwrap();
-                EthConnectorContract::create_contract(
-                    io,
-                    &engine_state.owner_id,
-                    parameters::InitCallArgs {
-                        prover_account: "prover.bridge.near".parse().unwrap(),
-                        eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
-                            .to_string(),
-                        metadata: FungibleTokenMetadata::default(),
-                    },
-                )
+                state::set_state(&mut local_io, &engine_state)
             });
 
             result.result.ok().unwrap();

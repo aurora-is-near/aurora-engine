@@ -1,10 +1,10 @@
-use base64::Engine;
 use borsh::{BorshDeserialize, BorshSerialize};
+use primitive_types::U256;
 use serde::{Deserialize, Serialize};
 
 use crate::account_id::AccountId;
-use crate::types::{Address, Balance, Fee, NEP141Wei, Yocto};
-use crate::{String, ToString, Vec, H160, H256};
+use crate::types::{Address, Balance, Fee, NEP141Wei, RawU256, Yocto};
+use crate::{String, ToString, Vec};
 
 /// Eth-connector initial args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
@@ -17,87 +17,153 @@ pub struct InitCallArgs {
 /// Eth-connector Set contract data call args
 pub type SetContractDataCallArgs = InitCallArgs;
 
-/// Proof used in deposit flow.
-#[derive(Debug, Default, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone)]
-pub struct Proof {
-    pub log_index: u64,
-    pub log_entry_data: Vec<u8>,
-    pub receipt_index: u64,
-    pub receipt_data: Vec<u8>,
-    pub header_data: Vec<u8>,
-    pub proof: Vec<Vec<u8>>,
-}
-
-/// Deposit ETH args
-#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
-pub struct DepositEthCallArgs {
-    pub proof: Proof,
-    pub relayer_eth_account: Address,
-}
-
-/// Finish deposit NEAR eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct FinishDepositEthCallArgs {
-    pub new_owner_id: Address,
+/// Withdraw NEAR eth-connector call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct WithdrawCallArgs {
+    pub recipient_address: Address,
     pub amount: NEP141Wei,
-    pub fee: Balance,
-    pub relayer_eth_account: AccountId,
-    pub proof: Proof,
 }
 
-/// transfer eth-connector call args
+/// On-transfer message. Used in the `ft_transfer_call` and  `ft_on_transfer` transactions.
+/// A message is parsed with the `parse_on_transfer_message` method.
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
+pub struct FtTransferMessageData {
+    pub recipient: Address,
+    #[deprecated]
+    pub fee: Option<FtTransferFee>,
+}
+
+impl TryFrom<&str> for FtTransferMessageData {
+    type Error = errors::ParseOnTransferMessageError;
+
+    fn try_from(message: &str) -> Result<Self, Self::Error> {
+        if message.len() == 40 {
+            // Parse message to determine recipient
+            let recipient = {
+                // Message format:
+                // Recipient of the transaction - 40 characters (Address in hex)
+                let mut address_bytes = [0; 20];
+                hex::decode_to_slice(message, &mut address_bytes)
+                    .map_err(|_| errors::ParseOnTransferMessageError::InvalidHexData)?;
+                Address::from_array(address_bytes)
+            };
+
+            #[allow(deprecated)]
+            return Ok(Self {
+                recipient,
+                fee: None,
+            });
+        }
+
+        // This logic is for backward compatibility to parse the message of the deprecated format.
+        // "{relayer_id}:0000000000000000000000000000000000000000000000000000000000000000{hex_address}"
+
+        // Split message by separator
+        let (account, msg) = message
+            .split_once(':')
+            .ok_or(errors::ParseOnTransferMessageError::TooManyParts)?;
+
+        // Check relayer account id from 1-th data element
+        let account_id = account
+            .parse()
+            .map_err(|_| errors::ParseOnTransferMessageError::InvalidAccount)?;
+
+        // Decode message array from 2-th element of data array
+        // Length = fee[32] + eth_address[20] bytes
+        let mut data = [0; 52];
+        hex::decode_to_slice(msg, &mut data).map_err(|e| match e {
+            hex::FromHexError::InvalidHexCharacter { .. } | hex::FromHexError::OddLength => {
+                errors::ParseOnTransferMessageError::InvalidHexData
+            }
+            hex::FromHexError::InvalidStringLength => {
+                errors::ParseOnTransferMessageError::WrongMessageFormat
+            }
+        })?;
+
+        // Parse the fee from the message slice.
+        // The fee is expected to be represented as a 32-byte value in the message.
+        // However, it will be parsed and converted to u128 for further processing.
+        // This parsing logic is implemented to ensure compatibility
+        let fee_u128: u128 = U256::from_little_endian(&data[..32])
+            .try_into()
+            .map_err(|_| errors::ParseOnTransferMessageError::OverflowNumber)?;
+        let fee_amount: Fee = fee_u128.into();
+
+        // Get recipient Eth address from message slice
+        let recipient = Address::try_from_slice(&data[32..]).unwrap();
+
+        #[allow(deprecated)]
+        Ok(Self {
+            recipient,
+            fee: Some(FtTransferFee {
+                relayer: account_id,
+                amount: fee_amount,
+            }),
+        })
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq, Eq))]
+pub struct FtTransferFee {
+    pub relayer: AccountId,
+    pub amount: Fee,
+}
+
+/// withdraw NEAR eth-connector call args
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct RefundCallArgs {
+    pub recipient_address: Address,
+    pub erc20_address: Option<Address>,
+    pub amount: RawU256,
+}
+
+/// Arguments for `ft_transfer` transaction.
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
+pub struct TransferNearArgs {
+    pub target_account_id: AccountId,
+    pub amount: u128,
+}
+
+/// Arguments for callback used in the `exit_to_near` precompile.
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq, Default)]
+pub struct ExitToNearPrecompileCallbackArgs {
+    pub refund: Option<RefundCallArgs>,
+    pub transfer_near: Option<TransferNearArgs>,
+}
+
+/// Arguments for the `ft_transfer_call` transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
-pub struct TransferCallCallArgs {
+pub struct FtTransferCallArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
     pub memo: Option<String>,
     pub msg: String,
 }
 
-/// `storage_balance_of` eth-connector call args
-#[derive(BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
-pub struct StorageBalanceOfCallArgs {
-    pub account_id: AccountId,
-}
-
-/// `storage_deposit` eth-connector call args
+/// Arguments for the `storage_deposit` transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
-pub struct StorageDepositCallArgs {
+pub struct StorageDepositArgs {
     pub account_id: Option<AccountId>,
     pub registration_only: Option<bool>,
 }
 
-/// `storage_withdraw` eth-connector call args
+/// Arguments for the `storage_withdraw` transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
-pub struct StorageWithdrawCallArgs {
+pub struct StorageWithdrawArgs {
     pub amount: Option<Yocto>,
 }
 
-/// transfer args for json invocation
+/// Arguments for the `ft_transfer` transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
-pub struct TransferCallArgs {
+pub struct FtTransferArgs {
     pub receiver_id: AccountId,
     pub amount: NEP141Wei,
     pub memo: Option<String>,
 }
 
-/// Eth-connector deposit arguments
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct DepositCallArgs {
-    /// Proof data
-    pub proof: Proof,
-    /// Optional relayer address
-    pub relayer_eth_account: Option<Address>,
-}
-
-/// Eth-connector `isUsedProof` arguments
-#[derive(BorshSerialize, BorshDeserialize)]
-pub struct IsUsedProofCallArgs {
-    /// Proof data
-    pub proof: Proof,
-}
-
-/// withdraw result for eth-connector
+/// A result produced by the `withdraw` transaction.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct WithdrawResult {
     pub amount: NEP141Wei,
@@ -105,9 +171,9 @@ pub struct WithdrawResult {
     pub eth_custodian_address: Address,
 }
 
-/// `ft_resolve_transfer` eth-connector call args
+/// Arguments for the `ft_resolve_transfer` transaction.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct ResolveTransferCallArgs {
+pub struct FtResolveTransferArgs {
     pub sender_id: AccountId,
     pub amount: NEP141Wei,
     pub receiver_id: AccountId,
@@ -115,7 +181,7 @@ pub struct ResolveTransferCallArgs {
 
 /// Finish deposit NEAR eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct FinishDepositCallArgs {
+pub struct FinishDepositArgs {
     pub new_owner_id: AccountId,
     pub amount: NEP141Wei,
     pub proof_key: String,
@@ -124,24 +190,10 @@ pub struct FinishDepositCallArgs {
     pub msg: Option<Vec<u8>>,
 }
 
-/// `balance_of` args for json invocation
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
-pub struct BalanceOfCallArgs {
-    pub account_id: AccountId,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Deserialize, Serialize)]
-pub struct BalanceOfEthCallArgs {
-    pub address: Address,
-}
-
-/// Borsh-encoded parameters for the `ft_transfer_call` function
-/// for regular NEP-141 tokens.
+/// Parameters for the `ft_on_transfer` transaction for regular NEP-141 tokens.
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
-pub struct NEP141FtOnTransferArgs {
+pub struct FtOnTransferArgs {
     pub sender_id: AccountId,
-    /// Balance can be for Eth on Near and for Eth to Aurora
-    /// `ft_on_transfer` can be called with arbitrary NEP-141 tokens attached, therefore we do not specify a particular type Wei.
     pub amount: Balance,
     pub msg: String,
 }
@@ -155,7 +207,7 @@ pub struct EngineWithdrawCallArgs {
 
 /// `storage_unregister` eth-connector call args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StorageUnregisterCallArgs {
+pub struct StorageUnregisterArgs {
     pub force: Option<bool>,
 }
 
@@ -174,27 +226,8 @@ pub enum WithdrawSerializeType {
 pub type PausedMask = u8;
 
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct PauseEthConnectorCallArgs {
+pub struct PauseEthConnectorArgs {
     pub paused_mask: PausedMask,
-}
-
-/// Fungible token Reference hash type.
-/// Used for `FungibleTokenMetadata`
-#[derive(Debug, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Eq)]
-pub struct FungibleReferenceHash([u8; 32]);
-
-impl FungibleReferenceHash {
-    /// Encode to base64-encoded string
-    #[must_use]
-    pub fn encode(&self) -> String {
-        base64::engine::general_purpose::STANDARD.encode(self.0)
-    }
-}
-
-impl AsRef<[u8]> for FungibleReferenceHash {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
 }
 
 #[derive(Debug, BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -222,30 +255,13 @@ impl Default for FungibleTokenMetadata {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub struct LogEntry {
-    pub address: H160,
-    pub topics: Vec<H256>,
-    pub data: Vec<u8>,
-}
+/// Fungible token Reference hash type. Used for `FungibleTokenMetadata`
+#[derive(Debug, BorshDeserialize, BorshSerialize, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct FungibleReferenceHash([u8; 32]);
 
-impl rlp::Decodable for LogEntry {
-    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let result = Self {
-            address: rlp.val_at(0usize)?,
-            topics: rlp.list_at(1usize)?,
-            data: rlp.val_at(2usize)?,
-        };
-        Ok(result)
-    }
-}
-
-impl rlp::Encodable for LogEntry {
-    fn rlp_append(&self, stream: &mut rlp::RlpStream) {
-        stream.begin_list(3usize);
-        stream.append(&self.address);
-        stream.append_list::<H256, _>(&self.topics);
-        stream.append(&self.data);
+impl AsRef<[u8]> for FungibleReferenceHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -307,30 +323,25 @@ impl Default for Erc20Metadata {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rlp::{Decodable, Encodable, Rlp, RlpStream};
+pub mod errors {
+    #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+    pub enum ParseOnTransferMessageError {
+        TooManyParts,
+        InvalidHexData,
+        WrongMessageFormat,
+        InvalidAccount,
+        OverflowNumber,
+    }
 
-    #[test]
-    fn test_roundtrip_rlp_encoding() {
-        let address = H160::from_low_u64_le(32u64);
-        let topics = vec![H256::zero()];
-        let data = vec![0u8, 1u8, 2u8, 3u8];
-        let expected_log_entry = LogEntry {
-            address,
-            topics,
-            data,
-        };
-
-        let mut stream = RlpStream::new();
-
-        expected_log_entry.rlp_append(&mut stream);
-
-        let bytes = stream.out();
-        let rlp = Rlp::new(bytes.as_ref());
-        let actual_log_entry = LogEntry::decode(&rlp).unwrap();
-
-        assert_eq!(expected_log_entry, actual_log_entry);
+    impl AsRef<[u8]> for ParseOnTransferMessageError {
+        fn as_ref(&self) -> &[u8] {
+            match self {
+                Self::TooManyParts => b"ERR_INVALID_ON_TRANSFER_MESSAGE_FORMAT",
+                Self::InvalidHexData => b"ERR_INVALID_ON_TRANSFER_MESSAGE_HEX",
+                Self::WrongMessageFormat => b"ERR_INVALID_ON_TRANSFER_MESSAGE_DATA",
+                Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
+                Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
+            }
+        }
     }
 }
