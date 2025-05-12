@@ -23,16 +23,14 @@ use aurora_engine_types::parameters::engine::errors::ParseArgsError;
 use aurora_engine_types::parameters::engine::{
     DeployErc20TokenArgs, GetErc20FromNep141CallArgs, SubmitResult,
 };
-use aurora_engine_types::parameters::{
-    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
-};
+use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{EthConnectorStorageId, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Yocto};
 use function_name::named;
 
 const ONE_YOCTO: Yocto = Yocto::new(1);
 /// Indicate zero attached balance for promise call
-pub const ZERO_ATTACHED_BALANCE: Yocto = Yocto::new(0);
+const ZERO_YOCTO: Yocto = Yocto::new(0);
 /// Amount of attached gas for read-only promises.
 const READ_PROMISE_ATTACHED_GAS: NearGas = NearGas::new(6_000_000_000_000);
 /// Amount of attached gas for the `mirror_erc20_token_callback`.
@@ -41,31 +39,21 @@ const MIRROR_ERC20_TOKEN_CALLBACK_ATTACHED_GAS: NearGas = NearGas::new(10_000_00
 const GAS_FOR_PROMISE_CREATION: NearGas = NearGas::new(2_000_000_000_000);
 
 pub fn withdraw<I: IO + Copy + PromiseHandler, E: Env>(
-    mut io: I,
+    io: I,
     env: &E,
 ) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
     env.assert_one_yocto()?;
 
     let args: WithdrawCallArgs = io.read_input_borsh()?;
-    let input = borsh::to_vec(&EngineWithdrawCallArgs {
+    let args = borsh::to_vec(&EngineWithdrawCallArgs {
         sender_id: env.predecessor_account_id(),
         recipient_address: args.recipient_address,
         amount: args.amount,
     })
     .unwrap();
 
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_withdraw".to_string(),
-        args: input,
-        attached_balance: ONE_YOCTO,
-        attached_gas: calculate_attached_gas(env),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, env, "engine_withdraw", args, ONE_YOCTO)
 }
 
 #[named]
@@ -186,13 +174,13 @@ pub fn exit_to_near_precompile_callback<I: IO + Copy, E: Env, H: PromiseHandler>
     })
 }
 
-pub fn ft_transfer<I: IO + Env + Copy + PromiseHandler, E: Env>(
-    mut io: I,
+pub fn ft_transfer<I: IO + Copy + PromiseHandler, E: Env>(
+    io: I,
     env: &E,
 ) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
     env.assert_one_yocto()?;
-    let input = read_json_args(&io).and_then(|args: FtTransferArgs| {
+    let args = read_json_args(&io).and_then(|args: FtTransferArgs| {
         serde_json::to_vec(&(
             env.predecessor_account_id(),
             args.receiver_id,
@@ -202,24 +190,13 @@ pub fn ft_transfer<I: IO + Env + Copy + PromiseHandler, E: Env>(
         .map_err(Into::<ParseArgsError>::into)
     })?;
 
-    let promise_arg = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_ft_transfer".to_string(),
-        args: input,
-        attached_balance: ONE_YOCTO,
-        attached_gas: calculate_attached_gas(env),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_arg) };
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, env, "engine_ft_transfer", args, ONE_YOCTO)
 }
 
-pub fn ft_transfer_call<I: IO + Env + Copy, E: Env, H: PromiseHandler>(
+pub fn ft_transfer_call<I: IO + Copy + PromiseHandler, E: Env>(
     io: I,
     env: &E,
-    handler: &mut H,
-) -> Result<Option<PromiseWithCallbackArgs>, ContractError> {
+) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
     // Check is payable
     env.assert_one_yocto()?;
@@ -234,26 +211,15 @@ pub fn ft_transfer_call<I: IO + Env + Copy, E: Env, H: PromiseHandler>(
         .map_err(Into::<ParseArgsError>::into)
     })?;
 
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_ft_transfer_call".to_string(),
-        args,
-        attached_balance: ONE_YOCTO,
-        attached_gas: calculate_attached_gas(env),
-    };
-    let promise_id = unsafe { handler.promise_create_call(&promise_args) };
-    handler.promise_return(promise_id);
-
-    Ok(None)
+    return_promise(io, env, "engine_ft_transfer_call", args, ONE_YOCTO)
 }
 
-pub fn storage_deposit<I: IO + Copy + Env, E: Env, H: PromiseHandler>(
+pub fn storage_deposit<I: IO + Copy + PromiseHandler, E: Env>(
     io: I,
     env: &E,
-    handler: &mut H,
 ) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
-    let input = read_json_args(&io).and_then(|args: StorageDepositArgs| {
+    let args = read_json_args(&io).and_then(|args: StorageDepositArgs| {
         serde_json::to_vec(&(
             env.predecessor_account_id(),
             args.account_id,
@@ -262,24 +228,18 @@ pub fn storage_deposit<I: IO + Copy + Env, E: Env, H: PromiseHandler>(
         .map_err(Into::<ParseArgsError>::into)
     })?;
 
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_storage_deposit".to_string(),
-        args: input,
-        attached_balance: Yocto::new(env.attached_deposit()),
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { handler.promise_create_call(&promise_args) };
-
-    handler.promise_return(promise_id);
-
-    Ok(())
+    return_promise(
+        io,
+        env,
+        "engine_storage_deposit",
+        args,
+        Yocto::new(env.attached_deposit()),
+    )
 }
 
-pub fn storage_unregister<I: IO + Copy + Env, E: Env, H: PromiseHandler>(
+pub fn storage_unregister<I: IO + Copy + PromiseHandler, E: Env>(
     io: I,
     env: &E,
-    handler: &mut H,
 ) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
     env.assert_one_yocto()?;
@@ -288,22 +248,12 @@ pub fn storage_unregister<I: IO + Copy + Env, E: Env, H: PromiseHandler>(
         serde_json::to_vec(&(env.predecessor_account_id(), args.force))
             .map_err(Into::<ParseArgsError>::into)
     })?;
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_storage_unregister".to_string(),
-        args,
-        attached_balance: ONE_YOCTO,
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { handler.promise_create_call(&promise_args) };
 
-    handler.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, env, "engine_storage_unregister", args, ONE_YOCTO)
 }
 
-pub fn storage_withdraw<I: IO + Env + PromiseHandler + Copy, E: Env>(
-    mut io: I,
+pub fn storage_withdraw<I: IO + PromiseHandler + Copy, E: Env>(
+    io: I,
     env: &E,
 ) -> Result<(), ContractError> {
     require_running(&state::get_state(&io)?)?;
@@ -313,69 +263,24 @@ pub fn storage_withdraw<I: IO + Env + PromiseHandler + Copy, E: Env>(
         serde_json::to_vec(&(env.predecessor_account_id(), args.amount))
             .map_err(Into::<ParseArgsError>::into)
     })?;
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "engine_storage_withdraw".to_string(),
-        args,
-        attached_balance: ZERO_ATTACHED_BALANCE,
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
 
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, env, "engine_storage_withdraw", args, ZERO_YOCTO)
 }
 
-pub fn storage_balance_of<I: IO + Copy + PromiseHandler + Env>(
-    mut io: I,
-) -> Result<(), ContractError> {
+pub fn storage_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     let args = io.read_input().to_vec();
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "storage_balance_of".to_string(),
-        args,
-        attached_balance: ZERO_ATTACHED_BALANCE,
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, &io, "storage_balance_of", args, ZERO_YOCTO)
 }
 
 pub fn ft_total_eth_supply_on_near<I: IO + Copy + PromiseHandler + Env>(
-    mut io: I,
+    io: I,
 ) -> Result<(), ContractError> {
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "ft_total_supply".to_string(),
-        args: Vec::new(),
-        attached_balance: ZERO_ATTACHED_BALANCE,
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, &io, "ft_total_supply", Vec::new(), ZERO_YOCTO)
 }
 
-pub fn ft_balance_of<I: IO + Copy + PromiseHandler + Env>(mut io: I) -> Result<(), ContractError> {
+pub fn ft_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
     let args = io.read_input().to_vec();
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "ft_balance_of".to_string(),
-        args,
-        attached_balance: ZERO_ATTACHED_BALANCE,
-        attached_gas: calculate_attached_gas(&io),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, &io, "ft_balance_of", args, ZERO_YOCTO)
 }
 
 /// Returns the balance of the given address in the base tokens. The method returns the
@@ -471,21 +376,10 @@ pub fn get_eth_connector_contract_account<I: IO + Copy>(mut io: I) -> Result<(),
 }
 
 pub fn ft_metadata<I: IO + Copy + PromiseHandler, E: Env>(
-    mut io: I,
+    io: I,
     env: &E,
 ) -> Result<(), ContractError> {
-    let promise_args = PromiseCreateArgs {
-        target_account_id: get_connector_account_id(&io)?,
-        method: "ft_metadata".to_string(),
-        args: Vec::new(),
-        attached_balance: ZERO_ATTACHED_BALANCE,
-        attached_gas: calculate_attached_gas(env),
-    };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
-
-    io.promise_return(promise_id);
-
-    Ok(())
+    return_promise(io, env, "ft_metadata", Vec::new(), ZERO_YOCTO)
 }
 
 pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
@@ -626,4 +520,25 @@ where
 
 fn calculate_attached_gas<E: Env>(env: &E) -> NearGas {
     env.prepaid_gas() - env.used_gas() - GAS_FOR_PROMISE_CREATION
+}
+
+fn return_promise<I: IO + PromiseHandler, E: Env>(
+    mut io: I,
+    env: &E,
+    method: &str,
+    args: Vec<u8>,
+    deposit: Yocto,
+) -> Result<(), ContractError> {
+    let promise_args = PromiseCreateArgs {
+        target_account_id: get_connector_account_id(&io)?,
+        method: method.to_string(),
+        args,
+        attached_balance: deposit,
+        attached_gas: calculate_attached_gas(env),
+    };
+    let promise_id = unsafe { io.promise_create_call(&promise_args) };
+
+    io.promise_return(promise_id);
+
+    Ok(())
 }

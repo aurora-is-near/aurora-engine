@@ -582,8 +582,7 @@ mod contract {
     pub extern "C" fn ft_transfer_call() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+        contract_methods::connector::ft_transfer_call(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -644,8 +643,7 @@ mod contract {
     pub extern "C" fn storage_deposit() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::storage_deposit(io, &env, &mut handler)
+        contract_methods::connector::storage_deposit(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -654,8 +652,7 @@ mod contract {
     pub extern "C" fn storage_unregister() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::storage_unregister(io, &env, &mut handler)
+        contract_methods::connector::storage_unregister(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
