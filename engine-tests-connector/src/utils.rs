@@ -1,5 +1,6 @@
-use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
-use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+use aurora_engine_types::parameters::connector::{
+    FungibleTokenMetadata, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+};
 use aurora_engine_types::types::{Address, Wei};
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::json;
@@ -297,7 +298,7 @@ impl TestContract {
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
         let res = self
             .engine_contract
-            .call("ft_balance_of_eth") // `get_balance` returns tha same value
+            .call("ft_balance_of_eth") // `get_balance` returns tha same value but in borsh
             .args_borsh((address,))
             .view()
             .await?;
@@ -321,17 +322,11 @@ impl TestContract {
     }
 }
 
-#[must_use]
-pub fn get_eth_connector_contract() -> Vec<u8> {
-    let contract_path = Path::new("etc/aurora-eth-connector");
-    std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
-}
-
 fn get_engine_contract() -> Vec<u8> {
     if cfg!(feature = "mainnet-test") {
-        std::fs::read("../bin/aurora-mainnet-silo-test.wasm").unwrap()
+        std::fs::read("../bin/aurora-mainnet-test.wasm").unwrap()
     } else if cfg!(feature = "testnet-test") {
-        std::fs::read("../bin/aurora-testnet-silo-test.wasm").unwrap()
+        std::fs::read("../bin/aurora-testnet-test.wasm").unwrap()
     } else {
         panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
     }

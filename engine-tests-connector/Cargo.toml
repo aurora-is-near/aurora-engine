@@ -11,9 +11,7 @@ publish.workspace = true
 autobenches = false
 
 [dev-dependencies]
-aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
-
 anyhow.workspace = true
 cargo-near-build.workspace = true
 near-sdk.workspace = true
@@ -27,4 +25,3 @@ workspace = true
 [features]
 mainnet-test = []
 testnet-test = []
-ext-connector = []

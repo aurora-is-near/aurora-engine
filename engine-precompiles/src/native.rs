@@ -11,15 +11,18 @@ use crate::prelude::{
     vec, Cow, String, ToString, Vec, H256, U256,
 };
 #[cfg(feature = "error_refund")]
-use crate::prelude::{parameters::RefundCallArgs, types};
+use crate::prelude::{parameters::connector::RefundCallArgs, types};
 use crate::xcc::state::get_wnear_address;
 use crate::PrecompileOutput;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh,
     parameters::{
-        connector::WithdrawSerializeType, ExitToNearPrecompileCallbackCallArgs,
-        PromiseWithCallbackArgs, TransferNearCallArgs, WithdrawCallArgs,
+        connector::{
+            ExitToNearPrecompileCallbackArgs, TransferNearArgs, WithdrawCallArgs,
+            WithdrawSerializeType,
+        },
+        PromiseWithCallbackArgs,
     },
     storage::EthConnectorStorageId,
     types::NEP141Wei,
@@ -284,12 +287,7 @@ impl<I> ExitToNear<I> {
 
 impl<I: IO> EthConnector for ExitToNear<I> {
     fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
-        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
-
-        Ok(eth_connector_account_id)
+        get_eth_connector_contract_account(&self.io)
     }
 }
 
@@ -309,7 +307,6 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
-#[cfg(feature = "ext-connector")]
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
     io.read_storage(&construct_contract_key(
         EthConnectorStorageId::EthConnectorAccount,
@@ -446,7 +443,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 }
             };
 
-        let callback_args = ExitToNearPrecompileCallbackCallArgs {
+        let callback_args = ExitToNearPrecompileCallbackArgs {
             #[cfg(feature = "error_refund")]
             refund: refund_call_args(&exit_to_near_params, &exit_event),
             #[cfg(not(feature = "error_refund"))]
@@ -467,7 +464,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             attached_gas,
         };
 
-        let promise = if callback_args == ExitToNearPrecompileCallbackCallArgs::default() {
+        let promise = if callback_args == ExitToNearPrecompileCallbackArgs::default() {
             PromiseArgs::Create(transfer_promise)
         } else {
             PromiseArgs::Callback(PromiseWithCallbackArgs {
@@ -511,7 +508,7 @@ fn exit_base_token_to_near(
         String,
         events::ExitToNear,
         String,
-        Option<TransferNearCallArgs>,
+        Option<TransferNearArgs>,
     ),
     ExitError,
 > {
@@ -565,7 +562,7 @@ fn exit_erc20_token_to_near<I: IO>(
         String,
         events::ExitToNear,
         String,
-        Option<TransferNearCallArgs>,
+        Option<TransferNearArgs>,
     ),
     ExitError,
 > {
@@ -595,7 +592,7 @@ fn exit_erc20_token_to_near<I: IO>(
                 nep141_account_id,
                 format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
                 "near_withdraw",
-                Some(TransferNearCallArgs {
+                Some(TransferNearArgs {
                     target_account_id: exit_params.receiver_account_id.clone(),
                     amount: exit_params.amount.as_u128(),
                 }),
@@ -816,8 +813,6 @@ fn ft_transfer_call_args(
 
 pub struct ExitToEthereum<I> {
     io: I,
-    #[cfg(not(feature = "ext-connector"))]
-    current_account_id: AccountId,
 }
 
 pub mod exit_to_ethereum {
@@ -831,31 +826,14 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    #[allow(clippy::missing_const_for_fn, clippy::needless_pass_by_value)]
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
-        #[cfg(not(feature = "ext-connector"))]
-        {
-            Self {
-                io,
-                current_account_id,
-            }
-        }
-
-        #[cfg(feature = "ext-connector")]
-        {
-            let _ = current_account_id;
-            Self { io }
-        }
+    pub const fn new(io: I) -> Self {
+        Self { io }
     }
 }
 
 impl<I: IO> EthConnector for ExitToEthereum<I> {
     fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
         let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
-
         Ok(eth_connector_account_id)
     }
 }

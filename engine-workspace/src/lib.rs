@@ -1,6 +1,5 @@
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-use aurora_engine_types::types::address::Address;
 use aurora_engine_types::U256;
 use near_workspaces::types::NearToken;
 
@@ -23,7 +22,6 @@ pub mod types {
 
 const AURORA_LOCAL_CHAIN_ID: u64 = 1313161556;
 const OWNER_ACCOUNT_ID: &str = "aurora.root";
-const PROVER_ACCOUNT_ID: &str = "prover.root";
 const ROOT_BALANCE: NearToken = NearToken::from_near(400);
 const CONTRACT_BALANCE: NearToken = NearToken::from_near(200);
 
@@ -32,8 +30,6 @@ pub struct EngineContractBuilder {
     code: Option<Vec<u8>>,
     chain_id: [u8; 32],
     owner_id: AccountId,
-    prover_id: AccountId,
-    custodian_address: Address,
     upgrade_delay_blocks: u64,
     root_balance: NearToken,
     contract_balance: NearToken,
@@ -46,8 +42,6 @@ impl EngineContractBuilder {
             code: None,
             chain_id: into_chain_id(AURORA_LOCAL_CHAIN_ID),
             owner_id: OWNER_ACCOUNT_ID.parse().unwrap(),
-            prover_id: PROVER_ACCOUNT_ID.parse().unwrap(),
-            custodian_address: Address::zero(),
             upgrade_delay_blocks: 1,
             root_balance: ROOT_BALANCE,
             contract_balance: CONTRACT_BALANCE,
@@ -71,18 +65,6 @@ impl EngineContractBuilder {
         self.owner_id = owner_id
             .parse()
             .map_err(|e| anyhow::anyhow!("Parse account_id error: {e}"))?;
-        Ok(self)
-    }
-
-    pub fn with_prover_id(mut self, prover_id: &str) -> anyhow::Result<Self> {
-        self.prover_id = prover_id
-            .parse()
-            .map_err(|e| anyhow::anyhow!("Parse account_id error: {e}"))?;
-        Ok(self)
-    }
-
-    pub fn with_custodian_address(mut self, address: &str) -> anyhow::Result<Self> {
-        self.custodian_address = Address::decode(address).map_err(|e| anyhow::anyhow!({ e }))?;
         Ok(self)
     }
 
@@ -142,16 +124,6 @@ impl EngineContractBuilder {
             .await
             .map_err(|e| anyhow::anyhow!("Error while initialize aurora contract: {e}"))?;
 
-        engine
-            .new_eth_connector(
-                self.prover_id,
-                self.custodian_address.encode(),
-                self.ft_metadata,
-            )
-            .transact()
-            .await
-            .map_err(|e| anyhow::anyhow!("Error while initialize eth-connector: {e}"))?;
-
         Ok(engine)
     }
 }
@@ -183,17 +155,9 @@ async fn test_creating_aurora_contract() {
 #[cfg(test)]
 fn get_engine_code() -> anyhow::Result<Vec<u8>> {
     let path = if cfg!(feature = "mainnet-test") {
-        if cfg!(feature = "ext-connector") {
-            "../bin/aurora-mainnet-silo-test.wasm"
-        } else {
-            "../bin/aurora-mainnet-test.wasm"
-        }
+        "../bin/aurora-mainnet-test.wasm"
     } else if cfg!(feature = "testnet-test") {
-        if cfg!(feature = "ext-connector") {
-            "../bin/aurora-testnet-silo-test.wasm"
-        } else {
-            "../bin/aurora-testnet-test.wasm"
-        }
+        "../bin/aurora-testnet-test.wasm"
     } else {
         anyhow::bail!("Requires mainnet-test or testnet-test feature provided.")
     };
