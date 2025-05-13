@@ -1,8 +1,6 @@
 env_files = [
     { path = ".env/mainnet.env", profile = "mainnet" },
-    { path = ".env/mainnet-silo.env", profile = "mainnet-silo" },
     { path = ".env/testnet.env", profile = "testnet" },
-    { path = ".env/testnet-silo.env", profile = "testnet-silo" },
     { path = ".env/local.env", profile = "local" },
     { path = ".env/custom.env", profile = "custom" },
     { path = ".env/local.env", profile = "development" },
@@ -97,21 +95,6 @@ args = [
     "clippy::as_conversions",
 ]
 
-[tasks.clippy-ext-connector]
-extend = "clippy-base"
-args = [
-    "clippy",
-    "--workspace",
-    "--all-targets",
-    "--features",
-    "ext-connector",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
-]
-
 [tasks.clippy-contract]
 extend = "clippy-base"
 args = [
@@ -145,7 +128,6 @@ args = [
 [tasks.clippy]
 dependencies = [
     "clippy-base",
-    "clippy-ext-connector",
     "clippy-contract",
     "clippy-contract-refund",
 ]
@@ -295,7 +277,7 @@ category = "Build"
 alias = "build-xcc-router"
 
 [tasks.build-test]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "custom"] }
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
@@ -310,7 +292,7 @@ script = '''
 '''
 
 [tasks.wasm-opt]
-condition = { profiles = ["mainnet", "testnet", "mainnet-silo", "testnet-silo", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "custom"] }
 env = { "CONTRACT_FILE" = "${WASM_FILE}" }
 category = "Build"
 run_task = "wasm-opt-common"
@@ -321,13 +303,13 @@ category = "Build"
 run_task = "wasm-opt-common"
 
 [tasks.build]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.build-docker-inner]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow-docker"
@@ -359,7 +341,7 @@ yarn test
 '''
 
 [tasks.test-workspace]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "custom"] }
 category = "Test"
 command = "${CARGO}"
 dependencies = ["build-test", "clone-aurora-eth-connector"]
@@ -374,7 +356,6 @@ args = [
 ]
 
 [tasks.test-connector]
-condition = { profiles = ["mainnet-silo", "testnet-silo"] }
 category = "Test"
 command = "${CARGO}"
 args = [
@@ -402,7 +383,6 @@ args = [
 
 [tasks.clone-aurora-eth-connector]
 category = "Build"
-condition = { profiles = ["mainnet-silo", "testnet-silo"] }
 script = '''
 AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
 AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
@@ -443,10 +423,10 @@ dependencies = [
 ]
 
 [tasks.default]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 run_task = "build"
 
 [tasks.deploy]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
+condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 category = "Deploy"
 script = "${NEAR_CLI} deploy --acount-id${NEAR_EVM_ACCOUNT} --wasm-file=bin/${WASM_FILE}"

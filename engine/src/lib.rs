@@ -1,31 +1,21 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-
-use aurora_engine_types::parameters::PromiseCreateArgs;
-
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
 extern crate core;
 
 mod map;
-
-pub mod parameters {
-    pub use aurora_engine_types::parameters::connector::*;
-    pub use aurora_engine_types::parameters::engine::*;
-}
-
-pub mod proof {
-    pub use aurora_engine_types::parameters::connector::Proof;
-}
+mod prelude;
 
 pub mod accounting;
-#[cfg_attr(feature = "contract", allow(dead_code))]
 pub mod contract_methods;
 pub mod engine;
 pub mod errors;
 pub mod hashchain;
+pub mod parameters {
+    pub use aurora_engine_types::parameters::engine::*;
+}
 pub mod pausables;
-mod prelude;
 pub mod state;
 pub mod xcc;
 
@@ -57,13 +47,14 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
 #[cfg(feature = "contract")]
 mod contract {
     use crate::engine::{self, Engine};
+    use crate::errors;
     use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, ToString, Vec, H256};
     use crate::{
         contract_methods::{self, silo, ContractError},
-        errors, state,
+        state,
     };
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
@@ -77,7 +68,6 @@ mod contract {
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
-    // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
     /// ADMINISTRATIVE METHODS
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
@@ -547,65 +537,10 @@ mod contract {
     /// ETH-CONNECTOR
     ///
     #[no_mangle]
-    pub extern "C" fn new_eth_connector() {
-        let io = Runtime;
-        let env = Runtime;
-        contract_methods::connector::new_eth_connector(io, &env)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn set_eth_connector_contract_data() {
-        let io = Runtime;
-        let env = Runtime;
-        contract_methods::connector::set_eth_connector_contract_data(io, &env)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
     pub extern "C" fn withdraw() {
         let io = Runtime;
         let env = Runtime;
         contract_methods::connector::withdraw(io, &env)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn deposit() {
-        let io = Runtime;
-        let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::deposit(io, &env, &mut handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn finish_deposit() {
-        let io = Runtime;
-        let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::finish_deposit(io, &env, &mut handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    /// Get bridge prover id for this contract.
-    #[no_mangle]
-    pub extern "C" fn get_bridge_prover() {
-        let io = Runtime;
-        contract_methods::connector::get_bridge_prover(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn is_used_proof() {
-        let io = Runtime;
-        contract_methods::connector::is_used_proof(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -619,34 +554,9 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_total_eth_supply_on_near() {
-        let io = Runtime;
-        contract_methods::connector::ft_total_eth_supply_on_near(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn ft_total_eth_supply_on_aurora() {
-        let io = Runtime;
-        contract_methods::connector::ft_total_eth_supply_on_aurora(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    #[cfg(not(feature = "ext-connector"))]
-    pub extern "C" fn ft_balances_of() {
-        let io = Runtime;
-        contract_methods::connector::ft_balances_of(io)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -669,21 +579,10 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_resolve_transfer() {
-        let io = Runtime;
-        let env = Runtime;
-        let handler = Runtime;
-        contract_methods::connector::ft_resolve_transfer(io, &env, &handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
     pub extern "C" fn ft_transfer_call() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
+        contract_methods::connector::ft_transfer_call(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -744,8 +643,7 @@ mod contract {
     pub extern "C" fn storage_deposit() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::storage_deposit(io, &env, &mut handler)
+        contract_methods::connector::storage_deposit(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -754,8 +652,7 @@ mod contract {
     pub extern "C" fn storage_unregister() {
         let io = Runtime;
         let env = Runtime;
-        let mut handler = Runtime;
-        contract_methods::connector::storage_unregister(io, &env, &mut handler)
+        contract_methods::connector::storage_unregister(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
     }
@@ -795,32 +692,6 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn get_paused_flags() {
-        let io = Runtime;
-        contract_methods::connector::get_paused_flags(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    pub extern "C" fn set_paused_flags() {
-        let io = Runtime;
-        let env = Runtime;
-        contract_methods::connector::set_paused_flags(io, &env)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
-    #[cfg(not(feature = "ext-connector"))]
-    pub extern "C" fn get_accounts_counter() {
-        let io = Runtime;
-        contract_methods::connector::get_accounts_counter(io)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-    }
-
-    #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
         let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
@@ -828,7 +699,7 @@ mod contract {
         io.return_output(
             engine::get_erc20_from_nep141(&io, &args.nep141)
                 .sdk_unwrap()
-                .as_slice(),
+                .as_bytes(),
         );
     }
 
@@ -847,18 +718,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn ft_metadata() {
         let io = Runtime;
-        contract_methods::connector::ft_metadata(io)
+        let env = Runtime;
+        contract_methods::connector::ft_metadata(io, &env)
             .map_err(ContractError::msg)
             .sdk_unwrap();
-    }
-
-    #[cfg(feature = "integration-test")]
-    #[no_mangle]
-    pub extern "C" fn verify_log_entry() {
-        sdk::log!("Call from verify_log_entry");
-        let mut io = Runtime;
-        let data = borsh::to_vec(&true).unwrap();
-        io.return_output(&data);
     }
 
     /// Function used to create accounts for tests
@@ -868,9 +731,6 @@ mod contract {
         use crate::prelude::{NEP141Wei, U256};
         use aurora_evm::backend::ApplyBackend;
 
-        #[cfg(not(feature = "ext-connector"))]
-        let mut io = Runtime;
-        #[cfg(feature = "ext-connector")]
         let io = Runtime;
         let args: ([u8; 20], u64, u64) = io.read_input_borsh().sdk_expect(errors::ERR_ARGS);
         let address = Address::from_array(args.0);
@@ -890,50 +750,6 @@ mod contract {
             reset_storage: false,
         };
         engine.apply(core::iter::once(state_change), core::iter::empty(), false);
-
-        #[cfg(not(feature = "ext-connector"))]
-        {
-            use crate::contract_methods::connector::ZERO_ATTACHED_BALANCE;
-            use crate::prelude::NearGas;
-            use aurora_engine_sdk::promise::PromiseHandler;
-
-            const GAS_FOR_VERIFY: NearGas = NearGas::new(20_000_000_000_000);
-            const GAS_FOR_FINISH: NearGas = NearGas::new(50_000_000_000_000);
-            // Call "finish_deposit" to mint the corresponding
-            // nETH NEP-141 tokens as well
-            let aurora_account_id = io.current_account_id();
-            let args = crate::parameters::FinishDepositCallArgs {
-                new_owner_id: aurora_account_id.clone(),
-                amount: balance,
-                proof_key: crate::prelude::String::new(),
-                relayer_id: aurora_account_id.clone(),
-                fee: 0.into(),
-                msg: None,
-            };
-            let verify_call = aurora_engine_types::parameters::PromiseCreateArgs {
-                target_account_id: aurora_account_id.clone(),
-                method: crate::prelude::String::from("verify_log_entry"),
-                args: crate::prelude::Vec::new(),
-                attached_balance: ZERO_ATTACHED_BALANCE,
-                attached_gas: GAS_FOR_VERIFY,
-            };
-            let finish_call = aurora_engine_types::parameters::PromiseCreateArgs {
-                target_account_id: aurora_account_id,
-                method: crate::prelude::String::from("finish_deposit"),
-                args: borsh::to_vec(&args).unwrap(),
-                attached_balance: ZERO_ATTACHED_BALANCE,
-                attached_gas: GAS_FOR_FINISH,
-            };
-            // Safety: this call is safe because it is only used in integration tests.
-            unsafe {
-                io.promise_create_with_callback(
-                    &aurora_engine_types::parameters::PromiseWithCallbackArgs {
-                        base: verify_call,
-                        callback: finish_call,
-                    },
-                )
-            };
-        }
     }
 
     ///
@@ -1072,7 +888,6 @@ mod contract {
         silo::remove_entry_from_whitelist(&io, &args);
     }
 
-    // TODO: rust-2023-08-24#[allow(clippy::empty_line_after_doc_comments)]
     /// Utility methods.
     fn internal_get_upgrade_index() -> u64 {
         let io = Runtime;
@@ -1090,15 +905,4 @@ mod contract {
             sdk::panic_utf8(errors::ERR_PAUSED);
         }
     }
-
-    #[cfg(not(feature = "ext-connector"))]
-    pub mod exports {
-        extern "C" {
-            pub(crate) fn value_return(value_len: u64, value_ptr: u64);
-        }
-    }
-}
-
-pub trait AuroraState {
-    fn add_promise(&mut self, promise: PromiseCreateArgs);
 }

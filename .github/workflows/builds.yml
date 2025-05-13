@@ -10,7 +10,7 @@ jobs:
     runs-on: github-hosted-heavy-runner
     strategy:
       matrix:
-        profile: [ mainnet, mainnet-silo, testnet, testnet-silo ]
+        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
