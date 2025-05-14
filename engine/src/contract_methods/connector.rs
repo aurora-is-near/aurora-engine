@@ -86,6 +86,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
             )
         };
 
+        #[allow(clippy::used_underscore_binding)]
         let amount_to_return = if let Err(_err) = &result {
             sdk::log!("Error in ft_on_transfer: {_err:?}");
             // An error occurred, so we need to return the amount of tokens to the sender.

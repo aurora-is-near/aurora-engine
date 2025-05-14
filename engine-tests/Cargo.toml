@@ -55,6 +55,4 @@ walrus.workspace = true
 workspace = true
 
 [features]
-mainnet-test = ["aurora-engine-workspace/mainnet-test"]
-testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]

@@ -23,5 +23,4 @@ serde = { workspace = true, features = ["derive"] }
 workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
+

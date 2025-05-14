@@ -1,11 +1,3 @@
-env_files = [
-    { path = ".env/mainnet.env", profile = "mainnet" },
-    { path = ".env/testnet.env", profile = "testnet" },
-    { path = ".env/local.env", profile = "local" },
-    { path = ".env/custom.env", profile = "custom" },
-    { path = ".env/local.env", profile = "development" },
-]
-
 [config]
 default_to_workspace = false
 skip_core_tasks = true
@@ -13,9 +5,14 @@ skip_core_tasks = true
 [env]
 CARGO = "cargo"
 ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
+CARGO_FEATURES_BUILD = "contract"
+CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
+RUSTC_FLAGS_BUILD = "-C link-arg=-s"
+WASM_FILE = "aurora-engine.wasm"
+WASM_FILE_TEST = "aurora-engine-test.wasm"
+XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
 BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
-XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 
 [tasks.sweep]
 category = "Cleanup"
@@ -73,7 +70,7 @@ args = [
 category = "Check"
 env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
 toolchain = "nightly"
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.53", test_arg = ["udeps", "-h"], force = true }
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.55", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
@@ -163,7 +160,6 @@ category = "Tools"
 script = '''
 echo "Environment:"
 echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
-echo "    IS_PROD:              ${IS_PROD}"
 echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
 echo "    WASM_FILE:            ${WASM_FILE}"
 echo "    SIZE_WASM_FILE:       $(wc -c bin/${WASM_FILE} | awk '{print $1}')"
@@ -177,7 +173,6 @@ category = "Tools"
 script = '''
 echo "Environment:"
 echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
-echo "    IS_PROD:              ${IS_PROD}"
 echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
 echo "    WASM_FILE:            ${XCC_ROUTER_WASM_FILE}"
 echo "    SIZE_WASM_FILE:       $(wc -c bin/${XCC_ROUTER_WASM_FILE} | awk '{print $1}')"
@@ -277,7 +272,6 @@ category = "Build"
 alias = "build-xcc-router"
 
 [tasks.build-test]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
@@ -292,7 +286,6 @@ script = '''
 '''
 
 [tasks.wasm-opt]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
 env = { "CONTRACT_FILE" = "${WASM_FILE}" }
 category = "Build"
 run_task = "wasm-opt-common"
@@ -303,13 +296,11 @@ category = "Build"
 run_task = "wasm-opt-common"
 
 [tasks.build]
-condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.build-docker-inner]
-condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow-docker"
@@ -341,41 +332,21 @@ yarn test
 '''
 
 [tasks.test-workspace]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
 category = "Test"
 command = "${CARGO}"
 dependencies = ["build-test", "clone-aurora-eth-connector"]
 args = [
     "test",
     "--workspace",
-    "--exclude",
-    "aurora-engine-tests-connector",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
-    "${@}",
-]
-
-[tasks.test-connector]
-category = "Test"
-command = "${CARGO}"
-args = [
-    "test",
-    "-p",
-    "aurora-engine-tests-connector",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
     "${@}",
 ]
 
 [tasks.bench-modexp-test]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
 category = "Test"
 command = "${CARGO}"
 args = [
     "test",
     "--release",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
     "bench_m",
     "--",
     "--ignored",
@@ -405,7 +376,6 @@ category = "Test"
 dependencies = [
     "test-contracts",
     "test-workspace",
-    "test-connector",
 ]
 
 [tasks.bench-modexp]
@@ -423,10 +393,4 @@ dependencies = [
 ]
 
 [tasks.default]
-condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
 run_task = "build"
-
-[tasks.deploy]
-condition = { profiles = ["mainnet", "testnet", "localnet", "development", "custom"] }
-category = "Deploy"
-script = "${NEAR_CLI} deploy --acount-id${NEAR_EVM_ACCOUNT} --wasm-file=bin/${WASM_FILE}"

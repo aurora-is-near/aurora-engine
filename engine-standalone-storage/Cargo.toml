@@ -32,8 +32,6 @@ workspace = true
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]
-mainnet = []
-testnet = []
 snappy = ["rocksdb/snappy"]
 lz4 = ["rocksdb/lz4"]
 zstd = ["rocksdb/zstd"]
