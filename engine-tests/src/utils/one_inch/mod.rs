@@ -47,22 +47,35 @@ fn download_and_compile_solidity_sources(repo_name: &str) -> PathBuf {
         String::from_utf8_lossy(&output.stderr),
     );
 
+    let mut num_attempts = 5;
     // clean and compile EVM contracts
-    hardhat(&sources_dir, "clean");
-    hardhat(&sources_dir, "compile");
+    while let Err(e) = compile_evm_contracts(&sources_dir) {
+        assert_ne!(num_attempts, 0, "Failed to compile EVM contracts: {e}");
+        num_attempts -= 1;
+    }
 
     sources_dir.join("artifacts/contracts")
 }
 
-fn hardhat(sources_dir: impl AsRef<Path>, command: &str) {
+fn compile_evm_contracts(sources_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    hardhat(&sources_dir, "clean")?;
+    hardhat(sources_dir, "compile")?;
+
+    Ok(())
+}
+
+fn hardhat(sources_dir: impl AsRef<Path>, command: &str) -> anyhow::Result<()> {
     let output = Command::new("/usr/bin/env")
         .current_dir(sources_dir)
         .args(["node", "node_modules/hardhat/internal/cli/cli.js", command])
-        .output()
-        .unwrap();
-    assert!(
+        .output()?;
+
+    anyhow::ensure!(
         output.status.success(),
-        "Unsuccessful exit status while install while executing `{command}`: {}",
-        String::from_utf8_lossy(&output.stderr)
+        "Unsuccessful exit status while executing: `hardhat {command}`\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
     );
+
+    Ok(())
 }

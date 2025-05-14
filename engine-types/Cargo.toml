@@ -13,7 +13,6 @@ readme.workspace = true
 publish = true
 
 [dependencies]
-base64.workspace = true
 borsh.workspace = true
 bs58.workspace = true
 hex.workspace = true

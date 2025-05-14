@@ -5,58 +5,44 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 /// it does not execute promises; but `aurora-workspaces` does.
 use crate::utils::AuroraRunner;
 use aurora_engine_types::account_id::AccountId;
-#[cfg(feature = "ext-connector")]
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::parameters::engine::DeployErc20TokenArgs;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-#[cfg(not(feature = "ext-connector"))]
-use aurora_engine_workspace::types::ExecutionFinalResult;
 use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
 use serde_json::json;
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
-#[cfg(feature = "ext-connector")]
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 
-/// Deploy Aurora smart contract WITHOUT init external eth-connector.
+/// Deploy Aurora smart contract with external eth-connector.
 pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
     let chain_id = AuroraRunner::get_default_chain_id();
-    aurora_engine_workspace::EngineContractBuilder::new()
+    let contract = aurora_engine_workspace::EngineContractBuilder::new()
         .unwrap()
         .with_chain_id(chain_id)
         .with_code(code)
-        .with_custodian_address("d045f7e19B2488924B97F9c145b5E51D0D895A65")
-        .unwrap()
         .with_root_balance(NearToken::from_near(10000))
         .with_contract_balance(NearToken::from_near(1000))
         .deploy_and_init()
         .await
-        .unwrap()
-}
-
-pub async fn deploy_engine() -> EngineContract {
-    inner_deploy_engine(AuroraRunner::get_engine_code()).await
-}
-
-pub async fn deploy_engine_v331() -> EngineContract {
-    inner_deploy_engine(AuroraRunner::get_engine_v331_code()).await
-}
-
-#[allow(clippy::let_and_return)]
-async fn inner_deploy_engine(code: Vec<u8>) -> EngineContract {
-    let contract = deploy_engine_with_code(code).await;
-
-    #[cfg(feature = "ext-connector")]
+        .unwrap();
     init_eth_connector(&contract).await.unwrap();
 
     contract
 }
 
+pub async fn deploy_engine() -> EngineContract {
+    deploy_engine_with_code(AuroraRunner::get_engine_code()).await
+}
+
+pub async fn deploy_engine_v331() -> EngineContract {
+    deploy_engine_with_code(AuroraRunner::get_engine_v331_code()).await
+}
+
 /// Deploy and init external eth connector
-#[cfg(feature = "ext-connector")]
 async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
     let contract_account = aurora
         .root()
@@ -64,9 +50,8 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
             AURORA_ETH_CONNECTOR,
             STORAGE_AMOUNT.checked_mul(15).unwrap(),
         )
-        .await
-        .unwrap();
-    let contract = contract_account.deploy(&ETH_CONNECTOR_WASM).await.unwrap();
+        .await?;
+    let contract = contract_account.deploy(&ETH_CONNECTOR_WASM).await?;
     let metadata = FungibleTokenMetadata::default();
     let init_args = json!({
         "metadata": metadata,
@@ -260,46 +245,6 @@ pub async fn transfer_nep_141(
     Ok(())
 }
 
-#[cfg(not(feature = "ext-connector"))]
-pub async fn storage_deposit_nep141(
-    nep_141: &AccountId,
-    source: &Account,
-    dest: &str,
-) -> anyhow::Result<ExecutionFinalResult> {
-    source
-        .call(nep_141, "storage_deposit")
-        .args_json(json!({
-            "account_id": dest,
-        }))
-        .deposit(STORAGE_AMOUNT)
-        .max_gas()
-        .transact()
-        .await
-}
-
-#[cfg(not(feature = "ext-connector"))]
-pub async fn transfer_call_nep_141(
-    nep_141: &AccountId,
-    source: &Account,
-    dest: &str,
-    amount: u128,
-    msg: &str,
-) -> anyhow::Result<ExecutionFinalResult> {
-    source
-        .call(nep_141, "ft_transfer_call")
-        .args_json(json!({
-            "receiver_id": dest,
-            "amount": amount.to_string(),
-            "memo": "null",
-            "msg": msg,
-        }))
-        .deposit(NearToken::from_yoctonear(1))
-        .max_gas()
-        .transact()
-        .await
-}
-
-#[cfg(feature = "ext-connector")]
 static ETH_CONNECTOR_WASM: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
     let manifest_path = std::env::current_dir()
         .unwrap()
@@ -316,6 +261,6 @@ static ETH_CONNECTOR_WASM: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::n
     .unwrap();
 
     std::fs::read(artifact.path.into_std_path_buf())
-        .map_err(|e| anyhow::anyhow!("failed read wasm file: {e}"))
+        .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
         .unwrap()
 });

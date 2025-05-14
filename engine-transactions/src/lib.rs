@@ -12,6 +12,8 @@ pub mod eip_2930;
 pub mod eip_4844;
 pub mod legacy;
 
+const INITCODE_WORD_COST: u64 = 2;
+
 /// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum EthTransactionKind {
@@ -184,10 +186,10 @@ impl NormalizedEthTransaction {
 
 fn init_code_cost(config: &aurora_evm::Config, data: &[u8]) -> Result<u64, Error> {
     // As per EIP-3860:
-    // > We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
-    // where INITCODE_WORD_COST is 2.
+    // We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
     let init_code_cost = if config.max_initcode_size.is_some() {
-        2 * ((u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)? + 31) / 32)
+        let data_len = u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)?;
+        data_len.div_ceil(32) * INITCODE_WORD_COST
     } else {
         0
     };
@@ -294,5 +296,26 @@ mod tests {
             EthTransactionKind::try_from([0x80].as_ref()),
             Err(Error::RlpDecodeError(_))
         ));
+    }
+
+    #[test]
+    fn test_initcode_cost() {
+        let config = aurora_evm::Config::cancun();
+
+        let data = [0u8; 60];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 4);
+
+        let data = [0u8; 30];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 2);
+
+        let data = [0u8; 129];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 10);
+
+        let data = [0u8; 1000];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 64);
     }
 }

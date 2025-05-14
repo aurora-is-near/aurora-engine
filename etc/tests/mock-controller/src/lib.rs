@@ -1,4 +1,3 @@
-use aurora_engine_types::types::Address;
 use near_sdk::{near, AccountId};
 use near_token::NearToken;
 

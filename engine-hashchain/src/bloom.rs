@@ -41,7 +41,7 @@ impl Bloom {
         let m = self.0.len();
         let bloom_bits = m * 8;
         let mask = bloom_bits - 1;
-        let bloom_bytes = (log2(bloom_bits) + 7) / 8;
+        let bloom_bytes = log2(bloom_bits).div_ceil(8);
         let hash = keccak(input);
         let mut ptr = 0;
 

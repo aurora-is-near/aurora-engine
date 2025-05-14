@@ -32,9 +32,6 @@ workspace = true
 
 [features]
 default = ["snappy", "lz4", "zstd", "zlib"]
-mainnet = []
-testnet = []
-ext-connector = ["aurora-engine/ext-connector", "aurora-engine-precompiles/ext-connector"]
 snappy = ["rocksdb/snappy"]
 lz4 = ["rocksdb/lz4"]
 zstd = ["rocksdb/zstd"]

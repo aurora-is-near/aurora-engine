@@ -117,6 +117,7 @@ impl CallTracer {
         self.call_stack.last_mut().unwrap().calls.push(frame);
     }
 
+    #[allow(clippy::missing_const_for_fn)]
     fn update_gas_from_snapshot(&mut self, snapshot: Option<aurora_evm::gasometer::Snapshot>) {
         if let Some(snapshot) = snapshot {
             if let Some(frame) = self.call_stack.last_mut() {
