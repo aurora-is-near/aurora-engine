@@ -84,7 +84,7 @@ fn bench_modexp() {
 
 // This test is marked as ignored because it should only be run with `--release`
 // specified (it requires the standalone engine to be compiled with an optimized build).
-// This test can be run with `cargo make --profile mainnet bench-modexp`
+// This test can be run with the command: `cargo make bench-modexp`
 #[ignore]
 #[test]
 fn bench_modexp_standalone() {

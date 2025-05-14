@@ -9,12 +9,8 @@ on:
 name: Tests
 jobs:
   test:
-    name: Test suite ${{ matrix.profile }}
+    name: Test suite
     runs-on: github-hosted-heavy-runner
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -30,7 +26,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.profile }}-cargo-test
+          key: aurora-cargo-test
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -43,16 +39,12 @@ jobs:
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
-      - name: Tests ${{ matrix.profile }}
-        run: cargo make --profile ${{ matrix.profile }} test-flow
+      - name: Tests
+        run: cargo make test-flow
 
   test_modexp:
-    name: Test modexp suite ${{ matrix.profile }}
+    name: Test modexp suite
     runs-on: github-hosted-heavy-runner
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -68,13 +60,13 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.profile }}-cargo-modexp-test
+          key: aurora-modexp-test
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
       - name: Test ${{ matrix.profile }} bench-modexp
-        run: cargo make --profile ${{ matrix.profile }} bench-modexp
+        run: cargo make bench-modexp
 
   build_xcc_router:
     name: Build XCC router

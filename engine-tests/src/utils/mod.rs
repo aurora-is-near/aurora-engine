@@ -548,15 +548,7 @@ impl AuroraRunner {
     }
 
     pub fn get_engine_code() -> Vec<u8> {
-        let path = if cfg!(feature = "mainnet-test") {
-            "../bin/aurora-mainnet-test.wasm"
-        } else if cfg!(feature = "testnet-test") {
-            "../bin/aurora-testnet-test.wasm"
-        } else {
-            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-        };
-
-        std::fs::read(path).unwrap()
+        std::fs::read("../bin/aurora-engine-test.wasm").expect("Failed to read engine code")
     }
 
     pub fn get_engine_v331_code() -> Vec<u8> {

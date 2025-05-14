@@ -8,16 +8,10 @@ use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::PromiseResult;
 use aurora_engine_types::H256;
 
-#[cfg(all(feature = "mainnet", not(feature = "testnet")))]
-/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52
+/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
+/// address for the mainnet only, since for the testnet it's not so critical.
 const CUSTODIAN_ADDRESS: &[u8] = &[
     107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
-];
-
-#[cfg(feature = "testnet")]
-/// The testnet `eth_custodian` address 0x84a82Bb39c83989D5Dc07e1310281923D2544dC2
-const CUSTODIAN_ADDRESS: &[u8] = &[
-    132, 168, 43, 179, 156, 131, 152, 157, 93, 192, 126, 19, 16, 40, 25, 35, 210, 84, 77, 194,
 ];
 
 macro_rules! feature_gated {
@@ -250,7 +244,6 @@ impl crate::io::IO for Runtime {
 
     fn return_output(&mut self, value: &[u8]) {
         unsafe {
-            #[cfg(any(feature = "mainnet", feature = "testnet"))]
             assert!(
                 !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
                 "ERR_ILLEGAL_RETURN"
