@@ -348,13 +348,17 @@ pub struct ViewCallArgs {
 }
 
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
-pub struct DeployErc20TokenArgs {
-    pub nep141: AccountId,
+#[derive(BorshDeserialize, BorshSerialize, Debug, Eq, PartialEq, Clone)]
+pub enum DeployErc20TokenArgs {
+    Legacy(AccountId),
+    WithMetadata(AccountId),
 }
 
-/// Borsh-encoded parameters for `get_erc20_from_nep141` function.
-pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
+impl DeployErc20TokenArgs {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, io::Error> {
+        Self::try_from_slice(bytes).or_else(|_| AccountId::try_from_slice(bytes).map(Self::Legacy))
+    }
+}
 
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -576,6 +580,33 @@ mod tests {
         let actual = Vec::<TransactionStatus>::try_from_slice(&bytes).unwrap();
         let expected = transaction_status_variants();
 
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_read_deploy_erc20_args() {
+        let nep141: AccountId = "nep141.near".parse().unwrap();
+        let expected = DeployErc20TokenArgs::Legacy(nep141.clone());
+
+        // Legacy args
+        let bytes = borsh::to_vec(&nep141).unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        // Args from just account id
+        let bytes = borsh::to_vec("nep141.near").unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let expected = DeployErc20TokenArgs::WithMetadata(nep141);
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
         assert_eq!(actual, expected);
     }
 

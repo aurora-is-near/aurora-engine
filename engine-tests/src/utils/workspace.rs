@@ -6,6 +6,7 @@ use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::AuroraRunner;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
+use aurora_engine_types::parameters::engine::DeployErc20TokenArgs;
 use aurora_engine_types::types::Address;
 use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
@@ -107,13 +108,28 @@ pub async fn deploy_erc20_from_nep_141(
     nep_141_account: &str,
     aurora: &EngineContract,
 ) -> anyhow::Result<ERC20> {
-    let nep141_account_id = nep_141_account.parse().unwrap();
+    let nep141 = nep_141_account.parse().unwrap();
     let result = aurora
-        .deploy_erc20_token(nep141_account_id)
+        .deploy_erc20_token(DeployErc20TokenArgs::WithMetadata(nep141))
         .max_gas()
         .transact()
-        .await
-        .unwrap();
+        .await?;
+    assert!(result.is_success());
+    let address = result.into_value();
+    let abi = ERC20Constructor::load().0.abi;
+    Ok(ERC20(utils::solidity::DeployedContract { abi, address }))
+}
+
+pub async fn deploy_erc20_from_nep_141_legacy(
+    nep_141_account: &str,
+    aurora: &EngineContract,
+) -> anyhow::Result<ERC20> {
+    let nep141 = nep_141_account.parse().unwrap();
+    let result = aurora
+        .deploy_erc20_token_legacy(nep141)
+        .max_gas()
+        .transact()
+        .await?;
     assert!(result.is_success());
     let address = result.into_value();
     let abi = ERC20Constructor::load().0.abi;
