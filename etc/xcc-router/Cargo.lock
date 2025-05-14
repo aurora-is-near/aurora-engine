@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-types"
-version = "1.2.0"
+version = "2.0.0"
 dependencies = [
  "borsh",
  "bs58 0.5.1",

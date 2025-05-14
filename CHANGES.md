@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Additions
+
+- Added a possibility to deploy ERC-20 token with metadata by [@aleksuss]. ([#1008])
+
+[#1008]: https://github.com/aurora-is-near/aurora-engine/pull/1008
+
 ## [3.9.0] 2025-04-07
 
 ### Additions

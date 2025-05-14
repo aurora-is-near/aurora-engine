@@ -257,6 +257,27 @@ async fn test_transfer_from_silo_to_silo() {
     );
 }
 
+#[tokio::test]
+async fn test_deploy_erc20_token_with_meta() {
+    let main_contract = deploy_main_contract().await;
+    let (nep141, _) = deploy_nep141(&main_contract).await;
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
+        .await
+        .unwrap();
+
+    let metadata = main_contract
+        .get_erc20_metadata(Erc20Identifier::Erc20 {
+            address: erc20.0.address,
+        })
+        .await
+        .unwrap()
+        .result;
+
+    assert_eq!(metadata.name, "Example NEAR fungible token");
+    assert_eq!(metadata.symbol, "EXAMPLE");
+    assert_eq!(metadata.decimals, 24);
+}
+
 async fn deploy_main_contract() -> EngineContract {
     let code = AuroraRunner::get_engine_code();
     deploy_engine_with_code(code).await

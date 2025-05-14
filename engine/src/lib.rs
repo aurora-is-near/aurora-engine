@@ -48,7 +48,7 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
 mod contract {
     use crate::engine::{self, Engine};
     use crate::errors;
-    use crate::parameters::{GetErc20FromNep141CallArgs, GetStorageAtArgs, ViewCallArgs};
+    use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
     use crate::prelude::storage::{bytes_to_key, KeyPrefix};
     use crate::prelude::{sdk, u256_to_arr, Address, ToString, Vec, H256};
@@ -59,6 +59,7 @@ mod contract {
     use aurora_engine_sdk::env::Env;
     use aurora_engine_sdk::io::{StorageIntermediate, IO};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
+    use aurora_engine_types::account_id::AccountId;
     use aurora_engine_types::borsh;
     use aurora_engine_types::parameters::silo::{
         Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
@@ -616,6 +617,17 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Callback used by the `deploy_erc20_token` function.
+    #[no_mangle]
+    pub extern "C" fn deploy_erc20_token_callback() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::deploy_erc20_token_callback(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     /// Set metadata of ERC-20 contract.
     #[no_mangle]
     pub extern "C" fn set_erc20_metadata() {
@@ -694,10 +706,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
-        let args: GetErc20FromNep141CallArgs = io.read_input_borsh().sdk_unwrap();
+        let nep141: AccountId = io.read_input_borsh().sdk_unwrap();
 
         io.return_output(
-            engine::get_erc20_from_nep141(&io, &args.nep141)
+            engine::get_erc20_from_nep141(&io, &nep141)
                 .sdk_unwrap()
                 .as_bytes(),
         );

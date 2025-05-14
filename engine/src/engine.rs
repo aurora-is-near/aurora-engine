@@ -26,8 +26,8 @@ use core::iter::once;
 
 use crate::contract_methods::{silo, ContractError};
 use crate::map::BijectionMap;
+use crate::parameters::TransactionStatus;
 use crate::parameters::{CallArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs};
-use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
@@ -1303,13 +1303,14 @@ pub fn setup_deploy_erc20_input(
 
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
 pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
-    args: DeployErc20TokenArgs,
+    nep141: AccountId,
+    metadata: Option<Erc20Metadata>,
     io: I,
     env: &E,
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id, None);
+    let input = setup_deploy_erc20_input(&current_account_id, metadata);
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1332,7 +1333,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
     engine
-        .register_token(address, args.nep141)
+        .register_token(address, nep141)
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
@@ -2414,12 +2415,10 @@ mod tests {
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs {
-            nep141: nep141_token,
-        };
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce);
-        let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let actual_address =
+            deploy_erc20_token(nep141_token, None, io, &env, &mut handler).unwrap();
 
         assert_eq!(expected_address, actual_address);
     }
@@ -2441,8 +2440,7 @@ mod tests {
             Engine::new_with_state(state, origin, current_account_id, io, &env);
         let nep141 = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs { nep141 };
-        let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let erc20_address = deploy_erc20_token(nep141, None, io, &env, &mut handler).unwrap();
         let metadata = engine
             .get_erc20_metadata(&Erc20Identifier::Erc20 {
                 address: erc20_address,
