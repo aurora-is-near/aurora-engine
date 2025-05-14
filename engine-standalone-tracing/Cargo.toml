@@ -24,6 +24,4 @@ workspace = true
 
 [features]
 default = []
-mainnet = []
-testnet = []
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]

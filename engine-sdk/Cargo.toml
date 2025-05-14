@@ -31,5 +31,3 @@ std = ["aurora-engine-types/std", "base64/std", "libsecp256k1/std", "ripemd/std"
 contract = []
 log = []
 all-promise-actions = []
-mainnet = []
-testnet = []

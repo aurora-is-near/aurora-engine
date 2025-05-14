@@ -8,10 +8,6 @@ jobs:
   tests:
     name: Run tests
     runs-on: github-hosted-heavy-runner
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -54,7 +50,7 @@ jobs:
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
       - name: Test ${{ matrix.profile }}
-        run: cargo make --profile ${{ matrix.profile }} test-flow
+        run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:

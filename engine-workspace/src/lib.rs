@@ -154,13 +154,5 @@ async fn test_creating_aurora_contract() {
 
 #[cfg(test)]
 fn get_engine_code() -> anyhow::Result<Vec<u8>> {
-    let path = if cfg!(feature = "mainnet-test") {
-        "../bin/aurora-mainnet-test.wasm"
-    } else if cfg!(feature = "testnet-test") {
-        "../bin/aurora-testnet-test.wasm"
-    } else {
-        anyhow::bail!("Requires mainnet-test or testnet-test feature provided.")
-    };
-
-    std::fs::read(path).map_err(Into::into)
+    std::fs::read("../bin/aurora-engine-test.wasm").map_err(Into::into)
 }
