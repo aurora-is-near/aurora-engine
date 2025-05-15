@@ -24,6 +24,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
+      - name: Install Rust toolchain
+        run: rustup component add rustfmt clippy
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run ${{ matrix.command }}
