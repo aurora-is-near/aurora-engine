@@ -12,7 +12,7 @@ use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
-use aurora_engine_types::{format, Cow, Vec, U256};
+use aurora_engine_types::{format, Cow, Vec};
 
 pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 
@@ -77,7 +77,7 @@ where
     E: Env,
 {
     let current_account_id = env.current_account_id();
-    let target_account_id = AccountId::new(&format!(
+    let target_account_id = AccountId::try_from(format!(
         "{}.{}",
         args.target.encode(),
         current_account_id.as_ref()
@@ -95,7 +95,7 @@ where
     if let AddressVersionStatus::DeployNeeded { create_needed } = deploy_needed {
         let code = get_router_code(io).0.into_owned();
         // wnear_account is needed for initialization so we must assume it is set
-        // in the Engine or we need to accept it as input.
+        // in the Engine, or we need to accept it as input.
         let wnear_account = if let Some(wnear_account) = args.wnear_account_id {
             wnear_account
         } else {
@@ -486,7 +486,7 @@ fn withdraw_to_near_args(recipient: &AccountId, amount: Yocto) -> Vec<u8> {
     let recipient_with_msg = format!("{recipient}:unwrap");
     let args = ethabi::encode(&[
         ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-        ethabi::Token::Uint(U256::from(amount.as_u128())),
+        ethabi::Token::Uint(amount.as_u128().into()),
     ]);
     [&WITHDRAW_TO_NEAR_SELECTOR, args.as_slice()].concat()
 }
@@ -501,7 +501,7 @@ struct PromiseInterceptor<'a, H> {
 }
 
 impl<'a, H> PromiseInterceptor<'a, H> {
-    fn new(inner: &'a mut H) -> Self {
+    const fn new(inner: &'a mut H) -> Self {
         Self {
             inner,
             promises: Vec::new(),
@@ -509,7 +509,7 @@ impl<'a, H> PromiseInterceptor<'a, H> {
     }
 }
 
-impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
+impl<H: PromiseHandler> PromiseHandler for PromiseInterceptor<'_, H> {
     type ReadOnly = H::ReadOnly;
 
     fn promise_results_count(&self) -> u64 {
@@ -569,7 +569,7 @@ impl<'a, H: PromiseHandler> PromiseHandler for PromiseInterceptor<'a, H> {
 
 #[cfg(test)]
 mod tests {
-    use aurora_engine_types::{account_id::AccountId, types::Yocto, U256};
+    use aurora_engine_types::{account_id::AccountId, types::Yocto};
 
     #[test]
     fn test_withdraw_to_near_encoding() {
@@ -598,7 +598,7 @@ mod tests {
         let expected_tx_data = withdraw_function
             .encode_input(&[
                 ethabi::Token::Bytes(recipient_with_msg.into_bytes()),
-                ethabi::Token::Uint(U256::from(amount.as_u128())),
+                ethabi::Token::Uint(amount.as_u128().into()),
             ])
             .unwrap();
 

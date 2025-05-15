@@ -14,6 +14,7 @@ autobenches = false
 [dependencies]
 aurora-engine-types = { workspace = true, features = ["std"] }
 aurora-engine-sdk.workspace = true
-evm = { workspace = true, features = ["std", "tracing"] }
-evm-gasometer.workspace = true
-evm-runtime.workspace = true
+aurora-evm = { workspace = true, features = ["std", "tracing"] }
+
+[lints]
+workspace = true

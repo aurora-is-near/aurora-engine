@@ -2,7 +2,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: aurora-engine-tests
+  name: aurora-engine-etc-tests
   description: |-
     Collection of Engine Tests
   tags:

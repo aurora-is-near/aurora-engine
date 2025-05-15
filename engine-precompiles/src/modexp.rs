@@ -4,7 +4,7 @@ use crate::{
     utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
 };
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 use num::{Integer, Zero};
 
 #[derive(Default)]
@@ -28,8 +28,7 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
             bytes,
             start.saturating_add(96),
             core::cmp::min(32, exp_len),
-            // I don't understand why I need a closure here, but doesn't compile without one
-            |x| U256::from(x),
+            U256::from_big_endian,
         );
 
         if exp_len <= 32 && exp.is_zero() {
@@ -66,11 +65,11 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
         };
 
         // The result must be the same length as the input modulus.
-        // To ensure this we pad on the left with zeros.
+        // To ensure that we pad on the left with zeros.
         if mod_len > computed_result.len() {
             let diff = mod_len - computed_result.len();
             let mut padded_result = Vec::with_capacity(mod_len);
-            padded_result.extend(core::iter::repeat(0).take(diff));
+            padded_result.extend(core::iter::repeat_n(0, diff));
             padded_result.extend_from_slice(&computed_result);
             padded_result
         } else {
@@ -225,8 +224,7 @@ fn saturating_round(x: U256) -> u64 {
 
 fn parse_lengths(input: &[u8]) -> (u64, u64, u64) {
     let parse = |start: usize| -> u64 {
-        // I don't understand why I need a closure here, but doesn't compile without one
-        saturating_round(parse_bytes(input, start, 32, |x| U256::from(x)))
+        saturating_round(parse_bytes(input, start, 32, U256::from_big_endian))
     };
     let base_len = parse(0);
     let exp_len = parse(32);

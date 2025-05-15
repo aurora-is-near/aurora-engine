@@ -3,7 +3,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{borsh, Cow, Vec};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// `get_promise_results` precompile address
 ///
@@ -57,11 +57,11 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         check_cost(cost)?;
 
         let num_promises = self.handler.ro_promise_results_count();
-        let n_usize = usize::try_from(num_promises).map_err(crate::utils::err_usize_conv)?;
+        let n_usize = usize::try_from(num_promises).map_err(utils::err_usize_conv)?;
         let mut results = Vec::with_capacity(n_usize);
         for i in 0..num_promises {
             if let Some(result) = self.handler.ro_promise_result(i) {
-                let n_bytes = u64::try_from(result.size()).map_err(crate::utils::err_usize_conv)?;
+                let n_bytes = u64::try_from(result.size()).map_err(utils::err_usize_conv)?;
                 cost = EthGas::new(n_bytes)
                     .checked_mul(costs::PROMISE_RESULT_BYTE_COST)
                     .and_then(|result| result.checked_add(cost))

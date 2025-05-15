@@ -1,11 +1,12 @@
+use borsh::{io, BorshDeserialize, BorshSerialize};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     account_id::AccountId,
     public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
 };
-use borsh::{io, BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 
 /// Parameters for the `new` function.
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -248,7 +249,7 @@ impl AsRef<[u8]> for TransactionStatus {
         match self {
             Self::Succeed(_) => b"SUCCESS",
             Self::Revert(_) => errors::ERR_REVERT,
-            Self::OutOfFund => errors::ERR_OUT_OF_FUNDS,
+            Self::OutOfFund => errors::ERR_OUT_OF_FUND,
             Self::OutOfGas => errors::ERR_OUT_OF_GAS,
             Self::OutOfOffset => errors::ERR_OUT_OF_OFFSET,
             Self::CallTooDeep => errors::ERR_CALL_TOO_DEEP,
@@ -347,24 +348,23 @@ pub struct ViewCallArgs {
 }
 
 /// Borsh-encoded parameters for `deploy_erc20_token` function.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
-pub struct DeployErc20TokenArgs {
-    pub nep141: AccountId,
+#[derive(BorshDeserialize, BorshSerialize, Debug, Eq, PartialEq, Clone)]
+pub enum DeployErc20TokenArgs {
+    Legacy(AccountId),
+    WithMetadata(AccountId),
 }
 
-/// Borsh-encoded parameters for `get_erc20_from_nep141` function.
-pub type GetErc20FromNep141CallArgs = DeployErc20TokenArgs;
+impl DeployErc20TokenArgs {
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, io::Error> {
+        Self::try_from_slice(bytes).or_else(|_| AccountId::try_from_slice(bytes).map(Self::Legacy))
+    }
+}
 
 /// Borsh-encoded parameters for the `get_storage_at` function.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct GetStorageAtArgs {
     pub address: Address,
     pub key: RawH256,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-pub struct StorageUnregisterArgs {
-    pub force: bool,
 }
 
 pub fn parse_json_args<'de, T: Deserialize<'de>>(
@@ -422,7 +422,7 @@ pub mod errors {
 
     pub const ERR_REVERT: &[u8] = b"ERR_REVERT";
     pub const ERR_NOT_ALLOWED: &[u8] = b"ERR_NOT_ALLOWED";
-    pub const ERR_OUT_OF_FUNDS: &[u8] = b"ERR_OUT_OF_FUNDS";
+    pub const ERR_OUT_OF_FUND: &[u8] = b"ERR_OUT_OF_FUND";
     pub const ERR_CALL_TOO_DEEP: &[u8] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8] = b"ERR_OUT_OF_GAS";
@@ -580,6 +580,33 @@ mod tests {
         let actual = Vec::<TransactionStatus>::try_from_slice(&bytes).unwrap();
         let expected = transaction_status_variants();
 
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_read_deploy_erc20_args() {
+        let nep141: AccountId = "nep141.near".parse().unwrap();
+        let expected = DeployErc20TokenArgs::Legacy(nep141.clone());
+
+        // Legacy args
+        let bytes = borsh::to_vec(&nep141).unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        // Args from just account id
+        let bytes = borsh::to_vec("nep141.near").unwrap();
+
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
+        assert_eq!(actual, expected);
+
+        let expected = DeployErc20TokenArgs::WithMetadata(nep141);
+        let bytes = borsh::to_vec(&expected).unwrap();
+        let actual = DeployErc20TokenArgs::deserialize(&bytes).unwrap();
         assert_eq!(actual, expected);
     }
 

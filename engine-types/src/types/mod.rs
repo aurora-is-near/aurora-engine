@@ -31,9 +31,9 @@ pub const ERC20_NAME_SELECTOR: &[u8] = &[6, 253, 222, 3];
 /// Selector to call `symbol` function in ERC-20 contact.
 /// `keccak(b"symbol()")[..4];`
 pub const ERC20_SYMBOL_SELECTOR: &[u8] = &[149, 216, 155, 65];
-/// Selector to call `digits` function in ERC-20 contact.
-/// `keccak(b"digits()")[..4];`
-pub const ERC20_DIGITS_SELECTOR: &[u8] = &[49, 60, 229, 103];
+/// Selector to call `decimals` function in ERC-20 contact.
+/// `keccak(b"decimals()")[..4];`
+pub const ERC20_DECIMALS_SELECTOR: &[u8] = &[49, 60, 229, 103];
 
 #[derive(Debug)]
 pub enum AddressValidationError {

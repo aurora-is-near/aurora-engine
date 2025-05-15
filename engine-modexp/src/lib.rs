@@ -1,7 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // All `as` conversions in this code base have been carefully reviewed
 // and are safe.
-#![allow(clippy::as_conversions)]
+#![allow(
+    clippy::as_conversions,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::cast_lossless,
+    clippy::many_single_char_names
+)]
 
 mod arith;
 mod maybe_std;
@@ -27,6 +33,7 @@ impl ModExpAlgorithm for AuroraModExp {
 
 /// Computes `(base ^ exp) % modulus`, where all values are given as big-endian
 /// encoded bytes.
+#[must_use]
 pub fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     let mut x = mpnat::MPNat::from_big_endian(base);
     let m = mpnat::MPNat::from_big_endian(modulus);

@@ -88,8 +88,8 @@ impl ERC20 {
             .function("mint")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(recipient.raw()),
-                ethabi::Token::Uint(amount),
+                ethabi::Token::Address(recipient.raw().0.into()),
+                ethabi::Token::Uint(ethabi::Uint::from(amount.to_big_endian())),
             ])
             .unwrap();
 
@@ -110,8 +110,8 @@ impl ERC20 {
             .function("transfer")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(recipient.raw()),
-                ethabi::Token::Uint(amount),
+                ethabi::Token::Address(recipient.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -137,9 +137,9 @@ impl ERC20 {
             .function("transferFrom")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(from.raw()),
-                ethabi::Token::Address(to.raw()),
-                ethabi::Token::Uint(amount),
+                ethabi::Token::Address(from.raw().0.into()),
+                ethabi::Token::Address(to.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -159,8 +159,8 @@ impl ERC20 {
             .function("approve")
             .unwrap()
             .encode_input(&[
-                ethabi::Token::Address(spender.raw()),
-                ethabi::Token::Uint(amount),
+                ethabi::Token::Address(spender.raw().0.into()),
+                ethabi::Token::Uint(amount.to_big_endian().into()),
             ])
             .unwrap();
         TransactionLegacy {
@@ -179,7 +179,7 @@ impl ERC20 {
             .abi
             .function("balanceOf")
             .unwrap()
-            .encode_input(&[ethabi::Token::Address(address.raw())])
+            .encode_input(&[ethabi::Token::Address(address.raw().0.into())])
             .unwrap();
         TransactionLegacy {
             nonce,

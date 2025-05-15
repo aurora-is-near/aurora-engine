@@ -8,10 +8,6 @@ jobs:
   tests:
     name: Run tests
     runs-on: selfhosted
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [ mainnet, mainnet-silo, testnet, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -35,7 +31,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.profile }}-cargo-test
+          key: scheduled-tests-key
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -47,9 +43,11 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
-      - name: Test ${{ matrix.profile }}
-        run: cargo make --profile ${{ matrix.profile }} test-flow
+        run: scripts/build-neard-sandbox.sh
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
+      - name: Tests
+        run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
@@ -82,7 +80,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - run: cargo make check
+      - name: Install wasm-opt
+        run: scripts/ci/install-wasm-opt.sh
+      - name: Run checks
+        run: cargo make check
+      - name: Run build XCC router
+        run: cargo make build-xcc-router
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
@@ -90,3 +93,7 @@ jobs:
           fields: repo,message,commit,author,action,eventName,job,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0

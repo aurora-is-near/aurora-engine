@@ -1,15 +1,21 @@
-use std::path::Path;
-use std::process::Command;
+use std::path::{Path, PathBuf};
 
-pub fn compile<P: AsRef<Path>>(source_path: P) {
-    let output = Command::new("cargo")
-        .current_dir(source_path)
-        .env("RUSTFLAGS", "-C link-arg=-s")
-        .args(["build", "--target", "wasm32-unknown-unknown", "--release"])
-        .output()
-        .unwrap();
+pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
+    let opts = cargo_near_build::BuildOpts {
+        no_locked: true,
+        no_abi: true,
+        no_embed_abi: true,
+        no_doc: true,
+        manifest_path: Some(
+            cargo_near_build::camino::Utf8PathBuf::from_path_buf(
+                manifest_path.as_ref().join("Cargo.toml"),
+            )
+            .unwrap(),
+        ),
+        ..Default::default()
+    };
 
-    if !output.status.success() {
-        panic!("{}", String::from_utf8(output.stderr).unwrap());
-    }
+    cargo_near_build::build(opts)
+        .map(|a| a.path.into_std_path_buf())
+        .unwrap()
 }

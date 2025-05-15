@@ -8,9 +8,6 @@ jobs:
   build:
     name: Build contracts
     runs-on: github-hosted-heavy-runner
-    strategy:
-      matrix:
-        profile: [ mainnet, mainnet-silo, testnet, testnet-silo ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -26,14 +23,13 @@ jobs:
         run: cargo install --no-default-features --force cargo-make
       - name: Compile smart contracts
         run: |
-          cargo make --profile ${{ matrix.profile }} build-docker
-          cargo make --profile ${{ matrix.profile }} build-xcc-docker
-      - run: ls -lH bin/aurora-*${{ matrix.profile }}.wasm
-      - name: Upload aurora-${{ matrix.profile }}.wasm artifact
-        uses: actions/upload-artifact@v3
+          cargo make build-docker
+          cargo make build-xcc-docker
+      - run: ls -lH bin
+      - name: Upload contract artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: contracts
-          path: bin/aurora*${{ matrix.profile }}.wasm
+          path: bin/aurora*.wasm
 
   publish:
     name: Publish contracts
@@ -42,14 +38,15 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
-      - run: ls -la contracts
+      - run: ls -lH artifact
       - name: Publish contracts for ${{ github.ref }} release
         uses: svenstaro/upload-release-action@v2
         with:
           tag: ${{ github.ref }}
-          file: contracts/aurora*.wasm
+          file: artifact/aurora*.wasm
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file_glob: true
+          overwrite: true
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0

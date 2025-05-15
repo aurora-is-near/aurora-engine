@@ -1,11 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(clippy::pedantic, clippy::nursery)]
-#![allow(
-    clippy::similar_names,
-    clippy::module_name_repetitions,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc
-)]
 #![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
@@ -18,6 +11,8 @@ pub mod eip_1559;
 pub mod eip_2930;
 pub mod eip_4844;
 pub mod legacy;
+
+const INITCODE_WORD_COST: u64 = 2;
 
 /// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -137,7 +132,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
 
 impl NormalizedEthTransaction {
     #[allow(clippy::naive_bytecount)]
-    pub fn intrinsic_gas(&self, config: &evm::Config) -> Result<u64, Error> {
+    pub fn intrinsic_gas(&self, config: &aurora_evm::Config) -> Result<u64, Error> {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
@@ -189,12 +184,12 @@ impl NormalizedEthTransaction {
     }
 }
 
-fn init_code_cost(config: &evm::Config, data: &[u8]) -> Result<u64, Error> {
+fn init_code_cost(config: &aurora_evm::Config, data: &[u8]) -> Result<u64, Error> {
     // As per EIP-3860:
-    // > We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
-    // where INITCODE_WORD_COST is 2.
+    // We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
     let init_code_cost = if config.max_initcode_size.is_some() {
-        2 * ((u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)? + 31) / 32)
+        let data_len = u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)?;
+        data_len.div_ceil(32) * INITCODE_WORD_COST
     } else {
         0
     };
@@ -258,7 +253,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
         if value.is_data() {
             Ok(None)
         } else {
-            Err(rlp::DecoderError::RlpExpectedToBeData)
+            Err(DecoderError::RlpExpectedToBeData)
         }
     } else {
         let v: H160 = value.as_val()?;
@@ -269,8 +264,8 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
     let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
-    r.to_big_endian(&mut result[0..32]);
-    s.to_big_endian(&mut result[32..64]);
+    result[..32].copy_from_slice(&r.to_big_endian());
+    result[32..64].copy_from_slice(&s.to_big_endian());
     result[64] = v;
     result
 }
@@ -301,5 +296,26 @@ mod tests {
             EthTransactionKind::try_from([0x80].as_ref()),
             Err(Error::RlpDecodeError(_))
         ));
+    }
+
+    #[test]
+    fn test_initcode_cost() {
+        let config = aurora_evm::Config::cancun();
+
+        let data = [0u8; 60];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 4);
+
+        let data = [0u8; 30];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 2);
+
+        let data = [0u8; 129];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 10);
+
+        let data = [0u8; 1000];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 64);
     }
 }

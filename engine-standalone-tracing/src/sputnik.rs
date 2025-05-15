@@ -1,5 +1,5 @@
 use aurora_engine_types::types::EthGas;
-use evm::{Capture, Opcode};
+use aurora_evm::{Capture, Opcode};
 use std::cell::RefCell;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -11,9 +11,9 @@ use crate::types::{
 /// Capture all events from `SputnikVM` emitted from within the given closure using the given listener.
 pub fn traced_call<T, R, F>(listener: &mut T, f: F) -> R
 where
-    T: evm_gasometer::tracing::EventListener
-        + evm_runtime::tracing::EventListener
-        + evm::tracing::EventListener
+    T: aurora_evm::gasometer::tracing::EventListener
+        + aurora_evm::runtime::tracing::EventListener
+        + aurora_evm::tracing::EventListener
         + 'static,
     F: FnOnce() -> R,
 {
@@ -21,9 +21,9 @@ where
     let mut runtime_listener = gas_listener.clone();
     let mut evm_listener = gas_listener.clone();
 
-    evm_gasometer::tracing::using(&mut gas_listener, || {
-        evm_runtime::tracing::using(&mut runtime_listener, || {
-            evm::tracing::using(&mut evm_listener, f)
+    aurora_evm::gasometer::tracing::using(&mut gas_listener, || {
+        aurora_evm::runtime::tracing::using(&mut runtime_listener, || {
+            aurora_evm::tracing::using(&mut evm_listener, f)
         })
     })
 }
@@ -45,9 +45,9 @@ impl TransactionTraceBuilder {
     }
 }
 
-impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
-    fn event(&mut self, event: evm_gasometer::tracing::Event) {
-        use evm_gasometer::tracing::Event;
+impl aurora_evm::gasometer::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: aurora_evm::gasometer::tracing::Event) {
+        use aurora_evm::gasometer::tracing::Event;
         match event {
             Event::RecordCost { cost, snapshot } => {
                 self.current.gas_cost = EthGas::new(cost);
@@ -99,9 +99,9 @@ impl evm_gasometer::tracing::EventListener for TransactionTraceBuilder {
     }
 }
 
-impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
-    fn event(&mut self, event: evm_runtime::tracing::Event) {
-        use evm_runtime::tracing::Event;
+impl aurora_evm::runtime::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: aurora_evm::runtime::tracing::Event) {
+        use aurora_evm::runtime::tracing::Event;
         match event {
             Event::Step {
                 address: _,
@@ -118,11 +118,7 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
                 self.current.stack = stack
                     .data()
                     .iter()
-                    .map(|x| {
-                        let mut buf = [0u8; 32];
-                        x.to_big_endian(&mut buf);
-                        buf
-                    })
+                    .map(aurora_engine_types::U256::to_big_endian)
                     .collect();
                 self.current.memory = memory.data().as_slice().into();
             }
@@ -186,9 +182,9 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
     }
 }
 
-impl evm::tracing::EventListener for TransactionTraceBuilder {
-    fn event(&mut self, event: evm::tracing::Event) {
-        use evm::tracing::Event;
+impl aurora_evm::tracing::EventListener for TransactionTraceBuilder {
+    fn event(&mut self, event: aurora_evm::tracing::Event) {
+        use aurora_evm::tracing::Event;
         match event {
             Event::Call { .. } | Event::Create { .. } => {
                 self.current.depth.increment();
@@ -240,28 +236,30 @@ impl<T> SharedMutableReference<T> {
     }
 }
 
-impl<T: evm_gasometer::tracing::EventListener> evm_gasometer::tracing::EventListener
+impl<T: aurora_evm::gasometer::tracing::EventListener> aurora_evm::gasometer::tracing::EventListener
     for SharedMutableReference<T>
 {
-    fn event(&mut self, event: evm_gasometer::tracing::Event) {
+    fn event(&mut self, event: aurora_evm::gasometer::tracing::Event) {
         unsafe {
             self.pointer.borrow_mut().as_mut().event(event);
         }
     }
 }
 
-impl<T: evm_runtime::tracing::EventListener> evm_runtime::tracing::EventListener
+impl<T: aurora_evm::runtime::tracing::EventListener> aurora_evm::runtime::tracing::EventListener
     for SharedMutableReference<T>
 {
-    fn event(&mut self, event: evm_runtime::tracing::Event) {
+    fn event(&mut self, event: aurora_evm::runtime::tracing::Event) {
         unsafe {
             self.pointer.borrow_mut().as_mut().event(event);
         }
     }
 }
 
-impl<T: evm::tracing::EventListener> evm::tracing::EventListener for SharedMutableReference<T> {
-    fn event(&mut self, event: evm::tracing::Event) {
+impl<T: aurora_evm::tracing::EventListener> aurora_evm::tracing::EventListener
+    for SharedMutableReference<T>
+{
+    fn event(&mut self, event: aurora_evm::tracing::Event) {
         unsafe {
             self.pointer.borrow_mut().as_mut().event(event);
         }

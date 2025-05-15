@@ -1,25 +1,33 @@
 [package]
 name = "aurora-engine-sdk"
-version = "1.0.0"
+version = "1.2.0"
+description = "SDK that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
+keywords.workspace = true
 readme.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
-publish.workspace = true
 autobenches = false
+publish = true
 
 [dependencies]
 aurora-engine-types.workspace = true
 base64.workspace = true
+libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
+ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
 
+[dev-dependencies]
+hex.workspace = true
+
+[lints]
+workspace = true
+
 [features]
-std = ["aurora-engine-types/std", "sha3/std", "sha2/std", "base64/std"]
+std = ["aurora-engine-types/std", "base64/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std"]
 contract = []
 log = []
 all-promise-actions = []
-mainnet = []
-testnet = []

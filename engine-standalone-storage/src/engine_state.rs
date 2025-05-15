@@ -11,7 +11,7 @@ pub enum EngineStorageValue<'a> {
     Vec(Vec<u8>),
 }
 
-impl<'a> AsRef<[u8]> for EngineStorageValue<'a> {
+impl AsRef<[u8]> for EngineStorageValue<'_> {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Slice(slice) => slice,
@@ -20,7 +20,7 @@ impl<'a> AsRef<[u8]> for EngineStorageValue<'a> {
     }
 }
 
-impl<'a> StorageIntermediate for EngineStorageValue<'a> {
+impl StorageIntermediate for EngineStorageValue<'_> {
     fn len(&self) -> usize {
         self.as_ref().len()
     }

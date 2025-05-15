@@ -46,8 +46,8 @@ module.exports = {
                 network: networkName,
                 chainId: parseInt(chainId),
                 urls: {
-                    apiURL: apiURL,
-                    browserURL: browserURL,
+                    apiURL,
+                    browserURL,
                 },
             },
         ],

@@ -19,7 +19,7 @@ aurora-engine-types = { path = "../../engine-types", default-features = false }
 near-sdk = { version = "5", default-features = false, features = ["legacy", "unit-testing"] }
 
 [dev-dependencies]
-near-primitives = "0.20"
+near-primitives = "0.29"
 
 [features]
 default = []

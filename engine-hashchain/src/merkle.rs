@@ -19,6 +19,7 @@ pub struct StreamCompactMerkleTree {
 }
 
 impl StreamCompactMerkleTree {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             subtrees: Vec::new(),
@@ -26,6 +27,7 @@ impl StreamCompactMerkleTree {
     }
 
     /// Returns `true` if no data has been added to the tree.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.subtrees.is_empty()
     }
@@ -76,6 +78,7 @@ impl StreamCompactMerkleTree {
 
     /// Computes the hash of the Merkle Tree.
     /// For n leaves hashes added, this function is O(log n).
+    #[must_use]
     pub fn compute_hash(&self) -> RawH256 {
         if self.subtrees.is_empty() {
             return [0; 32];
@@ -83,9 +86,7 @@ impl StreamCompactMerkleTree {
 
         // compute hash compacting or duplicating subtrees hashes from right to left
         let mut index = &self.subtrees.len() - 1;
-        let mut right_subtree = CompactMerkleSubtree {
-            ..self.subtrees[index]
-        };
+        let mut right_subtree = self.subtrees[index];
 
         while index >= 1 {
             let left_subtree = &self.subtrees[index - 1];
@@ -121,7 +122,7 @@ impl Default for StreamCompactMerkleTree {
 /// Compact Merkle Subtree.
 /// For leaves, this represents only the leaf node with height 1 and the hash of the leaf.
 /// For bigger subtrees, this represents the entire balanced subtree with its height and merkle hash.
-#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 struct CompactMerkleSubtree {
     /// Height of the subtree.

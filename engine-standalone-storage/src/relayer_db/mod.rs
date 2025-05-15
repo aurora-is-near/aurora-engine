@@ -3,6 +3,7 @@ use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
@@ -83,6 +84,7 @@ where
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
     // We use the Noop handler here since the relayer DB does not contain any promise information.
     let mut handler = aurora_engine_sdk::promise::Noop;
@@ -203,9 +205,7 @@ mod test {
     use super::FallibleIterator;
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::contract_methods::connector::EthConnectorContract;
-    use aurora_engine::{parameters, state};
-    use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
+    use aurora_engine::state;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -240,17 +240,7 @@ mod test {
                 .unwrap();
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
                 let mut local_io = io;
-                state::set_state(&mut local_io, &engine_state).unwrap();
-                EthConnectorContract::create_contract(
-                    io,
-                    &engine_state.owner_id,
-                    parameters::InitCallArgs {
-                        prover_account: "prover.bridge.near".parse().unwrap(),
-                        eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
-                            .to_string(),
-                        metadata: FungibleTokenMetadata::default(),
-                    },
-                )
+                state::set_state(&mut local_io, &engine_state)
             });
 
             result.result.ok().unwrap();

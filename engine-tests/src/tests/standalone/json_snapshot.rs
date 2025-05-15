@@ -124,11 +124,7 @@ fn test_produce_snapshot() {
         let balance_key = [&BALANCE_PREFIX, address].concat();
         let nonce_key = [&NONCE_PREFIX, address].concat();
         let balance_value = balance.to_bytes().to_vec();
-        let nonce_value = {
-            let mut buf = vec![0; 32];
-            U256::from(nonce).to_big_endian(&mut buf);
-            buf
-        };
+        let nonce_value = U256::from(nonce).to_big_endian();
         assert_eq!(computed_snapshot.get(&balance_key).unwrap(), &balance_value);
         if nonce != 0 {
             assert_eq!(computed_snapshot.get(&nonce_key).unwrap(), &nonce_value);

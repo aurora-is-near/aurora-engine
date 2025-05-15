@@ -1,49 +1,50 @@
-use crate::parameters::{
-    CallArgs, NEP141FtOnTransferArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs,
+use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
+use aurora_engine_precompiles::PrecompileConstructorContext;
+use aurora_engine_sdk::{
+    caching::FullCache,
+    env::Env,
+    io::{StorageIntermediate, IO},
+    promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
 };
-use aurora_engine_types::public_key::PublicKey;
-use aurora_engine_types::PhantomData;
-use core::mem;
-use evm::backend::{Apply, ApplyBackend, Backend, Basic, Log};
-use evm::{executor, Opcode};
-use evm::{Config, CreateScheme, ExitError, ExitFatal, ExitReason};
+use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
+use aurora_engine_types::parameters::connector::FtTransferMessageData;
+use aurora_engine_types::{
+    parameters::{
+        connector::{Erc20Identifier, Erc20Metadata, FtOnTransferArgs, MirrorErc20TokenArgs},
+        engine::FunctionCallArgsV2,
+    },
+    public_key::PublicKey,
+    types::EthGas,
+    PhantomData,
+};
+use aurora_evm::{
+    backend::{Apply, ApplyBackend, Backend, Basic, Log},
+    executor, Config, CreateScheme, ExitError, ExitFatal, ExitReason, Opcode,
+};
+use core::cell::RefCell;
+use core::iter::once;
 
+use crate::contract_methods::{silo, ContractError};
 use crate::map::BijectionMap;
-use crate::{errors, state};
-use aurora_engine_sdk::caching::FullCache;
-use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
-use aurora_engine_sdk::promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler};
-
-use crate::accounting;
-#[cfg(not(feature = "ext-connector"))]
-use crate::contract_methods::connector;
-use crate::contract_methods::silo;
-use crate::parameters::{DeployErc20TokenArgs, TransactionStatus};
+use crate::parameters::TransactionStatus;
+use crate::parameters::{CallArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs};
 use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
-use crate::prelude::parameters::RefundCallArgs;
+use crate::prelude::parameters::connector::RefundCallArgs;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::xcc::cross_contract_call;
 use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
     address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
-    Address, BTreeMap, BorshDeserialize, Cow, KeyPrefix, PromiseArgs, PromiseCreateArgs, String,
-    Vec, Wei, Yocto, ERC20_DIGITS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
+    Address, BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, String, Vec,
+    Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
     ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
 };
+use crate::state;
 use crate::state::EngineState;
-use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
-use aurora_engine_precompiles::PrecompileConstructorContext;
-use aurora_engine_types::parameters::connector::{
-    Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs,
-};
-use aurora_engine_types::parameters::engine::FunctionCallArgsV2;
-use aurora_engine_types::types::EthGas;
-use core::cell::RefCell;
-use core::iter::once;
+use crate::{accounting, errors};
 
 /// Used as the first byte in the concatenation of data used to compute the blockhash.
 /// Could be useful in the future as a version byte, or to distinguish different types of blocks.
@@ -119,7 +120,7 @@ impl EngineErrorKind {
             Self::EvmError(ExitError::CallTooDeep) => errors::ERR_CALL_TOO_DEEP,
             Self::EvmError(ExitError::CreateCollision) => errors::ERR_CREATE_COLLISION,
             Self::EvmError(ExitError::CreateContractLimit) => errors::ERR_CREATE_CONTRACT_LIMIT,
-            Self::EvmError(ExitError::InvalidCode(_)) => errors::ERR_INVALID_OPCODE,
+            Self::EvmError(ExitError::InvalidCode(_)) => errors::ERR_INVALID_CODE,
             Self::EvmError(ExitError::OutOfOffset) => errors::ERR_OUT_OF_OFFSET,
             Self::EvmError(ExitError::OutOfGas) => errors::ERR_OUT_OF_GAS,
             Self::EvmError(ExitError::OutOfFund) => errors::ERR_OUT_OF_FUND,
@@ -424,7 +425,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-pub(crate) const CONFIG: &Config = &Config::cancun();
+const CONFIG: &Config = &Config::cancun();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
@@ -627,6 +628,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             input,
             gas_limit,
             access_list,
+            Vec::new(),
         );
 
         let used_gas = executor.used_gas();
@@ -674,6 +676,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             value.raw(),
             input,
             executor_params.gas_limit,
+            Vec::new(),
             Vec::new(),
         );
         status.into_result(result)
@@ -740,49 +743,52 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         )
     }
 
-    /// Mint tokens for recipient on a particular ERC-20 token
-    /// This function should return the amount of tokens unused,
-    /// which will be always all (<amount>) if there is any problem
-    /// with the input, or 0 if tokens were minted successfully.
+    /// Mint base tokens for the recipient.
     ///
-    /// The output will be serialized as a String
-    /// `https://github.com/near/NEPs/discussions/146`
+    /// IMPORTANT: This function should not panic, otherwise it won't
+    /// be possible to return the tokens to the sender.
+    pub fn receive_base_tokens(
+        &mut self,
+        args: &FtOnTransferArgs,
+    ) -> Result<Option<SubmitResult>, ContractError> {
+        let message_data = FtTransferMessageData::try_from(args.msg.as_str())?;
+        let amount = Wei::new_u128(args.amount.as_u128());
+        let receipient = message_data.recipient;
+        let balance = get_balance(&self.io, &receipient);
+        let new_balance = balance
+            .checked_add(amount)
+            .ok_or(errors::ERR_BALANCE_OVERFLOW)?;
+
+        set_balance(&mut self.io, &receipient, &new_balance);
+
+        sdk::log!("Mint {amount} base tokens for: {}", receipient.encode());
+
+        Ok(None)
+    }
+
+    /// Mint tokens for recipient on a particular ERC-20 token.
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
     pub fn receive_erc20_tokens<P: PromiseHandler>(
         &mut self,
         token: &AccountId,
-        args: &NEP141FtOnTransferArgs,
+        args: &FtOnTransferArgs,
         current_account_id: &AccountId,
         handler: &mut P,
-    ) -> Result<SubmitResult, EngineError> {
-        const INVALID_MESSAGE: &str = "receive_erc20_tokens invalid message";
-        const UNKNOWN_NEP_141: &str = "receive_erc20_tokens unknown NEP-141";
-
-        let str_amount = crate::prelude::format!("\"{}\"", args.amount);
-        let output_on_fail = str_amount.as_bytes();
-        let mut local_io = self.io;
-        let mut engine_err = |msg: &'static str| {
-            sdk::log!("{}", msg);
-            local_io.return_output(output_on_fail);
-            EngineError {
-                kind: EngineErrorKind::EvmError(ExitError::Other(Cow::Borrowed(msg))),
-                gas_used: 0,
-            }
-        };
-
+    ) -> Result<Option<SubmitResult>, ContractError> {
+        let amount = args.amount.as_u128();
         // Parse message to determine recipient
         let mut recipient = {
-            // Message format:
-            //      Recipient of the transaction - 40 characters (Address in hex)
-            let message = args.msg.as_bytes();
+            // The message should contain the recipient EOA address.
+            let message = args.msg.strip_prefix("0x").unwrap_or(&args.msg);
+            // Recipient - 40 characters (Address in hex without '0x' prefix)
             if message.len() < 40 {
-                return Err(engine_err(INVALID_MESSAGE));
+                return Err(ParseOnTransferMessageError::WrongMessageFormat.into());
             }
             let mut address_bytes = [0; 20];
             hex::decode_to_slice(&message[..40], &mut address_bytes)
-                .map_err(|_| engine_err(INVALID_MESSAGE))?;
+                .map_err(|_| ParseOnTransferMessageError::WrongMessageFormat)?;
             Address::from_array(address_bytes)
         };
 
@@ -792,37 +798,25 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             }
         }
 
-        let erc20_token = {
-            let address_bytes: [u8; 20] = get_erc20_from_nep141(&self.io, token)
-                .ok()
-                .and_then(|bytes| bytes.as_slice().try_into().ok())
-                .ok_or_else(|| engine_err(UNKNOWN_NEP_141))?;
-            Address::from_array(address_bytes)
-        };
-
+        let erc20_token = get_erc20_from_nep141(&self.io, token)?;
         let erc20_admin_address = current_address(current_account_id);
         let result = self
             .call(
                 &erc20_admin_address,
                 &erc20_token,
                 Wei::zero(),
-                setup_receive_erc20_tokens_input(args, &recipient),
+                setup_receive_erc20_tokens_input(&recipient, amount),
                 u64::MAX,
                 Vec::new(), // TODO: are there values we should put here?
                 handler,
             )
-            .and_then(submit_result_or_err)
-            .inspect_err(|_e| {
-                sdk::log!("{:?}", _e);
-                self.io.return_output(output_on_fail);
-            })?;
+            .and_then(submit_result_or_err)?;
 
-        // Everything succeed so return "0"
-        self.io.return_output(b"\"0\"");
+        sdk::log!("Mint {amount} ERC-20 tokens for: {}", recipient.encode());
 
         // Return SubmitResult so that it can be accessed in standalone engine.
         // This is used to help with the indexing of bridge transactions.
-        Ok(result)
+        Ok(Some(result))
     }
 
     /// Read metadata of ERC-20 contract.
@@ -852,7 +846,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let decimals = self
             .view_with_selector(
                 erc20_address,
-                ERC20_DIGITS_SELECTOR,
+                ERC20_DECIMALS_SELECTOR,
                 &[ethabi::ParamType::Uint(8)],
             )?
             .into_uint()
@@ -962,11 +956,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     ) -> Result<Address, GetErc20FromNep141Error> {
         match identifier {
             Erc20Identifier::Erc20 { address } => Ok(*address),
-            Erc20Identifier::Nep141 { account_id } => get_erc20_from_nep141(&self.io, account_id)
-                .and_then(|bytes| {
-                    Address::try_from_slice(&bytes)
-                        .map_err(|_| GetErc20FromNep141Error::InvalidAddress)
-                }),
+            Erc20Identifier::Nep141 { account_id } => get_erc20_from_nep141(&self.io, account_id),
         }
     }
 }
@@ -1034,12 +1024,12 @@ pub fn submit_with_alt_modexp<
 
     let fixed_gas = silo::get_fixed_gas(&io);
 
-    // Check if the sender has rights to submit transactions or deploy code on SILO mode.
-    assert_access(&io, env, &fixed_gas, &transaction)?;
+    // Check if the sender has rights to submit transactions or deploy code.
+    assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
     if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from(state.chain_id) {
+        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
             return Err(EngineErrorKind::InvalidChainId.into());
         }
     }
@@ -1049,7 +1039,7 @@ pub fn submit_with_alt_modexp<
     check_nonce(&io, &sender, &transaction.nonce)?;
 
     // Check that fixed gas is not greater than gasLimit from the transaction.
-    if fixed_gas.map_or(false, |gas| gas.as_u256() > transaction.gas_limit) {
+    if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
@@ -1143,8 +1133,8 @@ pub fn submit_with_alt_modexp<
 pub fn setup_refund_on_error_input(amount: U256, refund_address: Address) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let mint_args = ethabi::encode(&[
-        ethabi::Token::Address(refund_address.raw()),
-        ethabi::Token::Uint(amount),
+        ethabi::Token::Address(refund_address.raw().0.into()),
+        ethabi::Token::Uint(amount.to_big_endian().into()),
     ]);
 
     [selector, mint_args.as_slice()].concat()
@@ -1212,9 +1202,9 @@ pub fn refund_on_error<I: IO + Copy, E: Env, P: PromiseHandler>(
 /// ```
 #[must_use]
 pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u8]) -> H256 {
-    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, mem::size_of_val(&BLOCK_HASH_PREFIX));
-    debug_assert_eq!(BLOCK_HEIGHT_SIZE, mem::size_of_val(&block_height));
-    debug_assert_eq!(CHAIN_ID_SIZE, mem::size_of_val(&chain_id));
+    debug_assert_eq!(BLOCK_HASH_PREFIX_SIZE, size_of_val(&BLOCK_HASH_PREFIX));
+    debug_assert_eq!(BLOCK_HEIGHT_SIZE, size_of_val(&block_height));
+    debug_assert_eq!(CHAIN_ID_SIZE, size_of_val(&chain_id));
     let mut data = Vec::with_capacity(
         BLOCK_HASH_PREFIX_SIZE + BLOCK_HEIGHT_SIZE + CHAIN_ID_SIZE + account_id.len(),
     );
@@ -1278,14 +1268,11 @@ pub fn refund_unused_gas<I: IO>(
 }
 
 #[must_use]
-pub fn setup_receive_erc20_tokens_input(
-    args: &NEP141FtOnTransferArgs,
-    recipient: &Address,
-) -> Vec<u8> {
+pub fn setup_receive_erc20_tokens_input(recipient: &Address, amount: u128) -> Vec<u8> {
     let selector = ERC20_MINT_SELECTOR;
     let tail = ethabi::encode(&[
-        ethabi::Token::Address(recipient.raw()),
-        ethabi::Token::Uint(U256::from(args.amount.as_u128())),
+        ethabi::Token::Address(recipient.raw().0.into()),
+        ethabi::Token::Uint(amount.into()),
     ]);
 
     [selector, tail.as_slice()].concat()
@@ -1308,7 +1295,7 @@ pub fn setup_deploy_erc20_input(
         ethabi::Token::String(erc20_metadata.name),
         ethabi::Token::String(erc20_metadata.symbol),
         ethabi::Token::Uint(erc20_metadata.decimals.into()),
-        ethabi::Token::Address(erc20_admin_address.raw()),
+        ethabi::Token::Address(erc20_admin_address.raw().0.into()),
     ]);
 
     [erc20_contract, deploy_args.as_slice()].concat()
@@ -1316,13 +1303,14 @@ pub fn setup_deploy_erc20_input(
 
 /// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
 pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
-    args: DeployErc20TokenArgs,
+    nep141: AccountId,
+    metadata: Option<Erc20Metadata>,
     io: I,
     env: &E,
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
     let current_account_id = env.current_account_id();
-    let input = setup_deploy_erc20_input(&current_account_id, None);
+    let input = setup_deploy_erc20_input(&current_account_id, metadata);
     let mut engine: Engine<_, _> = Engine::new(
         aurora_engine_sdk::types::near_account_to_evm_address(
             env.predecessor_account_id().as_bytes(),
@@ -1345,7 +1333,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
     engine
-        .register_token(address, args.nep141)
+        .register_token(address, nep141)
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
@@ -1475,10 +1463,14 @@ pub const fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20
 pub fn get_erc20_from_nep141<I: IO>(
     io: &I,
     nep141_account_id: &AccountId,
-) -> Result<Vec<u8>, GetErc20FromNep141Error> {
+) -> Result<Address, GetErc20FromNep141Error> {
     let key = bytes_to_key(KeyPrefix::Nep141Erc20Map, nep141_account_id.as_bytes());
     io.read_storage(&key)
-        .map(|v| v.to_vec())
+        .map(|v| {
+            let mut buf = [0u8; 20];
+            v.copy_to_slice(&mut buf);
+            Address::from_array(buf)
+        })
         .ok_or(GetErc20FromNep141Error::Nep141NotFound)
 }
 
@@ -1659,7 +1651,7 @@ where
                             PromiseArgs::Recursive(_) => {
                                 unreachable!("Exit precompiles do not produce recursive promises")
                             }
-                        };
+                        }
                     }
                     // do not pass on these "internal logs" to caller
                     None
@@ -1738,28 +1730,25 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
 fn assert_access<I: IO + Copy, E: Env>(
     io: &I,
     env: &E,
-    fixed_gas: &Option<EthGas>,
     transaction: &NormalizedEthTransaction,
 ) -> Result<(), EngineError> {
-    if fixed_gas.is_some() {
-        let allowed = if transaction.to.is_some() {
-            silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
-        } else {
-            silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
-        };
+    let allowed = if transaction.to.is_some() {
+        silo::is_allow_submit(io, &env.predecessor_account_id(), &transaction.address)
+    } else {
+        silo::is_allow_deploy(io, &env.predecessor_account_id(), &transaction.address)
+    };
 
-        if !allowed {
-            return Err(EngineError {
-                kind: EngineErrorKind::NotAllowed,
-                gas_used: 0,
-            });
-        }
+    if !allowed {
+        return Err(EngineError {
+            kind: EngineErrorKind::NotAllowed,
+            gas_used: 0,
+        });
     }
 
     Ok(())
 }
 
-impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I, E, M> {
+impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns the "effective" gas price (as defined by EIP-1559)
     fn gas_price(&self) -> U256 {
         self.gas_price
@@ -1857,7 +1846,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
 
     /// Returns the states chain ID.
     fn chain_id(&self) -> U256 {
-        U256::from(self.state.chain_id)
+        U256::from_big_endian(&self.state.chain_id)
     }
 
     /// Checks if an address exists.
@@ -1957,7 +1946,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'env, I,
     }
 }
 
-impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'env, J, E, M> {
+impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E, M> {
     fn apply<A, I, L>(&mut self, values: A, _logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
@@ -2042,22 +2031,7 @@ impl<'env, J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'en
         }
         match accounting.net() {
             // Net loss is possible if `SELFDESTRUCT(self)` calls are made.
-            accounting::Net::Lost(amount) => {
-                let _ = amount;
-                sdk::log!("Burn {} ETH due to SELFDESTRUCT", amount);
-                // Apply changes for eth-connector. We ignore the `StorageReadError` intentionally since
-                // if we cannot read the storage then there is nothing to remove.
-                #[cfg(not(feature = "ext-connector"))]
-                connector::EthConnectorContract::init(self.io)
-                    .map(|mut connector| {
-                        // The `unwrap` is safe here because (a) if the connector
-                        // is implemented correctly then the total supply will never underflow and (b) we are passing
-                        // in the balance directly so there will always be enough balance.
-                        connector.internal_remove_eth(Wei::new(amount)).unwrap();
-                    })
-                    .ok();
-            }
-            accounting::Net::Zero => (),
+            accounting::Net::Zero | accounting::Net::Lost(_) => (),
             accounting::Net::Gained(_) => {
                 // It should be impossible to gain ETH using normal EVM operations in production.
                 // In tests, we have convenience functions that can poof addresses with ETH out of nowhere.
@@ -2087,10 +2061,8 @@ fn submit_result_or_err(submit_result: SubmitResult) -> Result<SubmitResult, Eng
     match submit_result.status {
         TransactionStatus::Succeed(_) => Ok(submit_result),
         TransactionStatus::Revert(bytes) => {
-            let error_message = crate::prelude::format!(
-                "Reverted with message: {}",
-                crate::prelude::String::from_utf8_lossy(&bytes)
-            );
+            let error_message =
+                format!("Reverted with message: {}", String::from_utf8_lossy(&bytes));
             Err(engine_error(
                 ExitError::Other(error_message.into()),
                 submit_result.gas_used,
@@ -2177,6 +2149,7 @@ mod tests {
     use aurora_engine_sdk::promise::Noop;
     use aurora_engine_test_doubles::io::{Storage, StoragePointer};
     use aurora_engine_test_doubles::promise::PromiseTracker;
+    use aurora_engine_types::parameters::connector::FtOnTransferArgs;
     use aurora_engine_types::parameters::engine::RelayerKeyArgs;
     use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
     use std::cell::RefCell;
@@ -2198,7 +2171,7 @@ mod tests {
         let args = ViewCallArgs {
             sender: origin,
             address: contract,
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
             input,
         };
         let actual_status = engine.view_with_args(args).unwrap();
@@ -2277,7 +2250,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2307,7 +2280,7 @@ mod tests {
         let value = Wei::new_u64(1000);
         let args = CallArgs::V2(FunctionCallArgsV2 {
             contract,
-            value: RawU256::from(value.raw()),
+            value: RawU256::from(value.raw().to_big_endian()),
             input,
         });
         let actual_result = engine.call_with_args(args, &mut handler).unwrap();
@@ -2412,7 +2385,7 @@ mod tests {
         let receiver = make_address(6, 6);
         let erc20_token = make_address(4, 5);
         let nep141_token = AccountId::new("testcoin").unwrap();
-        let args = NEP141FtOnTransferArgs {
+        let args = FtOnTransferArgs {
             sender_id: AccountId::default(),
             amount: Balance::default(),
             msg: receiver.encode(),
@@ -2421,15 +2394,12 @@ mod tests {
         engine
             .register_token(erc20_token, nep141_token.clone())
             .unwrap();
-        engine
+        let result = engine
             .receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler)
+            .unwrap()
             .unwrap();
 
-        let storage = storage.borrow();
-        let actual_output = storage.output.as_slice();
-        let expected_output = b"\"0\"";
-
-        assert_eq!(expected_output, actual_output);
+        assert!(matches!(result.status, TransactionStatus::Succeed(_)));
     }
 
     #[test]
@@ -2445,12 +2415,10 @@ mod tests {
 
         let nep141_token = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs {
-            nep141: nep141_token,
-        };
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce);
-        let actual_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let actual_address =
+            deploy_erc20_token(nep141_token, None, io, &env, &mut handler).unwrap();
 
         assert_eq!(expected_address, actual_address);
     }
@@ -2472,8 +2440,7 @@ mod tests {
             Engine::new_with_state(state, origin, current_account_id, io, &env);
         let nep141 = AccountId::new("testcoin").unwrap();
         let mut handler = Noop;
-        let args = DeployErc20TokenArgs { nep141 };
-        let erc20_address = deploy_erc20_token(args, io, &env, &mut handler).unwrap();
+        let erc20_address = deploy_erc20_token(nep141, None, io, &env, &mut handler).unwrap();
         let metadata = engine
             .get_erc20_metadata(&Erc20Identifier::Erc20 {
                 address: erc20_address,
@@ -2723,7 +2690,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address,
             erc20_address: None,
-            amount: RawU256::from(refund_amount.raw()),
+            amount: RawU256::from(refund_amount.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();
@@ -2745,7 +2712,7 @@ mod tests {
         let args = RefundCallArgs {
             recipient_address: Address::default(),
             erc20_address: Some(origin),
-            amount: RawU256::from(value.raw()),
+            amount: RawU256::from(value.raw().to_big_endian()),
         };
         let mut handler = Noop;
         let actual_result = refund_on_error(io, &env, expected_state, &args, &mut handler).unwrap();

@@ -1,8 +1,7 @@
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
 use crate::prelude::{
-    mem,
     types::{make_address, Address},
     Borrowed,
 };
@@ -142,7 +141,7 @@ impl Blake2F {
 
 impl Precompile for Blake2F {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
+        let (int_bytes, _) = input.split_at(size_of::<u32>());
         let num_rounds = u32::from_be_bytes(
             // Unwrap is fine here as it can not fail
             int_bytes.try_into().unwrap(),

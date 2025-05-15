@@ -49,7 +49,7 @@ fn test_ecrecover_standalone() {
 
     let input = construct_input(&hash, &sig);
 
-    let ctx = evm::Context {
+    let ctx = aurora_evm::Context {
         address: H160::default(),
         caller: H160::default(),
         apparent_value: U256::zero(),
@@ -84,9 +84,9 @@ fn check_wasm_ecrecover(
 
 fn construct_input(hash: &[u8], sig: &[u8]) -> Vec<u8> {
     let mut buf = [0u8; 128];
-    (buf[0..32]).copy_from_slice(hash);
+    buf[0..32].copy_from_slice(hash);
     buf[63] = sig[64];
-    (buf[64..128]).copy_from_slice(&sig[0..64]);
+    buf[64..128].copy_from_slice(&sig[0..64]);
 
     buf.to_vec()
 }
