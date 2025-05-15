@@ -44,8 +44,6 @@ jobs:
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh
-      - name: Install wasm-opt
-        run: scripts/ci/install-wasm-opt.sh
       - name: Tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
@@ -59,7 +57,7 @@ jobs:
   checks:
     name: Run checks
     runs-on: selfhosted
-    container: ubuntu:20.04
+    container: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -68,20 +66,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-          toolchain: stable,nightly
-          override: false
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Install wasm-opt
-        run: scripts/ci/install-wasm-opt.sh
       - name: Run checks
         run: cargo make check
       - name: Run build XCC router
