@@ -34,7 +34,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ matrix.profile }}-cargo-test
+          key: scheduled-tests-key
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -46,10 +46,10 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh ${{ matrix.profile }}
+        run: scripts/build-neard-sandbox.sh
       - name: Install wasm-opt
         run: scripts/ci/install-wasm-opt.sh
-      - name: Test ${{ matrix.profile }}
+      - name: Tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
