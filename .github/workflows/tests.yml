@@ -38,19 +38,22 @@ jobs:
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
-        run: scripts/ci/install-wasm-opt.sh
+        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Tests
         run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: github-hosted-heavy-runner
+    runs-on: selfhosted-heavy
+    container: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -63,20 +66,25 @@ jobs:
           key: aurora-modexp-test
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci/install-wasm-opt.sh
-      - name: Test ${{ matrix.profile }} bench-modexp
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Test bench-modexp
         run: cargo make bench-modexp
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: github-hosted-heavy-runner
+    runs-on: selfhosted
+    container: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -89,8 +97,6 @@ jobs:
           key: cargo-build-xcc-router
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci/install-wasm-opt.sh
       - name: Build
         run: cargo make build-xcc-router
 

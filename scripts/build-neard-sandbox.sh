@@ -1,4 +1,4 @@
-NETWORK=`echo "${1:-mainnet}" | cut -d '-' -f 1`
+NETWORK=`echo "${1:-testnet}" | cut -d '-' -f 1`
 TAG=`curl -s https://rpc.${NETWORK}.near.org/status  | jq -r .version.build`
 
 git clone https://github.com/near/nearcore
