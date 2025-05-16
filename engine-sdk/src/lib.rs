@@ -1,7 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 // All `as` conversions in this code base have been carefully reviewed and are safe.
 #![allow(clippy::as_conversions)]
-extern crate alloc;
 
 use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
 #[cfg(feature = "contract")]

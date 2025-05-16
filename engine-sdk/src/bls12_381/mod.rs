@@ -19,9 +19,9 @@ pub const G2_MUL_INPUT_LENGTH: usize = 288;
 /// Input length of pairing operation.
 pub const PAIRING_INPUT_LENGTH: usize = 384;
 
-/// Length of each of the elements in a g1 operation input.
+/// Length of each element in a g1 operation input.
 const G1_INPUT_ITEM_LENGTH: usize = 128;
-/// Length of each of the elements in a g2 operation input.
+/// Length of each element in a g2 operation input.
 const G2_INPUT_ITEM_LENGTH: usize = 256;
 /// Finite field element input length.
 const FP_LENGTH: usize = 48;
