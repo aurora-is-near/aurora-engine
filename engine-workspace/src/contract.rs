@@ -2,36 +2,35 @@ use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
     CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
-    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token, CallDeployUpgrade,
-    CallDeposit, CallFactorySetWNearAddress, CallFactoryUpdate, CallFactoryUpdateAddressVersion,
-    CallFtOnTransfer, CallFtTransfer, CallFtTransferCall, CallFundXccSubAccount, CallMintAccount,
-    CallMirrorErc20Token, CallNew, CallNewEthConnector, CallPauseContract, CallPausePrecompiles,
-    CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist, CallRemoveRelayerKey,
-    CallResumeContract, CallResumePrecompiles, CallSetErc20Metadata,
-    CallSetEthConnectorContractAccount, CallSetEthConnectorContractData, CallSetFixedGas,
-    CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus,
-    CallStageUpgrade, CallStateMigration, CallStorageDeposit, CallStorageUnregister,
-    CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewAccountsCounter, ViewBalance,
-    ViewBlockHash, ViewBridgeProver, ViewChainId, ViewCode, ViewErc20FromNep141,
-    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtBalanceOfEth, ViewFtBalancesOf, ViewFtMetadata,
-    ViewFtTotalEthSupplyOnAurora, ViewFtTotalEthSupplyOnNear, ViewFtTotalSupply,
+    CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token,
+    CallDeployErc20TokenLegacy, CallDeployUpgrade, CallFactorySetWNearAddress, CallFactoryUpdate,
+    CallFactoryUpdateAddressVersion, CallFtOnTransfer, CallFtTransfer, CallFtTransferCall,
+    CallFundXccSubAccount, CallMintAccount, CallMirrorErc20Token, CallNew, CallPauseContract,
+    CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist,
+    CallRemoveRelayerKey, CallResumeContract, CallResumePrecompiles, CallSetErc20FallbackAddress,
+    CallSetErc20Metadata, CallSetEthConnectorContractAccount, CallSetFixedGas, CallSetKeyManager,
+    CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
+    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
+    CallUpgrade, CallWithdraw, ViewBalance, ViewBlockHash, ViewChainId, ViewCode,
+    ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtTotalSupply,
     ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
-    ViewGetWhitelistStatus, ViewIsUsedProof, ViewNep141FromErc20, ViewNonce, ViewOwner,
-    ViewPausedFlags, ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex,
-    ViewVersion, ViewView,
+    ViewGetWhitelistStatus, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
+    ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
+    ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{
-    Erc20Identifier, FungibleTokenMetadata, MirrorErc20TokenArgs, PausedMask, Proof,
-    SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+    Erc20Identifier, MirrorErc20TokenArgs, PausedMask, SetErc20MetadataArgs,
+    SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
-    CallArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs, NewCallArgsV2, RelayerKeyArgs,
-    RelayerKeyManagerArgs,
+    CallArgs, DeployErc20TokenArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs,
+    NewCallArgsV2, RelayerKeyArgs, RelayerKeyManagerArgs,
 };
 use aurora_engine_types::parameters::silo::{
-    FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs, WhitelistStatusArgs,
+    Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
+    WhitelistStatusArgs,
 };
 use aurora_engine_types::parameters::xcc::FundXccArgs;
 use aurora_engine_types::public_key::PublicKey;
@@ -43,8 +42,9 @@ use serde_json::json;
 
 #[derive(Debug, Clone)]
 pub struct EngineContract {
-    contract: RawContract,
-    public_key: PublicKey,
+    pub account: Account,
+    pub contract: RawContract,
+    pub public_key: PublicKey,
     pub node: Node,
 }
 
@@ -79,15 +79,23 @@ impl EngineContract {
 
         Account::from_inner(inner)
     }
-}
 
-impl From<(RawContract, PublicKey, Node)> for EngineContract {
-    fn from((contract, public_key, node): (RawContract, PublicKey, Node)) -> Self {
-        Self {
-            contract,
-            public_key,
-            node,
-        }
+    pub async fn deposit_to_near(
+        &self,
+        receipient_id: &AccountId,
+        amount: u64,
+    ) -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
+        let eth_connector_id = self.get_eth_connector_contract_account().await?.result;
+        self.account
+            .call(&eth_connector_id, "mint") // The 'mint' works here, because
+            // the engine account id is set as controller for the eth connector.
+            .args_json(json!( {
+                "account_id": receipient_id,
+                "amount": U128(u128::from(amount)),
+            }))
+            .max_gas()
+            .transact()
+            .await
     }
 }
 
@@ -108,20 +116,6 @@ impl EngineContract {
         });
 
         CallNew::call(&self.contract).args_borsh(args)
-    }
-
-    #[must_use]
-    pub fn new_eth_connector(
-        &self,
-        prover_account: AccountId,
-        custodian_address: String,
-        metadata: FungibleTokenMetadata,
-    ) -> CallNewEthConnector {
-        CallNewEthConnector::call(&self.contract).args_borsh((
-            prover_account,
-            custodian_address,
-            metadata,
-        ))
     }
 
     #[must_use]
@@ -177,25 +171,6 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn deposit(&self, raw_proof: Proof) -> CallDeposit {
-        CallDeposit::call(&self.contract).args_borsh(raw_proof)
-    }
-
-    #[must_use]
-    pub fn set_eth_connector_contract_data(
-        &self,
-        prover_account: AccountId,
-        eth_custodian_address: String,
-        metadata: FungibleTokenMetadata,
-    ) -> CallSetEthConnectorContractData {
-        CallSetEthConnectorContractData::call(&self.contract).args_borsh((
-            prover_account,
-            eth_custodian_address,
-            metadata,
-        ))
-    }
-
-    #[must_use]
     pub fn set_eth_connector_contract_account(
         &self,
         account_id: AccountId,
@@ -238,8 +213,13 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn deploy_erc20_token(&self, account_id: AccountId) -> CallDeployErc20Token {
-        CallDeployErc20Token::call(&self.contract).args_borsh(account_id)
+    pub fn deploy_erc20_token(&self, args: DeployErc20TokenArgs) -> CallDeployErc20Token {
+        CallDeployErc20Token::call(&self.contract).args_borsh(args)
+    }
+
+    #[must_use]
+    pub fn deploy_erc20_token_legacy(&self, account_id: AccountId) -> CallDeployErc20TokenLegacy {
+        CallDeployErc20TokenLegacy::call(&self.contract).args_borsh(account_id)
     }
 
     #[must_use]
@@ -381,6 +361,14 @@ impl EngineContract {
     }
 
     #[must_use]
+    pub fn set_erc20_fallback_address(
+        &self,
+        args: Erc20FallbackAddressArgs,
+    ) -> CallSetErc20FallbackAddress {
+        CallSetErc20FallbackAddress::call(&self.contract).args_borsh(args)
+    }
+
+    #[must_use]
     pub fn set_silo_params(&self, params: Option<SiloParamsArgs>) -> CallSetSiloParams {
         CallSetSiloParams::call(&self.contract).args_borsh(params)
     }
@@ -440,18 +428,8 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn ft_balances_of(&self, accounts: &Vec<AccountId>) -> ViewFtBalancesOf {
-        ViewFtBalancesOf::view(&self.contract).args_borsh(accounts)
-    }
-
-    #[must_use]
     pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf {
         ViewStorageBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
-    }
-
-    #[must_use]
-    pub fn ft_metadata(&self) -> ViewFtMetadata {
-        ViewFtMetadata::view(&self.contract)
     }
 
     #[must_use]
@@ -462,11 +440,6 @@ impl EngineContract {
     #[must_use]
     pub fn get_owner(&self) -> ViewOwner {
         ViewOwner::view(&self.contract)
-    }
-
-    #[must_use]
-    pub fn get_bridge_prover(&self) -> ViewBridgeProver {
-        ViewBridgeProver::view(&self.contract)
     }
 
     #[must_use]
@@ -522,26 +495,6 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn is_used_proof(&self, proof: Proof) -> ViewIsUsedProof {
-        ViewIsUsedProof::view(&self.contract).args_borsh(proof)
-    }
-
-    #[must_use]
-    pub fn ft_total_eth_supply_on_aurora(&self) -> ViewFtTotalEthSupplyOnAurora {
-        ViewFtTotalEthSupplyOnAurora::view(&self.contract)
-    }
-
-    #[must_use]
-    pub fn ft_total_eth_supply_on_near(&self) -> ViewFtTotalEthSupplyOnNear {
-        ViewFtTotalEthSupplyOnNear::view(&self.contract)
-    }
-
-    #[must_use]
-    pub fn ft_balance_of_eth(&self, address: Address) -> ViewFtBalanceOfEth {
-        ViewFtBalanceOfEth::view(&self.contract).args_borsh(address)
-    }
-
-    #[must_use]
     pub fn get_erc20_from_nep141(&self, account: AccountId) -> ViewErc20FromNep141 {
         ViewErc20FromNep141::view(&self.contract).args_borsh(account)
     }
@@ -554,11 +507,6 @@ impl EngineContract {
     #[must_use]
     pub fn get_paused_flags(&self) -> ViewPausedFlags {
         ViewPausedFlags::view(&self.contract)
-    }
-
-    #[must_use]
-    pub fn get_accounts_counter(&self) -> ViewAccountsCounter {
-        ViewAccountsCounter::view(&self.contract)
     }
 
     #[must_use]

@@ -34,12 +34,12 @@ use aurora_engine_sdk::env::Env;
 use aurora_engine_sdk::io::IO;
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
-use evm::backend::Log;
-use evm::executor::{
+use aurora_evm::backend::Log;
+use aurora_evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use evm::{Context, ExitError, ExitFatal, ExitSucceed};
+use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
@@ -349,7 +349,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
         let near_exit = ExitToNear::new(ctx.current_account_id.clone(), ctx.io);
-        let ethereum_exit = ExitToEthereum::new(ctx.current_account_id.clone(), ctx.io);
+        let ethereum_exit = ExitToEthereum::new(ctx.io);
         let cross_contract_call = CrossContractCall::new(ctx.current_account_id, ctx.io);
         let predecessor_account_id = PredecessorAccount::new(ctx.env);
         let prepaid_gas = PrepaidGas::new(ctx.env);
@@ -463,8 +463,8 @@ mod tests {
         use aurora_engine_sdk::promise::Noop;
         use aurora_engine_test_doubles::io::StoragePointer;
         use aurora_engine_types::types::EthGas;
-        use evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
-        use evm::{ExitFatal, ExitReason, Transfer};
+        use aurora_evm::executor::stack::{PrecompileFailure, PrecompileHandle, PrecompileSet};
+        use aurora_evm::{ExitFatal, ExitReason, Transfer};
 
         struct MockPrecompile;
 

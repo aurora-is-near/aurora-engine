@@ -11,24 +11,16 @@ publish.workspace = true
 autobenches = false
 
 [dev-dependencies]
-aurora-engine = { workspace = true, features = ["std", "tracing", "impl-serde"] }
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
-
 anyhow.workspace = true
-byte-slice-cast.workspace = true
-near-gas.workspace = true
+cargo-near-build.workspace = true
 near-sdk.workspace = true
 near-workspaces.workspace = true
 tokio = { workspace = true, features = ["macros"] }
-hex.workspace = true
-ethabi.workspace = true
-rlp.workspace = true
 serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
-ext-connector = []
+

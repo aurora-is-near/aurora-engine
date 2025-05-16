@@ -3,7 +3,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
 use aurora_engine_types::{borsh, Cow, Vec};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// `get_promise_results` precompile address
 ///

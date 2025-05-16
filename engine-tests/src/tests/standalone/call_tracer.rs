@@ -53,7 +53,7 @@ fn test_trace_precompile_direct_call() {
     let input = hex::decode("0000ca110000").unwrap();
     let precompile_cost = {
         use aurora_engine_precompiles::Precompile;
-        let context = evm::Context {
+        let context = aurora_evm::Context {
             address: H160::default(),
             caller: H160::default(),
             apparent_value: U256::zero(),
@@ -75,7 +75,9 @@ fn test_trace_precompile_direct_call() {
             utils::sign_transaction(tx.clone(), Some(runner.chain_id), &signer.secret_key);
         let kind = aurora_engine_transactions::EthTransactionKind::Legacy(signed_tx);
         let norm_tx = aurora_engine_transactions::NormalizedEthTransaction::try_from(kind).unwrap();
-        norm_tx.intrinsic_gas(&evm::Config::shanghai()).unwrap()
+        norm_tx
+            .intrinsic_gas(&aurora_evm::Config::shanghai())
+            .unwrap()
     };
 
     let mut listener = CallTracer::default();
@@ -342,9 +344,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::DeployErc20(
-            aurora_engine::parameters::DeployErc20TokenArgs {
-                nep141: "wrap.near".parse().unwrap(),
-            },
+            aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
         let mut tx = standalone::StandaloneRunner::template_tx_msg(
             storage,

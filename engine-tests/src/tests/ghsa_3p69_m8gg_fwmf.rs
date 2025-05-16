@@ -18,13 +18,7 @@ fn test_exploit_fix() {
         constructor,
     );
 
-    let eth_custodian_address = if cfg!(feature = "mainnet-test") {
-        "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
-    } else if cfg!(feature = "testnet-test") {
-        "84a82bb39c83989d5dc07e1310281923d2544dc2"
-    } else {
-        panic!("This test requires mainnet-test or testnet-test feature enabled.")
-    };
+    let eth_custodian_address = "6bfad42cfc4efc96f529d786d643ff4a8b89fa52";
     let target_address = "1111111122222222333333334444444455555555";
     let amount: u64 = 1_000_000;
     let amount_bytes = amount.to_le_bytes();
