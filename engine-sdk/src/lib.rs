@@ -8,6 +8,8 @@ use crate::prelude::{Vec, U256};
 pub use types::keccak;
 
 pub mod base64;
+#[cfg(feature = "bls")]
+pub mod bls12_381;
 pub mod caching;
 pub mod env;
 pub mod error;

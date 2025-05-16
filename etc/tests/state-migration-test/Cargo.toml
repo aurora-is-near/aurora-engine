@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-state-migration-test"
 version = "1.0.0"
-authors = ["NEAR <hello@near.org>"]
+authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2021"
 description = ""
 documentation = ""
@@ -39,5 +39,5 @@ rpath = false
 [dependencies]
 borsh = { version = "1", default-features = false }
 aurora-engine = { path = "../../../engine", default-features = false }
-aurora-engine-sdk = { path = "../../../engine-sdk", default-features = false, features = ["contract"] }
+aurora-engine-sdk = { path = "../../../engine-sdk", default-features = false, features = ["contract", "bls"] }
 aurora-engine-types = { path = "../../../engine-types", default-features = false }

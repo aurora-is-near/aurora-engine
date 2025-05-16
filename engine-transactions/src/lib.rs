@@ -3,6 +3,7 @@
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
+use aurora_evm::executor::stack::Authorization;
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
 
@@ -10,6 +11,7 @@ pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
 pub mod eip_4844;
+pub mod eip_7702;
 pub mod legacy;
 
 const INITCODE_WORD_COST: u64 = 2;
@@ -20,6 +22,7 @@ pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
     Eip2930(eip_2930::SignedTransaction2930),
     Eip1559(eip_1559::SignedTransaction1559),
+    Eip7702(eip_7702::SignedTransaction7702),
 }
 
 impl TryFrom<&[u8]> for EthTransactionKind {
@@ -38,6 +41,10 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             )?))
         } else if bytes[0] == eip_4844::TYPE_BYTE {
             Err(Error::UnsupportedTransactionEip4844)
+        } else if bytes[0] == eip_7702::TYPE_BYTE {
+            Ok(Self::Eip7702(eip_7702::SignedTransaction7702::decode(
+                &Rlp::new(&bytes[1..]),
+            )?))
         } else if bytes[0] <= 0x7f {
             Err(Error::UnknownTransactionType)
         } else if bytes[0] == 0xff {
@@ -56,12 +63,16 @@ impl From<&EthTransactionKind> for Vec<u8> {
             EthTransactionKind::Legacy(tx) => {
                 stream.append(tx);
             }
+            EthTransactionKind::Eip2930(tx) => {
+                stream.append(&eip_2930::TYPE_BYTE);
+                stream.append(tx);
+            }
             EthTransactionKind::Eip1559(tx) => {
                 stream.append(&eip_1559::TYPE_BYTE);
                 stream.append(tx);
             }
-            EthTransactionKind::Eip2930(tx) => {
-                stream.append(&eip_2930::TYPE_BYTE);
+            EthTransactionKind::Eip7702(tx) => {
+                stream.append(&eip_7702::TYPE_BYTE);
                 stream.append(tx);
             }
         }
@@ -82,13 +93,15 @@ pub struct NormalizedEthTransaction {
     pub value: Wei,
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
+    // Contains additional information - `chain_id` for each authorization item
+    pub authorization_list: Vec<Authorization>,
 }
 
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
-        use EthTransactionKind::{Eip1559, Eip2930, Legacy};
+        use EthTransactionKind::{Eip1559, Eip2930, Eip7702, Legacy};
         Ok(match kind {
             Legacy(tx) => Self {
                 address: tx.sender()?,
@@ -101,6 +114,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: vec![],
+                authorization_list: vec![],
             },
             Eip2930(tx) => Self {
                 address: tx.sender()?,
@@ -113,6 +127,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
+                authorization_list: vec![],
             },
             Eip1559(tx) => Self {
                 address: tx.sender()?,
@@ -125,6 +140,20 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
+                authorization_list: vec![],
+            },
+            Eip7702(tx) => Self {
+                address: tx.sender()?,
+                chain_id: Some(tx.transaction.chain_id),
+                nonce: tx.transaction.nonce,
+                gas_limit: tx.transaction.gas_limit,
+                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                to: Some(tx.transaction.to),
+                value: tx.transaction.value,
+                data: tx.transaction.data.clone(),
+                access_list: tx.transaction.access_list.clone(),
+                authorization_list: tx.authorization_list()?,
             },
         })
     }
@@ -211,6 +240,7 @@ pub enum Error {
     #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
     UnsupportedTransactionEip4844,
+    EmptyAuthorizationList,
 }
 
 #[cfg(feature = "serde")]
@@ -231,6 +261,7 @@ impl Error {
             Self::IntegerConversion => "ERR_INTEGER_CONVERSION",
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
             Self::UnsupportedTransactionEip4844 => "ERR_UNSUPPORTED_TX_EIP4844",
+            Self::EmptyAuthorizationList => "ERR_EMPTY_AUTHORIZATION_LIST",
         }
     }
 }
@@ -273,7 +304,7 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 #[cfg(test)]
 mod tests {
     use super::{Error, EthTransactionKind};
-    use crate::{eip_1559, eip_2930};
+    use crate::{eip_1559, eip_2930, eip_7702};
 
     #[test]
     fn test_try_parse_empty_input() {
@@ -294,6 +325,10 @@ mod tests {
         ));
         assert!(matches!(
             EthTransactionKind::try_from([0x80].as_ref()),
+            Err(Error::RlpDecodeError(_))
+        ));
+        assert!(matches!(
+            EthTransactionKind::try_from([eip_7702::TYPE_BYTE].as_ref()),
             Err(Error::RlpDecodeError(_))
         ));
     }
