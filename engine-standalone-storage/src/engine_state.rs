@@ -11,16 +11,16 @@ pub enum EngineStorageValue<'a> {
     Vec(Vec<u8>),
 }
 
-impl<'a> AsRef<[u8]> for EngineStorageValue<'a> {
+impl AsRef<[u8]> for EngineStorageValue<'_> {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::Slice(slice) => *slice,
+            Self::Slice(slice) => slice,
             Self::Vec(bytes) => bytes,
         }
     }
 }
 
-impl<'a> StorageIntermediate for EngineStorageValue<'a> {
+impl StorageIntermediate for EngineStorageValue<'_> {
     fn len(&self) -> usize {
         self.as_ref().len()
     }
@@ -30,7 +30,7 @@ impl<'a> StorageIntermediate for EngineStorageValue<'a> {
     }
 
     fn copy_to_slice(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
+        buffer.copy_from_slice(self.as_ref());
     }
 }
 
@@ -45,7 +45,7 @@ pub struct EngineStateAccess<'db, 'input, 'output> {
 }
 
 impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
-    pub fn new(
+    pub const fn new(
         input: &'input [u8],
         bound_block_height: u64,
         bound_tx_position: u16,
@@ -63,6 +63,7 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
         }
     }
 
+    #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
         self.transaction_diff.borrow().clone()
     }
@@ -86,7 +87,7 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
     }
 
     fn return_output(&mut self, value: &[u8]) {
-        self.output.set(value.to_vec())
+        self.output.set(value.to_vec());
     }
 
     fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
@@ -98,9 +99,11 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
 
         let opt = self.construct_engine_read(key);
         let mut iter = self.db.iterator_opt(rocksdb::IteratorMode::End, opt);
-        let value = iter
-            .next()
-            .map(|(_, value)| DiffValue::try_from_bytes(&value).unwrap())?;
+        let value = iter.next().and_then(|maybe_elem| {
+            maybe_elem
+                .ok()
+                .map(|(_, value)| DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
+        })?;
         value.take_value().map(EngineStorageValue::Vec)
     }
 

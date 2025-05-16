@@ -1,3 +1,4 @@
+// For the future: #![allow(clippy::doc_lazy_continuation)]
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
@@ -5,48 +6,46 @@ use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;
 
-use crate::test_utils::{self, standalone};
+use crate::utils::{self, standalone};
 
 /// This test replays two transactions from Ethereum mainnet (listed below) and checks we obtain
 /// the same gas usage and transaction trace as reported by etherscan.
 /// Transactions:
-/// * https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
-/// * https://etherscan.io/tx/0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e
+/// * `https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
+/// * `https://etherscan.io/tx/0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
+///
 /// Traces:
-/// * https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
-/// * https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e
+/// * `https://etherscan.io/vmtrace?txhash=0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4`
+/// * `https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
 #[test]
 fn test_evm_tracing_with_storage() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
-    let sender_address =
-        Address::decode(&"304ee8ae14eceb3a544dff53a27eb1bb1aaa471f".to_string()).unwrap();
-    let weth_address =
-        Address::decode(&"c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".to_string()).unwrap();
+    let mut signer = utils::Signer::random();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let sender_address = Address::decode("304ee8ae14eceb3a544dff53a27eb1bb1aaa471f").unwrap();
+    let weth_address = Address::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap();
 
     // Initialize EVM
     runner.init_evm_with_chain_id(1);
     runner.mint_account(signer_address, Wei::zero(), signer.nonce.into(), None);
 
     // Deploy WETH contract
-    let weth_constructor = test_utils::weth::WethConstructor::load();
+    let weth_constructor = utils::solidity::weth::WethConstructor::load();
     let deploy_tx = weth_constructor.deploy(signer.use_nonce().into());
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address =
-        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let contract_address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Move it over to the same address as it exists on mainnet
     let mut diff = engine_standalone_storage::Diff::default();
-    for (key, value) in runner.get_current_state().iter() {
+    for (key, value) in runner.get_current_state() {
         if key.len() >= 22 && &key[2..22] == contract_address.as_bytes() {
             let mut new_key = key.clone();
             new_key[2..22].copy_from_slice(weth_address.as_bytes());
             match value {
                 engine_standalone_storage::diff::DiffValue::Modified(bytes) => {
-                    diff.modify(new_key, bytes.clone())
+                    diff.modify(new_key, bytes.clone());
                 }
                 engine_standalone_storage::diff::DiffValue::Deleted => diff.delete(new_key),
             }
@@ -54,14 +53,14 @@ fn test_evm_tracing_with_storage() {
     }
     runner.env.block_height += 1;
     let block_height = runner.env.block_height;
-    let block_hash = test_utils::standalone::mocks::compute_block_hash(block_height);
+    let block_hash = standalone::mocks::compute_block_hash(block_height);
     let block_metadata = engine_standalone_storage::BlockMetadata {
         timestamp: runner.env.block_timestamp(),
         random_seed: runner.env.random_seed(),
     };
     runner
         .storage
-        .set_block_data(block_hash, block_height, block_metadata)
+        .set_block_data(block_hash, block_height, &block_metadata)
         .unwrap();
     let tx = engine_standalone_storage::sync::TransactionIncludedOutcome {
         hash: H256::zero(),
@@ -75,11 +74,13 @@ fn test_evm_tracing_with_storage() {
             attached_near: 0,
             transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
             promise_data: Vec::new(),
+            raw_input: Vec::new(),
+            action_hash: H256::default(),
         },
         diff,
         maybe_result: Ok(None),
     };
-    test_utils::standalone::storage::commit(&mut runner.storage, &tx);
+    standalone::storage::commit(&mut runner.storage, &tx);
 
     // Replay transaction depositing some ETH to get WETH (for the first time)
     // tx: https://etherscan.io/tx/0x79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4
@@ -100,7 +101,7 @@ fn test_evm_tracing_with_storage() {
 
     // Check trace
     check_transaction_trace(
-        listener.finish(),
+        &listener.finish(),
         "src/tests/res/79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4_trace.json",
     );
 
@@ -123,18 +124,18 @@ fn test_evm_tracing_with_storage() {
 
     // Check trace
     check_transaction_trace(
-        listener.finish(),
+        &listener.finish(),
         "src/tests/res/33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e_trace.json",
     );
 }
 
 /// Test based on expected trace of
-/// https://rinkeby.etherscan.io/tx/0xfc9359e49278b7ba99f59edac0e3de49956e46e530a53c15aa71226b7aa92c6f
-/// (geth example found at https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f).
+/// `https://rinkeby.etherscan.io/tx/0xfc9359e49278b7ba99f59edac0e3de49956e46e530a53c15aa71226b7aa92c6f`
+/// (geth example found at `https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f`).
 #[test]
 fn test_evm_tracing() {
     let mut runner = standalone::StandaloneRunner::default();
-    let mut signer = test_utils::Signer::random();
+    let mut signer = utils::Signer::random();
 
     // Initialize EVM
     runner.init_evm();
@@ -151,8 +152,7 @@ fn test_evm_tracing() {
     let result = runner
         .submit_transaction(&signer.secret_key, deploy_tx)
         .unwrap();
-    let contract_address =
-        Address::try_from_slice(test_utils::unwrap_success_slice(&result)).unwrap();
+    let contract_address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
 
     // Interact with contract (and trace execution)
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
@@ -175,7 +175,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.program_counter.into_u32() as u8)
+        .filter_map(|l| u8::try_from(l.program_counter.into_u32()).ok())
         .collect();
     assert_eq!(positions.as_slice(), &EXPECTED_POSITIONS);
 
@@ -183,7 +183,7 @@ fn test_evm_tracing() {
         .logs()
         .0
         .iter()
-        .map(|l| l.gas_cost.as_u64() as u32)
+        .filter_map(|l| u32::try_from(l.gas_cost.as_u64()).ok())
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
@@ -207,7 +207,7 @@ const EXPECTED_OP_CODES: [u8; 27] = [
     91, 91, 91, 0,
 ];
 
-fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_trace_path: P) {
+fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_trace_path: P) {
     let expected_trace: Vec<EtherscanTraceStep> = {
         let file = std::fs::File::open(expected_trace_path).unwrap();
         let reader = std::io::BufReader::new(file);
@@ -215,7 +215,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: TransactionTrace, expected_tra
     };
 
     assert_eq!(trace.logs().0.len(), expected_trace.len());
-    for (log, step) in trace.logs().0.iter().zip(expected_trace.into_iter()) {
+    for (log, step) in trace.logs().0.iter().zip(expected_trace) {
         assert_eq!(
             log.program_counter.0, step.pc,
             "Program counters should match"

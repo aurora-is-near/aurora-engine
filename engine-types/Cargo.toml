@@ -1,27 +1,38 @@
 [package]
 name = "aurora-engine-types"
-version = "1.0.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+version = "2.0.0"
+description = "Essential types which used in Aurora Engine"
 autobenches = false
+keywords.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+publish = true
 
 [dependencies]
-borsh = { version = "0.9.3", default-features = false }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
-primitive-types = { version = "0.11", default-features = false, features = ["rlp"] }
-serde = { version = "1", features = ["derive"], optional = true }
+borsh.workspace = true
+bs58.workspace = true
+hex.workspace = true
+primitive-types.workspace = true
+rlp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
-rand = "0.7.3"
+rand.workspace = true
+
+[lints]
+workspace = true
 
 [features]
 default = ["std"]
-std = ["borsh/std", "hex/std", "primitive-types/std"]
-impl-serde = ["primitive-types/impl-serde", "serde"]
+std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std", "rlp/std"]
+# `primitive-types/std` is excluded because it's `std` implementation includes a transitive
+# dependency on `getrandom` which uses OS call to obtain entropy. Such calls are not
+# available in Wasm, therefore we cannot use the `std` implementation of `primitive-types`
+# in other Rust contracts.
+contracts-std = ["borsh/std", "hex/std"]
+impl-serde = ["primitive-types/impl-serde"]

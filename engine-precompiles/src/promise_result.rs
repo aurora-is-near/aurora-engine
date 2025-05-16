@@ -1,24 +1,23 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
-use crate::PrecompileOutput;
+use crate::prelude::types::{make_address, Address, EthGas};
+use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{Cow, Vec};
-use borsh::BorshSerialize;
-use evm::{Context, ExitError};
+use aurora_engine_types::{borsh, Cow, Vec};
+use aurora_evm::{Context, ExitError};
 
-/// get_promise_results precompile address
+/// `get_promise_results` precompile address
 ///
 /// Address: `0x0a3540f79be10ef14890e87c1a0040a68cc6af71`
 /// This address is computed as: `&keccak("getPromiseResults")[12..]`
-pub const ADDRESS: Address = crate::make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
+pub const ADDRESS: Address = make_address(0x0a3540f7, 0x9be10ef14890e87c1a0040a68cc6af71);
 
 pub mod costs {
     use crate::prelude::types::EthGas;
 
     /// This cost is always charged for calling this precompile.
-    pub const PROMISE_RESULT_BASE_COST: EthGas = EthGas::new(125);
+    pub const PROMISE_RESULT_BASE_COST: EthGas = EthGas::new(111);
     /// This is the cost per byte of promise result data.
-    pub const PROMISE_RESULT_BYTE_COST: EthGas = EthGas::new(1);
+    pub const PROMISE_RESULT_BYTE_COST: EthGas = EthGas::new(2);
 }
 
 pub struct PromiseResult<H> {
@@ -26,7 +25,7 @@ pub struct PromiseResult<H> {
 }
 
 impl<H> PromiseResult<H> {
-    pub fn new(handler: H) -> Self {
+    pub const fn new(handler: H) -> Self {
         Self { handler }
     }
 }
@@ -42,9 +41,10 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let mut cost = Self::required_gas(input)?;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
             if let Some(target_gas) = target_gas {
@@ -57,19 +57,21 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         check_cost(cost)?;
 
         let num_promises = self.handler.ro_promise_results_count();
-        let n_usize = usize::try_from(num_promises).map_err(crate::utils::err_usize_conv)?;
+        let n_usize = usize::try_from(num_promises).map_err(utils::err_usize_conv)?;
         let mut results = Vec::with_capacity(n_usize);
         for i in 0..num_promises {
             if let Some(result) = self.handler.ro_promise_result(i) {
-                let n_bytes = u64::try_from(result.size()).map_err(crate::utils::err_usize_conv)?;
-                cost += n_bytes * costs::PROMISE_RESULT_BYTE_COST;
+                let n_bytes = u64::try_from(result.size()).map_err(utils::err_usize_conv)?;
+                cost = EthGas::new(n_bytes)
+                    .checked_mul(costs::PROMISE_RESULT_BYTE_COST)
+                    .and_then(|result| result.checked_add(cost))
+                    .ok_or(ExitError::Other(Cow::Borrowed("ERR_OVERFLOW_NUMBER")))?;
                 check_cost(cost)?;
                 results.push(result);
             }
         }
 
-        let bytes = results
-            .try_to_vec()
+        let bytes = borsh::to_vec(&results)
             .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_PROMISE_RESULT_SERIALIZATION")))?;
         Ok(PrecompileOutput::without_logs(cost, bytes))
     }
@@ -84,7 +86,7 @@ mod tests {
     fn test_get_promise_results_precompile_id() {
         assert_eq!(
             promise_result::ADDRESS,
-            near_account_to_evm_address("getPromiseResults".as_bytes())
+            near_account_to_evm_address(b"getPromiseResults")
         );
     }
 }

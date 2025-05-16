@@ -30,6 +30,7 @@ impl Accounting {
         self.lost = self.lost.saturating_add(amount);
     }
 
+    #[must_use]
     pub fn net(&self) -> Net {
         match self.gained.cmp(&self.lost) {
             Ordering::Equal => Net::Zero,
@@ -50,4 +51,96 @@ pub enum Net {
     Zero,
     Gained(U256),
     Lost(U256),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_removing_loss_is_same_as_decreasing_change() {
+        let loss = U256::from(16u64);
+        let change = Change {
+            new_value: U256::zero(),
+            old_value: loss,
+        };
+
+        let mut changed_accounting = Accounting::default();
+        changed_accounting.change(change);
+
+        let mut removed_accounting = Accounting::default();
+        removed_accounting.remove(loss);
+
+        assert_eq!(removed_accounting, changed_accounting);
+    }
+
+    #[test]
+    fn test_removing_loss_nets_loss() {
+        let mut actual_accounting = Accounting::default();
+
+        let loss = U256::from(16u64);
+
+        actual_accounting.remove(loss);
+
+        let actual_net = actual_accounting.net();
+        let expected_net = Net::Lost(loss);
+
+        assert_eq!(expected_net, actual_net);
+    }
+
+    #[test]
+    fn test_equal_change_nets_zero() {
+        let mut actual_accounting = Accounting::default();
+
+        let value = U256::from(16u64);
+        let equal_change = Change {
+            new_value: value,
+            old_value: value,
+        };
+
+        actual_accounting.change(equal_change);
+
+        let actual_net = actual_accounting.net();
+        let expected_net = Net::Zero;
+
+        assert_eq!(expected_net, actual_net);
+    }
+
+    #[test]
+    fn test_decreasing_change_nets_loss() {
+        let mut actual_accounting = Accounting::default();
+
+        let new_value = U256::from(16u64);
+        let old_value = U256::from(32u64);
+        let decreasing_change = Change {
+            new_value,
+            old_value,
+        };
+
+        actual_accounting.change(decreasing_change);
+
+        let actual_net = actual_accounting.net();
+        let expected_net = Net::Lost(U256::from(16u64));
+
+        assert_eq!(expected_net, actual_net);
+    }
+
+    #[test]
+    fn test_increasing_change_nets_gain() {
+        let mut actual_accounting = Accounting::default();
+
+        let new_value = U256::from(32u64);
+        let old_value = U256::from(16u64);
+        let increasing_change = Change {
+            new_value,
+            old_value,
+        };
+
+        actual_accounting.change(increasing_change);
+
+        let actual_net = actual_accounting.net();
+        let expected_net = Net::Gained(U256::from(16u64));
+
+        assert_eq!(expected_net, actual_net);
+    }
 }

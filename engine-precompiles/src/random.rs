@@ -1,8 +1,8 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::H256;
-use crate::PrecompileOutput;
-use evm::{Context, ExitError};
+use crate::{utils, PrecompileOutput};
+use aurora_evm::{Context, ExitError};
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -22,10 +22,10 @@ impl RandomSeed {
     ///
     /// Address: `0xc104f4840573bed437190daf5d2898c2bdf928ac`
     /// This address is computed as: `&keccak("randomSeed")[12..]`
-    pub const ADDRESS: Address =
-        super::make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
+    pub const ADDRESS: Address = make_address(0xc104f484, 0x0573bed437190daf5d2898c2bdf928ac);
 
-    pub fn new(random_seed: H256) -> Self {
+    #[must_use]
+    pub const fn new(random_seed: H256) -> Self {
         Self { random_seed }
     }
 }
@@ -39,9 +39,10 @@ impl Precompile for RandomSeed {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -65,7 +66,7 @@ mod tests {
     fn test_precompile_id() {
         assert_eq!(
             RandomSeed::ADDRESS,
-            near_account_to_evm_address("randomSeed".as_bytes())
+            near_account_to_evm_address(b"randomSeed")
         );
     }
 }

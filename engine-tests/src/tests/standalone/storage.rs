@@ -6,15 +6,16 @@ use engine_standalone_storage::{
     BlockMetadata,
 };
 
-use crate::test_utils::standalone::{mocks, storage::create_db};
-use crate::test_utils::{self, Signer};
+use crate::utils::standalone::{mocks, storage::create_db};
+use crate::utils::{self, Signer};
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
     let mut signer = Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
+    let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
-    let dest_address = test_utils::address_from_secret_key(&Signer::random().secret_key);
+    let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
     let transfer_amounts: Vec<Wei> = vec![10, 13, 75, 88, 1, 9, 19, 256]
         .into_iter()
         .map(Wei::new_u64)
@@ -27,11 +28,11 @@ fn test_replay_transaction() {
             Some(new_total)
         })
         .collect();
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let mut runner = utils::standalone::StandaloneRunner::default();
     let chain_id = Some(runner.chain_id);
     let create_transfer = |from: &mut Signer, to: Address, amount: Wei| {
-        test_utils::sign_transaction(
-            test_utils::transfer(to, amount, from.use_nonce().into()),
+        utils::sign_transaction(
+            utils::transfer(to, amount, from.use_nonce().into()),
             chain_id,
             &from.secret_key,
         )
@@ -85,10 +86,14 @@ fn test_replay_transaction() {
                 .enumerate()
                 .map(|(position, tx)| {
                     let diff = runner
-                        .execute_transaction_at_position(tx, block_height, position as u16)
+                        .execute_transaction_at_position(
+                            tx,
+                            block_height,
+                            u16::try_from(position).unwrap(),
+                        )
                         .unwrap();
 
-                    test_utils::standalone::storage::commit(&mut runner.storage, &diff);
+                    utils::standalone::storage::commit(&mut runner.storage, &diff);
 
                     assert_eq!(
                         runner.get_balance(&address),
@@ -117,7 +122,7 @@ fn test_replay_transaction() {
         rand::seq::SliceRandom::shuffle(txs.as_mut_slice(), &mut rng);
         for ((position, tx), diff) in txs {
             let replay_diff = runner
-                .execute_transaction_at_position(tx, block_height, position as u16)
+                .execute_transaction_at_position(tx, block_height, u16::try_from(position).unwrap())
                 .unwrap()
                 .diff;
             assert_eq!(replay_diff, diff);
@@ -129,12 +134,12 @@ fn test_replay_transaction() {
 fn test_consume_transaction() {
     // Some util structures we will use in this test
     let signer = Signer::random();
-    let address = test_utils::address_from_secret_key(&signer.secret_key);
+    let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
     let transfer_amount = Wei::new_u64(37);
     let nonce = signer.nonce.into();
-    let dest_address = test_utils::address_from_secret_key(&Signer::random().secret_key);
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
+    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(address, balance, nonce, None);
@@ -144,7 +149,7 @@ fn test_consume_transaction() {
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // Try to execute a transfer transaction
-    let tx = test_utils::transfer(dest_address, transfer_amount, nonce);
+    let tx = utils::transfer(dest_address, transfer_amount, nonce);
     let result = runner.submit_transaction(&signer.secret_key, tx).unwrap();
     assert!(result.status.is_ok());
 
@@ -170,7 +175,7 @@ fn test_block_index() {
 
     // write block hash / height association
     storage
-        .set_block_data(block_hash, block_height, block_metadata.clone())
+        .set_block_data(block_hash, block_height, &block_metadata.clone())
         .unwrap();
     // read it back
     assert_eq!(
@@ -198,25 +203,23 @@ fn test_block_index() {
     let missing_block_height = block_height + 1;
     let missing_block_hash = H256([32u8; 32]);
     match storage.get_block_hash_by_height(missing_block_height) {
-        Err(engine_standalone_storage::Error::NoBlockAtHeight(h)) if h == missing_block_height => {
-            () // ok
-        }
-        other => panic!("Unexpected response: {:?}", other),
+        Err(engine_standalone_storage::Error::NoBlockAtHeight(h)) if h == missing_block_height => {}
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_block_height_by_hash(missing_block_hash) {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_block_metadata(missing_block_hash) {
         Err(engine_standalone_storage::Error::BlockNotFound(h)) if h == missing_block_hash => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
 
     // insert later block
     let next_height = block_height + 1;
     let next_hash = H256([0xaa; 32]);
     storage
-        .set_block_data(next_hash, next_height, block_metadata.clone())
+        .set_block_data(next_hash, next_height, &block_metadata.clone())
         .unwrap();
 
     // check earliest+latest blocks are still correct
@@ -233,7 +236,7 @@ fn test_block_index() {
     let prev_height = block_height - 1;
     let prev_hash = H256([0xbb; 32]);
     storage
-        .set_block_data(prev_hash, prev_height, block_metadata.clone())
+        .set_block_data(prev_hash, prev_height, &block_metadata)
         .unwrap();
 
     // check earliest+latest blocks are still correct
@@ -269,6 +272,8 @@ fn test_transaction_index() {
         attached_near: 0,
         transaction: TransactionKind::Unknown,
         promise_data: Vec::new(),
+        raw_input: Vec::new(),
+        action_hash: H256::default(),
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,
@@ -280,7 +285,7 @@ fn test_transaction_index() {
             aurora_engine_types::storage::KeyPrefix::Balance,
             &[1u8; 20],
         );
-        let value = crate::prelude::Wei::new_u64(159).to_bytes().to_vec();
+        let value = Wei::new_u64(159).to_bytes().to_vec();
         tmp.modify(key, value);
         tmp
     };
@@ -313,19 +318,16 @@ fn test_transaction_index() {
     let missing_tx_hash = H256([13u8; 32]);
     match storage.get_transaction_data(missing_tx_hash) {
         Err(engine_standalone_storage::Error::TransactionHashNotFound(h))
-            if h == missing_tx_hash =>
-        {
-            () // ok
-        }
-        other => panic!("Unexpected response: {:?}", other),
+            if h == missing_tx_hash => {}
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_transaction_by_position(tx_not_included) {
         Err(engine_standalone_storage::Error::TransactionNotFound(x)) if x == tx_not_included => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
     match storage.get_transaction_diff(tx_not_included) {
         Err(engine_standalone_storage::Error::TransactionNotFound(x)) if x == tx_not_included => (), // ok
-        other => panic!("Unexpected response: {:?}", other),
+        other => panic!("Unexpected response: {other:?}"),
     }
 
     drop(storage);
@@ -336,12 +338,12 @@ fn test_transaction_index() {
 fn test_track_key() {
     // Set up the test
     let mut signer = Signer::random();
-    let signer_address = test_utils::address_from_secret_key(&signer.secret_key);
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let initial_balance = Wei::new_u64(1000);
     let transfer_amount = Wei::new_u64(37);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
-    let mut runner = test_utils::standalone::StandaloneRunner::default();
+    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
@@ -367,8 +369,10 @@ fn test_track_key() {
     let trace = runner.storage.track_engine_key(&balance_key).unwrap();
     let mut expected_balance = initial_balance;
     for (i, (block_height, tx_hash, value)) in trace.into_iter().enumerate() {
-        let i = i as u64;
-        assert_eq!(block_height, created_block_height + i);
+        assert_eq!(
+            block_height,
+            created_block_height + u64::try_from(i).unwrap()
+        );
         let transaction_included = engine_standalone_storage::TransactionIncluded {
             block_hash: runner
                 .storage

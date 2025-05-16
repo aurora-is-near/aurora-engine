@@ -1,53 +1,51 @@
 [package]
 name = "aurora-engine"
-version = "2.7.0"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
-description = ""
-documentation = ""
-readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+version = "3.9.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+publish.workspace = true
 autobenches = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false }
-aurora-engine-sdk = { path = "../engine-sdk", default-features = false }
-aurora-engine-precompiles = { path = "../engine-precompiles", default-features = false }
-aurora-engine-transactions = { path = "../engine-transactions", default-features = false }
-base64 = { version = "0.13.0", default-features = false, features = ["alloc"] }
-bitflags = { version = "1.3", default-features = false }
-borsh = { version = "0.9.3", default-features = false }
-byte-slice-cast = { version = "1.0", default-features = false }
-ethabi = { version = "17.1", default-features = false }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false }
-hex = { version = "0.4", default-features = false, features = ["alloc"] }
-rjson = { git = "https://github.com/aurora-is-near/rjson", rev = "cc3da949", default-features = false, features = ["integer"] }
-rlp = { version = "0.5.0", default-features = false }
-serde = { version = "1", features = ["derive"], optional = true }
+aurora-engine-hashchain.workspace = true
+aurora-engine-modexp.workspace = true
+aurora-engine-precompiles.workspace = true
+aurora-engine-transactions.workspace = true
+aurora-engine-types.workspace = true
+aurora-engine-sdk.workspace = true
+bitflags.workspace = true
+ethabi.workspace = true
+aurora-evm = { workspace = true, features = ["create-fixed"] }
+function_name.workspace = true
+hex.workspace = true
+rlp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wee_alloc = { version = "0.4.5", default-features = false }
+wee_alloc.workspace = true
 
 [dev-dependencies]
-serde_json = "1"
-rand = "0.7.3"
-test-case = "2.1"
+aurora-engine-test-doubles.workspace = true
+test-case.workspace = true
+
+[lints]
+workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "base64/std", "borsh/std", "byte-slice-cast/std", "ethabi/std", "evm/std", "hex/std", "rjson/std", "rlp/std"]
-contract = ["aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
-evm_bully = []
+std = ["aurora-engine-types/std", "aurora-engine-hashchain/std", "aurora-engine-sdk/std", "aurora-engine-precompiles/std", "aurora-engine-transactions/std", "ethabi/std", "aurora-evm/std", "hex/std", "rlp/std", "serde/std", "serde_json/std"]
+contract = ["log", "aurora-engine-sdk/contract", "aurora-engine-precompiles/contract"]
 log = ["aurora-engine-sdk/log", "aurora-engine-precompiles/log"]
-tracing = ["evm/tracing"]
+tracing = ["aurora-evm/tracing"]
 error_refund = ["aurora-engine-precompiles/error_refund"]
 integration-test = ["log"]
-mainnet = ["contract", "log", "aurora-engine-sdk/mainnet"]
-testnet = ["contract", "log", "aurora-engine-sdk/testnet"]
-impl-serde = ["aurora-engine-types/impl-serde", "serde", "aurora-engine-transactions/impl-serde", "evm/with-serde"]
+all-promise-actions = ["aurora-engine-sdk/all-promise-actions"]
+impl-serde = ["aurora-engine-types/impl-serde", "aurora-engine-transactions/impl-serde", "aurora-evm/with-serde"]

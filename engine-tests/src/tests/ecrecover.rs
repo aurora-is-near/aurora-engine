@@ -1,10 +1,10 @@
 use super::sanity::initialize_transfer;
-use crate::prelude::Wei;
-use crate::prelude::{Address, U256};
-use crate::test_utils::{self, AuroraRunner, Signer};
+use crate::prelude::{make_address, Address, U256};
+use crate::prelude::{Wei, H160};
+use crate::utils::{self, AuroraRunner, Signer};
 use aurora_engine_precompiles::Precompile;
 
-const ECRECOVER_ADDRESS: Address = aurora_engine_precompiles::make_address(0, 1);
+const ECRECOVER_ADDRESS: Address = make_address(0, 1);
 
 /// ecrecover tests taken from geth
 #[test]
@@ -17,6 +17,7 @@ fn test_ecrecover_geth() {
         "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c100000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
         "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
         "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000011c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+        "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549aabbccddeeff"
     ];
     let outputs = [
         Vec::new(),
@@ -24,6 +25,7 @@ fn test_ecrecover_geth() {
         Vec::new(),
         Vec::new(),
         Vec::new(),
+        hex::decode("000000000000000000000000a94f5374fce5edbc8e2a8697c15331677e6ebf0b").unwrap(),
     ];
 
     for (input, output) in inputs.iter().zip(outputs.iter()) {
@@ -47,9 +49,9 @@ fn test_ecrecover_standalone() {
 
     let input = construct_input(&hash, &sig);
 
-    let ctx = evm::Context {
-        address: Default::default(),
-        caller: Default::default(),
+    let ctx = aurora_evm::Context {
+        address: H160::default(),
+        caller: H160::default(),
         apparent_value: U256::zero(),
     };
     let standalone_result = aurora_engine_precompiles::secp256k1::ECRecover
@@ -77,17 +79,14 @@ fn check_wasm_ecrecover(
             }
         })
         .unwrap();
-    assert_eq!(
-        expected_output,
-        test_utils::unwrap_success_slice(&wasm_result),
-    );
+    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result),);
 }
 
 fn construct_input(hash: &[u8], sig: &[u8]) -> Vec<u8> {
     let mut buf = [0u8; 128];
-    (&mut buf[0..32]).copy_from_slice(hash);
+    buf[0..32].copy_from_slice(hash);
     buf[63] = sig[64];
-    (&mut buf[64..128]).copy_from_slice(&sig[0..64]);
+    buf[64..128].copy_from_slice(&sig[0..64]);
 
     buf.to_vec()
 }

@@ -1,7 +1,9 @@
-use aurora_engine::engine;
+use aurora_engine::parameters::SubmitArgs;
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
@@ -54,7 +56,7 @@ where
         };
 
         storage
-            .set_block_data(row.hash, row.id, metadata)
+            .set_block_data(row.hash, row.id, &metadata)
             .map_err(crate::Error::Rocksdb)?;
     }
     Ok(())
@@ -63,7 +65,7 @@ where
 pub fn initialize_transactions<I>(
     storage: &mut Storage,
     mut rows: I,
-    engine_state: engine::EngineState,
+    engine_state: &state::EngineState,
 ) -> Result<(), error::Error>
 where
     I: FallibleIterator<Item = types::TransactionRow, Error = postgres::Error>,
@@ -82,6 +84,7 @@ where
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
     // We use the Noop handler here since the relayer DB does not contain any promise information.
     let mut handler = aurora_engine_sdk::promise::Noop;
@@ -101,11 +104,15 @@ where
         env.block_timestamp = block_metadata.timestamp;
         env.random_seed = block_metadata.random_seed;
 
+        let args = SubmitArgs {
+            tx_data: transaction_bytes.clone(),
+            ..Default::default()
+        };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
             engine::submit(
                 io,
                 &env,
-                &transaction_bytes,
+                &args,
                 engine_state.clone(),
                 env.current_account_id(),
                 relayer_address,
@@ -118,9 +125,7 @@ where
             Err(e) => {
                 if tx_succeeded {
                     println!(
-                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-                        near_tx_hash,
-                        e
+                        "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {e:?}",
                     );
                 }
                 continue;
@@ -128,8 +133,7 @@ where
             Ok(result) => {
                 if result.status.is_fail() && tx_succeeded {
                     println!(
-                        "WARN: Transaction with NEAR hash {:?} expected to succeed, but failed with error message {:?}",
-                        near_tx_hash,
+                        "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {:?}",
                         result.status
                     );
                     continue;
@@ -152,6 +156,8 @@ where
             attached_near: 0,
             transaction: crate::sync::types::TransactionKind::Submit(tx),
             promise_data: Vec::new(),
+            raw_input: transaction_bytes,
+            action_hash: H256::default(),
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -159,13 +165,13 @@ where
 }
 
 pub mod error {
-    use aurora_engine::engine;
+    use aurora_engine::{engine, state};
 
     #[derive(Debug)]
     pub enum Error {
         Storage(crate::Error),
         Postgres(postgres::Error),
-        EngineState(engine::EngineStateError),
+        EngineState(state::EngineStateError),
         Engine(engine::EngineError),
     }
 
@@ -181,8 +187,8 @@ pub mod error {
         }
     }
 
-    impl From<engine::EngineStateError> for Error {
-        fn from(e: engine::EngineStateError) -> Self {
+    impl From<state::EngineStateError> for Error {
+        fn from(e: state::EngineStateError) -> Self {
             Self::EngineState(e)
         }
     }
@@ -197,24 +203,27 @@ pub mod error {
 #[cfg(test)]
 mod test {
     use super::FallibleIterator;
+    use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
-    use aurora_engine::{connector, engine, parameters};
+    use aurora_engine::state;
     use aurora_engine_types::H256;
 
+    #[allow(clippy::doc_markdown)]
     /// Requires a running postgres server to work. A snapshot of the DB can be
-    /// downloaded using the script from https://github.com/aurora-is-near/partner-relayer-deploy
+    /// downloaded using the script from `https://github.com/aurora-is-near/partner-relayer-deploy`
     /// The postgres DB can be started in Docker using the following command:
     /// docker run --name mainnet_database -p '127.0.0.1:15432:5432' -v $PATH_TO_DB:/var/lib/postgresql/data auroraisnear/relayer-database:latest
     #[test]
     #[ignore]
     fn test_fill_db() {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
-        let mut connection = super::connect_without_tls(&Default::default()).unwrap();
-        let engine_state = engine::EngineState {
-            chain_id: aurora_engine_types::types::u256_to_arr(&1313161555.into()),
+        let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();
+        let engine_state = state::EngineState {
+            chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
             owner_id: "aurora".parse().unwrap(),
-            bridge_prover_id: "prover.bridge.near".parse().unwrap(),
             upgrade_delay_blocks: 0,
+            is_paused: false,
+            key_manager: None,
         };
 
         // Initialize engine and connector states in storage.
@@ -227,21 +236,11 @@ mod test {
                 random_seed: H256::zero(),
             };
             storage
-                .set_block_data(block_hash, block_height, block_metadata)
+                .set_block_data(block_hash, block_height, &block_metadata)
                 .unwrap();
             let result = storage.with_engine_access(block_height, 0, &[], |io| {
-                let mut local_io = io.clone();
-                engine::set_state(&mut local_io, engine_state.clone());
-                connector::EthConnectorContract::create_contract(
-                    io,
-                    engine_state.owner_id.clone(),
-                    parameters::InitCallArgs {
-                        prover_account: engine_state.bridge_prover_id.clone(),
-                        eth_custodian_address: "6bfad42cfc4efc96f529d786d643ff4a8b89fa52"
-                            .to_string(),
-                        metadata: Default::default(),
-                    },
-                )
+                let mut local_io = io;
+                state::set_state(&mut local_io, &engine_state)
             });
 
             result.result.ok().unwrap();
@@ -259,18 +258,24 @@ mod test {
                         attached_near: 0,
                         transaction: TransactionKind::Unknown,
                         promise_data: Vec::new(),
+                        raw_input: Vec::new(),
+                        action_hash: H256::default(),
                     },
                     &diff,
                 )
                 .unwrap();
         }
         let block_rows = super::read_block_data(&mut connection).unwrap();
-        super::initialize_blocks(&mut storage, block_rows.map(|row| Ok(row.into()))).unwrap();
+        super::initialize_blocks(
+            &mut storage,
+            block_rows.map(|row| Ok(row.try_into().unwrap())),
+        )
+        .unwrap();
         let tx_rows = super::read_transaction_data(&mut connection).unwrap();
         super::initialize_transactions(
             &mut storage,
-            tx_rows.map(|row| Ok(row.into())),
-            engine_state,
+            tx_rows.map(|row| Ok(row.try_into().unwrap())),
+            &engine_state,
         )
         .unwrap();
 

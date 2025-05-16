@@ -1,6 +1,6 @@
 use aurora_engine_types::types::EthGas;
 use aurora_engine_types::BTreeMap;
-use evm_core::Opcode;
+use aurora_evm::core::Opcode;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::ops::Index;
@@ -14,19 +14,21 @@ pub struct Depth(u32);
 
 impl Depth {
     /// Performs the conversion into a u32.
-    pub fn into_u32(self) -> u32 {
+    #[must_use]
+    pub const fn into_u32(self) -> u32 {
         self.0
     }
 
-    pub fn increment(&mut self) {
+    pub const fn increment(&mut self) {
         self.0 += 1;
     }
 
-    pub fn decrement(&mut self) {
-        self.0 -= 1;
+    pub const fn decrement(&mut self) {
+        self.0 = self.0.saturating_sub(1);
     }
 
-    pub fn is_zero(&self) -> bool {
+    #[must_use]
+    pub const fn is_zero(&self) -> bool {
         self.0 == 0
     }
 }
@@ -38,17 +40,21 @@ pub struct LogMemory(Vec<[u8; 32]>);
 
 impl LogMemory {
     /// Returns the number of elements in the memory buffer.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no elements in the memory buffer.
     #[allow(dead_code)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Performs the conversion into a raw buffer.
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn into_raw(self) -> Vec<[u8; 32]> {
         self.0
     }
@@ -62,7 +68,7 @@ impl From<&[u8]> for LogMemory {
             let j = i % 32;
             buf[j] = *b;
             if j == 31 {
-                result.push(buf)
+                result.push(buf);
             }
         }
         Self(result)
@@ -76,23 +82,27 @@ pub struct LogStack(Vec<[u8; 32]>);
 
 impl LogStack {
     /// Returns the number of elements in the stack buffer.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no elements in the stack buffer.
     #[allow(dead_code)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Performs the conversion into a vector.
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn into_raw(self) -> Vec<[u8; 32]> {
         self.0
     }
 }
 
-impl std::iter::FromIterator<[u8; 32]> for LogStack {
+impl FromIterator<[u8; 32]> for LogStack {
     fn from_iter<T: IntoIterator<Item = [u8; 32]>>(iter: T) -> Self {
         let vec = iter.into_iter().collect();
         Self(vec)
@@ -105,8 +115,9 @@ impl std::iter::FromIterator<[u8; 32]> for LogStack {
 pub struct ProgramCounter(pub u32);
 
 impl ProgramCounter {
-    /// Performs the conversion into a u32.
-    pub fn into_u32(self) -> u32 {
+    /// Performs the conversion into u32.
+    #[must_use]
+    pub const fn into_u32(self) -> u32 {
         self.0
     }
 }
@@ -118,7 +129,8 @@ pub struct LogStorageKey(pub [u8; 32]);
 
 impl LogStorageKey {
     /// Performs the conversion into a 32 byte word.
-    pub fn into_raw(self) -> [u8; 32] {
+    #[must_use]
+    pub const fn into_raw(self) -> [u8; 32] {
         self.0
     }
 }
@@ -130,7 +142,8 @@ pub struct LogStorageValue(pub [u8; 32]);
 
 impl LogStorageValue {
     /// Performs the conversion into a 32 byte word.
-    pub fn into_raw(self) -> [u8; 32] {
+    #[must_use]
+    pub const fn into_raw(self) -> [u8; 32] {
         self.0
     }
 }
@@ -183,15 +196,15 @@ pub struct TraceLog {
 impl Default for TraceLog {
     fn default() -> Self {
         Self {
-            depth: Default::default(),
-            error: Default::default(),
-            gas: Default::default(),
-            gas_cost: Default::default(),
-            memory: Default::default(),
+            depth: Depth::default(),
+            error: Option::default(),
+            gas: EthGas::default(),
+            gas_cost: EthGas::default(),
+            memory: LogMemory::default(),
             opcode: Opcode::STOP,
-            program_counter: Default::default(),
-            stack: Default::default(),
-            storage: Default::default(),
+            program_counter: ProgramCounter::default(),
+            stack: LogStack::default(),
+            storage: LogStorage::default(),
         }
     }
 }
@@ -203,12 +216,14 @@ pub struct Logs(pub Vec<TraceLog>);
 impl Logs {
     /// Returns the number of logs.
     #[allow(dead_code)]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no logs.
     #[allow(dead_code)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -218,7 +233,7 @@ impl Index<usize> for Logs {
     type Output = TraceLog;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.0[index]
+        self.0.get(index).expect("index out of bounds")
     }
 }
 
@@ -246,13 +261,9 @@ pub struct TransactionTrace {
 }
 
 impl TransactionTrace {
-    /// Constructs a new TransactionTrace with a given gas, return, and logs.
-    pub fn new(
-        gas: EthGas,
-        failed: bool,
-        return_value: Vec<u8>,
-        struct_logs: Logs,
-    ) -> TransactionTrace {
+    /// Constructs a new `TransactionTrace` with a given gas, return, and logs.
+    #[must_use]
+    pub const fn new(gas: EthGas, failed: bool, return_value: Vec<u8>, struct_logs: Logs) -> Self {
         Self {
             gas,
             failed,
@@ -261,18 +272,21 @@ impl TransactionTrace {
         }
     }
 
-    /// Returns the EthGas associated with this transaction as a reference.
-    pub fn gas(&self) -> EthGas {
+    /// Returns the `EthGas` associated with this transaction as a reference.
+    #[must_use]
+    pub const fn gas(&self) -> EthGas {
         self.gas
     }
 
     /// Returns the output bytes of the transaction as a slice.
+    #[must_use]
     pub fn result(&self) -> &[u8] {
         self.return_value.as_slice()
     }
 
     /// Returns a reference to the logs.
-    pub fn logs(&self) -> &Logs {
+    #[must_use]
+    pub const fn logs(&self) -> &Logs {
         &self.struct_logs
     }
 }
@@ -290,7 +304,8 @@ pub struct StepTransactionTrace {
 impl StepTransactionTrace {
     /// Constructs a new `TraceStepper` with a given `TransactionTrace`.
     #[allow(dead_code)]
-    pub fn new(transaction_trace: TransactionTrace) -> Self {
+    #[must_use]
+    pub const fn new(transaction_trace: TransactionTrace) -> Self {
         Self {
             inner: transaction_trace,
             step: 0,
@@ -304,7 +319,9 @@ impl StepTransactionTrace {
     /// `None`.
     #[allow(dead_code)]
     pub fn step(&mut self) -> Option<&TraceLog> {
-        if self.step > self.inner.struct_logs.len() {
+        // We subtract 2 from the length to avoid "index out of bounds" error,
+        // given the else block increments the step by 1.
+        if self.step > self.inner.struct_logs.len() - 2 {
             None
         } else {
             self.step += 1;
@@ -317,7 +334,8 @@ impl StepTransactionTrace {
 // See here for custom serde serialization: https://serde.rs/custom-serialization.html
 #[cfg(feature = "serde")]
 mod opcode_serde {
-    pub fn serialize<S>(opcode: &evm_core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<S>(opcode: &aurora_evm::core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -326,7 +344,7 @@ mod opcode_serde {
 
     struct U8Visitor;
 
-    impl<'de> serde::de::Visitor<'de> for U8Visitor {
+    impl serde::de::Visitor<'_> for U8Visitor {
         type Value = u8;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -341,10 +359,12 @@ mod opcode_serde {
         }
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<evm_core::Opcode, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<aurora_evm::core::Opcode, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        Ok(evm_core::Opcode(deserializer.deserialize_u8(U8Visitor)?))
+        Ok(aurora_evm::core::Opcode(
+            deserializer.deserialize_u8(U8Visitor)?,
+        ))
     }
 }

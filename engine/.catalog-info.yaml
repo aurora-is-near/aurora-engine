@@ -2,7 +2,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: aurora-engine
+  name: aurora-engine-contract
   title: Aurora (engine)
   description: |-
     The Aurora engine
@@ -19,4 +19,5 @@ spec:
   system: aurora-engine
   deployedAt:
     - contract:near/mainnet/aurora
+    - contract:near/testnet/aurora
   interactsWith: []

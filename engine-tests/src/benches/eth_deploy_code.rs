@@ -2,15 +2,16 @@ use criterion::{BatchSize, BenchmarkId, Criterion, Throughput};
 use libsecp256k1::SecretKey;
 
 use crate::prelude::Wei;
-use crate::test_utils::{
-    address_from_secret_key, create_deploy_transaction, deploy_evm, sign_transaction, SUBMIT,
+use crate::utils::{
+    address_from_secret_key, create_deploy_transaction, deploy_runner, parse_eth_gas,
+    sign_transaction, SUBMIT,
 };
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
-pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
-    let mut runner = deploy_evm();
+pub fn eth_deploy_code_benchmark(c: &mut Criterion) {
+    let mut runner = deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
     runner.create_address(
@@ -33,24 +34,23 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
     let calling_account_id = "some-account.near";
 
     // measure gas usage
-    for input in inputs.iter() {
+    for input in &inputs {
         let input_size = input.len();
-        let (output, maybe_err) = runner
+        let output = runner
             .one_shot()
-            .call(SUBMIT, calling_account_id, input.clone());
-        assert!(maybe_err.is_none());
-        let output = output.unwrap();
+            .call(SUBMIT, calling_account_id, input.clone())
+            .unwrap();
         let gas = output.burnt_gas;
-        let eth_gas = crate::test_utils::parse_eth_gas(&output);
+        let eth_gas = parse_eth_gas(&output);
         // TODO(#45): capture this in a file
-        println!("ETH_DEPLOY_CODE_{:?} NEAR GAS: {:?}", input_size, gas);
-        println!("ETH_DEPLOY_CODE_{:?} ETH GAS: {:?}", input_size, eth_gas);
+        println!("ETH_DEPLOY_CODE_{input_size:?} NEAR GAS: {gas:?}");
+        println!("ETH_DEPLOY_CODE_{input_size:?} ETH GAS: {eth_gas:?}");
     }
 
     // measure wall-clock time
     let mut group = c.benchmark_group("deploy_code");
     for input in inputs {
-        let input_size = input.len() as u64;
+        let input_size = u64::try_from(input.len()).unwrap();
         let id = BenchmarkId::from_parameter(input_size);
         group.throughput(Throughput::Bytes(input_size));
         group.bench_function(id, |b| {
@@ -58,7 +58,7 @@ pub(crate) fn eth_deploy_code_benchmark(c: &mut Criterion) {
                 || (runner.one_shot(), calling_account_id, input.clone()),
                 |(r, c, i)| r.call(SUBMIT, c, i),
                 BatchSize::SmallInput,
-            )
+            );
         });
     }
     group.finish();

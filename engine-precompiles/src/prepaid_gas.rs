@@ -1,15 +1,15 @@
 use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{Address, EthGas};
-use crate::PrecompileOutput;
+use crate::prelude::types::{make_address, Address, EthGas};
+use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
-use aurora_engine_types::{vec, U256};
-use evm::{Context, ExitError};
+use aurora_engine_types::U256;
+use aurora_evm::{Context, ExitError};
 
-/// prepaid_gas precompile address
+/// `prepaid_gas` precompile address
 ///
 /// Address: `0x536822d27de53629ef1f84c60555689e9488609f`
 /// This address is computed as: `&keccak("prepaidGas")[12..]`
-pub const ADDRESS: Address = crate::make_address(0x536822d2, 0x7de53629ef1f84c60555689e9488609f);
+pub const ADDRESS: Address = make_address(0x536822d2, 0x7de53629ef1f84c60555689e9488609f);
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -23,12 +23,12 @@ pub struct PrepaidGas<'a, E> {
 }
 
 impl<'a, E> PrepaidGas<'a, E> {
-    pub fn new(env: &'a E) -> Self {
+    pub const fn new(env: &'a E) -> Self {
         Self { env }
     }
 }
 
-impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
+impl<E: Env> Precompile for PrepaidGas<'_, E> {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
         Ok(costs::PREPAID_GAS_COST)
     }
@@ -37,9 +37,10 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
         &self,
         input: &[u8],
         target_gas: Option<EthGas>,
-        _context: &Context,
+        context: &Context,
         _is_static: bool,
     ) -> EvmPrecompileResult {
+        utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
         if let Some(target_gas) = target_gas {
             if cost > target_gas {
@@ -48,12 +49,8 @@ impl<'a, E: Env> Precompile for PrepaidGas<'a, E> {
         }
 
         let prepaid_gas = self.env.prepaid_gas();
-        let bytes = {
-            let mut buf = vec![0; 32];
-            U256::from(prepaid_gas.as_u64()).to_big_endian(&mut buf);
-            buf
-        };
-        Ok(PrecompileOutput::without_logs(cost, bytes))
+        let bytes = U256::from(prepaid_gas.as_u64()).to_big_endian();
+        Ok(PrecompileOutput::without_logs(cost, bytes.to_vec()))
     }
 }
 
@@ -66,7 +63,7 @@ mod tests {
     fn test_prepaid_gas_precompile_id() {
         assert_eq!(
             prepaid_gas::ADDRESS,
-            near_account_to_evm_address("prepaidGas".as_bytes())
+            near_account_to_evm_address(b"prepaidGas")
         );
     }
 }

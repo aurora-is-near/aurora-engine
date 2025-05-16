@@ -1,17 +1,20 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use std::collections::{btree_map, BTreeMap};
 
 #[derive(Debug, Default, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 /// Collection of Engine state keys which changed by executing a transaction.
 pub struct Diff(BTreeMap<Vec<u8>, DiffValue>);
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[borsh(crate = "aurora_engine_types::borsh")]
 pub enum DiffValue {
     Modified(Vec<u8>),
     Deleted,
 }
 
 impl DiffValue {
+    #[must_use]
     pub fn value(&self) -> Option<&[u8]> {
         match self {
             Self::Deleted => None,
@@ -19,6 +22,8 @@ impl DiffValue {
         }
     }
 
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn take_value(self) -> Option<Vec<u8>> {
         match self {
             Self::Deleted => None,
@@ -27,7 +32,7 @@ impl DiffValue {
     }
 
     pub fn try_to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        self.try_to_vec()
+        borsh::to_vec(&self)
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error> {
@@ -51,9 +56,10 @@ impl Diff {
     }
 
     pub fn clear(&mut self) {
-        self.0.clear()
+        self.0.clear();
     }
 
+    #[must_use]
     pub fn get(&self, key: &[u8]) -> Option<&DiffValue> {
         self.0.get(key)
     }
@@ -66,15 +72,24 @@ impl Diff {
         self.0.iter()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     pub fn try_to_bytes(&self) -> Result<Vec<u8>, std::io::Error> {
-        self.try_to_vec()
+        borsh::to_vec(&self)
     }
 
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error> {
         Self::try_from_slice(bytes)
+    }
+}
+
+impl<'diff> IntoIterator for &'diff Diff {
+    type Item = (&'diff Vec<u8>, &'diff DiffValue);
+    type IntoIter = btree_map::Iter<'diff, Vec<u8>, DiffValue>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }

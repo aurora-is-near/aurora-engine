@@ -7,228 +7,164 @@
 [![Builds](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml/badge.svg)](https://github.com/aurora-is-near/aurora-engine/actions/workflows/builds.yml)
 
 Aurora Engine implements an Ethereum Virtual Machine (EVM) on the NEAR Protocol.
-See [doc.aurora.dev](https://doc.aurora.dev/develop/compat/evm) for additional
+See [doc.aurora.dev](https://doc.aurora.dev/dev-reference/aurora-engine) for additional
 documentation.
 
 ## Deployments
 
-Network | Contract ID         | Chain ID   | Version
-------- | ------------------- | ---------- | ------
-Mainnet | [`aurora`][Mainnet] | 1313161554 | 2.6.1
-Testnet | [`aurora`][Testnet] | 1313161555 | 2.7.0
-Local   | `aurora.test.near`  | 1313161556 | 2.7.0
+| Network | Contract ID         | Chain ID   |
+|---------|---------------------|------------|
+| Mainnet | [`aurora`][Mainnet] | 1313161554 |
+| Testnet | [`aurora`][Testnet] | 1313161555 |
+| Local   | `aurora.test.near`  | 1313161556 |
 
-[Mainnet]: https://explorer.near.org/accounts/aurora
-[Testnet]: https://explorer.testnet.near.org/accounts/aurora
+[Mainnet]: https://nearblocks.io/address/aurora
+[Testnet]: https://testnet.nearblocks.io/address/aurora
 
 ## Development
 
 ### Prerequisites
 
-- Node.js (v14+)
-- Rust nightly (2021-03-25) with the WebAssembly toolchain
+- Node.js (v18+)
 - cargo-make
+- wasm-opt
 
 ```sh
-rustup install nightly-2021-03-25
-rustup target add wasm32-unknown-unknown --toolchain nightly-2021-03-25
 cargo install --force cargo-make
 ```
 
 ### Prerequisites for Development
 
-- Node.js (v14+)
+- Node.js (v18+)
 - Docker
 - cargo-make
+- wasm-opt
+
+### Prerequisite wasm-opt
+
+For WebAssembly optimization we use `wasm-opt` from the [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen).
+
+We recommend installing the release:
+https://github.com/WebAssembly/binaryen/releases/tag/version_123
+
+`wasm-opt` command should be available for the build process.
+
+Verify version:
+
+```bash
+$ wasm-opt --version
+wasm-opt version 123 (version_123)
+```
+
+Please be aware that you don't need to run `wasm-opt` explicitly, The `wasm-opt` runs automatically
+when you run `cargo make build-*` and `cargo make test` commands.
 
 ## Development
 
 ### Branches
 
 - [`master`] is the current stable branch.
-  It must be ready, anytime, to deployed on chain at a moment's notice.
+  It must be ready, at all times, to be deployed on chain at a moment's notice.
 
 - [`develop`] is our bleeding-edge development branch.
   In general, kindly target all pull requests to this branch.
 
-### Building & Make Commands
-
-Every task with `cargo make` must have a `--profile` argument.
-
-The current available `profile`s are:
-- `mainnet`, suitable for mainnet.
-- `testnet`, suitable for testnet.
-- `local`, suitable for local development.
-- `custom`, suitable for custom environments, see note below.
-
-A custom environment may be required depending on the circumstances. This can
-be created in the `.env` folder as `custom.env` following the structure of the
-other `.env` files. See `bin/local-custom.env` for more details.
-
-Every make most follow the following pattern, though `--profile` is not required
-for all such as cleanup:
-```sh
-cargo make [--profile <profile>] <task>
-```
-
 #### Building the engine and contracts
 
-To build the binaries there are a few commands to do such following the format.
+There are several commands that can be used to build the binaries. The currently supported parameters
+for the `task` field are listed below:
 
-The current available build `task`s are:
-- `default`, does not need to be specified, runs `build`. Requires a `--profile`
-  argument.
-- `build`, builds all engine smart contract and produces the
-  `aurora-<profile>-test.wasm` in the `bin` folder. Requires `build-contracts`. 
-  Requires a `--profile` argument.
-- `build-test`, builds all the below using test features. Requires a `--profile`
-  argument.
-- `build-contracts`, builds all the ETH contracts.
+- `default`: does not need to be specified, runs `build`.
+- `build`: builds included solidity contracts in the engine contract and engine smart contract itself and produces
+ the file `aurora-engine.wasm` in the `bin` folder.
+- `build-test`: builds the engine contract which is used in the integration tests and produces the 
+ `aurora-engine-test.wasm` file in the `bin` folder.
+- `build-contracts`: builds all the solidity contracts.
+- `build-docker`: builds the `aurora-engine.wasm` in the `bin` folder using docker build environment.
+  The purpose of this task is to produce reproducible binaries.
 
 For example, the following will build the mainnet debug binary:
+
 ```sh
-cargo make --profile mainnet build
+cargo make build
+```
+
+#### Verifying binary hash
+
+To verify that a deployed binary matches the source code, you may want to build it reproducibly and then verify that
+the SHA256 hash matches that of the deployed binary. The motivation behind this is to prevent malicious code from being
+deployed.
+
+Run these commands to produce the binary hash:
+
+```sh
+cargo make build-docker
+shasum -a 256 bin/aurora-engine.wasm
 ```
 
 #### Running unit & integration tests
 
 To run tests, there are a few cargo make tasks we can run:
-- `test`, tests the whole cargo workspace and ETH contracts. Requires a 
-  `--profile` argument.
-- `test-workspace`, tests only the cargo workspace.
-- `test-contracts`, tests only the contracts.
+- `test-workspace`: tests only the cargo workspace.
+- `test-contracts`: tests only the contracts.
+- `test`: tests the whole cargo workspace, solidity contracts and runs modexp benchmarks.
+- `test-flow`: tests the whole cargo workspace and solidity contracts.
+- `bench-modexp`: runs modexp benchmarks.
 
-For example, the following will test the whole workspace and ETH contracts:
+For example, the following will test the whole workspace and solidity contracts:
+
 ```sh
-cargo make --profile mainnet test 
+cargo make test 
 ```
 
-#### Running checks & lints
+#### Running checks and lints
 
-To run lints and checks, the following tasks are available:
-- `check`, checks the format, clippy and ETH contracts.
-- `check-contracts`, runs yarn lints on the ETH contracts.
-- `check-fmt`, checks the workspace Rust format only.
-- `check-clippy`, checks the Rust workspace with clippy only.
+The following tasks are available to run lints and checks:
 
-For example the following command will run the checks. `profile` is not required
+- `check`: checks the format, clippy and solidity contracts.
+- `check-contracts` runs yarn lints on the solidity contracts.
+- `check-fmt`: checks the workspace Rust format only.
+- `clippy`: checks the Rust workspace with clippy only.
+
+For example, the following command will run the checks. 
 here:
-```
+
+```sh
 cargo make check
+```
+
+#### Running WebAssembly optimization
+
+In common cases, you don't need to run `wasm-opt` manually, because it's part of builds and tests.
+
+But for development reasons only you can run:
+
+- `wasm-opt` , runs WebAssembly optimization for pre-build wasm files.
+
+For example, the following will run wasm-opt for pre-build mainnet binary:
+
+```sh
+cargo make wasm-opt 
 ```
 
 #### Cleanup
 
-To clean up the workspace, the following tasks are available:
-- `clean`, cleans all built binaries and ETH contracts.
-- `clean-cargo`, cleans with cargo.
-- `clean-contracts`, cleans the ETH contracts.
-- `clean-bin`, cleans the binaries.
+The following tasks are available to clean up the workspace:
+
+- `clean`: cleans all built binaries and solidity contracts.
+- `clean-cargo`: cleans with cargo.
+- `clean-contracts`: cleans the solidity contracts.
+- `clean-bin`: cleans the binaries.
 
 Additionally, there is also but not included in the `clean` task:
-- `sweep`, sweeps the set amount of days in the ENV, default at 30 days.
 
-For example, the following command will clean everything. `profile` is not 
-required:
-```
+- `sweep`: cleans up unused build files for a period of time provided in the `time` argument. The `time` argument 
+ is set in the ENV variable `SWEEP_DAYS`, default to 30 days.
+
+For example, the following command will clean everything.
+
+```sh
 cargo make clean
-```
-
-## Deployment
-
-### Downloading the latest EVM release
-
-```sh
-wget https://github.com/aurora-is-near/aurora-engine/releases/download/latest/mainnet-release.wasm
-```
-
-### Installing the Aurora CLI tool
-
-```sh
-npm install -g aurora-is-near/aurora-cli
-```
-
-### Deploying the EVM with the CLI
-
-```sh
-export NEAR_ENV=local
-near delete aurora.test.near test.near  # if needed
-near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-aurora install --chain 1313161556 --owner test.near bin/mainnet-release.wasm
-```
-
-### Deploying the EVM without the CLI
-
-```sh
-export NEAR_ENV=local
-near delete aurora.test.near test.near  # if needed
-near create-account aurora.test.near --master-account=test.near --initial-balance 1000000
-near deploy --account-id=aurora.test.near --wasm-file=bin/mainnet-release.wasm
-aurora initialize --chain 1313161556 --owner test.near
-```
-
-## Usage
-
-### Examining deployed EVM metadata
-
-```sh
-aurora get-version
-aurora get-owner
-aurora get-bridge-prover
-aurora get-chain-id
-```
-
-### Deploying EVM contract bytecode
-
-```sh
-aurora deploy-code @contract.bytecode
-```
-
-```sh
-aurora deploy-code 0x600060005560648060106000396000f360e060020a6000350480638ada066e146028578063d09de08a1460365780632baeceb714604d57005b5060005460005260206000f3005b5060016000540160005560005460005260206000f3005b5060016000540360005560005460005260206000f300
-```
-
-### Examining EVM contract state
-
-```console
-$ aurora encode-address test.near
-0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
-```
-
-```sh
-aurora get-nonce 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
-aurora get-balance 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
-aurora get-code 0xFc481F4037887e10708552c0D7563Ec6858640d6
-aurora get-storage-at 0xFc481F4037887e10708552c0D7563Ec6858640d6 0
-```
-
-### Calling an EVM contract read-only
-
-```console
-$ aurora encode-address test.near
-0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B
-```
-
-```sh
-aurora view --sender 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x8ada066e  # getCounter()
-aurora view --sender 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B 0xFc481F4037887e10708552c0D7563Ec6858640d6 0xd09de08a  # increment()
-aurora view --sender 0xCBdA96B3F2B8eb962f97AE50C3852CA976740e2B 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x2baeceb7  # decrement()
-```
-
-### Calling an EVM contract mutatively
-
-```sh
-aurora call 0xFc481F4037887e10708552c0D7563Ec6858640d6 0xd09de08a  # increment()
-aurora call 0xFc481F4037887e10708552c0D7563Ec6858640d6 0x2baeceb7  # decrement()
-```
-
-## Debugging
-
-### Inspecting EVM storage state
-
-```sh
-near state aurora.test.near
-aurora dump-storage
 ```
 
 [`master`]:  https://github.com/aurora-is-near/aurora-engine/commits/master
@@ -236,5 +172,5 @@ aurora dump-storage
 
 ## License
 **aurora-engine** has multiple licenses:
-* all crates except `engine-test` has **CCO-1.0** license
+* All crates except `engine-test` have **CCO-1.0** license
 * `engine-test` has **GPL-v3** license

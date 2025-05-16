@@ -1,6 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![deny(clippy::as_conversions)]
+#![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{vec, Vec, H160, U256};
@@ -10,9 +9,12 @@ use rlp::{Decodable, DecoderError, Rlp};
 pub mod backwards_compatibility;
 pub mod eip_1559;
 pub mod eip_2930;
+pub mod eip_4844;
 pub mod legacy;
 
-/// Typed Transaction Envelope (see https://eips.ethereum.org/EIPS/eip-2718)
+const INITCODE_WORD_COST: u64 = 2;
+
+/// Typed Transaction Envelope (see `https://eips.ethereum.org/EIPS/eip-2718`)
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum EthTransactionKind {
     Legacy(legacy::LegacyEthSignedTransaction),
@@ -34,6 +36,8 @@ impl TryFrom<&[u8]> for EthTransactionKind {
             Ok(Self::Eip1559(eip_1559::SignedTransaction1559::decode(
                 &Rlp::new(&bytes[1..]),
             )?))
+        } else if bytes[0] == eip_4844::TYPE_BYTE {
+            Err(Error::UnsupportedTransactionEip4844)
         } else if bytes[0] <= 0x7f {
             Err(Error::UnknownTransactionType)
         } else if bytes[0] == 0xff {
@@ -45,8 +49,8 @@ impl TryFrom<&[u8]> for EthTransactionKind {
     }
 }
 
-impl<'a> From<&'a EthTransactionKind> for Vec<u8> {
-    fn from(tx: &'a EthTransactionKind) -> Self {
+impl From<&EthTransactionKind> for Vec<u8> {
+    fn from(tx: &EthTransactionKind) -> Self {
         let mut stream = rlp::RlpStream::new();
         match &tx {
             EthTransactionKind::Legacy(tx) => {
@@ -84,7 +88,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
     type Error = Error;
 
     fn try_from(kind: EthTransactionKind) -> Result<Self, Self::Error> {
-        use EthTransactionKind::*;
+        use EthTransactionKind::{Eip1559, Eip2930, Legacy};
         Ok(match kind {
             Legacy(tx) => Self {
                 address: tx.sender()?,
@@ -127,11 +131,12 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
 }
 
 impl NormalizedEthTransaction {
-    pub fn intrinsic_gas(&self, config: &evm::Config) -> Result<u64, Error> {
+    #[allow(clippy::naive_bytecount)]
+    pub fn intrinsic_gas(&self, config: &aurora_evm::Config) -> Result<u64, Error> {
         let is_contract_creation = self.to.is_none();
 
         let base_gas = if is_contract_creation {
-            config.gas_transaction_create
+            config.gas_transaction_create + init_code_cost(config, &self.data)?
         } else {
             config.gas_transaction_call
         };
@@ -179,6 +184,19 @@ impl NormalizedEthTransaction {
     }
 }
 
+fn init_code_cost(config: &aurora_evm::Config, data: &[u8]) -> Result<u64, Error> {
+    // As per EIP-3860:
+    // We define initcode_cost(initcode) to equal INITCODE_WORD_COST * ceil(len(initcode) / 32).
+    let init_code_cost = if config.max_initcode_size.is_some() {
+        let data_len = u64::try_from(data.len()).map_err(|_| Error::IntegerConversion)?;
+        data_len.div_ceil(32) * INITCODE_WORD_COST
+    } else {
+        0
+    };
+
+    Ok(init_code_cost)
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Error {
@@ -192,15 +210,17 @@ pub enum Error {
     IntegerConversion,
     #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
     RlpDecodeError(DecoderError),
+    UnsupportedTransactionEip4844,
 }
 
 #[cfg(feature = "serde")]
 fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
-    ser.serialize_str(&format!("{:?}", err))
+    ser.serialize_str(&format!("{err:?}"))
 }
 
 impl Error {
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
         match self {
             Self::UnknownTransactionType => "ERR_UNKNOWN_TX_TYPE",
             Self::EmptyInput => "ERR_EMPTY_TX_INPUT",
@@ -210,6 +230,7 @@ impl Error {
             Self::GasOverflow => "ERR_GAS_OVERFLOW",
             Self::IntegerConversion => "ERR_INTEGER_CONVERSION",
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
+            Self::UnsupportedTransactionEip4844 => "ERR_UNSUPPORTED_TX_EIP4844",
         }
     }
 }
@@ -232,7 +253,7 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
         if value.is_data() {
             Ok(None)
         } else {
-            Err(rlp::DecoderError::RlpExpectedToBeData)
+            Err(DecoderError::RlpExpectedToBeData)
         }
     } else {
         let v: H160 = value.as_val()?;
@@ -243,8 +264,8 @@ fn rlp_extract_to(rlp: &Rlp<'_>, index: usize) -> Result<Option<Address>, Decode
 
 fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
     let mut result = [0u8; 65]; // (r, s, v), typed (uint256, uint256, uint8)
-    r.to_big_endian(&mut result[0..32]);
-    s.to_big_endian(&mut result[32..64]);
+    result[..32].copy_from_slice(&r.to_big_endian());
+    result[32..64].copy_from_slice(&s.to_big_endian());
     result[64] = v;
     result
 }
@@ -275,5 +296,26 @@ mod tests {
             EthTransactionKind::try_from([0x80].as_ref()),
             Err(Error::RlpDecodeError(_))
         ));
+    }
+
+    #[test]
+    fn test_initcode_cost() {
+        let config = aurora_evm::Config::cancun();
+
+        let data = [0u8; 60];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 4);
+
+        let data = [0u8; 30];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 2);
+
+        let data = [0u8; 129];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 10);
+
+        let data = [0u8; 1000];
+        let cost = super::init_code_cost(&config, &data).unwrap();
+        assert_eq!(cost, 64);
     }
 }

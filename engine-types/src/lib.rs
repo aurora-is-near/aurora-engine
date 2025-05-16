@@ -1,10 +1,8 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
-#![cfg_attr(feature = "log", feature(panic_info_message))]
-#![deny(clippy::as_conversions)]
+#![cfg_attr(not(any(feature = "std", feature = "contracts-std")), no_std)]
 
 pub mod account_id;
 pub mod parameters;
+pub mod public_key;
 pub mod storage;
 pub mod types;
 
@@ -25,6 +23,7 @@ mod v0 {
         vec,
         vec::Vec,
     };
+    pub use borsh;
     pub use core::{
         cmp::Ordering, fmt::Display, marker::PhantomData, mem, ops::Add, ops::AddAssign, ops::Div,
         ops::Mul, ops::Sub, ops::SubAssign,
@@ -33,3 +32,7 @@ mod v0 {
 }
 
 pub use v0::*;
+
+pub trait AsBytes {
+    fn as_bytes(&self) -> &[u8];
+}

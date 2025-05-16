@@ -1,17 +1,16 @@
 use crate::Error;
-use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct TransactionLegacy {
     /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
     /// The fee the sender pays per unit of gas
     pub gas_price: U256,
-    /// The maximum amount of gas units consumed by the transaction
+    /// The maximum amount of gas the sender is willing to consume on a transaction
     pub gas_limit: U256,
     /// The receiving address (`None` for the zero address)
     pub to: Option<Address>,
@@ -40,8 +39,9 @@ impl TransactionLegacy {
         }
     }
 
-    /// Returns self.gas as a u64, or None if self.gas > u64::MAX
+    /// Returns self.gas as a u64, or None if self.gas > `u64::MAX`
     #[allow(unused)]
+    #[must_use]
     pub fn get_gas_limit(&self) -> Option<u64> {
         self.gas_limit.try_into().ok()
     }
@@ -78,12 +78,13 @@ impl LegacyEthSignedTransaction {
         self.transaction
             .rlp_append_unsigned(&mut rlp_stream, chain_id);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s))
-            .map_err(|_e| Error::EcRecover)
+        sdk::ecrecover(message_hash, &super::vrs_to_arr(rec_id, self.r, self.s))
+            .map_err(|_| Error::EcRecover)
     }
 
     /// Returns chain id encoded in `v` parameter of the signature if that was done, otherwise None.
-    pub fn chain_id(&self) -> Option<u64> {
+    #[must_use]
+    pub const fn chain_id(&self) -> Option<u64> {
         match self.v {
             0..=34 => None,
             _ => Some((self.v - 35) / 2),
@@ -112,7 +113,7 @@ impl Encodable for LegacyEthSignedTransaction {
 impl Decodable for LegacyEthSignedTransaction {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         if rlp.item_count() != Ok(9) {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
+            return Err(DecoderError::RlpIncorrectListLen);
         }
         let nonce = rlp.val_at(0)?;
         let gas_price = rlp.val_at(1)?;
@@ -166,12 +167,12 @@ mod tests {
             tx.transaction,
             TransactionLegacy {
                 nonce: U256::zero(),
-                gas_price: U256::from(234567897654321u128),
-                gas_limit: U256::from(2000000u128),
+                gas_price: U256::from(234_567_897_654_321_u128),
+                gas_limit: U256::from(2_000_000u128),
                 to: Some(address_from_arr(
                     &hex::decode("F0109fC8DF283027b6285cc889F5aA624EaC1F55").unwrap()
                 )),
-                value: Wei::new_u64(1000000000),
+                value: Wei::new_u64(1_000_000_000),
                 data: vec![],
             }
         );
@@ -193,7 +194,7 @@ mod tests {
         assert_eq!(tx_2.transaction.to, Some(address_from_arr(&[0u8; 20])));
 
         // otherwise, tx_1 and tx_2 are identical.
-        let mut tx_2_mod = tx_2.clone();
+        let mut tx_2_mod = tx_2;
         tx_2_mod.transaction.to = None;
         assert_eq!(tx_1.transaction, tx_2_mod.transaction);
     }

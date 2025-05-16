@@ -1,23 +1,24 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc_error_handler))]
+// All `as` conversions in this code base have been carefully reviewed and are safe.
+#![allow(clippy::as_conversions)]
 
+use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
 #[cfg(feature = "contract")]
-use crate::prelude::{Address, Vec, U256};
-use crate::prelude::{H256, STORAGE_PRICE_PER_BYTE};
+use crate::prelude::{Vec, U256};
 pub use types::keccak;
 
+pub mod base64;
 pub mod caching;
 pub mod env;
 pub mod error;
+#[cfg(feature = "contract")]
+mod exports;
 pub mod io;
 #[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;
 pub mod types;
-
-#[cfg(feature = "contract")]
-use near_runtime::exports;
 
 #[cfg(feature = "contract")]
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;
@@ -43,17 +44,19 @@ pub fn log_utf8(bytes: &[u8]) {
 
 /// Calls environment sha256 on given input.
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
         let bytes = H256::zero();
-        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as *const u64 as u64);
+        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as u64);
         bytes
     }
 }
 
 #[cfg(not(feature = "contract"))]
+#[must_use]
 pub fn sha256(input: &[u8]) -> H256 {
     use sha2::Digest;
 
@@ -63,6 +66,7 @@ pub fn sha256(input: &[u8]) -> H256 {
 
 /// Calls environment ripemd160 on given input.
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
@@ -73,7 +77,19 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     }
 }
 
+#[cfg(not(feature = "contract"))]
+#[must_use]
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    use ripemd::{Digest, Ripemd160};
+
+    let hash = Ripemd160::digest(input);
+    let mut output = [0u8; 20];
+    output.copy_from_slice(&hash);
+    output
+}
+
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
     let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
 
@@ -92,13 +108,14 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }
 
 #[cfg(feature = "contract")]
+#[must_use]
 pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
     let mut bytes = [0u8; 96];
     bytes[0..64].copy_from_slice(&g1);
@@ -114,8 +131,8 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
         exports::read_register(REGISTER_ID, output.as_ptr() as u64);
         let x = U256::from_little_endian(&output[0..32]);
         let y = U256::from_little_endian(&output[32..64]);
-        x.to_big_endian(&mut output[0..32]);
-        y.to_big_endian(&mut output[32..64]);
+        output[0..32].copy_from_slice(&x.to_big_endian());
+        output[32..64].copy_from_slice(&y.to_big_endian());
         output
     }
 }
@@ -146,20 +163,21 @@ where
 #[cfg(feature = "contract")]
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     unsafe {
-        let hash_ptr = hash.as_ptr() as u64;
-        let sig_ptr = signature.as_ptr() as u64;
         const RECOVER_REGISTER_ID: u64 = 1;
         const KECCACK_REGISTER_ID: u64 = 2;
+
+        let hash_ptr = hash.as_ptr() as u64;
+        let sig_ptr = signature.as_ptr() as u64;
         let result = exports::ecrecover(
             ECRECOVER_MESSAGE_SIZE,
             hash_ptr,
             ECRECOVER_SIGNATURE_LENGTH,
             sig_ptr,
-            signature[64] as u64,
+            u64::from(signature[64]),
             ECRECOVER_MALLEABILITY_FLAG,
             RECOVER_REGISTER_ID,
         );
-        if result == (true as u64) {
+        if result == u64::from(true) {
             // The result from the ecrecover call is in a register; we can use this
             // register directly for the input to keccak256. This is why the length is
             // set to `u64::MAX`.
@@ -173,32 +191,58 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
     }
 }
 
+#[cfg(not(feature = "contract"))]
+pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
+    use sha3::Digest;
+
+    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).map_err(|_| ECRecoverErr)?;
+    let v = signature[64];
+    let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
+        .map_err(|_| ECRecoverErr)?;
+    let bit = match v {
+        0..=26 => v,
+        _ => v - 27,
+    };
+    let recovery_id = libsecp256k1::RecoveryId::parse(bit).map_err(|_| ECRecoverErr)?;
+
+    libsecp256k1::recover(&hash, &signature, &recovery_id)
+        .map_err(|_| ECRecoverErr)
+        .and_then(|public_key| {
+            // recover returns a 65-byte key, but addresses come from the raw 64-byte key
+            let r = sha3::Keccak256::digest(&public_key.serialize()[1..]);
+            Address::try_from_slice(&r[12..]).map_err(|_| ECRecoverErr)
+        })
+}
+
 #[cfg(feature = "contract")]
 pub fn log(data: &str) {
-    log_utf8(data.as_bytes())
+    log_utf8(data.as_bytes());
 }
 
 #[cfg(not(feature = "contract"))]
+#[allow(clippy::missing_const_for_fn)]
 pub fn log(_data: &str) {
     // TODO: standalone logging
 }
 
 #[macro_export]
 macro_rules! log {
-    ($e: expr) => {
+    ($($args:tt)*) => {
         #[cfg(feature = "log")]
-        $crate::log($e)
+        $crate::log(&aurora_engine_types::format!("{}", format_args!($($args)*)))
     };
 }
 
-pub fn storage_byte_cost() -> u128 {
+#[must_use]
+pub const fn storage_byte_cost() -> u128 {
     STORAGE_PRICE_PER_BYTE
 }
 
 pub struct ECRecoverErr;
 
 impl ECRecoverErr {
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         "ERR_ECRECOVER"
     }
 }
@@ -206,5 +250,34 @@ impl ECRecoverErr {
 impl AsRef<[u8]> for ECRecoverErr {
     fn as_ref(&self) -> &[u8] {
         self.as_str().as_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aurora_engine_types::types::Address;
+    use aurora_engine_types::H256;
+
+    const SIGNATURE_LENGTH: usize = 65;
+
+    fn ecverify(hash: H256, signature: &[u8], signer: Address) -> bool {
+        matches!(ecrecover(hash, signature[0..SIGNATURE_LENGTH].try_into().unwrap()), Ok(s) if s == signer)
+    }
+
+    #[test]
+    fn test_ecverify() {
+        let hash = H256::from_slice(
+            &hex::decode("1111111111111111111111111111111111111111111111111111111111111111")
+                .unwrap(),
+        );
+        let signature =
+            &hex::decode("b9f0bb08640d3c1c00761cdd0121209268f6fd3816bc98b9e6f3cc77bf82b69812ac7a61788a0fdc0e19180f14c945a8e1088a27d92a74dce81c0981fb6447441b")
+                .unwrap();
+        let signer = Address::try_from_slice(
+            &hex::decode("1563915e194D8CfBA1943570603F7606A3115508").unwrap(),
+        )
+        .unwrap();
+        assert!(ecverify(hash, signature, signer));
     }
 }

@@ -1,22 +1,297 @@
-use aurora_engine::pausables::{
-    EnginePrecompilesPauser, PausedPrecompilesManager, PrecompileFlags,
+use crate::engine_state::EngineStateAccess;
+use aurora_engine::contract_methods::silo;
+use aurora_engine::{contract_methods, parameters::SubmitResult};
+use aurora_engine_modexp::ModExpAlgorithm;
+use aurora_engine_sdk::{
+    env::{self, DEFAULT_PREPAID_GAS},
+    io::IO,
 };
-use aurora_engine::{connector, engine, parameters::SubmitResult, xcc};
-use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::parameters::{connector, engine, PromiseOrValue};
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
-    parameters::PromiseWithCallbackArgs,
-    types::{Address, Yocto},
+    borsh::BorshDeserialize,
+    parameters::{silo as silo_params, xcc, PromiseWithCallbackArgs},
+    types::Address,
     H256,
 };
+use std::{io, str::FromStr};
 
 pub mod types;
 
-use crate::engine_state::EngineStateAccess;
-use crate::{BlockMetadata, Diff, Storage};
-use types::{Message, TransactionKind, TransactionMessage};
+use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
+use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
-pub fn consume_message(
+/// Try to parse an Aurora transaction from raw information available in a Near action
+/// (method name, input bytes, data returned from promises).
+#[allow(clippy::too_many_lines)]
+pub fn parse_transaction_kind(
+    method_name: &str,
+    bytes: Vec<u8>,
+    promise_data: &[Option<Vec<u8>>],
+) -> Result<TransactionKind, ParseTransactionKindError> {
+    let tx_kind_tag = TransactionKindTag::from_str(method_name).map_err(|_| {
+        ParseTransactionKindError::UnknownMethodName {
+            name: method_name.into(),
+        }
+    })?;
+    let f = |e: io::Error| ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e));
+
+    let tx_kind = match tx_kind_tag {
+        TransactionKindTag::Submit => {
+            let eth_tx = EthTransactionKind::try_from(bytes.as_slice()).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
+            TransactionKind::Submit(eth_tx)
+        }
+        TransactionKindTag::SubmitWithArgs => {
+            let args = engine::SubmitArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SubmitWithArgs(args)
+        }
+        TransactionKindTag::Call => {
+            let call_args = engine::CallArgs::deserialize(&bytes).ok_or_else(|| {
+                ParseTransactionKindError::failed_deserialization::<io::Error>(tx_kind_tag, None)
+            })?;
+            TransactionKind::Call(call_args)
+        }
+        TransactionKindTag::PausePrecompiles => {
+            let args = engine::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::PausePrecompiles(args)
+        }
+        TransactionKindTag::ResumePrecompiles => {
+            let args = engine::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::ResumePrecompiles(args)
+        }
+        TransactionKindTag::SetOwner => {
+            let args = engine::SetOwnerArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetOwner(args)
+        }
+        TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
+        TransactionKindTag::DeployErc20 => {
+            let deploy_args = engine::DeployErc20TokenArgs::deserialize(&bytes).map_err(f)?;
+            TransactionKind::DeployErc20(deploy_args)
+        }
+        TransactionKindTag::DeployErc20Callback => {
+            let args = AccountId::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::DeployErc20Callback(args)
+        }
+        TransactionKindTag::FtOnTransfer => {
+            let transfer_args: connector::FtOnTransferArgs =
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::FtOnTransfer(transfer_args)
+        }
+        TransactionKindTag::Deposit => TransactionKind::Deposit(bytes),
+        TransactionKindTag::FtTransferCall => {
+            let transfer_args: connector::FtTransferCallArgs =
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::FtTransferCall(transfer_args)
+        }
+        TransactionKindTag::FinishDeposit => {
+            let args = connector::FinishDepositArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::FinishDeposit(args)
+        }
+        TransactionKindTag::ResolveTransfer => {
+            let args = connector::FtResolveTransferArgs::try_from_slice(&bytes).map_err(f)?;
+            let promise_result = promise_data
+                .first()
+                .and_then(Option::as_ref)
+                .map_or(aurora_engine_types::types::PromiseResult::Failed, |bytes| {
+                    aurora_engine_types::types::PromiseResult::Successful(bytes.clone())
+                });
+            TransactionKind::ResolveTransfer(args, promise_result)
+        }
+        TransactionKindTag::FtTransfer => {
+            let args: connector::FtTransferArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::FtTransfer(args)
+        }
+        TransactionKindTag::Withdraw => {
+            let args = connector::WithdrawCallArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::Withdraw(args)
+        }
+        TransactionKindTag::StorageDeposit => {
+            let args: connector::StorageDepositArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::StorageDeposit(args)
+        }
+        TransactionKindTag::StorageUnregister => {
+            let json_args: serde_json::Value =
+                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+            let force = json_args
+                .as_object()
+                .and_then(|x| x.get("force"))
+                .and_then(serde_json::Value::as_bool);
+
+            TransactionKind::StorageUnregister(force)
+        }
+        TransactionKindTag::StorageWithdraw => {
+            let args: connector::StorageWithdrawArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::StorageWithdraw(args)
+        }
+        TransactionKindTag::SetPausedFlags => {
+            let args = connector::PauseEthConnectorArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetPausedFlags(args)
+        }
+        TransactionKindTag::RegisterRelayer => {
+            let address = Address::try_from_slice(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
+            TransactionKind::RegisterRelayer(address)
+        }
+        TransactionKindTag::ExitToNear => {
+            if promise_data.first().and_then(Option::as_ref).is_none() {
+                TransactionKind::ExitToNear(None)
+            } else {
+                let args = connector::ExitToNearPrecompileCallbackArgs::try_from_slice(&bytes)
+                    .map_err(f)?;
+                TransactionKind::ExitToNear(Some(args))
+            }
+        }
+        TransactionKindTag::SetConnectorData => {
+            let args = connector::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetConnectorData(args)
+        }
+        TransactionKindTag::NewConnector => {
+            let args = connector::InitCallArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::NewConnector(args)
+        }
+        TransactionKindTag::NewEngine => {
+            let args = engine::NewCallArgs::deserialize(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
+            TransactionKind::NewEngine(args)
+        }
+        TransactionKindTag::FactoryUpdate => TransactionKind::FactoryUpdate(bytes),
+        TransactionKindTag::FactoryUpdateAddressVersion => {
+            let args = xcc::AddressVersionUpdateArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::FactoryUpdateAddressVersion(args)
+        }
+        TransactionKindTag::FactorySetWNearAddress => {
+            let address = Address::try_from_slice(&bytes).map_err(|e| {
+                ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+            })?;
+            TransactionKind::FactorySetWNearAddress(address)
+        }
+        TransactionKindTag::WithdrawWnearToRouter => {
+            let args = xcc::WithdrawWnearToRouterArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::WithdrawWnearToRouter(args)
+        }
+        TransactionKindTag::SetUpgradeDelayBlocks => {
+            let args = engine::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetUpgradeDelayBlocks(args)
+        }
+        TransactionKindTag::FundXccSubAccount => {
+            let args = xcc::FundXccArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::FundXccSubAccount(args)
+        }
+        TransactionKindTag::PauseContract => TransactionKind::PauseContract,
+        TransactionKindTag::ResumeContract => TransactionKind::ResumeContract,
+        TransactionKindTag::SetKeyManager => {
+            let args: engine::RelayerKeyManagerArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+            TransactionKind::SetKeyManager(args)
+        }
+        TransactionKindTag::AddRelayerKey => {
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::AddRelayerKey(args)
+        }
+        TransactionKindTag::StoreRelayerKeyCallback => {
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::StoreRelayerKeyCallback(args)
+        }
+        TransactionKindTag::RemoveRelayerKey => {
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::RemoveRelayerKey(args)
+        }
+        TransactionKindTag::StartHashchain => {
+            let args = engine::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::StartHashchain(args)
+        }
+        TransactionKindTag::SetErc20Metadata => {
+            let args: connector::SetErc20MetadataArgs =
+                serde_json::from_slice(&bytes).map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+            TransactionKind::SetErc20Metadata(args)
+        }
+        TransactionKindTag::SetFixedGas => {
+            let args = silo_params::FixedGasArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetFixedGas(args)
+        }
+        TransactionKindTag::SetErc20FallbackAddress => {
+            let args = silo_params::Erc20FallbackAddressArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetErc20FallbackAddress(args)
+        }
+        TransactionKindTag::SetSiloParams => {
+            let args: Option<silo_params::SiloParamsArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetSiloParams(args)
+        }
+        TransactionKindTag::SetWhitelistStatus => {
+            let args = silo_params::WhitelistStatusArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetWhitelistStatus(args)
+        }
+        TransactionKindTag::SetWhitelistsStatuses => {
+            let args: Vec<silo_params::WhitelistStatusArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetWhitelistsStatuses(args)
+        }
+        TransactionKindTag::AddEntryToWhitelist => {
+            let args = silo_params::WhitelistArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::AddEntryToWhitelist(args)
+        }
+        TransactionKindTag::AddEntryToWhitelistBatch => {
+            let args: Vec<silo_params::WhitelistArgs> =
+                BorshDeserialize::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::AddEntryToWhitelistBatch(args)
+        }
+        TransactionKindTag::RemoveEntryFromWhitelist => {
+            let args = silo_params::WhitelistArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::RemoveEntryFromWhitelist(args)
+        }
+        TransactionKindTag::SetEthConnectorContractAccount => {
+            let args =
+                connector::SetEthConnectorContractAccountArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::SetEthConnectorContractAccount(args)
+        }
+        TransactionKindTag::MirrorErc20TokenCallback => {
+            let args = connector::MirrorErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::MirrorErc20TokenCallback(args)
+        }
+        TransactionKindTag::Unknown => {
+            return Err(ParseTransactionKindError::UnknownMethodName {
+                name: method_name.into(),
+            });
+        }
+    };
+    Ok(tx_kind)
+}
+
+/// Note: this function does not automatically commit transaction messages to the storage.
+/// If you want the transaction diff committed then you must call the `commit` method on
+/// the outcome of this function.
+pub fn consume_message<M: ModExpAlgorithm + 'static>(
     storage: &mut Storage,
     message: Message,
 ) -> Result<ConsumeMessageOutcome, crate::Error> {
@@ -26,7 +301,7 @@ pub fn consume_message(
             let block_height = block_message.height;
             let block_metadata = block_message.metadata;
             storage
-                .set_block_data(block_hash, block_height, block_metadata)
+                .set_block_data(block_hash, block_height, &block_metadata)
                 .map_err(crate::Error::Rocksdb)?;
             Ok(ConsumeMessageOutcome::BlockAdded)
         }
@@ -44,20 +319,22 @@ pub fn consume_message(
             let engine_account_id = storage.get_engine_account_id()?;
 
             let (tx_hash, diff, result) = storage
-                .with_engine_access(block_height, transaction_position, &[], |io| {
-                    execute_transaction(
-                        transaction_message.as_ref(),
-                        block_height,
-                        &block_metadata,
-                        engine_account_id,
-                        io,
-                    )
-                })
+                .with_engine_access(
+                    block_height,
+                    transaction_position,
+                    &transaction_message.raw_input,
+                    |io| {
+                        execute_transaction::<_, M, _>(
+                            transaction_message.as_ref(),
+                            block_height,
+                            &block_metadata,
+                            engine_account_id,
+                            io,
+                            EngineStateAccess::get_transaction_diff,
+                        )
+                    },
+                )
                 .result;
-            match result.as_ref() {
-                Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
-                _ => storage.set_transaction_included(tx_hash, &transaction_message, &diff)?,
-            }
             let outcome = TransactionIncludedOutcome {
                 hash: tx_hash,
                 info: *transaction_message,
@@ -71,7 +348,7 @@ pub fn consume_message(
     }
 }
 
-pub fn execute_transaction_message(
+pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     storage: &Storage,
     transaction_message: TransactionMessage,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
@@ -80,15 +357,21 @@ pub fn execute_transaction_message(
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
-    let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
-        execute_transaction(
-            &transaction_message,
-            block_height,
-            &block_metadata,
-            engine_account_id,
-            io,
-        )
-    });
+    let result = storage.with_engine_access(
+        block_height,
+        transaction_position,
+        &transaction_message.raw_input,
+        |io| {
+            execute_transaction::<_, M, _>(
+                &transaction_message,
+                block_height,
+                &block_metadata,
+                engine_account_id,
+                io,
+                EngineStateAccess::get_transaction_diff,
+            )
+        },
+    );
     let (tx_hash, diff, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
         hash: tx_hash,
@@ -99,23 +382,31 @@ pub fn execute_transaction_message(
     Ok(outcome)
 }
 
-fn execute_transaction<'db>(
+pub fn execute_transaction<I, M, F>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    io: EngineStateAccess<'db, 'db, 'db>,
+    io: I,
+    get_diff: F,
 ) -> (
     H256,
     Diff,
     Result<Option<TransactionExecutionResult>, error::Error>,
-) {
+)
+where
+    I: IO + Copy,
+    M: ModExpAlgorithm + 'static,
+    F: FnOnce(&I) -> Diff,
+{
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
-    let relayer_address =
-        aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let near_receipt_id = transaction_message.near_receipt_id;
     let current_account_id = engine_account_id;
+    let random_seed = compute_random_seed(
+        &transaction_message.action_hash,
+        &block_metadata.random_seed,
+    );
     let env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -123,8 +414,9 @@ fn execute_transaction<'db>(
         block_height,
         block_timestamp: block_metadata.timestamp,
         attached_deposit: transaction_message.attached_near,
-        random_seed: block_metadata.random_seed,
+        random_seed,
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
 
     let (tx_hash, result) = match &transaction_message.transaction {
@@ -134,276 +426,268 @@ fn execute_transaction<'db>(
             let mut handler = crate::promise::NoScheduler {
                 promise_data: &transaction_message.promise_data,
             };
-            let transaction_bytes: Vec<u8> = tx.into();
-            let tx_hash = aurora_engine_sdk::keccak(&transaction_bytes);
-
-            let result = engine::get_state(&io)
-                .map(|engine_state| {
-                    let submit_result = engine::submit(
-                        io,
-                        &env,
-                        &transaction_bytes,
-                        engine_state,
-                        env.current_account_id(),
-                        relayer_address,
-                        &mut handler,
-                    );
-                    Some(TransactionExecutionResult::Submit(submit_result))
-                })
+            let tx_data: Vec<u8> = tx.into();
+            let tx_hash = aurora_engine_sdk::keccak(&tx_data);
+            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
+                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
                 .map_err(Into::into);
 
             (tx_hash, result)
         }
+        TransactionKind::SubmitWithArgs(args) => {
+            let mut handler = crate::promise::NoScheduler {
+                promise_data: &transaction_message.promise_data,
+            };
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
+            let result =
+                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
+                    .map(|submit_result| {
+                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
+                    })
+                    .map_err(Into::into);
 
+            (tx_hash, result)
+        }
         other => {
-            let result = non_submit_execute(
-                other,
-                io,
-                env,
-                relayer_address,
-                &transaction_message.promise_data,
-            );
+            let result = non_submit_execute(other, io, &env, &transaction_message.promise_data);
             (near_receipt_id, result)
         }
     };
 
-    let diff = io.get_transaction_diff();
+    let diff = get_diff(&io);
 
     (tx_hash, diff, result)
 }
 
+/// Based on nearcore implementation:
+/// <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295>
+fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
+    const BYTES_LEN: usize = 32 + 32;
+    let mut bytes: Vec<u8> = Vec::with_capacity(BYTES_LEN);
+    bytes.extend_from_slice(action_hash.as_bytes());
+    bytes.extend_from_slice(block_random_value.as_bytes());
+    aurora_engine_sdk::sha256(&bytes)
+}
+
 /// Handles all transaction kinds other than `submit`.
-/// The `submit` transaction kind is special because it is the only one where the transaction hash is
-/// different than the NEAR receipt hash.
-fn non_submit_execute<'db>(
+/// The `submit` transaction kind is special because it is the only one where the transaction hash
+/// differs from the NEAR receipt hash.
+#[allow(
+    clippy::too_many_lines,
+    clippy::match_same_arms,
+    clippy::cognitive_complexity
+)]
+fn non_submit_execute<I: IO + Copy>(
     transaction: &TransactionKind,
-    mut io: EngineStateAccess<'db, 'db, 'db>,
-    env: env::Fixed,
-    relayer_address: Address,
+    mut io: I,
+    env: &env::Fixed,
     promise_data: &[Option<Vec<u8>>],
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
     let result = match transaction {
-        TransactionKind::Call(args) => {
+        TransactionKind::Call(_) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            let result = contract_methods::evm_transactions::call(io, env, &mut handler)?;
 
-            let result = engine.call_with_args(args.clone(), &mut handler);
-
-            Some(TransactionExecutionResult::Submit(result))
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
 
-        TransactionKind::Deploy(input) => {
+        TransactionKind::Deploy(_) => {
             // We can ignore promises in the standalone engine (see above)
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            let result = contract_methods::evm_transactions::deploy_code(io, env, &mut handler)?;
 
-            let result = engine.deploy_code_with_input(input.clone(), &mut handler);
-
-            Some(TransactionExecutionResult::Submit(result))
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
-
-        TransactionKind::DeployErc20(args) => {
-            // No promises can be created by `deploy_erc20_token`
+        TransactionKind::DeployErc20(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = engine::deploy_erc20_token(args.clone(), io, &env, &mut handler)?;
+            let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
+
+            Some(match result {
+                PromiseOrValue::Value(address) => TransactionExecutionResult::DeployErc20(address),
+                PromiseOrValue::Promise(promise_args) => {
+                    TransactionExecutionResult::Promise(promise_args)
+                }
+            })
+        }
+        TransactionKind::DeployErc20Callback(_) => {
+            // No promises can be created by `deploy_erc20_token_callback`
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result =
+                contract_methods::connector::deploy_erc20_token_callback(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
-
-        TransactionKind::FtOnTransfer(args) => {
+        TransactionKind::FtOnTransfer(_) => {
             // No promises can be created by `ft_on_transfer`
             let mut handler = crate::promise::NoScheduler { promise_data };
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
+            let maybe_output = contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
 
-            if env.predecessor_account_id == env.current_account_id {
-                connector::EthConnectorContract::init_instance(io)?
-                    .ft_on_transfer(&engine, args)?;
-            } else {
-                engine.receive_erc20_tokens(
-                    &env.predecessor_account_id,
-                    &env.signer_account_id,
-                    args,
-                    &env.current_account_id,
-                    &mut handler,
-                );
-            }
-
+            maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
+        }
+        TransactionKind::FtTransferCall(_) => None,
+        TransactionKind::ResolveTransfer(_, _) => None,
+        TransactionKind::FtTransfer(_) => None,
+        TransactionKind::Withdraw(_) => None,
+        TransactionKind::Deposit(_) => None,
+        TransactionKind::FinishDeposit(_) => None,
+        TransactionKind::StorageDeposit(_) => None,
+        TransactionKind::StorageUnregister(_) => None,
+        TransactionKind::StorageWithdraw(_) => None,
+        TransactionKind::SetPausedFlags(_) => None,
+        TransactionKind::RegisterRelayer(_) => {
+            contract_methods::admin::register_relayer(io, env)?;
             None
         }
-
-        TransactionKind::FtTransferCall(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector.ft_transfer_call(
-                env.predecessor_account_id.clone(),
-                env.current_account_id.clone(),
-                args.clone(),
-                env.prepaid_gas,
-            )?;
-
-            Some(TransactionExecutionResult::Promise(promise_args))
-        }
-
-        TransactionKind::ResolveTransfer(args, promise_result) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_resolve_transfer(args.clone(), promise_result.clone());
-
-            None
-        }
-
-        TransactionKind::FtTransfer(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.ft_transfer(&env.predecessor_account_id, args.clone())?;
-
-            None
-        }
-
-        TransactionKind::Withdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.withdraw_eth_from_near(
-                &env.current_account_id,
-                &env.predecessor_account_id,
-                args.clone(),
-            )?;
-
-            None
-        }
-
-        TransactionKind::Deposit(raw_proof) => {
-            let connector_contract = connector::EthConnectorContract::init_instance(io)?;
-            let promise_args = connector_contract.deposit(
-                raw_proof.clone(),
-                env.current_account_id(),
-                env.predecessor_account_id(),
-            )?;
-
-            Some(TransactionExecutionResult::Promise(promise_args))
-        }
-
-        TransactionKind::FinishDeposit(finish_args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let maybe_promise_args = connector.finish_deposit(
-                env.predecessor_account_id(),
-                env.current_account_id(),
-                finish_args.clone(),
-                env.prepaid_gas,
-            )?;
-
-            maybe_promise_args.map(TransactionExecutionResult::Promise)
-        }
-
-        TransactionKind::StorageDeposit(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_deposit(
-                env.predecessor_account_id,
-                Yocto::new(env.attached_deposit),
-                args.clone(),
-            )?;
-
-            None
-        }
-
-        TransactionKind::StorageUnregister(force) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            let _ = connector.storage_unregister(env.predecessor_account_id, *force)?;
-
-            None
-        }
-
-        TransactionKind::StorageWithdraw(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.storage_withdraw(&env.predecessor_account_id, args.clone())?;
-
-            None
-        }
-
-        TransactionKind::SetPausedFlags(args) => {
-            let mut connector = connector::EthConnectorContract::init_instance(io)?;
-            connector.set_paused_flags(args.clone());
-
-            None
-        }
-
-        TransactionKind::RegisterRelayer(evm_address) => {
-            let mut engine =
-                engine::Engine::new(relayer_address, env.current_account_id(), io, &env)?;
-            engine.register_relayer(env.predecessor_account_id.as_bytes(), *evm_address);
-
-            None
-        }
-
-        TransactionKind::RefundOnError(maybe_args) => {
-            let result: Result<Option<TransactionExecutionResult>, engine::EngineStateError> =
-                maybe_args
-                    .clone()
-                    .map(|args| {
-                        let mut handler = crate::promise::NoScheduler { promise_data };
-                        let engine_state = engine::get_state(&io)?;
-                        let result =
-                            engine::refund_on_error(io, &env, engine_state, args, &mut handler);
-                        Ok(TransactionExecutionResult::Submit(result))
-                    })
-                    .transpose();
-
-            result?
-        }
-
-        TransactionKind::SetConnectorData(args) => {
-            let mut connector_io = io;
-            connector::set_contract_data(&mut connector_io, args.clone())?;
-
-            None
-        }
-
-        TransactionKind::NewConnector(args) => {
-            connector::EthConnectorContract::create_contract(
+        TransactionKind::ExitToNear(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
                 io,
-                env.current_account_id,
-                args.clone(),
+                env,
+                &mut handler,
             )?;
 
+            maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
+        }
+        TransactionKind::SetConnectorData(_) => None,
+        TransactionKind::NewConnector(_) => None,
+        TransactionKind::NewEngine(_) => {
+            contract_methods::admin::new(io, env)?;
             None
         }
-        TransactionKind::NewEngine(args) => {
-            engine::set_state(&mut io, args.clone().into());
+        TransactionKind::SetEthConnectorContractAccount(_) => {
+            contract_methods::connector::set_eth_connector_contract_account(io, env)?;
+            None
+        }
+        TransactionKind::FactoryUpdate(_) => {
+            contract_methods::xcc::factory_update(io, env)?;
 
             None
         }
-        TransactionKind::FactoryUpdate(bytecode) => {
-            let router_bytecode = xcc::RouterCode::borrowed(bytecode);
-            xcc::update_router_code(&mut io, &router_bytecode);
+        TransactionKind::FactoryUpdateAddressVersion(_) => {
+            let handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::xcc::factory_update_address_version(io, env, &handler)?;
 
             None
         }
-        TransactionKind::FactoryUpdateAddressVersion(args) => {
-            xcc::set_code_version_of_address(&mut io, &args.address, args.version);
+        TransactionKind::FactorySetWNearAddress(_) => {
+            contract_methods::xcc::factory_set_wnear_address(io, env)?;
 
             None
         }
-        TransactionKind::FactorySetWNearAddress(address) => {
-            xcc::set_wnear_address(&mut io, address);
+        TransactionKind::FundXccSubAccount(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::xcc::fund_xcc_sub_account(io, env, &mut handler)?;
 
             None
+        }
+        TransactionKind::WithdrawWnearToRouter(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
+
+            Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function
-        TransactionKind::Submit(_) => unreachable!(),
-        TransactionKind::PausePrecompiles(args) => {
-            let precompiles_to_pause = PrecompileFlags::from_bits_truncate(args.paused_mask);
-
-            let mut pauser = EnginePrecompilesPauser::from_io(io);
-            pauser.pause_precompiles(precompiles_to_pause);
+        TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
+        TransactionKind::PausePrecompiles(_) => {
+            contract_methods::admin::pause_precompiles(io, env)?;
 
             None
         }
-        TransactionKind::ResumePrecompiles(args) => {
-            let precompiles_to_resume = PrecompileFlags::from_bits_truncate(args.paused_mask);
+        TransactionKind::ResumePrecompiles(_) => {
+            contract_methods::admin::resume_precompiles(io, env)?;
 
-            let mut pauser = EnginePrecompilesPauser::from_io(io);
-            pauser.resume_precompiles(precompiles_to_resume);
+            None
+        }
+        TransactionKind::SetOwner(_) => {
+            contract_methods::admin::set_owner(io, env)?;
+
+            None
+        }
+        TransactionKind::SetUpgradeDelayBlocks(_) => {
+            contract_methods::admin::set_upgrade_delay_blocks(io, env)?;
+
+            None
+        }
+        TransactionKind::PauseContract => {
+            contract_methods::admin::pause_contract(io, env)?;
+
+            None
+        }
+        TransactionKind::ResumeContract => {
+            contract_methods::admin::resume_contract(io, env)?;
+
+            None
+        }
+        TransactionKind::SetKeyManager(_) => {
+            contract_methods::admin::set_key_manager(io, env)?;
+
+            None
+        }
+        TransactionKind::AddRelayerKey(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::StoreRelayerKeyCallback(_) => {
+            contract_methods::admin::store_relayer_key_callback(io, env)?;
+
+            None
+        }
+        TransactionKind::RemoveRelayerKey(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::admin::remove_relayer_key(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::StartHashchain(_) => {
+            contract_methods::admin::start_hashchain(io, env)?;
+
+            None
+        }
+        TransactionKind::SetErc20Metadata(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::set_erc20_metadata(io, env, &mut handler)?;
+
+            None
+        }
+        TransactionKind::SetFixedGas(args) => {
+            silo::set_fixed_gas(&mut io, args.fixed_gas);
+            None
+        }
+        TransactionKind::SetErc20FallbackAddress(args) => {
+            silo::set_erc20_fallback_address(&mut io, args.address);
+            None
+        }
+        TransactionKind::SetSiloParams(args) => {
+            silo::set_silo_params(&mut io, args.clone());
+            None
+        }
+        TransactionKind::AddEntryToWhitelist(args) => {
+            silo::add_entry_to_whitelist(&io, args);
+            None
+        }
+        TransactionKind::AddEntryToWhitelistBatch(args) => {
+            silo::add_entry_to_whitelist_batch(&io, args.clone());
+            None
+        }
+        TransactionKind::RemoveEntryFromWhitelist(args) => {
+            silo::remove_entry_from_whitelist(&io, args);
+            None
+        }
+        TransactionKind::SetWhitelistStatus(args) => {
+            silo::set_whitelist_status(&io, args);
+            None
+        }
+        TransactionKind::SetWhitelistsStatuses(args) => {
+            silo::set_whitelists_statuses(&io, args.clone());
+            None
+        }
+        TransactionKind::MirrorErc20TokenCallback(_) => {
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            contract_methods::connector::mirror_erc20_token_callback(io, env, &mut handler)?;
 
             None
         }
@@ -419,44 +703,47 @@ pub enum ConsumeMessageOutcome {
     TransactionIncluded(Box<TransactionIncludedOutcome>),
 }
 
+impl ConsumeMessageOutcome {
+    pub fn commit(&self, storage: &mut Storage) -> Result<(), crate::error::Error> {
+        if let Self::TransactionIncluded(x) = self {
+            x.commit(storage)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct TransactionIncludedOutcome {
-    pub hash: aurora_engine_types::H256,
+    pub hash: H256,
     pub info: TransactionMessage,
-    pub diff: crate::Diff,
+    pub diff: Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
+}
+
+impl TransactionIncludedOutcome {
+    pub fn commit(&self, storage: &mut Storage) -> Result<(), crate::error::Error> {
+        match self.maybe_result.as_ref() {
+            Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
+            _ => storage.set_transaction_included(self.hash, &self.info, &self.diff)?,
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionExecutionResult {
-    Submit(engine::EngineResult<SubmitResult>),
+    Submit(aurora_engine::engine::EngineResult<SubmitResult>),
     DeployErc20(Address),
     Promise(PromiseWithCallbackArgs),
 }
 
 pub mod error {
-    use aurora_engine::{connector, engine, fungible_token};
+    use aurora_engine::{contract_methods, engine};
 
     #[derive(Debug)]
     pub enum Error {
-        EngineState(engine::EngineStateError),
         Engine(engine::EngineError),
-        DeployErc20(engine::DeployErc20Error),
-        FtOnTransfer(connector::error::FtTransferCallError),
-        Deposit(connector::error::DepositError),
-        FinishDeposit(connector::error::FinishDepositError),
-        FtTransfer(fungible_token::error::TransferError),
-        FtWithdraw(connector::error::WithdrawError),
-        FtStorageFunding(fungible_token::error::StorageFundingError),
-        InvalidAddress(aurora_engine_types::types::address::error::AddressError),
-        ConnectorInit(connector::error::InitContractError),
-        ConnectorStorage(connector::error::StorageReadError),
-    }
-
-    impl From<engine::EngineStateError> for Error {
-        fn from(e: engine::EngineStateError) -> Self {
-            Self::EngineState(e)
-        }
+        ContractError(contract_methods::ContractError),
     }
 
     impl From<engine::EngineError> for Error {
@@ -465,63 +752,9 @@ pub mod error {
         }
     }
 
-    impl From<engine::DeployErc20Error> for Error {
-        fn from(e: engine::DeployErc20Error) -> Self {
-            Self::DeployErc20(e)
-        }
-    }
-
-    impl From<connector::error::FtTransferCallError> for Error {
-        fn from(e: connector::error::FtTransferCallError) -> Self {
-            Self::FtOnTransfer(e)
-        }
-    }
-
-    impl From<connector::error::DepositError> for Error {
-        fn from(e: connector::error::DepositError) -> Self {
-            Self::Deposit(e)
-        }
-    }
-
-    impl From<connector::error::FinishDepositError> for Error {
-        fn from(e: connector::error::FinishDepositError) -> Self {
-            Self::FinishDeposit(e)
-        }
-    }
-
-    impl From<fungible_token::error::TransferError> for Error {
-        fn from(e: fungible_token::error::TransferError) -> Self {
-            Self::FtTransfer(e)
-        }
-    }
-
-    impl From<connector::error::WithdrawError> for Error {
-        fn from(e: connector::error::WithdrawError) -> Self {
-            Self::FtWithdraw(e)
-        }
-    }
-
-    impl From<fungible_token::error::StorageFundingError> for Error {
-        fn from(e: fungible_token::error::StorageFundingError) -> Self {
-            Self::FtStorageFunding(e)
-        }
-    }
-
-    impl From<aurora_engine_types::types::address::error::AddressError> for Error {
-        fn from(e: aurora_engine_types::types::address::error::AddressError) -> Self {
-            Self::InvalidAddress(e)
-        }
-    }
-
-    impl From<connector::error::InitContractError> for Error {
-        fn from(e: connector::error::InitContractError) -> Self {
-            Self::ConnectorInit(e)
-        }
-    }
-
-    impl From<connector::error::StorageReadError> for Error {
-        fn from(e: connector::error::StorageReadError) -> Self {
-            Self::ConnectorStorage(e)
+    impl From<contract_methods::ContractError> for Error {
+        fn from(e: contract_methods::ContractError) -> Self {
+            Self::ContractError(e)
         }
     }
 }

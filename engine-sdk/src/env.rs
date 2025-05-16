@@ -5,23 +5,27 @@ use aurora_engine_types::account_id::AccountId;
 pub const DEFAULT_PREPAID_GAS: NearGas = NearGas::new(300_000_000_000_000);
 
 /// Timestamp represented by the number of nanoseconds since the Unix Epoch.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Timestamp(u64);
 
 impl Timestamp {
-    pub fn new(ns: u64) -> Self {
+    #[must_use]
+    pub const fn new(ns: u64) -> Self {
         Self(ns)
     }
 
-    pub fn nanos(&self) -> u64 {
+    #[must_use]
+    pub const fn nanos(&self) -> u64 {
         self.0
     }
 
-    pub fn millis(&self) -> u64 {
+    #[must_use]
+    pub const fn millis(&self) -> u64 {
         self.0 / 1_000_000
     }
 
-    pub fn secs(&self) -> u64 {
+    #[must_use]
+    pub const fn secs(&self) -> u64 {
         self.0 / 1_000_000_000
     }
 }
@@ -47,6 +51,8 @@ pub trait Env {
     fn random_seed(&self) -> H256;
     /// Prepaid NEAR Gas
     fn prepaid_gas(&self) -> NearGas;
+    /// Used NEAR Gas
+    fn used_gas(&self) -> NearGas;
 
     fn assert_private_call(&self) -> Result<(), PrivateCallError> {
         if self.predecessor_account_id() == self.current_account_id() {
@@ -67,7 +73,7 @@ pub trait Env {
 
 /// Fully in-memory implementation of the blockchain environment with
 /// fixed values for all the fields.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Fixed {
     pub signer_account_id: AccountId,
     pub current_account_id: AccountId,
@@ -77,6 +83,7 @@ pub struct Fixed {
     pub attached_deposit: u128,
     pub random_seed: H256,
     pub prepaid_gas: NearGas,
+    pub used_gas: NearGas,
 }
 
 impl Env for Fixed {
@@ -110,5 +117,9 @@ impl Env for Fixed {
 
     fn prepaid_gas(&self) -> NearGas {
         self.prepaid_gas
+    }
+
+    fn used_gas(&self) -> NearGas {
+        self.used_gas
     }
 }

@@ -1,10 +1,10 @@
-use crate::prelude::types::{Address, EthGas};
+use crate::prelude::types::{make_address, Address, EthGas};
 use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 /// Identity precompile costs.
 mod costs {
-    use crate::prelude::types::EthGas;
+    use aurora_engine_types::types::EthGas;
 
     /// The base cost of the operation.
     pub(super) const IDENTITY_BASE: EthGas = EthGas::new(15);
@@ -21,23 +21,22 @@ mod consts {
 pub struct Identity;
 
 impl Identity {
-    pub const ADDRESS: Address = super::make_address(0, 4);
+    pub const ADDRESS: Address = make_address(0, 4);
 }
 
 impl Precompile for Identity {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
         Ok(
-            (input_len + consts::IDENTITY_WORD_LEN - 1) / consts::IDENTITY_WORD_LEN
-                * costs::IDENTITY_PER_WORD
+            input_len.div_ceil(consts::IDENTITY_WORD_LEN) * costs::IDENTITY_PER_WORD
                 + costs::IDENTITY_BASE,
         )
     }
 
     /// Takes the input bytes, copies them, and returns it as the output.
     ///
-    /// See: https://ethereum.github.io/yellowpaper/paper.pdf
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000004
+    /// See: `https://ethereum.github.io/yellowpaper/paper.pdf`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000004`
     fn run(
         &self,
         input: &[u8],
@@ -58,7 +57,7 @@ impl Precompile for Identity {
 
 #[cfg(test)]
 mod tests {
-    use evm::ExitError;
+    use aurora_evm::ExitError;
 
     use crate::utils::new_context;
 

@@ -9,36 +9,97 @@ on:
 name: Tests
 jobs:
   test:
-    name: Test suite (mainnet, testnet)
-    runs-on: [self-hosted, heavy]
+    name: Test suite
+    runs-on: github-hosted-heavy-runner
     steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
-        uses: actions/checkout@v3
-      - name: Restore cache
+        uses: actions/checkout@v4
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: aurora-cargo-test
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts
+            etc/tests/uniswap
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Tests
+        run: cargo make test-flow
+
+  test_modexp:
+    name: Test modexp suite
+    runs-on: selfhosted-heavy
+    container: rust:latest
+    steps:
+      - name: Potential broken submodules fix
         run: |
-          cache-util restore cargo_git cargo_registry sccache yarn_cache
-          cache-util restore aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
-      - name: Build contracts
-        run: cargo make build-contracts
-      - name: Test contracts
-        run: cargo make test-contracts
-      - name: Build mainnet test WASM
-        run: cargo make --profile mainnet build-test
-      - name: List mainnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
-      - name: Test mainnet
-        run: cargo make --profile mainnet test-workspace
-      - name: Build testnet test WASM
-        run: cargo make --profile testnet build-test
-      - name: List testnet WASM directory and root directory
-        run: ls -la target/wasm32-unknown-unknown/release && ls -la
-      - name: Test testnet
-        run: cargo make --profile testnet test-workspace
-      - name: Save cache
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: aurora-modexp-test
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Test bench-modexp
+        run: cargo make bench-modexp
+
+  build_xcc_router:
+    name: Build XCC router
+    runs-on: selfhosted
+    container: rust:latest
+    steps:
+      - name: Potential broken submodules fix
         run: |
-          cache-util save cargo_git cargo_registry sccache yarn_cache
-          cache-util msave aurora-engine-target@generic@${{ hashFiles('**/Cargo.lock') }}:target
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            etc/xcc-router/target/
+          key: cargo-build-xcc-router
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Build
+        run: cargo make build-xcc-router
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  RUSTC_WRAPPER: sccache

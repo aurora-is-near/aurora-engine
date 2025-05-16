@@ -1,7 +1,10 @@
-use evm::{Context, ExitError};
+use aurora_evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
-use crate::prelude::{mem, types::Address, Borrowed};
+use crate::prelude::{
+    types::{make_address, Address},
+    Borrowed,
+};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_types::Vec;
 
@@ -67,6 +70,7 @@ mod consts {
 ///
 /// See [RFC 7693](https://datatracker.ietf.org/doc/html/rfc7693#section-3.1) specification for more
 /// details.
+#[allow(clippy::many_single_char_names)]
 fn g(v: &mut [u64], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) {
     v[a] = v[a].wrapping_add(v[b]).wrapping_add(x);
     v[d] = (v[d] ^ v[a]).rotate_right(consts::R1);
@@ -81,11 +85,12 @@ fn g(v: &mut [u64], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) {
 /// Takes as an argument the state vector `h`, message block vector `m` (the last block is padded
 /// with zeros to full block size, if required), 2w-bit offset counter `t`, and final block
 /// indicator flag `f`. Local vector v[0..15] is used in processing. F returns a new state vector.
-/// The number of rounds, `r`, is 12 for BLAKE2b and 10 for BLAKE2s. Rounds are numbered from 0 to
+/// The number of rounds, `r`, is 12 for `BLAKE2b` and 10 for BLAKE2s. Rounds are numbered from 0 to
 /// r - 1.
 ///
 /// See [RFC 7693](https://datatracker.ietf.org/doc/html/rfc7693#section-3.2) specification for more
 /// details.
+#[allow(clippy::many_single_char_names)]
 fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8> {
     // Initialize the work vector.
     let mut v = [0u64; 16];
@@ -97,7 +102,7 @@ fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8
 
     if f {
         // last block flag?
-        v[14] = !v[14] // Invert all bits.
+        v[14] = !v[14]; // Invert all bits.
     }
 
     for i in 0..rounds {
@@ -131,12 +136,12 @@ fn f(mut h: [u64; 8], m: [u64; 16], t: [u64; 2], f: bool, rounds: u32) -> Vec<u8
 pub struct Blake2F;
 
 impl Blake2F {
-    pub const ADDRESS: Address = crate::make_address(0, 9);
+    pub const ADDRESS: Address = make_address(0, 9);
 }
 
 impl Precompile for Blake2F {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
-        let (int_bytes, _) = input.split_at(mem::size_of::<u32>());
+        let (int_bytes, _) = input.split_at(size_of::<u32>());
         let num_rounds = u32::from_be_bytes(
             // Unwrap is fine here as it can not fail
             int_bytes.try_into().unwrap(),
@@ -149,11 +154,11 @@ impl Precompile for Blake2F {
     /// Takes as an argument the state vector `h`, message block vector `m` (the last block is padded
     /// with zeros to full block size, if required), 2w-bit offset counter `t`, and final block
     /// indicator flag `f`. Local vector v[0..15] is used in processing. F returns a new state vector.
-    /// The number of rounds, `r`, is 12 for BLAKE2b and 10 for BLAKE2s. Rounds are numbered from 0 to
+    /// The number of rounds, `r`, is 12 for `BLAKE2b` and 10 for BLAKE2s. Rounds are numbered from 0 to
     /// r - 1.
     ///
-    /// See: https://eips.ethereum.org/EIPS/eip-152
-    /// See: https://etherscan.io/address/0000000000000000000000000000000000000009
+    /// See: `https://eips.ethereum.org/EIPS/eip-152`
+    /// See: `https://etherscan.io/address/0000000000000000000000000000000000000009`
     fn run(
         &self,
         input: &[u8],

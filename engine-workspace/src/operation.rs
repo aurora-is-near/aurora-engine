@@ -1,0 +1,261 @@
+use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::connector::{Erc20Metadata, WithdrawResult};
+use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
+use aurora_engine_types::parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistStatusArgs};
+use aurora_engine_types::types::Address;
+use aurora_engine_types::{H256, U256};
+use near_sdk::json_types::U128;
+use near_sdk::PromiseOrValue;
+
+use crate::contract::RawContract;
+use crate::result::{ExecutionResult, ViewResult};
+use crate::transaction::{CallTransaction, ViewTransaction};
+use crate::{impl_call_return, impl_view_return};
+
+impl_call_return![
+    (CallNew, Call::New),
+    (CallFtTransfer, Call::FtTransfer),
+    (
+        CallFactoryUpdateAddressVersion,
+        Call::FactoryUpdateAddressVersion
+    ),
+    (CallSetOwner, Call::SetOwner),
+    (CallRegisterRelayer, Call::RegisterRelayer),
+    (CallRefundOnError, Call::RefundOnError),
+    (CallFactoryUpdate, Call::FactoryUpdate),
+    (CallFundXccSubAccount, Call::FundXccSubAccount),
+    (CallFactorySetWNearAddress, Call::FactorySetWNearAddress),
+    (CallDeployUpgrade, Call::DeployUpgrade),
+    (CallResumePrecompiles, Call::ResumePrecompiles),
+    (CallPausePrecompiles, Call::PausePrecompiles),
+    (CallUpgrade, Call::Upgrade),
+    (CallStageUpgrade, Call::StageUpgrade),
+    (CallStateMigration, Call::StateMigration),
+    (CallMintAccount, Call::MintAccount),
+    (CallSetPausedFlags, Call::SetPausedFlags),
+    (CallSetKeyManager, Call::SetKeyManager),
+    (CallAddRelayerKey, Call::AddRelayerKey),
+    (CallRemoveRelayerKey, Call::RemoveRelayerKey),
+    (
+        CallSetEthConnectorContractAccount,
+        Call::SetEthConnectorContractAccount
+    ),
+    (CallPauseContract, Call::PauseContract),
+    (CallResumeContract, Call::ResumeContract),
+    (CallSetFixedGas, Call::SetFixedGas),
+    (CallSetErc20FallbackAddress, Call::SetErc20FallbackAddress),
+    (CallSetSiloParams, Call::SetSiloParams),
+    (CallSetWhitelistStatus, Call::SetWhitelistStatus),
+    (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
+    (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
+    (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist),
+    (CallSetErc20Metadata, Call::SetErc20Metadata),
+    (CallAttachFullAccessKey, Call::AttachFullAccessKey)
+];
+
+impl_call_return![
+    (CallFtTransferCall => PromiseOrValue<U128>, Call::FtTransferCall, try_from),
+    (CallStorageDeposit => StorageBalance, Call::StorageDeposit, json),
+    (CallStorageUnregister => bool, Call::StorageUnregister, json),
+    (CallStorageWithdraw => StorageBalance, Call::StorageWithdraw, json),
+    (CallWithdraw => WithdrawResult, Call::Withdraw, borsh),
+    (CallDeployCode => SubmitResult, Call::DeployCode, borsh),
+    (CallDeployErc20Token => Address, Call::DeployErc20Token, borsh_address),
+    (CallDeployErc20TokenLegacy => Address, Call::DeployErc20TokenLegacy, borsh_address),
+    (CallMirrorErc20Token => Address, Call::MirrorErc20Token, borsh_address),
+    (CallCall => SubmitResult, Call::Call, borsh),
+    (CallSubmit => SubmitResult, Call::Submit, borsh),
+    (CallFtOnTransfer => U128, Call::FtOnTransfer, json),
+];
+
+impl_view_return![
+    (ViewFtTotalSupply => U128, View::FtTotalSupply, json),
+    (ViewFtBalanceOf => U128, View::FtBalanceOf, json),
+    (ViewStorageBalanceOf => StorageBalance, View::StorageBalanceOf, json),
+    (ViewVersion => String, View::Version, borsh),
+    (ViewOwner => AccountId, View::Owner, from_bytes),
+    (ViewChainId => U256, View::ChainId, borsh_U256),
+    (ViewUpgradeIndex => u64, View::UpgradeIndex, borsh),
+    (ViewPausedPrecompiles => u32, View::PausedPrecompiles, borsh),
+    (ViewBlockHash => H256, View::BlockHash, borsh_H256),
+    (ViewCode => Vec<u8>, View::Code, vec),
+    (ViewBalance => U256, View::Balance, borsh_U256),
+    (ViewNonce => U256, View::Nonce, borsh_U256),
+    (ViewStorageAt => H256, View::StorageAt, borsh_H256),
+    (ViewView => TransactionStatus, View::View, borsh),
+    (ViewErc20FromNep141 => Address, View::Erc20FromNep141, borsh),
+    (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
+    (ViewPausedFlags => u8, View::PausedFlags, borsh),
+    (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
+    (ViewGetFixedGas => FixedGasArgs, View::GetFixedGas, borsh),
+    (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
+    (ViewGetWhitelistStatus => WhitelistStatusArgs, View::GetWhitelistStatus, borsh),
+    (ViewFactoryWnearAddress => Address, View::FactoryWnearAddress, borsh),
+    (ViewGetErc20Metadata => Erc20Metadata, View::GetErc20Metadata, json)
+];
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[allow(clippy::enum_variant_names)]
+pub(crate) enum Call {
+    New,
+    DeployCode,
+    DeployErc20Token,
+    DeployErc20TokenLegacy,
+    MirrorErc20Token,
+    Call,
+    Submit,
+    SetOwner,
+    RegisterRelayer,
+    FtOnTransfer,
+    Withdraw,
+    FtTransfer,
+    FtTransferCall,
+    StorageDeposit,
+    StorageUnregister,
+    StorageWithdraw,
+    PausePrecompiles,
+    Upgrade,
+    StageUpgrade,
+    DeployUpgrade,
+    StateMigration,
+    ResumePrecompiles,
+    FactoryUpdate,
+    FundXccSubAccount,
+    FactorySetWNearAddress,
+    SetEthConnectorContractAccount,
+    FactoryUpdateAddressVersion,
+    RefundOnError,
+    MintAccount,
+    SetPausedFlags,
+    SetKeyManager,
+    AddRelayerKey,
+    RemoveRelayerKey,
+    PauseContract,
+    ResumeContract,
+    SetFixedGas,
+    SetErc20FallbackAddress,
+    SetSiloParams,
+    SetWhitelistStatus,
+    AddEntryToWhitelist,
+    AddEntryToWhitelistBatch,
+    RemoveEntryFromWhitelist,
+    SetErc20Metadata,
+    AttachFullAccessKey,
+}
+
+impl AsRef<str> for Call {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::New => "new",
+            Self::DeployCode => "deploy_code",
+            Self::DeployErc20Token | Self::DeployErc20TokenLegacy => "deploy_erc20_token",
+            Self::MirrorErc20Token => "mirror_erc20_token",
+            Self::Call => "call",
+            Self::Submit => "submit",
+            Self::SetOwner => "set_owner",
+            Self::RegisterRelayer => "register_relayer",
+            Self::FtOnTransfer => "ft_on_transfer",
+            Self::Withdraw => "withdraw",
+            Self::FtTransfer => "ft_transfer",
+            Self::FtTransferCall => "ft_transfer_call",
+            Self::StorageDeposit => "storage_deposit",
+            Self::StorageUnregister => "storage_unregister",
+            Self::StorageWithdraw => "storage_withdraw",
+            Self::PausePrecompiles => "pause_precompiles",
+            Self::Upgrade => "upgrade",
+            Self::StageUpgrade => "stage_upgrade",
+            Self::DeployUpgrade => "deploy_upgrade",
+            Self::StateMigration => "state_migration",
+            Self::ResumePrecompiles => "resume_precompiles",
+            Self::FactoryUpdate => "factory_update",
+            Self::FundXccSubAccount => "fund_xcc_sub_account",
+            Self::FactorySetWNearAddress => "factory_set_wnear_address",
+            Self::SetEthConnectorContractAccount => "set_eth_connector_contract_account",
+            Self::FactoryUpdateAddressVersion => "factory_update_address_version",
+            Self::RefundOnError => "refund_on_error",
+            Self::MintAccount => "mint_account",
+            Self::SetPausedFlags => "set_paused_flags",
+            Self::SetKeyManager => "set_key_manager",
+            Self::AddRelayerKey => "add_relayer_key",
+            Self::RemoveRelayerKey => "remove_relayer_key",
+            Self::PauseContract => "pause_contract",
+            Self::ResumeContract => "resume_contract",
+            Self::SetFixedGas => "set_fixed_gas",
+            Self::SetErc20FallbackAddress => "set_erc20_fallback_address",
+            Self::SetSiloParams => "set_silo_params",
+            Self::SetWhitelistStatus => "set_whitelist_status",
+            Self::AddEntryToWhitelist => "add_entry_to_whitelist",
+            Self::AddEntryToWhitelistBatch => "add_entry_to_whitelist_batch",
+            Self::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
+            Self::SetErc20Metadata => "set_erc20_metadata",
+            Self::AttachFullAccessKey => "attach_full_access_key",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum View {
+    Version,
+    Owner,
+    BridgeProver,
+    ChainId,
+    UpgradeIndex,
+    PausedPrecompiles,
+    BlockHash,
+    Code,
+    Balance,
+    Nonce,
+    StorageAt,
+    View,
+    IsUsedProof,
+    FtTotalSupply,
+    FtBalanceOf,
+    FtBalanceOfEth,
+    FtMetadata,
+    StorageBalanceOf,
+    PausedFlags,
+    Erc20FromNep141,
+    Nep141FromErc20,
+    AccountsCounter,
+    GetEthConnectorContractAccount,
+    GetFixedGas,
+    GetSiloParams,
+    GetWhitelistStatus,
+    FactoryWnearAddress,
+    GetErc20Metadata,
+}
+
+impl AsRef<str> for View {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Version => "get_version",
+            Self::Owner => "get_owner",
+            Self::BridgeProver => "get_bridge_prover",
+            Self::ChainId => "get_chain_id",
+            Self::UpgradeIndex => "get_upgrade_index",
+            Self::PausedPrecompiles => "get_paused_precompiles",
+            Self::BlockHash => "get_block_hash",
+            Self::Code => "get_code",
+            Self::Balance => "get_balance",
+            Self::Nonce => "get_nonce",
+            Self::StorageAt => "get_storage_at",
+            Self::View => "get_view",
+            Self::IsUsedProof => "is_used_proof",
+            Self::FtTotalSupply => "ft_total_supply",
+            Self::FtBalanceOf => "ft_balance_of",
+            Self::FtBalanceOfEth => "ft_balance_of_eth",
+            Self::FtMetadata => "ft_metadata",
+            Self::StorageBalanceOf => "storage_balance_of",
+            Self::PausedFlags => "get_paused_flags",
+            Self::Erc20FromNep141 => "get_erc20_from_nep141",
+            Self::Nep141FromErc20 => "get_nep141_from_erc20",
+            Self::AccountsCounter => "get_accounts_counter",
+            Self::GetEthConnectorContractAccount => "get_eth_connector_contract_account",
+            Self::GetFixedGas => "get_fixed_gas",
+            Self::GetSiloParams => "get_silo_params",
+            Self::GetWhitelistStatus => "get_whitelist_status",
+            Self::FactoryWnearAddress => "factory_get_wnear_address",
+            Self::GetErc20Metadata => "get_erc20_metadata",
+        }
+    }
+}

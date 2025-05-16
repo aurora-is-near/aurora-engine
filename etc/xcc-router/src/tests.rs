@@ -1,10 +1,11 @@
 use super::Router;
 use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs};
 use aurora_engine_types::types::{NearGas, Yocto};
-use near_sdk::mock::VmAction;
+use near_primitives::types::GasWeight;
+use near_sdk::mock::MockAction;
 use near_sdk::test_utils::test_env::{alice, bob, carol};
 use near_sdk::test_utils::{self, VMContextBuilder};
-use near_sdk::testing_env;
+use near_sdk::{testing_env, Gas, NearToken};
 
 const WNEAR_ACCOUNT: &str = "wrap.near";
 
@@ -84,7 +85,7 @@ fn test_execute() {
         promise.target_account_id.as_ref()
     );
 
-    validate_function_call_action(&receipt.actions, promise);
+    validate_function_call_action(&receipt.actions, promise, 0);
 }
 
 #[test]
@@ -115,8 +116,8 @@ fn test_execute_callback() {
     let base = &receipts[0];
     let callback = &receipts[1];
 
-    validate_function_call_action(&base.actions, promise.base);
-    validate_function_call_action(&callback.actions, promise.callback);
+    validate_function_call_action(&base.actions, promise.base, 0);
+    validate_function_call_action(&callback.actions, promise.callback, 2);
 }
 
 #[test]
@@ -162,7 +163,7 @@ fn test_schedule_and_execute() {
         Some(PromiseArgs::Create(promise)) => promise,
         _ => unreachable!(),
     };
-    assert_eq!(stored_promise, promise);
+    assert_eq!(stored_promise, &promise);
 
     // promise executed after calling `execute_scheduled`
     // anyone can call this function
@@ -181,20 +182,26 @@ fn test_schedule_and_execute() {
         receipt.receiver_id.as_str(),
         promise.target_account_id.as_ref()
     );
-    validate_function_call_action(&receipt.actions, promise);
+    validate_function_call_action(&receipt.actions, promise, 0);
 }
 
-fn validate_function_call_action(actions: &[VmAction], promise: PromiseCreateArgs) {
+fn validate_function_call_action(
+    actions: &[MockAction],
+    promise: PromiseCreateArgs,
+    receipt_index: u64,
+) {
     assert_eq!(actions.len(), 1);
     let action = &actions[0];
 
     assert_eq!(
         *action,
-        VmAction::FunctionCall {
-            function_name: promise.method,
+        MockAction::FunctionCallWeight {
+            receipt_index,
+            method_name: promise.method.into_bytes(),
             args: promise.args,
-            gas: promise.attached_gas.as_u64().into(),
-            deposit: promise.attached_balance.as_u128()
+            attached_deposit: NearToken::from_yoctonear(promise.attached_balance.as_u128()),
+            prepaid_gas: Gas::from_gas(promise.attached_gas.as_u64()),
+            gas_weight: GasWeight(0),
         }
     );
 }

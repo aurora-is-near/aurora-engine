@@ -1,28 +1,28 @@
-use crate::test_utils::standalone::mocks::{promise, storage};
-use aurora_engine::engine;
+use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
-use aurora_engine_types::types::{Address, Wei};
+use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+use aurora_engine_test_doubles::promise::PromiseTracker;
+use aurora_engine_types::types::{Address, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
-use std::sync::RwLock;
+use std::cell::RefCell;
 
 #[test]
 fn test_deploy_code() {
     let chain_id: [u8; 32] = {
-        let value = U256::from(1313161554);
-        let mut buf = [0u8; 32];
-        value.to_big_endian(&mut buf);
-        buf
+        let value = U256::from(1_313_161_554);
+        value.to_big_endian()
     };
     let owner_id: AccountId = "aurora".parse().unwrap();
-    let state = engine::EngineState {
+    let state = state::EngineState {
         chain_id,
         owner_id: owner_id.clone(),
-        bridge_prover_id: "mr_the_prover".parse().unwrap(),
         upgrade_delay_blocks: 0,
+        is_paused: false,
+        key_manager: None,
     };
     let origin = Address::new(H160([0u8; 20]));
-    let storage = RwLock::new(storage::Storage::default());
-    let io = storage::StoragePointer(&storage);
+    let storage = RefCell::new(Storage::default());
+    let io = StoragePointer(&storage);
     let env = aurora_engine_sdk::env::Fixed {
         signer_account_id: owner_id.clone(),
         current_account_id: owner_id.clone(),
@@ -32,14 +32,17 @@ fn test_deploy_code() {
         attached_deposit: 0,
         random_seed: H256::zero(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        used_gas: NearGas::new(0),
     };
-    let mut handler = promise::PromiseTracker::default();
-    let mut engine = engine::Engine::new_with_state(state, origin, owner_id, io, &env);
+    let mut handler = PromiseTracker::default();
+    let mut engine: engine::Engine<_, _> =
+        engine::Engine::new_with_state(state, origin, owner_id, io, &env);
     let code_to_deploy = vec![1, 2, 3, 4, 5, 6];
     let result = engine.deploy_code(
         origin,
         Wei::zero(),
         evm_deploy(&code_to_deploy),
+        None,
         u64::MAX,
         Vec::new(),
         &mut handler,
@@ -53,7 +56,7 @@ fn test_deploy_code() {
         aurora_engine::parameters::TransactionStatus::Succeed(bytes) => {
             Address::try_from_slice(&bytes).unwrap()
         }
-        other => panic!("Unexpected status: {:?}", other),
+        other => panic!("Unexpected status: {other:?}"),
     };
 
     // state is updated
@@ -66,11 +69,8 @@ fn test_deploy_code() {
 }
 
 fn evm_deploy(code: &[u8]) -> Vec<u8> {
-    let len = code.len();
-    if len > u16::MAX as usize {
-        panic!("Cannot deploy a contract with that many bytes!");
-    }
-    let len = len as u16;
+    let len = u16::try_from(code.len())
+        .unwrap_or_else(|_| panic!("Cannot deploy a contract with that many bytes!"));
     // This bit of EVM byte code essentially says:
     // "If msg.value > 0 revert; otherwise return `len` amount of bytes that come after me
     // in the code." By prepending this to `code` we create a valid EVM program which

@@ -37,7 +37,7 @@ codegen-units = 1
 rpath = false
 
 [dependencies]
-borsh = { version = "0.9.3", default-features = false }
+borsh = { version = "1", default-features = false }
 aurora-engine = { path = "../../../engine", default-features = false }
 aurora-engine-sdk = { path = "../../../engine-sdk", default-features = false, features = ["contract"] }
 aurora-engine-types = { path = "../../../engine-types", default-features = false }

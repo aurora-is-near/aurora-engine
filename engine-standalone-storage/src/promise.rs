@@ -13,7 +13,7 @@ pub struct NoScheduler<'a> {
     pub promise_data: &'a [Option<Vec<u8>>],
 }
 
-impl<'a> PromiseHandler for NoScheduler<'a> {
+impl PromiseHandler for NoScheduler<'_> {
     type ReadOnly = Self;
 
     fn promise_results_count(&self) -> u64 {
@@ -22,18 +22,26 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
 
     fn promise_result(&self, index: u64) -> Option<PromiseResult> {
         let i = usize::try_from(index).ok()?;
-        let result = match self.promise_data.get(i)? {
-            Some(bytes) => PromiseResult::Successful(bytes.clone()),
-            None => PromiseResult::Failed,
-        };
+        let result = self
+            .promise_data
+            .get(i)?
+            .as_ref()
+            .map_or(PromiseResult::Failed, |bytes| {
+                PromiseResult::Successful(bytes.clone())
+            });
+
         Some(result)
     }
 
-    fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
+    unsafe fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
         PromiseId::new(0)
     }
 
-    fn promise_attach_callback(
+    unsafe fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
+        PromiseId::new(0)
+    }
+
+    unsafe fn promise_attach_callback(
         &mut self,
         _base: PromiseId,
         _callback: &PromiseCreateArgs,
@@ -41,7 +49,15 @@ impl<'a> PromiseHandler for NoScheduler<'a> {
         PromiseId::new(0)
     }
 
-    fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+    unsafe fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+        PromiseId::new(0)
+    }
+
+    unsafe fn promise_attach_batch_callback(
+        &mut self,
+        _base: PromiseId,
+        _args: &PromiseBatchAction,
+    ) -> PromiseId {
         PromiseId::new(0)
     }
 

@@ -1,6 +1,7 @@
 use crate::prelude::{Address, Wei, U256};
-use crate::test_utils::{self, solidity};
+use crate::utils::{self, solidity};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::parameters::engine::TransactionStatus;
 use libsecp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,11 +13,7 @@ const INITIAL_NONCE: u64 = 0;
 static DOWNLOAD_ONCE: Once = Once::new();
 static COMPILE_ONCE: Once = Once::new();
 
-pub(crate) fn measure_gas_usage(
-    total_tokens: usize,
-    data_size: usize,
-    tokens_per_page: usize,
-) -> u64 {
+pub fn measure_gas_usage(total_tokens: usize, data_size: usize, tokens_per_page: usize) -> u64 {
     let (mut runner, mut source_account, dest_address) = initialize_evm();
 
     let marketplace_constructor = MarketPlaceConstructor::load();
@@ -28,7 +25,7 @@ pub(crate) fn measure_gas_usage(
     ));
 
     // mint NFTs
-    let data: String = std::iter::repeat('0').take(data_size).collect();
+    let data = "0".repeat(data_size);
     for i in 0..total_tokens {
         let result = runner
             .submit_with_signer(&mut source_account, |nonce| {
@@ -46,10 +43,11 @@ pub(crate) fn measure_gas_usage(
     // show them
     let nonce = source_account.nonce;
     let tx = marketplace.get_page(tokens_per_page, 0, nonce.into());
-    let (result, profile) = runner.profiled_view_call(test_utils::as_view_call(tx, dest_address));
+    let (status, profile) = runner
+        .profiled_view_call(&utils::as_view_call(tx, dest_address))
+        .unwrap();
 
-    let status = result.unwrap();
-    assert!(status.is_ok());
+    assert!(matches!(status, TransactionStatus::Succeed(_)));
     profile.all_gas()
 }
 
@@ -109,17 +107,17 @@ impl MarketPlaceConstructor {
     fn download_solidity_sources() -> PathBuf {
         let sources_dir = Path::new("target").join("NFT-culturas-latinas");
         let contracts_dir = sources_dir.join("blockchain");
-        if contracts_dir.exists() {
-            contracts_dir
-        } else {
+
+        if !contracts_dir.exists() {
             // Contracts not already present, so download them (but only once, even
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
             DOWNLOAD_ONCE.call_once(|| {
                 let url = "https://github.com/birchmd/NFT-culturas-latinas.git";
                 git2::Repository::clone(url, sources_dir).unwrap();
             });
-            contracts_dir
         }
+
+        contracts_dir
     }
 }
 
@@ -134,9 +132,9 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "minar",
             &[
-                ethabi::Token::Address(recipient.raw()),
+                ethabi::Token::Address(recipient.raw().0.into()),
                 ethabi::Token::String(data),
-                ethabi::Token::Uint(price.raw()),
+                ethabi::Token::Uint(price.raw().to_big_endian().into()),
             ],
             nonce,
         )
@@ -151,26 +149,25 @@ impl MarketPlace {
         self.0.call_method_with_args(
             "obtenerPaginav2",
             &[
-                ethabi::Token::Uint(U256::from(tokens_per_page)),
-                ethabi::Token::Uint(U256::from(page_index)),
+                ethabi::Token::Uint(tokens_per_page.into()),
+                ethabi::Token::Uint(page_index.into()),
             ],
             nonce,
         )
     }
 }
 
-fn initialize_evm() -> (test_utils::AuroraRunner, test_utils::Signer, Address) {
+fn initialize_evm() -> (utils::AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
-    let mut runner = test_utils::deploy_evm();
+    let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
-    let source_address = test_utils::address_from_secret_key(&source_account);
+    let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let dest_address = test_utils::address_from_secret_key(&SecretKey::random(&mut rng));
-    let mut signer = test_utils::Signer::new(source_account);
+    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
-
-    runner.wasm_config.limit_config.max_gas_burnt = u64::MAX;
+    runner.max_gas_burnt(u64::MAX);
 
     (runner, signer, dest_address)
 }

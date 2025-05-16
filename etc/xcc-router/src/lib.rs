@@ -1,15 +1,23 @@
-use aurora_engine_types::parameters::{PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LazyOption, LookupMap};
-use near_sdk::json_types::{U128, U64};
+use aurora_engine_types::parameters::{
+    NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
+    SimpleNearPromise,
+};
+use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
+use near_sdk::collections::LazyOption;
+use near_sdk::json_types::U64;
+use near_sdk::store::LookupMap;
 use near_sdk::BorshStorageKey;
-use near_sdk::{env, near_bindgen, AccountId, Gas, PanicOnDefault, Promise, PromiseIndex};
+use near_sdk::{
+    env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex,
+    PromiseResult,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests;
 
 #[derive(BorshSerialize, BorshStorageKey)]
+#[borsh(crate = "near_sdk::borsh")]
 enum StorageKey {
     Version,
     Parent,
@@ -17,27 +25,31 @@ enum StorageKey {
     Map,
 }
 
-const CURRENT_VERSION: u32 = 1;
+const INITIALIZE: &str = "initialize";
+const CURRENT_VERSION: u32 = include!("VERSION");
 
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
-/// Gas cost estimated from mainnet data. Cost seems to consistently be 3 Tgas, but we add a
-/// little more to be safe. Example:
-/// https://explorer.mainnet.near.org/transactions/3U9SKbGKM3MchLa2hLTNuYLdErcEDneJGbGv1cHZXuvE#HsHabUdJ7DRJcseNa4GQTYwm8KtbB4mqsq2AUssJWWv6
-const WNEAR_WITHDRAW_GAS: Gas = Gas(5_000_000_000_000);
+const INITIALIZE_GAS: Gas = Gas::from_tgas(15);
 /// Gas cost estimated from mainnet data. Example:
 /// https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM
-const WNEAR_REGISTER_GAS: Gas = Gas(5_000_000_000_000);
-/// Gas cost estimated from simulation tests.
-const REFUND_GAS: Gas = Gas(5_000_000_000_000);
+const WNEAR_REGISTER_GAS: Gas = Gas::from_tgas(5);
 /// Registration amount computed from FT token source code, see
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
 /// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
-const WNEAR_REGISTER_AMOUNT: u128 = 1_250_000_000_000_000_000_000;
-/// Must match arora_engine_precompiles::xcc::state::STORAGE_AMOUNT
-const REFUND_AMOUNT: u128 = 2_000_000_000_000_000_000_000_000;
+const WNEAR_REGISTER_AMOUNT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_000_000_000);
+/// Must match aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT
+const REFUND_AMOUNT: NearToken = NearToken::from_near(2);
+
+#[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(crate = "near_sdk::borsh")]
+pub struct DeployUpgradeParams {
+    pub code: Vec<u8>,
+    pub initialize_args: Vec<u8>,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Router {
     /// The account id of the Aurora Engine instance that controls this router.
     parent: LazyOption<AccountId>,
@@ -55,6 +67,7 @@ pub struct Router {
 #[near_bindgen]
 impl Router {
     #[init(ignore_state)]
+    #[must_use]
     pub fn initialize(wnear_account: AccountId, must_register: bool) -> Self {
         // The first time this function is called there is no state and the parent is set to be
         // the predecessor account id. In subsequent calls, only the original parent is allowed to
@@ -70,7 +83,9 @@ impl Router {
                 parent.set(&caller);
             }
             Some(parent) => {
-                if caller != parent {
+                // Allow self-calls to `initialize` also.
+                // This happens during the upgrade flow.
+                if (caller != parent) && (caller != env::current_account_id()) {
                     env::panic_str(ERR_ILLEGAL_CALLER);
                 }
             }
@@ -104,24 +119,28 @@ impl Router {
         }
     }
 
+    pub fn get_version(&self) -> u32 {
+        self.version.get().unwrap_or_default()
+    }
+
     /// This function can only be called by the parent account (i.e. Aurora engine) to ensure that
     /// no one can create calls on behalf of the user this router contract is deployed for.
     /// The engine only calls this function when the special precompile in the EVM for NEAR cross
     /// contract calls is used by the address associated with the sub-account this router contract
     /// is deployed at.
     pub fn execute(&self, #[serializer(borsh)] promise: PromiseArgs) {
-        self.require_parent_caller();
+        self.assert_preconditions();
 
-        let promise_id = Router::promise_create(promise);
-        env::promise_return(promise_id)
+        let promise_id = Self::promise_create(promise);
+        env::promise_return(promise_id);
     }
 
     /// Similar security considerations here as for `execute`.
     pub fn schedule(&mut self, #[serializer(borsh)] promise: PromiseArgs) {
-        self.require_parent_caller();
+        self.assert_preconditions();
 
         let nonce = self.nonce.get().unwrap_or_default();
-        self.scheduled_promises.insert(&nonce, &promise);
+        self.scheduled_promises.insert(nonce, promise);
         self.nonce.set(&(nonce + 1));
 
         near_sdk::log!("Promise scheduled at nonce {}", nonce);
@@ -132,97 +151,264 @@ impl Router {
     /// act on promises that were created via `schedule`.
     #[payable]
     pub fn execute_scheduled(&mut self, nonce: U64) {
-        let promise = match self.scheduled_promises.remove(&nonce.0) {
-            Some(promise) => promise,
-            None => env::panic_str("ERR_PROMISE_NOT_FOUND"),
+        let Some(promise) = self.scheduled_promises.remove(&nonce.0) else {
+            env::panic_str("ERR_PROMISE_NOT_FOUND")
         };
-
-        let promise_id = Router::promise_create(promise);
-        env::promise_return(promise_id)
+        let promise_id = Self::promise_create(promise);
+        env::promise_return(promise_id);
     }
 
-    /// The router will receive wNEAR deposits from its user. This function is to
-    /// unwrap that wNEAR into NEAR. Additionally, this function will transfer some
-    /// NEAR back to its parent, if needed. This transfer is done because the parent
-    /// must cover the storage staking cost with the router account is first created,
-    /// but the user ultimately is responsible to pay for it.
-    pub fn unwrap_and_refund_storage(&self, amount: U128, refund_needed: bool) {
-        self.require_parent_caller();
+    /// Allows the parent contract to trigger an update to the logic of this contract
+    /// (by deploying a new contract to this account);
+    #[payable]
+    pub fn deploy_upgrade(&mut self, #[serializer(borsh)] args: DeployUpgradeParams) {
+        self.assert_preconditions();
 
-        let args = format!(r#"{{"amount": "{}"}}"#, amount.0);
-        let id = env::promise_create(
-            self.wnear_account.clone(),
-            "near_withdraw",
-            args.as_bytes(),
-            1,
-            WNEAR_WITHDRAW_GAS,
+        let promise_id = env::promise_batch_create(&env::current_account_id());
+        env::promise_batch_action_deploy_contract(promise_id, &args.code);
+        env::promise_batch_action_function_call(
+            promise_id,
+            INITIALIZE,
+            &args.initialize_args,
+            NearToken::default(),
+            INITIALIZE_GAS,
         );
-        let final_id = if refund_needed {
-            env::promise_then(
-                id,
-                env::current_account_id(),
-                "send_refund",
-                &[],
-                0,
-                REFUND_GAS,
-            )
-        } else {
-            id
-        };
-        env::promise_return(final_id);
+        env::promise_return(promise_id);
     }
 
-    #[private]
     pub fn send_refund(&self) -> Promise {
-        let parent = self
-            .parent
-            .get()
-            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
+        let parent = self.get_parent().unwrap_or_else(env_panic);
+
+        require_caller(&parent)
+            .and_then(|_| require_no_failed_promises())
+            .unwrap_or_else(env_panic);
 
         Promise::new(parent).transfer(REFUND_AMOUNT)
     }
 }
 
 impl Router {
-    fn require_parent_caller(&self) {
-        let caller = env::predecessor_account_id();
-        let parent = self
-            .parent
-            .get()
-            .unwrap_or_else(|| env::panic_str("ERR_CONTRACT_NOT_INITIALIZED"));
-        if caller != parent {
-            env::panic_str(ERR_ILLEGAL_CALLER)
-        }
+    fn get_parent(&self) -> Result<AccountId, Error> {
+        self.parent.get().ok_or(Error::ContractNotInitialized)
+    }
+
+    /// Checks the following preconditions:
+    ///   1. Contract is initialized
+    ///   2. predecessor_account_id == self.parent
+    ///   3. There are no failed promise results
+    /// These preconditions must be checked on methods where are important for
+    /// the security of the contract (e.g. `execute`).
+    fn require_preconditions(&self) -> Result<(), Error> {
+        let parent = self.get_parent()?;
+        require_caller(&parent)?;
+        require_no_failed_promises()?;
+        Ok(())
+    }
+
+    /// Panics if any of the preconditions checked in `require_preconditions` are not met.
+    fn assert_preconditions(&self) {
+        self.require_preconditions().unwrap_or_else(env_panic);
     }
 
     fn promise_create(promise: PromiseArgs) -> PromiseIndex {
         match promise {
-            PromiseArgs::Create(call) => Self::base_promise_create(call),
-            PromiseArgs::Callback(cb) => Self::cb_promise_create(cb),
+            PromiseArgs::Create(call) => Self::base_promise_create(&call),
+            PromiseArgs::Callback(cb) => Self::cb_promise_create(&cb),
+            PromiseArgs::Recursive(p) => Self::recursive_promise_create(&p),
         }
     }
 
-    fn cb_promise_create(promise: PromiseWithCallbackArgs) -> PromiseIndex {
-        let base = Self::base_promise_create(promise.base);
-        let promise = promise.callback;
+    fn cb_promise_create(promise: &PromiseWithCallbackArgs) -> PromiseIndex {
+        let base = Self::base_promise_create(&promise.base);
+        let promise = &promise.callback;
 
         env::promise_then(
             base,
-            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.target_account_id.as_ref().parse().unwrap(),
             promise.method.as_str(),
             &promise.args,
-            promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64().into(),
+            NearToken::from_yoctonear(promise.attached_balance.as_u128()),
+            Gas::from_gas(promise.attached_gas.as_u64()),
         )
     }
 
-    fn base_promise_create(promise: PromiseCreateArgs) -> PromiseIndex {
+    fn base_promise_create(promise: &PromiseCreateArgs) -> PromiseIndex {
         env::promise_create(
-            near_sdk::AccountId::new_unchecked(promise.target_account_id.to_string()),
+            promise.target_account_id.as_ref().parse().unwrap(),
             promise.method.as_str(),
             &promise.args,
-            promise.attached_balance.as_u128(),
-            promise.attached_gas.as_u64().into(),
+            NearToken::from_yoctonear(promise.attached_balance.as_u128()),
+            Gas::from_gas(promise.attached_gas.as_u64()),
         )
+    }
+
+    fn recursive_promise_create(promise: &NearPromise) -> PromiseIndex {
+        match promise {
+            NearPromise::Simple(x) => match x {
+                SimpleNearPromise::Create(call) => Self::base_promise_create(call),
+                SimpleNearPromise::Batch(batch) => {
+                    let target = batch.target_account_id.as_ref().parse().unwrap();
+                    let id = env::promise_batch_create(&target);
+                    Self::add_batch_actions(id, &batch.actions);
+                    id
+                }
+            },
+            NearPromise::Then { base, callback } => {
+                let base_index = Self::recursive_promise_create(base);
+                match callback {
+                    SimpleNearPromise::Create(call) => env::promise_then(
+                        base_index,
+                        call.target_account_id.as_ref().parse().unwrap(),
+                        call.method.as_str(),
+                        &call.args,
+                        NearToken::from_yoctonear(call.attached_balance.as_u128()),
+                        Gas::from_gas(call.attached_gas.as_u64()),
+                    ),
+                    SimpleNearPromise::Batch(batch) => {
+                        let id = env::promise_batch_then(
+                            base_index,
+                            &batch.target_account_id.as_ref().parse().unwrap(),
+                        );
+                        Self::add_batch_actions(id, &batch.actions);
+                        id
+                    }
+                }
+            }
+            NearPromise::And(promises) => {
+                let indices: Vec<PromiseIndex> = promises
+                    .iter()
+                    .map(Self::recursive_promise_create)
+                    .collect();
+                env::promise_and(&indices)
+            }
+        }
+    }
+
+    #[cfg(not(feature = "all-promise-actions"))]
+    fn add_batch_actions(_id: PromiseIndex, _actions: &[PromiseAction]) {
+        unimplemented!("NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine")
+    }
+
+    #[cfg(feature = "all-promise-actions")]
+    fn add_batch_actions(id: PromiseIndex, actions: &[PromiseAction]) {
+        for action in actions.iter() {
+            match action {
+                PromiseAction::CreateAccount => env::promise_batch_action_create_account(id),
+                PromiseAction::Transfer { amount } => env::promise_batch_action_transfer(
+                    id,
+                    NearToken::from_yoctonear(amount.as_u128()),
+                ),
+                PromiseAction::DeployContract { code } => {
+                    env::promise_batch_action_deploy_contract(id, code)
+                }
+                PromiseAction::FunctionCall {
+                    name,
+                    args,
+                    attached_yocto,
+                    gas,
+                } => env::promise_batch_action_function_call(
+                    id,
+                    name,
+                    args,
+                    NearToken::from_yoctonear(attached_yocto.as_u128()),
+                    Gas::from_gas(gas.as_u64()),
+                ),
+                PromiseAction::Stake { amount, public_key } => env::promise_batch_action_stake(
+                    id,
+                    NearToken::from_yoctonear(amount.as_u128()),
+                    &to_sdk_pk(public_key),
+                ),
+                PromiseAction::AddFullAccessKey { public_key, nonce } => {
+                    env::promise_batch_action_add_key_with_full_access(
+                        id,
+                        &to_sdk_pk(public_key),
+                        *nonce,
+                    )
+                }
+                PromiseAction::AddFunctionCallKey {
+                    public_key,
+                    nonce,
+                    allowance,
+                    receiver_id,
+                    function_names,
+                } => {
+                    let receiver_id = receiver_id.as_ref().parse().unwrap();
+                    env::promise_batch_action_add_key_allowance_with_function_call(
+                        id,
+                        &to_sdk_pk(public_key),
+                        *nonce,
+                        near_sdk::Allowance::limited(NearToken::from_yoctonear(
+                            allowance.as_u128(),
+                        ))
+                        .unwrap(),
+                        &receiver_id,
+                        function_names,
+                    )
+                }
+                PromiseAction::DeleteKey { public_key } => {
+                    env::promise_batch_action_delete_key(id, &to_sdk_pk(public_key))
+                }
+                PromiseAction::DeleteAccount { beneficiary_id } => {
+                    let beneficiary_id = beneficiary_id.as_ref().parse().unwrap();
+                    env::promise_batch_action_delete_account(id, &beneficiary_id)
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "all-promise-actions")]
+fn to_sdk_pk(key: &aurora_engine_types::public_key::PublicKey) -> near_sdk::PublicKey {
+    let (curve_type, key_bytes): (near_sdk::CurveType, &[u8]) = match key {
+        aurora_engine_types::public_key::PublicKey::Ed25519(bytes) => {
+            (near_sdk::CurveType::ED25519, bytes)
+        }
+        aurora_engine_types::public_key::PublicKey::Secp256k1(bytes) => {
+            (near_sdk::CurveType::SECP256K1, bytes)
+        }
+    };
+    let mut data = Vec::with_capacity(1 + key_bytes.len());
+    data.push(curve_type as u8);
+    data.extend_from_slice(key_bytes);
+
+    // Unwrap should be safe because we only encode valid public keys
+    data.try_into().unwrap()
+}
+
+fn require_caller(caller: &AccountId) -> Result<(), Error> {
+    if caller != &env::predecessor_account_id() {
+        return Err(Error::IllegalCaller);
+    }
+    Ok(())
+}
+
+fn require_no_failed_promises() -> Result<(), Error> {
+    let num_promises = env::promise_results_count();
+    for index in 0..num_promises {
+        if env::promise_result(index) == PromiseResult::Failed {
+            return Err(Error::CallbackOfFailedPromise);
+        }
+    }
+    Ok(())
+}
+
+fn env_panic<T>(e: Error) -> T {
+    env::panic_str(e.as_ref())
+}
+
+#[derive(Debug)]
+enum Error {
+    ContractNotInitialized,
+    IllegalCaller,
+    CallbackOfFailedPromise,
+}
+
+impl AsRef<str> for Error {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::ContractNotInitialized => "ERR_CONTRACT_NOT_INITIALIZED",
+            Self::IllegalCaller => ERR_ILLEGAL_CALLER,
+            Self::CallbackOfFailedPromise => "ERR_CALLBACK_OF_FAILED_PROMISE",
+        }
     }
 }

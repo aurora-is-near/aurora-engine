@@ -1,15 +1,19 @@
-use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, H256, U256};
-use crate::test_utils::{origin, AuroraRunner, Signer};
-
-use crate::test_utils;
-use crate::test_utils::exit_precompile::{Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS};
+use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, U256};
+use crate::utils::solidity::exit_precompile::{
+    Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS,
+};
+use crate::utils::{self, deploy_runner, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
-    let token = runner.deploy_erc20_token(&"tt.testnet".to_string());
-    let mut signer = test_utils::Signer::random();
+    let wnear_token_address = runner.deploy_erc20_token("wrap.testnet");
+    runner
+        .factory_set_wnear_address(wnear_token_address)
+        .unwrap();
+    let token = runner.deploy_erc20_token("tt.testnet");
+    let mut signer = Signer::random();
     runner.create_address(
-        test_utils::address_from_secret_key(&signer.secret_key),
+        utils::address_from_secret_key(&signer.secret_key),
         Wei::from_eth(1.into()).unwrap(),
         U256::zero(),
     );
@@ -20,19 +24,29 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let tester: Tester = runner
         .deploy_contract(
             &signer.secret_key,
-            |ctr| ctr.deploy(nonce, token.into()),
+            |ctr| ctr.deploy(nonce, token),
             tester_ctr,
         )
         .into();
 
-    runner.mint(
-        token,
-        tester.contract.address.into(),
-        1_000_000_000,
-        origin(),
-    );
+    runner
+        .mint(
+            token,
+            tester.contract.address,
+            1_000_000_000,
+            DEFAULT_AURORA_ACCOUNT_ID,
+        )
+        .unwrap();
 
     (runner, signer, token, tester)
+}
+
+#[test]
+#[should_panic(expected = "ERR_BORSH_DESERIALIZE")]
+fn test_deploy_erc20_token_with_invalid_account_id() {
+    let mut runner = deploy_runner();
+    let invalid_nep141 = "_";
+    runner.deploy_erc20_token(invalid_nep141);
 }
 
 #[test]
@@ -40,7 +54,7 @@ fn hello_world_solidity() {
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let name = "AuroraG".to_string();
-    let expected = format!("Hello {}!", name);
+    let expected = format!("Hello {name}!");
 
     let result = tester.hello_world(&mut runner, &mut signer, name);
     assert_eq!(expected, result);
@@ -88,17 +102,17 @@ fn withdraw() {
             let address = Address::try_from_slice(&address).unwrap();
             ethabi::LogParam {
                 name: "dest".to_string(),
-                value: ethabi::Token::Address(address.raw()),
+                value: ethabi::Token::Address(address.raw().0.into()),
             }
         };
         let expected_event = vec![
             ethabi::LogParam {
                 name: "sender".to_string(),
-                value: ethabi::Token::Address(token.raw()),
+                value: ethabi::Token::Address(token.raw().0.into()),
             },
             ethabi::LogParam {
                 name: "erc20_address".to_string(),
-                value: ethabi::Token::Address(token.raw()),
+                value: ethabi::Token::Address(token.raw().0.into()),
             },
             dest,
             ethabi::LogParam {
@@ -161,7 +175,7 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
     ];
 
     for (flag, expected) in test_data {
-        println!("{}", flag);
+        println!("{flag}");
         assert!(tester
             .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
             .is_ok());
@@ -187,12 +201,15 @@ fn withdraw_eth() {
     let mut expected_event = vec![
         ethabi::LogParam {
             name: "sender".to_string(),
-            value: ethabi::Token::Address(tester.contract.address.raw()),
+            value: ethabi::Token::Address(tester.contract.address.raw().0.into()),
         },
         ethabi::LogParam {
             name: "erc20_address".to_string(),
             value: ethabi::Token::Address(
-                aurora_engine_precompiles::native::events::ETH_ADDRESS.raw(),
+                aurora_engine_precompiles::native::events::ETH_ADDRESS
+                    .raw()
+                    .0
+                    .into(),
             ),
         },
         ethabi::LogParam {
@@ -201,12 +218,12 @@ fn withdraw_eth() {
         },
         ethabi::LogParam {
             name: "amount".to_string(),
-            value: ethabi::Token::Uint(amount.raw()),
+            value: ethabi::Token::Uint(amount.raw().to_big_endian().into()),
         },
     ];
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 
     // exit to ethereum
@@ -216,16 +233,16 @@ fn withdraw_eth() {
         .unwrap();
     expected_event[2] = ethabi::LogParam {
         name: "dest".to_string(),
-        value: ethabi::Token::Address(DEST_ADDRESS.raw()),
+        value: ethabi::Token::Address(DEST_ADDRESS.raw().0.into()),
     };
     expected_event[3] = ethabi::LogParam {
         name: "amount".to_string(),
-        value: ethabi::Token::Uint(amount.raw()),
+        value: ethabi::Token::Uint(amount.raw().to_big_endian().into()),
     };
     let schema = aurora_engine_precompiles::native::events::exit_to_eth_schema();
     let exit_events = parse_exit_events(result, &schema);
 
-    assert!(exit_events.len() == 1);
+    assert_eq!(exit_events.len(), 1);
     assert_eq!(&expected_event, &exit_events[0].params);
 }
 
@@ -241,7 +258,7 @@ fn parse_exit_events(result: SubmitResult, schema: &ethabi::Event) -> Vec<ethabi
             Some(
                 schema
                     .parse_log(ethabi::RawLog {
-                        topics: log.topics.into_iter().map(H256).collect(),
+                        topics: log.topics.into_iter().map(Into::into).collect(),
                         data: log.data,
                     })
                     .unwrap(),

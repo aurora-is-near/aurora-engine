@@ -1,5 +1,4 @@
 use crate::Error;
-use aurora_engine_precompiles::secp256k1::ecrecover;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{Vec, H160, H256, U256};
@@ -29,16 +28,25 @@ impl Decodable for AccessTuple {
     }
 }
 
-/// See https://eips.ethereum.org/EIPS/eip-2930
+/// See `https://eips.ethereum.org/EIPS/eip-2930`
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Transaction2930 {
+    /// ID of chain which the transaction belongs.
     pub chain_id: u64,
+    /// A monotonically increasing transaction counter for this sender
     pub nonce: U256,
+    /// The fee the sender pays per unit of gas.
     pub gas_price: U256,
+    /// The maximum amount of gas the sender is willing to consume on a transaction.
     pub gas_limit: U256,
+    /// The receiving address (`None` for the zero address)
     pub to: Option<Address>,
+    /// The amount of ETH to transfer.
     pub value: Wei,
+    /// Arbitrary binary data for a contract call invocation
     pub data: Vec<u8>,
+    /// A list of addresses and storage keys that the transaction plans to access.
+    /// Accesses outside the list are possible, but become more expensive.
     pub access_list: Vec<AccessTuple>,
 }
 
@@ -66,11 +74,11 @@ impl Transaction2930 {
         s.append(&self.value.raw());
         s.append(&self.data);
         s.begin_list(self.access_list.len());
-        for tuple in self.access_list.iter() {
+        for tuple in &self.access_list {
             s.begin_list(2);
             s.append(&tuple.address);
             s.begin_list(tuple.storage_keys.len());
-            for key in tuple.storage_keys.iter() {
+            for key in &tuple.storage_keys {
                 s.append(key);
             }
         }
@@ -92,11 +100,11 @@ impl SignedTransaction2930 {
         rlp_stream.append(&TYPE_BYTE);
         self.transaction.rlp_append_unsigned(&mut rlp_stream);
         let message_hash = sdk::keccak(rlp_stream.as_raw());
-        ecrecover(
+        sdk::ecrecover(
             message_hash,
             &super::vrs_to_arr(self.parity, self.r, self.s),
         )
-        .map_err(|_e| Error::EcRecover)
+        .map_err(|_| Error::EcRecover)
     }
 }
 
@@ -112,7 +120,7 @@ impl Encodable for SignedTransaction2930 {
 impl Decodable for SignedTransaction2930 {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         if rlp.item_count() != Ok(11) {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
+            return Err(DecoderError::RlpIncorrectListLen);
         }
         let chain_id = rlp.val_at(0)?;
         let nonce = rlp.val_at(1)?;

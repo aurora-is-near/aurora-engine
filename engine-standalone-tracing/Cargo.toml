@@ -1,29 +1,27 @@
 [package]
 name = "engine-standalone-tracing"
 version = "0.1.0"
-edition = "2021"
-authors = ["Aurora Labs <hello@aurora.dev>"]
-description = "Aurora engine standalone tracing library. Provides functions and types for extracing geth-like traces from standalone engine execution."
-homepage = "https://github.com/aurora-is-near/aurora-engine"
-repository = "https://github.com/aurora-is-near/aurora-engine"
-license = "CC0-1.0"
-publish = false
+edition.workspace = true
+authors.workspace = true
+description = "Aurora engine standalone tracing library. Provides functions and types for extracting geth-like traces from standalone engine execution."
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
 autobenches = false
 
 [lib]
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine-types = { path = "../engine-types", default-features = false, features = ["std"] }
-evm-core = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std"] }
-evm = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
-evm-runtime = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
-evm-gasometer = { git = "https://github.com/aurora-is-near/sputnikvm.git", tag = "v0.36.0-aurora", default-features = false, features = ["std", "tracing"] }
-hex = { version = "0.4", default-features = false, features = ["std"] }
-serde = { version = "1", features = ["derive"], optional = true }
+aurora-engine-types = { workspace = true, features = ["std"] }
+aurora-evm = { workspace = true, features = ["std", "tracing"] }
+hex = { workspace = true, features = ["std"] }
+serde = { workspace = true, features = ["std"], optional = true }
+
+[lints]
+workspace = true
 
 [features]
 default = []
-mainnet = []
-testnet = []
 impl-serde = ["aurora-engine-types/impl-serde", "serde"]
