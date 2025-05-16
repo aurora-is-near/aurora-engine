@@ -67,6 +67,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
+      - name: Install Rust toolchain and components
+        run: |
+          rustup component add rustfmt clippy
+          rustup toolchain add nightly
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
