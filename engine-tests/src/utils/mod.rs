@@ -35,7 +35,7 @@ pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
 pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
-pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
