@@ -10,21 +10,13 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: selfhosted-heavy
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/dind.sh
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-          toolchain: stable
-          override: false
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -41,10 +33,12 @@ jobs:
           node-version: 18
           cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts/yarn.lock
-            etc/tests/uniswap/yarn.lock
+            etc/eth-contracts
+            etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Tests
         run: cargo make test-flow
 

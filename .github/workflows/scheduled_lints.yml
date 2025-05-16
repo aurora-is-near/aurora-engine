@@ -8,15 +8,13 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests
-    runs-on: selfhosted-heavy
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/dind.sh
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -39,12 +37,14 @@ jobs:
           node-version: 18
           cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts/yarn.lock
-            etc/tests/uniswap/yarn.lock
+            etc/eth-contracts
+            etc/tests/uniswap
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
@@ -88,7 +88,8 @@ jobs:
           fields: repo,message,commit,author,action,eventName,job,took
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+scripts/ci-deps/dind:
+  sh:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
