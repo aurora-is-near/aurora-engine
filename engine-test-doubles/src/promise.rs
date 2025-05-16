@@ -28,7 +28,7 @@ pub struct PromiseTracker {
 }
 
 impl PromiseTracker {
-    fn take_id(&mut self) -> u64 {
+    const fn take_id(&mut self) -> u64 {
         let id = self.internal_index;
         self.internal_index += 1;
         id

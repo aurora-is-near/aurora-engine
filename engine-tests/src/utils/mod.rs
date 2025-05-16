@@ -1,22 +1,9 @@
-#[cfg(not(feature = "ext-connector"))]
-use crate::prelude::parameters::InitCallArgs;
-use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
-use crate::prelude::transactions::{
-    eip_1559::{self, SignedTransaction1559, Transaction1559},
-    eip_2930::{self, SignedTransaction2930, Transaction2930},
-    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
-};
-use crate::prelude::{sdk, Address, Wei, H256, U256};
-use crate::utils::solidity::{ContractConstructor, DeployedContract};
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_transactions::eip_7702;
 use aurora_engine_transactions::eip_7702::{SignedTransaction7702, Transaction7702};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshDeserialize;
-#[cfg(not(feature = "ext-connector"))]
-use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-#[cfg(feature = "ext-connector")]
 use aurora_engine_types::parameters::connector::{
     SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
@@ -37,11 +24,20 @@ use rlp::RlpStream;
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
+use crate::prelude::transactions::{
+    eip_1559::{self, SignedTransaction1559, Transaction1559},
+    eip_2930::{self, SignedTransaction2930, Transaction2930},
+    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
+};
+use crate::prelude::{sdk, Address, Wei, H256, U256};
+use crate::utils::solidity::{ContractConstructor, DeployedContract};
+
 pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
 pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
-pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
@@ -318,52 +314,6 @@ impl AuroraRunner {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
         }
 
-        #[cfg(not(feature = "ext-connector"))]
-        {
-            use aurora_engine::contract_methods::connector::fungible_token::FungibleToken;
-            let ft_key = crate::prelude::storage::bytes_to_key(
-                crate::prelude::storage::KeyPrefix::EthConnector,
-                &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
-            );
-            let ft_value = {
-                let mut current_ft: FungibleToken = trie
-                    .get(&ft_key)
-                    .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
-                    .unwrap_or_default();
-                current_ft.total_eth_supply_on_near = current_ft.total_eth_supply_on_near
-                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
-                current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
-                current_ft
-            };
-
-            let aurora_balance_key = [
-                ft_key.as_slice(),
-                self.context.current_account_id.as_bytes(),
-            ]
-            .concat();
-            let aurora_balance_value = {
-                let mut current_balance: u128 = trie
-                    .get(&aurora_balance_key)
-                    .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                    .unwrap_or_default();
-                current_balance += init_balance.raw().as_u128();
-                current_balance
-            };
-
-            let proof_key = crate::prelude::storage::bytes_to_key(
-                crate::prelude::storage::KeyPrefix::EthConnector,
-                &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
-            );
-
-            trie.insert(ft_key, borsh::to_vec(&ft_value).unwrap());
-            trie.insert(proof_key, vec![0]);
-            trie.insert(
-                aurora_balance_key,
-                borsh::to_vec(&aurora_balance_value).unwrap(),
-            );
-        }
-
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
@@ -600,31 +550,11 @@ impl AuroraRunner {
     }
 
     pub fn get_engine_code() -> Vec<u8> {
-        let path = if cfg!(feature = "mainnet-test") {
-            if cfg!(feature = "ext-connector") {
-                "../bin/aurora-mainnet-silo-test.wasm"
-            } else {
-                "../bin/aurora-mainnet-test.wasm"
-            }
-        } else if cfg!(feature = "testnet-test") {
-            if cfg!(feature = "ext-connector") {
-                "../bin/aurora-testnet-silo-test.wasm"
-            } else {
-                "../bin/aurora-testnet-test.wasm"
-            }
-        } else {
-            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-        };
-
-        std::fs::read(path).unwrap()
+        std::fs::read("../bin/aurora-engine-test.wasm").expect("Failed to read engine code")
     }
 
     pub fn get_engine_v331_code() -> Vec<u8> {
-        let path = if cfg!(feature = "ext-connector") {
-            "src/tests/res/aurora_silo_v3.3.1.wasm"
-        } else {
-            "src/tests/res/aurora_v3.3.1.wasm"
-        };
+        let path = "src/tests/res/aurora_v3.3.1.wasm";
         std::fs::read(path).unwrap()
     }
 
@@ -732,21 +662,6 @@ pub fn deploy_runner() -> AuroraRunner {
 
     assert!(result.is_ok());
 
-    #[cfg(not(feature = "ext-connector"))]
-    let result = {
-        let args = InitCallArgs {
-            prover_account: str_to_account_id("prover.near"),
-            eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-            metadata: FungibleTokenMetadata::default(),
-        };
-        runner.call(
-            "new_eth_connector",
-            &account_id,
-            borsh::to_vec(&args).unwrap(),
-        )
-    };
-
-    #[cfg(feature = "ext-connector")]
     let result = {
         let args = SetEthConnectorContractAccountArgs {
             account: AccountId::new("aurora_eth_connector.root").unwrap(),

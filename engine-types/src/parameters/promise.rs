@@ -1,6 +1,6 @@
 use crate::account_id::AccountId;
 use crate::public_key::PublicKey;
-use crate::types::{Address, NEP141Wei, NearGas, RawU256, Yocto};
+use crate::types::{NearGas, Yocto};
 use crate::{Box, String, Vec};
 
 use borsh::{io, BorshDeserialize, BorshSerialize};
@@ -269,35 +269,6 @@ pub struct PromiseBatchAction {
     pub actions: Vec<PromiseAction>,
 }
 
-/// withdraw NEAR eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct WithdrawCallArgs {
-    pub recipient_address: Address,
-    pub amount: NEP141Wei,
-}
-
-/// withdraw NEAR eth-connector call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct RefundCallArgs {
-    pub recipient_address: Address,
-    pub erc20_address: Option<Address>,
-    pub amount: RawU256,
-}
-
-// Transfer near tokens call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
-pub struct TransferNearCallArgs {
-    pub target_account_id: AccountId,
-    pub amount: u128,
-}
-
-/// Exit to near precompile callback call args
-#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq, Default)]
-pub struct ExitToNearPrecompileCallbackCallArgs {
-    pub refund: Option<RefundCallArgs>,
-    pub transfer_near: Option<TransferNearCallArgs>,
-}
-
 /// Args passed to the cross contract call precompile.
 /// That precompile is used by Aurora contracts to make calls to the broader NEAR ecosystem.
 /// See `https://github.com/aurora-is-near/AIPs/pull/2` for design details.
@@ -311,4 +282,9 @@ pub enum CrossContractCallArgs {
     /// much gas left to perform it. In this case, the promise could be `Delayed` (stored in the router)
     /// and executed in a separate transaction with a fresh 300 Tgas available for it.
     Delayed(PromiseArgs),
+}
+
+pub enum PromiseOrValue<T> {
+    Value(T),
+    Promise(PromiseWithCallbackArgs),
 }

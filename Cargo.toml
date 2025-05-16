@@ -14,7 +14,7 @@ aurora-engine-hashchain = { path = "engine-hashchain", default-features = false 
 aurora-engine-precompiles = { path = "engine-precompiles", version = "1.2.0", default-features = false }
 aurora-engine-sdk = { path = "engine-sdk", version = "1.2.0", default-features = false }
 aurora-engine-transactions = { path = "engine-transactions", version = "1.2.0", default-features = false }
-aurora-engine-types = { path = "engine-types", version = "1.2.0", default-features = false }
+aurora-engine-types = { path = "engine-types", version = "2.0.0", default-features = false }
 aurora-engine-modexp = { path = "engine-modexp", version = "1.2.0", default-features = false }
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
 aurora-engine-workspace = { path = "engine-workspace" }
@@ -29,7 +29,7 @@ bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
-byte-slice-cast = { version = "1", default-features = false }
+cargo-near-build = "0.7"
 criterion = "0.5"
 ethabi = { version = "18", default-features = false }
 aurora-evm = { version = "2.0.0", default-features = false }
@@ -40,19 +40,18 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.27"
+near-crypto = "0.30"
 near-gas = "0.3"
-near-parameters = "0.27"
-near-primitives = "0.27"
-near-primitives-core = "0.27"
+near-parameters = "0.30"
+near-primitives = "0.30"
+near-primitives-core = "0.30"
 near-sdk = "5"
-near-vm-runner = { version = "0.27", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
-near-workspaces = "0.17"
+near-vm-runner = { version = "0.30", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
+near-workspaces = "0.20"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
-reqwest = "0.12"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.6", default-features = false }
 rocksdb = { version = "0.21", default-features = false }
@@ -60,7 +59,7 @@ serde = { version = "1", default-features = false, features = ["alloc", "derive"
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
-strum = { version = "0.26", features = ["derive"] }
+strum = { version = "0.27", features = ["derive"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
@@ -76,6 +75,7 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 unreadable_literal = "allow"
 similar_names = "allow"
+too_long_first_doc_paragraph = "allow"
 
 [workspace]
 resolver = "2"
@@ -102,11 +102,12 @@ exclude = [
     "etc/tests/self-contained-5bEgfRQ",
     "etc/tests/fibonacci",
     "etc/tests/modexp-bench",
+    "etc/tests/mock-controller",
     "etc/xcc-router",
 ]
 
 [profile.release]
-opt-level = 3
+opt-level = 3 # "z" level decreases contract size, but at the same time, increases NEAR gas consumption in some cases
 debug = false
 debug-assertions = false
 overflow-checks = true

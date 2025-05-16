@@ -11,15 +11,18 @@ use crate::prelude::{
     vec, Cow, String, ToString, Vec, H256, U256,
 };
 #[cfg(feature = "error_refund")]
-use crate::prelude::{parameters::RefundCallArgs, types};
+use crate::prelude::{parameters::connector::RefundCallArgs, types};
 use crate::xcc::state::get_wnear_address;
 use crate::PrecompileOutput;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh,
     parameters::{
-        connector::WithdrawSerializeType, ExitToNearPrecompileCallbackCallArgs,
-        PromiseWithCallbackArgs, TransferNearCallArgs, WithdrawCallArgs,
+        connector::{
+            ExitToNearPrecompileCallbackArgs, TransferNearArgs, WithdrawCallArgs,
+            WithdrawSerializeType,
+        },
+        PromiseWithCallbackArgs,
     },
     storage::EthConnectorStorageId,
     types::NEP141Wei,
@@ -284,12 +287,7 @@ impl<I> ExitToNear<I> {
 
 impl<I: IO> EthConnector for ExitToNear<I> {
     fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
-        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
-
-        Ok(eth_connector_account_id)
+        get_eth_connector_contract_account(&self.io)
     }
 }
 
@@ -309,7 +307,6 @@ fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId,
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
 }
 
-#[cfg(feature = "ext-connector")]
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
     io.read_storage(&construct_contract_key(
         EthConnectorStorageId::EthConnectorAccount,
@@ -446,7 +443,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 }
             };
 
-        let callback_args = ExitToNearPrecompileCallbackCallArgs {
+        let callback_args = ExitToNearPrecompileCallbackArgs {
             #[cfg(feature = "error_refund")]
             refund: refund_call_args(&exit_to_near_params, &exit_event),
             #[cfg(not(feature = "error_refund"))]
@@ -467,7 +464,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             attached_gas,
         };
 
-        let promise = if callback_args == ExitToNearPrecompileCallbackCallArgs::default() {
+        let promise = if callback_args == ExitToNearPrecompileCallbackArgs::default() {
             PromiseArgs::Create(transfer_promise)
         } else {
             PromiseArgs::Callback(PromiseWithCallbackArgs {
@@ -511,7 +508,7 @@ fn exit_base_token_to_near(
         String,
         events::ExitToNear,
         String,
-        Option<TransferNearCallArgs>,
+        Option<TransferNearArgs>,
     ),
     ExitError,
 > {
@@ -565,7 +562,7 @@ fn exit_erc20_token_to_near<I: IO>(
         String,
         events::ExitToNear,
         String,
-        Option<TransferNearCallArgs>,
+        Option<TransferNearArgs>,
     ),
     ExitError,
 > {
@@ -583,32 +580,29 @@ fn exit_erc20_token_to_near<I: IO>(
     let nep141_account_id = get_nep141_from_erc20(erc20_address.as_bytes(), io)?;
 
     let (nep141_account_id, args, method, transfer_near_args, event) = match exit_params.message {
-        Some(Message::UnwrapWnear) => {
-            // The flow is following here:
-            // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
-            // In such way we unwrap wNEAR to NEAR.
-            // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
-            // in which make transfer of unwrapped NEAR to the `target_account_id`.
-            if erc20_address == get_wnear_address(io).raw() {
-                // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
-                (
-                    nep141_account_id,
-                    format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
-                    "near_withdraw",
-                    Some(TransferNearCallArgs {
-                        target_account_id: exit_params.receiver_account_id.clone(),
-                        amount: exit_params.amount.as_u128(),
-                    }),
-                    events::ExitToNear::Legacy(ExitToNearLegacy {
-                        sender: Address::new(erc20_address),
-                        erc20_address: Address::new(erc20_address),
-                        dest: exit_params.receiver_account_id.to_string(),
-                        amount: exit_params.amount,
-                    }),
-                )
-            } else {
-                return Err(ExitError::Other(Cow::from("ERR_INVALID_ERC20_FOR_UNWRAP")));
-            }
+        // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
+        Some(Message::UnwrapWnear) if erc20_address == get_wnear_address(io).raw() =>
+        // The flow is following here:
+        // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
+        // In such way we unwrap wNEAR to NEAR.
+        // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
+        // in which make transfer of unwrapped NEAR to the `target_account_id`.
+        {
+            (
+                nep141_account_id,
+                format!(r#"{{"amount":"{}"}}"#, exit_params.amount.as_u128()),
+                "near_withdraw",
+                Some(TransferNearArgs {
+                    target_account_id: exit_params.receiver_account_id.clone(),
+                    amount: exit_params.amount.as_u128(),
+                }),
+                events::ExitToNear::Legacy(ExitToNearLegacy {
+                    sender: Address::new(erc20_address),
+                    erc20_address: Address::new(erc20_address),
+                    dest: exit_params.receiver_account_id.to_string(),
+                    amount: exit_params.amount,
+                }),
+            )
         }
         // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
         Some(Message::Omni(msg)) => (
@@ -629,7 +623,9 @@ fn exit_erc20_token_to_near<I: IO>(
             }),
         ),
         // The legacy flow. Just withdraw the tokens to the NEAR account id.
-        None => {
+        // P.S. We use underscore here instead of `None` to handle the case when a user
+        // could add the `unwrap` suffix for non wNEAR ERC-20 token by mistake.
+        _ => {
             // There is no way to inject json, given the encoding of both arguments
             // as decimal and valid account id respectively.
             (
@@ -797,8 +793,6 @@ fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
 
 pub struct ExitToEthereum<I> {
     io: I,
-    #[cfg(not(feature = "ext-connector"))]
-    current_account_id: AccountId,
 }
 
 pub mod exit_to_ethereum {
@@ -812,31 +806,14 @@ pub mod exit_to_ethereum {
 }
 
 impl<I> ExitToEthereum<I> {
-    #[allow(clippy::missing_const_for_fn, clippy::needless_pass_by_value)]
-    pub fn new(current_account_id: AccountId, io: I) -> Self {
-        #[cfg(not(feature = "ext-connector"))]
-        {
-            Self {
-                io,
-                current_account_id,
-            }
-        }
-
-        #[cfg(feature = "ext-connector")]
-        {
-            let _ = current_account_id;
-            Self { io }
-        }
+    pub const fn new(io: I) -> Self {
+        Self { io }
     }
 }
 
 impl<I: IO> EthConnector for ExitToEthereum<I> {
     fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        #[cfg(not(feature = "ext-connector"))]
-        let eth_connector_account_id = self.current_account_id.clone();
-        #[cfg(feature = "ext-connector")]
         let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
-
         Ok(eth_connector_account_id)
     }
 }

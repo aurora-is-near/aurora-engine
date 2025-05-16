@@ -27,14 +27,14 @@ pub fn is_valid_be(input: &[u8; 48]) -> bool {
         match i.cmp(modul) {
             core::cmp::Ordering::Greater => return false,
             core::cmp::Ordering::Less => return true,
-            core::cmp::Ordering::Equal => continue,
+            core::cmp::Ordering::Equal => {}
         }
     }
     // false if matching the modulus
     false
 }
 
-/// Checks whether or not the input represents a canonical field element, returning the field
+/// Checks whether the input represents a canonical field element, returning the field
 /// element if successful.
 pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, Bls12381Error> {
     if !is_valid_be(input) {

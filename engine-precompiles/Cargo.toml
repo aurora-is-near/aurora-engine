@@ -21,8 +21,6 @@ ethabi.workspace = true
 aurora-evm.workspace = true
 hex.workspace = true
 num.workspace = true
-ripemd.workspace = true
-sha2.workspace = true
 
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
@@ -33,8 +31,7 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-engine-sdk/bls", "bn/std", "aurora-evm/std", "ripemd/std", "sha2/std", "ethabi/std"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/bls", "aurora-engine-sdk/std", "aurora-evm/std", "bn/std", "ethabi/std"]
 contract = ["aurora-engine-sdk/contract", "aurora-engine-sdk/bls"]
 log = []
 error_refund = []
-ext-connector = []

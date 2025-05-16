@@ -17,6 +17,3 @@ panic = "abort"
 [dependencies]
 near-sdk = "5"
 serde = "1"
-
-[patch.crates-io]
-parity-secp256k1 = { git = 'https://github.com/paritytech/rust-secp256k1', rev = "d05fd8e" }

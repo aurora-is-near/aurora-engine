@@ -1,4 +1,4 @@
-use crate::near_runtime::exports;
+use crate::exports;
 
 pub fn bls12381_p1_sum(input: &[u8]) -> [u8; 96] {
     unsafe {

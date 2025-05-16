@@ -14,15 +14,14 @@ pub mod bls12_381;
 pub mod caching;
 pub mod env;
 pub mod error;
+#[cfg(feature = "contract")]
+mod exports;
 pub mod io;
 #[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;
 pub mod types;
-
-#[cfg(feature = "contract")]
-use near_runtime::exports;
 
 #[cfg(feature = "contract")]
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;
@@ -79,6 +78,17 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
         exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
         bytes
     }
+}
+
+#[cfg(not(feature = "contract"))]
+#[must_use]
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    use ripemd::{Digest, Ripemd160};
+
+    let hash = Ripemd160::digest(input);
+    let mut output = [0u8; 20];
+    output.copy_from_slice(&hash);
+    output
 }
 
 #[cfg(feature = "contract")]

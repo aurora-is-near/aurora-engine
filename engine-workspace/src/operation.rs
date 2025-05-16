@@ -1,11 +1,9 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{
-    Erc20Metadata, FungibleTokenMetadata, WithdrawResult,
-};
+use aurora_engine_types::parameters::connector::{Erc20Metadata, WithdrawResult};
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
 use aurora_engine_types::parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistStatusArgs};
 use aurora_engine_types::types::Address;
-use aurora_engine_types::{HashMap, H256, U256};
+use aurora_engine_types::{H256, U256};
 use near_sdk::json_types::U128;
 use near_sdk::PromiseOrValue;
 
@@ -16,13 +14,7 @@ use crate::{impl_call_return, impl_view_return};
 
 impl_call_return![
     (CallNew, Call::New),
-    (CallNewEthConnector, Call::NewEthConnector),
     (CallFtTransfer, Call::FtTransfer),
-    (CallDeposit, Call::Deposit),
-    (
-        CallSetEthConnectorContractData,
-        Call::SetEthConnectorContractData
-    ),
     (
         CallFactoryUpdateAddressVersion,
         Call::FactoryUpdateAddressVersion
@@ -51,6 +43,7 @@ impl_call_return![
     (CallPauseContract, Call::PauseContract),
     (CallResumeContract, Call::ResumeContract),
     (CallSetFixedGas, Call::SetFixedGas),
+    (CallSetErc20FallbackAddress, Call::SetErc20FallbackAddress),
     (CallSetSiloParams, Call::SetSiloParams),
     (CallSetWhitelistStatus, Call::SetWhitelistStatus),
     (CallAddEntryToWhitelist, Call::AddEntryToWhitelist),
@@ -68,6 +61,7 @@ impl_call_return![
     (CallWithdraw => WithdrawResult, Call::Withdraw, borsh),
     (CallDeployCode => SubmitResult, Call::DeployCode, borsh),
     (CallDeployErc20Token => Address, Call::DeployErc20Token, borsh_address),
+    (CallDeployErc20TokenLegacy => Address, Call::DeployErc20TokenLegacy, borsh_address),
     (CallMirrorErc20Token => Address, Call::MirrorErc20Token, borsh_address),
     (CallCall => SubmitResult, Call::Call, borsh),
     (CallSubmit => SubmitResult, Call::Submit, borsh),
@@ -77,12 +71,9 @@ impl_call_return![
 impl_view_return![
     (ViewFtTotalSupply => U128, View::FtTotalSupply, json),
     (ViewFtBalanceOf => U128, View::FtBalanceOf, json),
-    (ViewFtBalancesOf => HashMap<AccountId, u128>, View::FtBalancesOf, borsh),
     (ViewStorageBalanceOf => StorageBalance, View::StorageBalanceOf, json),
-    (ViewFtMetadata => FungibleTokenMetadata, View::FtMetadata, json),
     (ViewVersion => String, View::Version, borsh),
     (ViewOwner => AccountId, View::Owner, from_bytes),
-    (ViewBridgeProver => AccountId, View::BridgeProver, from_bytes),
     (ViewChainId => U256, View::ChainId, borsh_U256),
     (ViewUpgradeIndex => u64, View::UpgradeIndex, borsh),
     (ViewPausedPrecompiles => u32, View::PausedPrecompiles, borsh),
@@ -92,14 +83,9 @@ impl_view_return![
     (ViewNonce => U256, View::Nonce, borsh_U256),
     (ViewStorageAt => H256, View::StorageAt, borsh_H256),
     (ViewView => TransactionStatus, View::View, borsh),
-    (ViewIsUsedProof => bool, View::IsUsedProof, borsh),
-    (ViewFtTotalEthSupplyOnAurora => U128, View::FtTotalEthSupplyOnAurora, json),
-    (ViewFtTotalEthSupplyOnNear => U128, View::FtTotalEthSupplyOnNear, json),
-    (ViewFtBalanceOfEth => U128, View::FtBalanceOfEth, json),
     (ViewErc20FromNep141 => Address, View::Erc20FromNep141, borsh),
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
-    (ViewAccountsCounter => u64, View::AccountsCounter, borsh),
     (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
     (ViewGetFixedGas => FixedGasArgs, View::GetFixedGas, borsh),
     (ViewGetSiloParams => SiloParamsArgs, View::GetSiloParams, borsh),
@@ -112,9 +98,9 @@ impl_view_return![
 #[allow(clippy::enum_variant_names)]
 pub(crate) enum Call {
     New,
-    NewEthConnector,
     DeployCode,
     DeployErc20Token,
+    DeployErc20TokenLegacy,
     MirrorErc20Token,
     Call,
     Submit,
@@ -122,7 +108,6 @@ pub(crate) enum Call {
     RegisterRelayer,
     FtOnTransfer,
     Withdraw,
-    Deposit,
     FtTransfer,
     FtTransferCall,
     StorageDeposit,
@@ -137,7 +122,6 @@ pub(crate) enum Call {
     FactoryUpdate,
     FundXccSubAccount,
     FactorySetWNearAddress,
-    SetEthConnectorContractData,
     SetEthConnectorContractAccount,
     FactoryUpdateAddressVersion,
     RefundOnError,
@@ -149,6 +133,7 @@ pub(crate) enum Call {
     PauseContract,
     ResumeContract,
     SetFixedGas,
+    SetErc20FallbackAddress,
     SetSiloParams,
     SetWhitelistStatus,
     AddEntryToWhitelist,
@@ -162,9 +147,8 @@ impl AsRef<str> for Call {
     fn as_ref(&self) -> &str {
         match self {
             Self::New => "new",
-            Self::NewEthConnector => "new_eth_connector",
             Self::DeployCode => "deploy_code",
-            Self::DeployErc20Token => "deploy_erc20_token",
+            Self::DeployErc20Token | Self::DeployErc20TokenLegacy => "deploy_erc20_token",
             Self::MirrorErc20Token => "mirror_erc20_token",
             Self::Call => "call",
             Self::Submit => "submit",
@@ -172,7 +156,6 @@ impl AsRef<str> for Call {
             Self::RegisterRelayer => "register_relayer",
             Self::FtOnTransfer => "ft_on_transfer",
             Self::Withdraw => "withdraw",
-            Self::Deposit => "deposit",
             Self::FtTransfer => "ft_transfer",
             Self::FtTransferCall => "ft_transfer_call",
             Self::StorageDeposit => "storage_deposit",
@@ -187,7 +170,6 @@ impl AsRef<str> for Call {
             Self::FactoryUpdate => "factory_update",
             Self::FundXccSubAccount => "fund_xcc_sub_account",
             Self::FactorySetWNearAddress => "factory_set_wnear_address",
-            Self::SetEthConnectorContractData => "set_eth_connector_contract_data",
             Self::SetEthConnectorContractAccount => "set_eth_connector_contract_account",
             Self::FactoryUpdateAddressVersion => "factory_update_address_version",
             Self::RefundOnError => "refund_on_error",
@@ -199,6 +181,7 @@ impl AsRef<str> for Call {
             Self::PauseContract => "pause_contract",
             Self::ResumeContract => "resume_contract",
             Self::SetFixedGas => "set_fixed_gas",
+            Self::SetErc20FallbackAddress => "set_erc20_fallback_address",
             Self::SetSiloParams => "set_silo_params",
             Self::SetWhitelistStatus => "set_whitelist_status",
             Self::AddEntryToWhitelist => "add_entry_to_whitelist",
@@ -227,10 +210,7 @@ pub enum View {
     IsUsedProof,
     FtTotalSupply,
     FtBalanceOf,
-    FtBalancesOf,
     FtBalanceOfEth,
-    FtTotalEthSupplyOnAurora,
-    FtTotalEthSupplyOnNear,
     FtMetadata,
     StorageBalanceOf,
     PausedFlags,
@@ -263,10 +243,7 @@ impl AsRef<str> for View {
             Self::IsUsedProof => "is_used_proof",
             Self::FtTotalSupply => "ft_total_supply",
             Self::FtBalanceOf => "ft_balance_of",
-            Self::FtBalancesOf => "ft_balances_of",
             Self::FtBalanceOfEth => "ft_balance_of_eth",
-            Self::FtTotalEthSupplyOnAurora => "ft_total_eth_supply_on_aurora",
-            Self::FtTotalEthSupplyOnNear => "ft_total_eth_supply_on_near",
             Self::FtMetadata => "ft_metadata",
             Self::StorageBalanceOf => "storage_balance_of",
             Self::PausedFlags => "get_paused_flags",
