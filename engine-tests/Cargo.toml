@@ -27,7 +27,7 @@ aurora-engine-workspace.workspace = true
 anyhow.workspace = true
 borsh.workspace = true
 bstr.workspace = true
-cargo-near-build.workspace = true
+cargo-near-build = { workspace = true, features = ["build_internal"] }
 criterion.workspace = true
 engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true

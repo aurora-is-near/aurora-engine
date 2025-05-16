@@ -215,7 +215,7 @@ mod contract {
     /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
     /// to that bit is paused and 0-bit means not paused.
     #[no_mangle]
-    pub extern "C" fn paused_precompiles() {
+    pub extern "C" fn get_paused_precompiles() {
         let io = Runtime;
         contract_methods::admin::paused_precompiles(io)
             .map_err(ContractError::msg)
