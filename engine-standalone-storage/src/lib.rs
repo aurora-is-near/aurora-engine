@@ -23,6 +23,8 @@ pub use error::Error;
 mod state;
 pub use self::state::State as GlobalState;
 
+pub mod native_ffi;
+
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
 /// 16 bits for the transaction position.
@@ -334,7 +336,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
+            if db_key.get(0..engine_prefix_len) != Some(engine_prefix.as_slice()) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
@@ -528,60 +530,4 @@ fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16
         .concat()
         .as_slice(),
     )
-}
-
-pub mod contract {
-    use std::{ffi, sync::Mutex};
-
-    use libloading::os::unix::{self, Library};
-
-    use aurora_engine::{contract_methods::ContractError, parameters::SubmitResult};
-
-    static CONTRACT: Mutex<Option<DynamicContract>> = Mutex::new(None);
-
-    struct DynamicContract {
-        library: Library,
-        submit_fn: extern "C" fn() -> *mut ffi::c_void,
-        submit_with_args_fn: extern "C" fn() -> *mut ffi::c_void,
-    }
-
-    pub fn load(path: &str) {
-        if let Some(old) = CONTRACT.lock().expect("poisoned").take() {
-            if let Err(err) = old.library.close() {
-                eprintln!("unload library: {err}");
-            }
-        }
-
-        let library = unsafe { Library::open(Some(path), unix::RTLD_GLOBAL | unix::RTLD_LAZY) }
-            .expect("cannot load contract library");
-        let submit_fn = *unsafe { library.get(b"submit") }
-            .expect("cannot load `submit` function from the contract");
-        let submit_with_args_fn = *unsafe { library.get(b"submit_with_args") }
-            .expect("cannot load `submit_with_args` function from the contract");
-        *CONTRACT.lock().expect("poisoned") = Some(DynamicContract {
-            library,
-            submit_fn,
-            submit_with_args_fn,
-        });
-    }
-
-    pub(crate) fn submit() -> Result<SubmitResult, ContractError> {
-        let f = CONTRACT
-            .lock()
-            .expect("poisoned")
-            .as_ref()
-            .expect("must load `contract::load`")
-            .submit_fn;
-        *unsafe { Box::from_raw(f().cast()) }
-    }
-
-    pub(crate) fn submit_with_args() -> Result<SubmitResult, ContractError> {
-        let f = CONTRACT
-            .lock()
-            .expect("poisoned")
-            .as_ref()
-            .expect("must load `contract::load`")
-            .submit_with_args_fn;
-        *unsafe { Box::from_raw(f().cast()) }
-    }
 }
