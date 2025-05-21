@@ -46,8 +46,6 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use std::ffi;
-
     use crate::engine::{self, Engine};
     use crate::errors;
     use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
@@ -271,44 +269,25 @@ mod contract {
     /// Process signed Ethereum transaction.
     /// Must match `CHAIN_ID` to make sure it's signed for given chain vs replayed from another chain.
     #[no_mangle]
-    pub extern "C" fn submit() -> *mut ffi::c_void {
+    pub extern "C" fn submit() {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        #[cfg(target_arch = "wasm32")]
-        {
-            contract_methods::evm_transactions::submit(io, &env, &mut handler)
-                .map_err(ContractError::msg)
-                .sdk_unwrap();
-            std::ptr::null_mut()
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler);
-            Box::into_raw(Box::new(result)).cast()
-        }
+        contract_methods::evm_transactions::submit(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
     /// the array of bytes representing the transaction.
     #[no_mangle]
-    pub extern "C" fn submit_with_args() -> *mut ffi::c_void {
+    pub extern "C" fn submit_with_args() {
         let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        #[cfg(target_arch = "wasm32")]
-        {
-            contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
-                .map_err(ContractError::msg)
-                .sdk_unwrap();
-            std::ptr::null_mut()
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let result =
-                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler);
-            Box::into_raw(Box::new(result)).cast()
-        }
+        contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
     }
 
     #[no_mangle]

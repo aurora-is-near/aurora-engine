@@ -10,6 +10,7 @@ publish = false
 
 [workspace.dependencies]
 aurora-engine = { path = "engine", default-features = false }
+aurora-engine-native = { path = "engine-native" }
 aurora-engine-hashchain = { path = "engine-hashchain", default-features = false }
 aurora-engine-precompiles = { path = "engine-precompiles", version = "1.2.0", default-features = false }
 aurora-engine-sdk = { path = "engine-sdk", version = "1.2.0", default-features = false }
@@ -92,6 +93,7 @@ members = [
     "engine-transactions",
     "engine-types",
     "engine-workspace",
+    "engine-native",
 ]
 
 exclude = [
