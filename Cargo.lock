@@ -317,6 +317,7 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine",
  "aurora-engine-sdk",
+ "aurora-engine-types",
 ]
 
 [[package]]
