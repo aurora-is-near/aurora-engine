@@ -9,7 +9,6 @@ use sync::types::TransactionMessage;
 const VERSION: u8 = 0;
 
 pub mod diff;
-pub mod engine_state;
 pub mod error;
 pub mod json_snapshot;
 pub mod promise;

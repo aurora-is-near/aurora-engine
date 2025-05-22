@@ -340,15 +340,15 @@ impl State {
 }
 
 mod io {
+    use std::borrow::Cow;
+
     use aurora_engine_sdk::io::IO;
 
-    use crate::engine_state::EngineStorageValue;
-
     impl<'a> IO for &'a super::State {
-        type StorageValue = EngineStorageValue<'a>;
+        type StorageValue = Cow<'a, [u8]>;
 
         fn read_input(&self) -> Self::StorageValue {
-            EngineStorageValue::Vec(self.inner().input.clone())
+            Cow::Owned(self.inner().input.clone())
         }
 
         fn return_output(&mut self, value: &[u8]) {
@@ -376,7 +376,7 @@ mod io {
                 }
             };
 
-            value.map(ToOwned::to_owned).map(EngineStorageValue::Vec)
+            value.map(ToOwned::to_owned).map(Cow::Owned)
         }
 
         fn storage_has_key(&self, key: &[u8]) -> bool {
