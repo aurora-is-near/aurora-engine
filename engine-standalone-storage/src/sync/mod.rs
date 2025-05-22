@@ -2,8 +2,8 @@ use crate::{
     native_ffi::{self, DynamicContractImpl},
     state,
 };
-use aurora_engine::contract_methods::silo;
-use aurora_engine::{contract_methods, parameters::SubmitResult};
+
+use aurora_engine::parameters::SubmitResult;
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
     env::{self, DEFAULT_PREPAID_GAS},
@@ -424,7 +424,7 @@ where
     };
 
     let global_state = state::STATE.get().expect("must init global state");
-    global_state.set_env(env.clone());
+    global_state.set_env(env);
     // We can ignore promises in the standalone engine because it processes each receipt separately
     // and it is fed a stream of receipts (it does not schedule them)
     global_state.set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
@@ -451,13 +451,7 @@ where
             (tx_hash, result)
         }
         other => {
-            let result = non_submit_execute(
-                other,
-                contract_lock,
-                io,
-                &env,
-                &transaction_message.promise_data,
-            );
+            let result = non_submit_execute(other, contract_lock);
             (near_receipt_id, result)
         }
     };
@@ -485,33 +479,24 @@ fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
     clippy::match_same_arms,
     clippy::cognitive_complexity
 )]
-fn non_submit_execute<I: IO + Copy>(
+fn non_submit_execute(
     transaction: &TransactionKind,
-    // TODO: use it
-    _contract_lock: impl Deref<Target = DynamicContractImpl>,
-    mut io: I,
-    env: &env::Fixed,
-    promise_data: &[Option<Vec<u8>>],
+    contract_lock: impl Deref<Target = DynamicContractImpl>,
 ) -> Result<Option<TransactionExecutionResult>, error::Error> {
     let result = match transaction {
         TransactionKind::Call(_) => {
-            // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::evm_transactions::call(io, env, &mut handler)?;
+            let result = contract_lock.call()?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
 
         TransactionKind::Deploy(_) => {
-            // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::evm_transactions::deploy_code(io, env, &mut handler)?;
+            let result = contract_lock.deploy_code()?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::DeployErc20(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
+            let result = contract_lock.deploy_erc20_token()?;
 
             Some(match result {
                 PromiseOrValue::Value(address) => TransactionExecutionResult::DeployErc20(address),
@@ -522,16 +507,12 @@ fn non_submit_execute<I: IO + Copy>(
         }
         TransactionKind::DeployErc20Callback(_) => {
             // No promises can be created by `deploy_erc20_token_callback`
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result =
-                contract_methods::connector::deploy_erc20_token_callback(io, env, &mut handler)?;
+            let result = contract_lock.deploy_erc20_token_callback()?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
         TransactionKind::FtOnTransfer(_) => {
-            // No promises can be created by `ft_on_transfer`
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_output = contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
+            let maybe_output = contract_lock.ft_on_transfer()?;
 
             maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
@@ -546,54 +527,47 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::StorageWithdraw(_) => None,
         TransactionKind::SetPausedFlags(_) => None,
         TransactionKind::RegisterRelayer(_) => {
-            contract_methods::admin::register_relayer(io, env)?;
+            contract_lock.register_relayer()?;
             None
         }
         TransactionKind::ExitToNear(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
-                io,
-                env,
-                &mut handler,
-            )?;
+            let maybe_result = contract_lock.exit_to_near_precompile_callback()?;
 
             maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
         }
         TransactionKind::SetConnectorData(_) => None,
         TransactionKind::NewConnector(_) => None,
         TransactionKind::NewEngine(_) => {
-            contract_methods::admin::new(io, env)?;
+            contract_lock.new()?;
             None
         }
         TransactionKind::SetEthConnectorContractAccount(_) => {
-            contract_methods::connector::set_eth_connector_contract_account(io, env)?;
+            contract_lock.set_eth_connector_contract_account()?;
+
             None
         }
         TransactionKind::FactoryUpdate(_) => {
-            contract_methods::xcc::factory_update(io, env)?;
+            contract_lock.factory_update()?;
 
             None
         }
         TransactionKind::FactoryUpdateAddressVersion(_) => {
-            let handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::xcc::factory_update_address_version(io, env, &handler)?;
+            contract_lock.factory_update_address_version()?;
 
             None
         }
         TransactionKind::FactorySetWNearAddress(_) => {
-            contract_methods::xcc::factory_set_wnear_address(io, env)?;
+            contract_lock.factory_set_wnear_address()?;
 
             None
         }
         TransactionKind::FundXccSubAccount(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::xcc::fund_xcc_sub_account(io, env, &mut handler)?;
+            contract_lock.fund_xcc_sub_account()?;
 
             None
         }
         TransactionKind::WithdrawWnearToRouter(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
+            let result = contract_lock.withdraw_wnear_to_router()?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
@@ -601,103 +575,107 @@ fn non_submit_execute<I: IO + Copy>(
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(_) => {
-            contract_methods::admin::pause_precompiles(io, env)?;
+            contract_lock.pause_precompiles()?;
 
             None
         }
         TransactionKind::ResumePrecompiles(_) => {
-            contract_methods::admin::resume_precompiles(io, env)?;
+            contract_lock.resume_precompiles()?;
 
             None
         }
         TransactionKind::SetOwner(_) => {
-            contract_methods::admin::set_owner(io, env)?;
+            contract_lock.set_owner()?;
 
             None
         }
         TransactionKind::SetUpgradeDelayBlocks(_) => {
-            contract_methods::admin::set_upgrade_delay_blocks(io, env)?;
+            contract_lock.set_upgrade_delay_blocks()?;
 
             None
         }
         TransactionKind::PauseContract => {
-            contract_methods::admin::pause_contract(io, env)?;
+            contract_lock.pause_contract()?;
 
             None
         }
         TransactionKind::ResumeContract => {
-            contract_methods::admin::resume_contract(io, env)?;
+            contract_lock.resume_contract()?;
 
             None
         }
         TransactionKind::SetKeyManager(_) => {
-            contract_methods::admin::set_key_manager(io, env)?;
+            contract_lock.set_key_manager()?;
 
             None
         }
         TransactionKind::AddRelayerKey(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
+            contract_lock.add_relayer_key()?;
 
             None
         }
         TransactionKind::StoreRelayerKeyCallback(_) => {
-            contract_methods::admin::store_relayer_key_callback(io, env)?;
+            contract_lock.store_relayer_key_callback()?;
 
             None
         }
         TransactionKind::RemoveRelayerKey(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::admin::remove_relayer_key(io, env, &mut handler)?;
+            contract_lock.remove_relayer_key()?;
 
             None
         }
         TransactionKind::StartHashchain(_) => {
-            contract_methods::admin::start_hashchain(io, env)?;
+            contract_lock.start_hashchain()?;
 
             None
         }
         TransactionKind::SetErc20Metadata(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::set_erc20_metadata(io, env, &mut handler)?;
+            contract_lock.set_erc20_metadata()?;
 
             None
         }
         TransactionKind::SetFixedGas(args) => {
-            silo::set_fixed_gas(&mut io, args.fixed_gas);
+            contract_lock.silo_set_fixed_gas(args.fixed_gas);
+
             None
         }
         TransactionKind::SetErc20FallbackAddress(args) => {
-            silo::set_erc20_fallback_address(&mut io, args.address);
+            contract_lock.silo_set_erc20_fallback_address(args.address);
+
             None
         }
         TransactionKind::SetSiloParams(args) => {
-            silo::set_silo_params(&mut io, args.clone());
+            contract_lock.silo_set_silo_params(args.clone());
+
             None
         }
         TransactionKind::AddEntryToWhitelist(args) => {
-            silo::add_entry_to_whitelist(&io, args);
+            contract_lock.silo_add_entry_to_whitelist(args.clone());
+
             None
         }
         TransactionKind::AddEntryToWhitelistBatch(args) => {
-            silo::add_entry_to_whitelist_batch(&io, args.clone());
+            contract_lock.silo_add_entry_to_whitelist_batch(args.clone());
+
             None
         }
         TransactionKind::RemoveEntryFromWhitelist(args) => {
-            silo::remove_entry_from_whitelist(&io, args);
+            contract_lock.silo_remove_entry_from_whitelist(args.clone());
+
             None
         }
         TransactionKind::SetWhitelistStatus(args) => {
-            silo::set_whitelist_status(&io, args);
+            contract_lock.silo_set_whitelist_status(args.clone());
+
             None
         }
         TransactionKind::SetWhitelistsStatuses(args) => {
-            silo::set_whitelists_statuses(&io, args.clone());
+            contract_lock.silo_set_whitelists_statuses(args.clone());
+
             None
         }
         TransactionKind::MirrorErc20TokenCallback(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::mirror_erc20_token_callback(io, env, &mut handler)?;
+            contract_lock.mirror_erc20_token_callback()?;
 
             None
         }

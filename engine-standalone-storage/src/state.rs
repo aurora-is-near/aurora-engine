@@ -352,11 +352,11 @@ mod io {
         }
 
         fn return_output(&mut self, value: &[u8]) {
-            #[cfg(any(feature = "mainnet", feature = "testnet"))]
-            assert!(
-                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
-                "ERR_ILLEGAL_RETURN"
-            );
+            // #[cfg(any(feature = "mainnet", feature = "testnet"))]
+            // assert!(
+            //     !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
+            //     "ERR_ILLEGAL_RETURN"
+            // );
             super::value_return(value.len() as u64, value.as_ptr() as u64);
         }
 
