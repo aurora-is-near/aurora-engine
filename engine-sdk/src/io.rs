@@ -26,6 +26,23 @@ pub trait StorageIntermediate: Sized {
     }
 }
 
+impl<T> StorageIntermediate for T
+where
+    T: AsRef<[u8]>,
+{
+    fn len(&self) -> usize {
+        self.as_ref().len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.as_ref().is_empty()
+    }
+
+    fn copy_to_slice(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.as_ref());
+    }
+}
+
 /// Trait for reading/writing values from storage and a generalized `stdin`/`stdout`.
 pub trait IO {
     /// A type giving a reference to a value obtained by IO without loading it

@@ -1,9 +1,9 @@
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
-use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
@@ -19,6 +19,11 @@ pub mod sync;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
+
+mod state;
+pub use self::state::State as GlobalState;
+
+pub mod native_ffi;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
@@ -58,12 +63,16 @@ impl From<StoragePrefix> for u8 {
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
-    db: DB,
+    db: Arc<DB>,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
-        let db = DB::open_default(path)?;
+        let db = Arc::new(DB::open_default(path)?);
+        state::STATE
+            .set(state::State::new(Storage { db: db.clone() }))
+            .unwrap_or_default();
+
         Ok(Self { db })
     }
 
@@ -89,6 +98,24 @@ impl Storage {
 
     pub fn get_earliest_block(&self) -> Result<(H256, u64), Error> {
         self.block_read(rocksdb::IteratorMode::Start)
+    }
+
+    fn read_by_key(
+        &self,
+        key: &[u8],
+        bound_block_height: u64,
+        transaction_position: u16,
+    ) -> Result<DiffValue, Error> {
+        let upper_bound = construct_engine_key(key, bound_block_height, transaction_position);
+        let lower_bound = construct_storage_key(StoragePrefix::Engine, key);
+        let mut opt = rocksdb::ReadOptions::default();
+        opt.set_iterate_upper_bound(upper_bound);
+        opt.set_iterate_lower_bound(lower_bound);
+
+        let mut iter = self.db.iterator_opt(rocksdb::IteratorMode::End, opt);
+        // TODO: error kind
+        let (_, value) = iter.next().ok_or(Error::NoBlockAtHeight(0))??;
+        Ok(DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
     }
 
     fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), Error> {
@@ -309,7 +336,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
+            if db_key.get(0..engine_prefix_len) != Some(engine_prefix.as_slice()) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
@@ -369,31 +396,27 @@ impl Storage {
     /// with the engine, but not to make any immediate changes to storage; only return the diff and outcome.
     /// Note the closure is allowed to mutate the `EngineStateAccess` object, but this does not impact the `Storage`
     /// because all changes are held in the diff in memory.
-    pub fn with_engine_access<'db, 'input, R, F>(
-        &'db self,
+    pub fn with_engine_access<R, F>(
+        &self,
         block_height: u64,
         transaction_position: u16,
-        input: &'input [u8],
+        input: &[u8],
         f: F,
     ) -> EngineAccessResult<R>
     where
-        F: for<'output> FnOnce(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
+        F: FnOnce(&state::State) -> R,
     {
-        let diff = RefCell::new(Diff::default());
-        let engine_output = Cell::new(Vec::new());
+        let state = state::STATE.get_or_init(|| {
+            state::State::new(Storage {
+                db: self.db.clone(),
+            })
+        });
+        state.set_input(input.to_vec());
+        state.init(block_height, transaction_position);
 
-        let engine_state = engine_state::EngineStateAccess::new(
-            input,
-            block_height,
-            transaction_position,
-            &diff,
-            &engine_output,
-            &self.db,
-        );
-
-        let result = f(engine_state);
-        let diff = engine_state.get_transaction_diff();
-        let engine_output = engine_output.into_inner();
+        let result = f(state);
+        let diff = state.get_transaction_diff();
+        let engine_output = state.take_output();
 
         EngineAccessResult {
             result,

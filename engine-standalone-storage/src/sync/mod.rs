@@ -1,4 +1,7 @@
-use crate::engine_state::EngineStateAccess;
+use crate::{
+    native_ffi::{self, DynamicContractImpl},
+    state,
+};
 use aurora_engine::contract_methods::silo;
 use aurora_engine::{contract_methods, parameters::SubmitResult};
 use aurora_engine_modexp::ModExpAlgorithm;
@@ -16,6 +19,7 @@ use aurora_engine_types::{
     types::Address,
     H256,
 };
+use std::ops::Deref;
 use std::{io, str::FromStr};
 
 pub mod types;
@@ -330,7 +334,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                             &block_metadata,
                             engine_account_id,
                             io,
-                            EngineStateAccess::get_transaction_diff,
+                            |s| s.get_transaction_diff(),
                         )
                     },
                 )
@@ -368,7 +372,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 &block_metadata,
                 engine_account_id,
                 io,
-                EngineStateAccess::get_transaction_diff,
+                |s| s.get_transaction_diff(),
             )
         },
     );
@@ -419,37 +423,41 @@ where
         used_gas: NearGas::new(0),
     };
 
+    let global_state = state::STATE.get().expect("must init global state");
+    global_state.set_env(env.clone());
+    // We can ignore promises in the standalone engine because it processes each receipt separately
+    // and it is fed a stream of receipts (it does not schedule them)
+    global_state.set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
+
+    let contract_lock = native_ffi::lock();
     let (tx_hash, result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
-            // We can ignore promises in the standalone engine because it processes each receipt separately
-            // and it is fed a stream of receipts (it does not schedule them)
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
+            let result = contract_lock
+                .submit()
                 .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
                 .map_err(Into::into);
 
             (tx_hash, result)
         }
         TransactionKind::SubmitWithArgs(args) => {
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let result =
-                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
-                    .map(|submit_result| {
-                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
-                    })
-                    .map_err(Into::into);
+            let result = contract_lock
+                .submit_with_args()
+                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
+                .map_err(Into::into);
 
             (tx_hash, result)
         }
         other => {
-            let result = non_submit_execute(other, io, &env, &transaction_message.promise_data);
+            let result = non_submit_execute(
+                other,
+                contract_lock,
+                io,
+                &env,
+                &transaction_message.promise_data,
+            );
             (near_receipt_id, result)
         }
     };
@@ -479,6 +487,8 @@ fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
 )]
 fn non_submit_execute<I: IO + Copy>(
     transaction: &TransactionKind,
+    // TODO: use it
+    _contract_lock: impl Deref<Target = DynamicContractImpl>,
     mut io: I,
     env: &env::Fixed,
     promise_data: &[Option<Vec<u8>>],
