@@ -28,7 +28,6 @@ pub fn lock() -> impl Deref<Target = DynamicContractImpl> {
     })
 }
 
-#[allow(dead_code)]
 pub struct DynamicContractImpl {
     library: Library,
     get_version_fn: extern "C" fn() -> *mut ffi::c_void,
@@ -39,20 +38,8 @@ pub struct DynamicContractImpl {
     deploy_erc20_token_fn: extern "C" fn() -> *mut ffi::c_void,
     deploy_erc20_token_callback_fn: extern "C" fn() -> *mut ffi::c_void,
     ft_on_transfer_fn: extern "C" fn() -> *mut ffi::c_void,
-    ft_transfer_call_fn: extern "C" fn() -> *mut ffi::c_void,
-    ft_resolve_transfer_fn: extern "C" fn() -> *mut ffi::c_void,
-    ft_transfer_fn: extern "C" fn() -> *mut ffi::c_void,
-    withdraw_fn: extern "C" fn() -> *mut ffi::c_void,
-    deposit_fn: extern "C" fn() -> *mut ffi::c_void,
-    finish_deposit_fn: extern "C" fn() -> *mut ffi::c_void,
-    storage_deposit_fn: extern "C" fn() -> *mut ffi::c_void,
-    storage_unregister_fn: extern "C" fn() -> *mut ffi::c_void,
-    storage_withdraw_fn: extern "C" fn() -> *mut ffi::c_void,
-    set_paused_flags_fn: extern "C" fn() -> *mut ffi::c_void,
     register_relayer_fn: extern "C" fn() -> *mut ffi::c_void,
     exit_to_near_precompile_callback_fn: extern "C" fn() -> *mut ffi::c_void,
-    set_eth_connector_contract_data_fn: extern "C" fn() -> *mut ffi::c_void,
-    new_eth_connector_fn: extern "C" fn() -> *mut ffi::c_void,
     new_fn: extern "C" fn() -> *mut ffi::c_void,
     set_eth_connector_contract_account_fn: extern "C" fn() -> *mut ffi::c_void,
     factory_update_fn: extern "C" fn() -> *mut ffi::c_void,
@@ -132,47 +119,11 @@ where
     let name = "_native_ft_on_transfer";
     let ft_on_transfer_fn = *unsafe { library.get(name.as_bytes()) }
         .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_ft_transfer_call";
-    let ft_transfer_call_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_ft_resolve_transfer";
-    let ft_resolve_transfer_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_ft_transfer";
-    let ft_transfer_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_withdraw";
-    let withdraw_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_deposit";
-    let deposit_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_finish_deposit";
-    let finish_deposit_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_storage_deposit";
-    let storage_deposit_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_storage_unregister";
-    let storage_unregister_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_storage_withdraw";
-    let storage_withdraw_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_set_paused_flags";
-    let set_paused_flags_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
     let name = "_native_register_relayer";
     let register_relayer_fn = *unsafe { library.get(name.as_bytes()) }
         .map_err(|err| LibLoadingError::Function { name, err })?;
     let name = "_native_exit_to_near_precompile_callback";
     let exit_to_near_precompile_callback_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_set_eth_connector_contract_data";
-    let set_eth_connector_contract_data_fn = *unsafe { library.get(name.as_bytes()) }
-        .map_err(|err| LibLoadingError::Function { name, err })?;
-    let name = "_native_new_eth_connector";
-    let new_eth_connector_fn = *unsafe { library.get(name.as_bytes()) }
         .map_err(|err| LibLoadingError::Function { name, err })?;
     let name = "_native_new";
     let new_fn = *unsafe { library.get(name.as_bytes()) }
@@ -268,20 +219,8 @@ where
         deploy_erc20_token_fn,
         deploy_erc20_token_callback_fn,
         ft_on_transfer_fn,
-        ft_transfer_call_fn,
-        ft_resolve_transfer_fn,
-        ft_transfer_fn,
-        withdraw_fn,
-        deposit_fn,
-        finish_deposit_fn,
-        storage_deposit_fn,
-        storage_unregister_fn,
-        storage_withdraw_fn,
-        set_paused_flags_fn,
         register_relayer_fn,
         exit_to_near_precompile_callback_fn,
-        set_eth_connector_contract_data_fn,
-        new_eth_connector_fn,
         new_fn,
         set_eth_connector_contract_account_fn,
         factory_update_fn,
