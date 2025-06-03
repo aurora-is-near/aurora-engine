@@ -333,11 +333,12 @@ yarn test
 
 [tasks.test-workspace]
 category = "Test"
+env = { "RUSTFLAGS" = "-C link-arg=-Wl,--export-dynamic", "LD_LIBRARY_PATH" = "target/release" }
 command = "${CARGO}"
 dependencies = ["build-test", "clone-aurora-eth-connector"]
 args = [
     "test",
-    "--workspace",
+    "-paurora-engine-tests",
     "${@}",
 ]
 

@@ -166,6 +166,9 @@ fn test_total_supply_accounting() {
 
 #[test]
 fn test_transaction_to_zero_address() {
+    // NOTE: The function is not pure, must call early.
+    let mut runner = utils::standalone::StandaloneRunner::default();
+
     // Transactions that explicit list `0x0000...` as the `to` field in the transaction
     // should not be interpreted as contract creation. Previously this was the case
     // and it caused the Engine to incorrectly derive the sender's address.
@@ -184,7 +187,6 @@ fn test_transaction_to_zero_address() {
 
     // We want the standalone engine to still reproduce the old behaviour for blocks before the bug fix, and
     // to use the correct parsing for blocks after the fix.
-    let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
     let mut context = utils::AuroraRunner::default().context;
     context.input = tx_bytes;

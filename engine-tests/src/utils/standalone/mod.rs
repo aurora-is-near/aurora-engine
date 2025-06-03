@@ -386,6 +386,9 @@ fn unwrap_result(
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
+        engine_standalone_storage::native_ffi::load("libaurora_engine_native.so")
+            .expect("Failed to load native library");
+
         let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
         storage

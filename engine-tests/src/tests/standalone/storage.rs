@@ -12,6 +12,9 @@ use crate::utils::{self, Signer};
 #[test]
 #[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
+    // Must call before any SDK use.
+    let mut runner = utils::standalone::StandaloneRunner::default();
+
     let mut signer = Signer::random();
     let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
@@ -28,7 +31,6 @@ fn test_replay_transaction() {
             Some(new_total)
         })
         .collect();
-    let mut runner = utils::standalone::StandaloneRunner::default();
     let chain_id = Some(runner.chain_id);
     let create_transfer = |from: &mut Signer, to: Address, amount: Wei| {
         utils::sign_transaction(
@@ -132,6 +134,8 @@ fn test_replay_transaction() {
 
 #[test]
 fn test_consume_transaction() {
+    let mut runner = utils::standalone::StandaloneRunner::default();
+
     // Some util structures we will use in this test
     let signer = Signer::random();
     let address = utils::address_from_secret_key(&signer.secret_key);
@@ -139,7 +143,6 @@ fn test_consume_transaction() {
     let transfer_amount = Wei::new_u64(37);
     let nonce = signer.nonce.into();
     let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
-    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(address, balance, nonce, None);
@@ -336,6 +339,8 @@ fn test_transaction_index() {
 
 #[test]
 fn test_track_key() {
+    let mut runner = utils::standalone::StandaloneRunner::default();
+
     // Set up the test
     let mut signer = Signer::random();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -343,7 +348,6 @@ fn test_track_key() {
     let transfer_amount = Wei::new_u64(37);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
-    let mut runner = utils::standalone::StandaloneRunner::default();
 
     runner.init_evm();
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
