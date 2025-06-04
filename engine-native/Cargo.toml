@@ -14,8 +14,8 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-aurora-engine = { workspace = true, features = ["std", "contract", "tracing"] }
-aurora-engine-sdk.workspace = true
+aurora-engine = { workspace = true, features = ["std", "tracing"] }
+aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-types.workspace = true
 
 [lints]
