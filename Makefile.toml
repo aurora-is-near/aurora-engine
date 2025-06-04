@@ -331,14 +331,29 @@ yarn
 yarn test
 '''
 
+[tasks.build-dynamic-lib]
+category = "Test"
+command = "${CARGO}"
+args = ["build", "--package=aurora-engine-native", "--release"]
+
+[tasks.copy-dynamic-lib]
+category = "Test"
+command = "cp"
+dependencies = ["build-dynamic-lib"]
+args = [
+    # TODO: fix for MacOS
+    "target/release/libaurora_engine_native.so",
+    "bin/libaurora_engine_native.so",
+]
+
 [tasks.test-workspace]
 category = "Test"
-env = { "RUSTFLAGS" = "-C link-arg=-Wl,--export-dynamic", "LD_LIBRARY_PATH" = "target/release" }
+env = { "RUSTFLAGS" = "-C link-arg=-Wl,--export-dynamic", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKING_DIRECTORY}/bin" }
 command = "${CARGO}"
-dependencies = ["build-test", "clone-aurora-eth-connector"]
+dependencies = ["build-test", "copy-dynamic-lib", "clone-aurora-eth-connector"]
 args = [
     "test",
-    "-paurora-engine-tests",
+    "--package=aurora-engine-tests",
     "${@}",
 ]
 
