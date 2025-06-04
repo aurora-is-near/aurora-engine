@@ -11,10 +11,10 @@ pub mod base64;
 pub mod caching;
 pub mod env;
 pub mod error;
-#[cfg(feature = "contract")]
+// #[cfg(feature = "contract")]
 mod exports;
 pub mod io;
-#[cfg(feature = "contract")]
+// #[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;

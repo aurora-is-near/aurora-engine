@@ -38,7 +38,7 @@ const REGISTERS_NUMBER: usize = 6;
 
 impl Default for StateInner {
     fn default() -> Self {
-        StateInner {
+        Self {
             env: None,
             input: vec![],
             output: vec![],
@@ -52,7 +52,7 @@ impl Default for StateInner {
 
 impl State {
     pub fn new(storage: Storage) -> Self {
-        State {
+        Self {
             inner: Mutex::new(StateInner::default()),
             registers: Mutex::new(
                 iter::repeat_with(|| Register::default())
@@ -109,7 +109,7 @@ impl State {
         op(reg)
     }
 
-    fn set_reg<'a>(&self, register_id: u64, data: Cow<'a, [u8]>) {
+    fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
         let index = register_id as usize;
         let mut lock = self.registers.lock().expect("poisoned");
         *lock
@@ -369,11 +369,7 @@ mod io {
                 db_value =
                     self.db
                         .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
-                if let Ok(diff) = &db_value {
-                    diff.value()
-                } else {
-                    None
-                }
+                db_value.as_ref().map_or(None, |diff| diff.value())
             };
 
             value.map(ToOwned::to_owned).map(Cow::Owned)
@@ -413,7 +409,7 @@ mod io {
 
 #[unsafe(no_mangle)]
 extern "C" fn read_register(register_id: u64, ptr: u64) {
-    STATE.get().unwrap().read_register(register_id, ptr)
+    STATE.get().unwrap().read_register(register_id, ptr);
 }
 
 #[unsafe(no_mangle)]
@@ -427,28 +423,28 @@ extern "C" fn register_len(register_id: u64) -> u64 {
 
 #[unsafe(no_mangle)]
 extern "C" fn current_account_id(register_id: u64) {
-    STATE.get().unwrap().current_account_id(register_id)
+    STATE.get().unwrap().current_account_id(register_id);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn signer_account_id(register_id: u64) {
-    STATE.get().unwrap().signer_account_id(register_id)
+    STATE.get().unwrap().signer_account_id(register_id);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn signer_account_pk(register_id: u64) {
     let _ = register_id;
-    unimplemented!()
+    unimplemented!();
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn predecessor_account_id(register_id: u64) {
-    STATE.get().unwrap().predecessor_account_id(register_id)
+    STATE.get().unwrap().predecessor_account_id(register_id);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn input(register_id: u64) {
-    STATE.get().unwrap().input(register_id)
+    STATE.get().unwrap().input(register_id);
 }
 
 #[unsafe(no_mangle)]
@@ -502,7 +498,7 @@ extern "C" fn used_gas() -> u64 {
 
 #[unsafe(no_mangle)]
 extern "C" fn random_seed(register_id: u64) {
-    STATE.get().unwrap().random_seed(register_id)
+    STATE.get().unwrap().random_seed(register_id);
 }
 
 #[unsafe(no_mangle)]
@@ -510,7 +506,7 @@ extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
     STATE
         .get()
         .unwrap()
-        .digest::<sha2::Sha256>(value_len, value_ptr, register_id)
+        .digest::<sha2::Sha256>(value_len, value_ptr, register_id);
 }
 
 #[unsafe(no_mangle)]
@@ -518,7 +514,7 @@ extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
     STATE
         .get()
         .unwrap()
-        .digest::<sha3::Keccak256>(value_len, value_ptr, register_id)
+        .digest::<sha3::Keccak256>(value_len, value_ptr, register_id);
 }
 
 #[unsafe(no_mangle)]
@@ -526,7 +522,7 @@ extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
     STATE
         .get()
         .unwrap()
-        .digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id)
+        .digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id);
 }
 
 #[unsafe(no_mangle)]
@@ -575,11 +571,11 @@ extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn value_return(value_len: u64, value_ptr: u64) {
-    STATE.get().unwrap().value_return(value_len, value_ptr)
+    STATE.get().unwrap().value_return(value_len, value_ptr);
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn panic() {
+const extern "C" fn panic() {
     panic!()
 }
 
@@ -600,13 +596,13 @@ extern "C" fn log_utf8(len: u64, ptr: u64) {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn log_utf16(len: u64, ptr: u64) {
+const extern "C" fn log_utf16(len: u64, ptr: u64) {
     let _ = (len, ptr);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
+const extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
     let _ = (msg_ptr, filename_ptr, line, col);
 }
 
@@ -615,7 +611,7 @@ extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
 // ################
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_create(
+const extern "C" fn promise_create(
     account_id_len: u64,
     account_id_ptr: u64,
     method_name_len: u64,
@@ -634,7 +630,7 @@ extern "C" fn promise_create(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_then(
+const extern "C" fn promise_then(
     promise_index: u64,
     account_id_len: u64,
     account_id_ptr: u64,
@@ -655,21 +651,21 @@ extern "C" fn promise_then(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64 {
+const extern "C" fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64 {
     let _ = (promise_idx_ptr, promise_idx_count);
     // TODO:
     0
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64 {
+const extern "C" fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64 {
     let _ = (account_id_len, account_id_ptr);
     // TODO:
     0
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_then(
+const extern "C" fn promise_batch_then(
     promise_index: u64,
     account_id_len: u64,
     account_id_ptr: u64,

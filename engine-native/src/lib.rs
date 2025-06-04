@@ -11,7 +11,6 @@ use aurora_engine_sdk::{
     env::Env,
     io::{StorageIntermediate, IO},
     near_runtime::{Runtime, ViewEnv},
-    types::SdkExpect,
 };
 use aurora_engine_types::{
     borsh,
@@ -369,7 +368,7 @@ pub extern "C" fn _native_view() -> *mut ffi::c_void {
         let current_account_id = io.current_account_id();
         let engine: Engine<_, _> = Engine::new(args.sender, current_account_id, io, &env)?;
         let result = Engine::view_with_args(&engine, args)?;
-        io.return_output(&borsh::to_vec(&result).sdk_expect(errors::ERR_SERIALIZE));
+        io.return_output(&borsh::to_vec(&result).expect(errors::ERR_SERIALIZE));
 
         Ok(())
     };
@@ -604,7 +603,7 @@ pub extern "C" fn _native_get_nep141_from_erc20() -> *mut ffi::c_void {
         let erc20_address: engine::ERC20Address = io.read_input().to_vec().try_into()?;
         let result = engine::nep141_erc20_map(io)
             .lookup_right(&erc20_address)
-            .sdk_expect("ERC20_NOT_FOUND");
+            .expect("ERC20_NOT_FOUND");
         io.return_output(result.as_ref());
 
         Ok(())

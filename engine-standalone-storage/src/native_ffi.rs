@@ -50,9 +50,11 @@ pub fn load<P>(path: P) -> Result<(), LibLoadingError>
 where
     P: AsRef<OsStr>,
 {
-    if let Some(old) = CONTRACT.lock().take() {
+    let mut lock = CONTRACT.lock();
+    if let Some(old) = lock.take() {
         old.library.close().map_err(LibLoadingError::Unload)?;
     }
+    drop(lock);
 
     let library = unsafe { Library::open(Some(path), unix::RTLD_GLOBAL | unix::RTLD_LAZY) }
         .map_err(LibLoadingError::Loading)?;
@@ -76,12 +78,11 @@ impl DynamicContractImpl {
 
     fn a<T>(&self, name: &str, arg: T) {
         unsafe {
-            (self
-                .library
+            self.library
                 .get::<extern "C" fn(*mut ffi::c_void)>(name.as_bytes())
-                .unwrap_or_else(|_| panic!("symbol {name} not found")))(
+                .unwrap_or_else(|_| panic!("symbol {name} not found"))(
                 Box::into_raw(Box::new(arg)).cast(),
-            )
+            );
         }
     }
 

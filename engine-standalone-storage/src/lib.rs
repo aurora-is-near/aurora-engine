@@ -69,7 +69,7 @@ impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = Arc::new(DB::open_default(path)?);
         state::STATE
-            .set(state::State::new(Storage { db: db.clone() }))
+            .set(state::State::new(Self { db: db.clone() }))
             .unwrap_or_default();
 
         Ok(Self { db })
@@ -406,7 +406,7 @@ impl Storage {
         F: FnOnce(&state::State) -> R,
     {
         let state = state::STATE.get_or_init(|| {
-            state::State::new(Storage {
+            state::State::new(Self {
                 db: self.db.clone(),
             })
         });
