@@ -128,7 +128,7 @@ impl DynamicContractImpl {
         self.e("_native_exit_to_near_precompile_callback")
     }
 
-    pub(crate) fn new(&self) -> Result<(), ContractError> {
+    pub(crate) fn new_engine(&self) -> Result<(), ContractError> {
         self.e("_native_new")
     }
 

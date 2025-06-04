@@ -427,7 +427,7 @@ where
     global_state.set_env(env);
     // We can ignore promises in the standalone engine because it processes each receipt separately
     // and it is fed a stream of receipts (it does not schedule them)
-    global_state.set_promise_handler(transaction_message.promise_data.to_vec().into_boxed_slice());
+    global_state.set_promise_handler(transaction_message.promise_data.clone().into_boxed_slice());
 
     let contract_lock = native_ffi::lock();
     let (tx_hash, result) = match &transaction_message.transaction {
@@ -538,7 +538,7 @@ fn non_submit_execute(
         TransactionKind::SetConnectorData(_) => None,
         TransactionKind::NewConnector(_) => None,
         TransactionKind::NewEngine(_) => {
-            contract_lock.new()?;
+            contract_lock.new_engine()?;
             None
         }
         TransactionKind::SetEthConnectorContractAccount(_) => {

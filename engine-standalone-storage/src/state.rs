@@ -1,3 +1,5 @@
+#![allow(clippy::as_conversions)]
+
 use std::{
     borrow::Cow,
     iter,
@@ -55,7 +57,7 @@ impl State {
         Self {
             inner: Mutex::new(StateInner::default()),
             registers: Mutex::new(
-                iter::repeat_with(|| Register::default())
+                iter::repeat_with(Register::default)
                     .take(REGISTERS_NUMBER)
                     .collect(),
             ),
@@ -97,11 +99,12 @@ impl State {
         lock.transaction_diff.clear();
     }
 
+    #[allow(clippy::significant_drop_tightening)]
     fn read_reg<F, T>(&self, register_id: u64, mut op: F) -> T
     where
         F: FnMut(&Register) -> T,
     {
-        let index = register_id as usize;
+        let index = usize::try_from(register_id).expect("pointer size must be wide enough");
         let lock = self.registers.lock().expect("poisoned");
         let reg = lock
             .get(index)
@@ -110,7 +113,7 @@ impl State {
     }
 
     fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
-        let index = register_id as usize;
+        let index = usize::try_from(register_id).expect("pointer size must be wide enough");
         let mut lock = self.registers.lock().expect("poisoned");
         *lock
             .get_mut(index)
@@ -127,7 +130,8 @@ impl State {
                 Cow::Owned(data)
             })
         } else {
-            Cow::Borrowed(unsafe { slice::from_raw_parts(ptr as *const u8, len as usize) })
+            let len = usize::try_from(len).expect("pointer size must be wide enough");
+            Cow::Borrowed(unsafe { slice::from_raw_parts(ptr as *const u8, len) })
         }
     }
 
@@ -143,7 +147,11 @@ impl State {
 
     fn register_len(&self, register_id: u64) -> u64 {
         self.read_reg(register_id, |reg| {
-            reg.0.as_ref().map_or(u64::MAX, |reg| reg.len() as u64)
+            reg.0.as_ref().map_or(u64::MAX, |reg| {
+                reg.len()
+                    .try_into()
+                    .expect("pointer size must be wide enough")
+            })
         })
     }
 
@@ -240,8 +248,8 @@ impl State {
         let sig = self.get_data(sig_ptr, sig_len);
         let sig = libsecp256k1::Signature::parse_standard_slice(&sig).map_err(|_| ())?;
         let bit = match v {
-            0..=26 => v as u8,
-            _ => (v - 27) as u8,
+            0..=26 => u8::try_from(v).expect("checked above"),
+            _ => u8::try_from(v - 27).expect("bad value of `v`"),
         };
         let recovery_id = libsecp256k1::RecoveryId::parse(bit).map_err(|_| ())?;
 
@@ -306,14 +314,12 @@ impl State {
         let value = self
             .db
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
-        if let Ok(diff) = &value {
+        value.as_ref().map_or(0, |diff| {
             if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
             }
             1
-        } else {
-            0
-        }
+        })
     }
 
     fn storage_remove(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
@@ -357,18 +363,19 @@ mod io {
             //     !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
             //     "ERR_ILLEGAL_RETURN"
             // );
-            super::value_return(value.len() as u64, value.as_ptr() as u64);
+            let len = u64::try_from(value.len()).expect("pointer size must fit in 64");
+            super::value_return(len, value.as_ptr() as u64);
         }
 
         fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
             let lock = self.inner();
             let db_value;
-            let value = if let Some(diff) = lock.transaction_diff.get(&key) {
+            let value = if let Some(diff) = lock.transaction_diff.get(key) {
                 diff.value()
             } else {
                 db_value =
                     self.db
-                        .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
+                        .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
                 db_value.as_ref().map_or(None, |diff| diff.value())
             };
 
@@ -479,7 +486,7 @@ extern "C" fn account_balance(balance_ptr: u64) {
 
 #[unsafe(no_mangle)]
 extern "C" fn attached_deposit(balance_ptr: u64) {
-    STATE.get().unwrap().attached_deposit(balance_ptr)
+    STATE.get().unwrap().attached_deposit(balance_ptr);
 }
 
 #[unsafe(no_mangle)]
@@ -581,17 +588,17 @@ const extern "C" fn panic() {
 
 #[unsafe(no_mangle)]
 extern "C" fn panic_utf8(len: u64, ptr: u64) {
-    let str = unsafe {
-        std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len as usize))
-    };
+    let len = usize::try_from(len).expect("pointer size must be wide enough");
+    let str =
+        unsafe { std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len)) };
     panic!("{str}");
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn log_utf8(len: u64, ptr: u64) {
-    let str = unsafe {
-        std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len as usize))
-    };
+    let len = usize::try_from(len).expect("pointer size must be wide enough");
+    let str =
+        unsafe { std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len)) };
     println!("{str}");
 }
 
