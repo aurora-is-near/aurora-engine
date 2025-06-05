@@ -20,3 +20,6 @@ aurora-engine-types.workspace = true
 
 [lints]
 workspace = true
+
+[features]
+integration-test = ["aurora-engine/integration-test"]

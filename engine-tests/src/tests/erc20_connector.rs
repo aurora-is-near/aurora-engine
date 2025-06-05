@@ -471,6 +471,9 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near() {
+        engine_standalone_storage::native_ffi::load("libaurora_engine_native.so")
+            .expect("Failed to load native library");
+
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,

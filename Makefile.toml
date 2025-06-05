@@ -331,26 +331,34 @@ yarn
 yarn test
 '''
 
+[tasks.set-env-macos]
+condition = { env = { CARGO_MAKE_RUST_TARGET_OS = "macos" } }
+env = { "RUSTC_FLAGS_EXPORT_DYNAMIC" = "-C link-args=-rdynamic", "RUSTC_FLAGS_ALLOW_UNDEFINED" = "-C link-arg=-undefined -C link-arg=dynamic_lookup", "LIB_EXT" = "dylib" }
+
+[tasks.set-env-linux]
+condition = { env = { CARGO_MAKE_RUST_TARGET_OS = "linux" } }
+env = { "RUSTC_FLAGS_EXPORT_DYNAMIC" = "-C link-arg=-Wl,--export-dynamic", "RUSTC_FLAGS_ALLOW_UNDEFINED" = "", "LIB_EXT" = "so" }
+
 [tasks.build-dynamic-lib]
 category = "Test"
+dependencies = ["set-env-linux", "set-env-macos"]
+env = { "RUSTFLAGS" = "${RUSTC_FLAGS_ALLOW_UNDEFINED}" }
 command = "${CARGO}"
-args = ["build", "--package=aurora-engine-native", "--release"]
+args = ["build", "--package=aurora-engine-native", "--release", "--features=integration-test"]
 
 [tasks.copy-dynamic-lib]
-category = "Test"
 command = "cp"
 dependencies = ["build-dynamic-lib"]
 args = [
-    # TODO: fix for MacOS
-    "target/release/libaurora_engine_native.so",
-    "bin/libaurora_engine_native.so",
+    "target/release/libaurora_engine_native.${LIB_EXT}",
+    "bin/libaurora_engine_native.${LIB_EXT}",
 ]
 
 [tasks.test-workspace]
 category = "Test"
-env = { "RUSTFLAGS" = "-C link-arg=-Wl,--export-dynamic", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKING_DIRECTORY}/bin" }
+env = { "RUSTFLAGS" = "${RUSTC_FLAGS_EXPORT_DYNAMIC} ${RUSTC_FLAGS_ALLOW_UNDEFINED}", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKING_DIRECTORY}/bin" }
 command = "${CARGO}"
-dependencies = ["build-test", "copy-dynamic-lib", "clone-aurora-eth-connector"]
+dependencies = ["build-test", "set-env-linux", "set-env-macos", "copy-dynamic-lib", "clone-aurora-eth-connector"]
 args = [
     "test",
     "--package=aurora-engine-tests",
