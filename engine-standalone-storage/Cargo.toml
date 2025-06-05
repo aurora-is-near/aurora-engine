@@ -14,7 +14,7 @@ autobenches = false
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine = { workspace = true, features = ["std", "contract"] }
+aurora-engine = { workspace = true, features = ["std"] }
 aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }

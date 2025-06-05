@@ -379,15 +379,19 @@ fn unwrap_result(
 ) -> Result<SubmitResult, sync::error::Error> {
     match outcome.maybe_result?.unwrap() {
         sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
-        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
-        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise"),
+        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20"),
     }
 }
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
-        engine_standalone_storage::native_ffi::load("libaurora_engine_native.so")
-            .expect("Failed to load native library");
+        #[cfg(target_os = "linux")]
+        let lib = "libaurora-engine-native.so";
+        #[cfg(target_os = "macos")]
+        let lib = "libaurora-engine-native.dylib";
+
+        engine_standalone_storage::native_ffi::load(lib).expect("Failed to load a native library");
 
         let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
