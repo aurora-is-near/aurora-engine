@@ -13,6 +13,7 @@ use engine_standalone_storage::{
     BlockMetadata, Diff, Storage,
 };
 use libsecp256k1::SecretKey;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 use crate::utils;
@@ -386,12 +387,16 @@ fn unwrap_result(
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
+        let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("bin");
         #[cfg(target_os = "linux")]
         let lib = "libaurora-engine-native.so";
         #[cfg(target_os = "macos")]
         let lib = "libaurora-engine-native.dylib";
 
-        engine_standalone_storage::native_ffi::load(lib).expect("Failed to load a native library");
+        engine_standalone_storage::native_ffi::load(lib_path.join(lib))
+            .expect("Failed to load a native library");
 
         let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
