@@ -4,6 +4,7 @@ use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use engine_standalone_storage::{native_ffi, sync};
+use std::path::PathBuf;
 
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone::StandaloneRunner};
@@ -361,7 +362,15 @@ fn sample_block() -> sync::types::BlockMessage {
 }
 
 fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
-    native_ffi::load("libaurora_engine_native.so").expect("cannot load aurora engine");
+    let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("bin");
+    #[cfg(target_os = "linux")]
+    let lib = "libaurora-engine-native.so";
+    #[cfg(target_os = "macos")]
+    let lib = "libaurora-engine-native.dylib";
+
+    native_ffi::load(lib_path.join(lib)).expect("cannot load aurora engine");
     let mut runner = StandaloneRunner::default();
     runner.init_evm();
 
