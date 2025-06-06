@@ -1,3 +1,4 @@
+use crate::utils;
 use crate::utils::workspace::deploy_engine;
 use aurora_engine_types::parameters::engine::{
     FullAccessKeyArgs, RelayerKeyArgs, RelayerKeyManagerArgs, SetUpgradeDelayBlocksArgs,
@@ -13,6 +14,8 @@ const DEPOSIT: NearToken = NearToken::from_millinear(500);
 
 #[tokio::test]
 async fn test_add_key_manager() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let pk = PublicKey::from_str("ed25519:DcA2MzgpJbrUATQLLceocVckhhAqrkingax4oJ9kZ847").unwrap();
     let relayer_key_args = RelayerKeyArgs { public_key: pk };
@@ -77,6 +80,8 @@ async fn test_add_key_manager() {
 
 #[tokio::test]
 async fn test_submit_by_relayer() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = public_key(&secret_key);
@@ -126,6 +131,8 @@ async fn test_submit_by_relayer() {
 
 #[tokio::test]
 async fn test_delete_relayer_key() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = public_key(&secret_key);
@@ -194,6 +201,8 @@ async fn test_delete_relayer_key() {
 
 #[tokio::test]
 async fn test_delete_fak_via_relayer_key() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let public_key = aurora.public_key();
 
@@ -240,6 +249,8 @@ async fn test_delete_fak_via_relayer_key() {
 
 #[tokio::test]
 async fn test_call_not_allowed_method() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = public_key(&secret_key);
@@ -284,6 +295,8 @@ async fn test_call_not_allowed_method() {
 
 #[tokio::test]
 async fn test_call_not_allowed_contract() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = public_key(&secret_key);
@@ -327,6 +340,8 @@ async fn test_call_not_allowed_contract() {
 
 #[tokio::test]
 async fn test_attach_full_access_key() {
+    utils::load_library();
+
     let aurora = deploy_engine().await;
     let secret_key = SecretKey::from_random(KeyType::ED25519);
     let public_key = public_key(&secret_key);

@@ -379,8 +379,8 @@ fn unwrap_result(
 ) -> Result<SubmitResult, sync::error::Error> {
     match outcome.maybe_result?.unwrap() {
         sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
-        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
-        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise"),
+        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20"),
     }
 }
 

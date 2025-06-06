@@ -5,7 +5,7 @@ use crate::utils::workspace::{
     deploy_engine_with_code, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
     transfer_nep_141_to_erc_20,
 };
-use crate::utils::AuroraRunner;
+use crate::utils::{self, AuroraRunner};
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
     WithdrawSerializeType,
@@ -18,6 +18,8 @@ const TRANSFER_AMOUNT: u128 = 1000;
 
 #[tokio::test]
 async fn test_mirroring_erc20_token() {
+    utils::load_library();
+
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
@@ -150,6 +152,8 @@ async fn test_mirroring_erc20_token() {
 // to transfer ERC-20 tokens between Aurora Engine contracts, including Silos.
 #[tokio::test]
 async fn test_transfer_from_silo_to_silo() {
+    utils::load_library();
+
     let main_contract = deploy_main_contract().await;
     let silo_contract = deploy_silo_contract(&main_contract).await;
     let (nep141, ft_owner) = deploy_nep141(&main_contract).await;
@@ -259,6 +263,8 @@ async fn test_transfer_from_silo_to_silo() {
 
 #[tokio::test]
 async fn test_deploy_erc20_token_with_meta() {
+    utils::load_library();
+
     let main_contract = deploy_main_contract().await;
     let (nep141, _) = deploy_nep141(&main_contract).await;
     let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)

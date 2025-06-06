@@ -5,6 +5,8 @@ use aurora_engine_types::{types::Wei, U256};
 
 #[test]
 fn test_prepaid_gas_precompile() {
+    utils::load_library();
+
     const EXPECTED_VALUE: u64 = 157_277_246_352_223;
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();

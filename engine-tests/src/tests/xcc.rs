@@ -25,6 +25,8 @@ const XCC_ROUTER_VERSION_RELATIVE_PATH: &str = "src/VERSION";
 #[test]
 #[allow(clippy::too_many_lines)]
 fn test_xcc_eth_gas_cost() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     runner.standalone_runner = None;
     let xcc_wasm_bytes = contract_bytes();
@@ -187,6 +189,8 @@ fn check_fib_result(output: &serde_json::Value, n: usize) {
 
 #[test]
 fn test_xcc_schedule_gas() {
+    utils::load_library();
+
     let mut router = deploy_router();
 
     let promise = PromiseCreateArgs {
@@ -216,6 +220,8 @@ fn test_xcc_schedule_gas() {
 
 #[test]
 fn test_xcc_exec_gas() {
+    utils::load_library();
+
     let mut router = deploy_router();
     router.ext.underlying.action_log.clear(); // we need to clear logs here to remove old entries.
 
@@ -428,6 +434,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_xcc_external_fund() {
+        utils::load_library();
+
         // In this test we intentionally do not bridge wNEAR into the Engine.
         // The purpose of the `fund_xcc_sub_account` functionality is to allow using
         // the XCC feature in an Engine instance where there is no bridged wNEAR.
@@ -502,11 +510,13 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_xcc_precompile_eager() {
+        utils::load_library();
         test_xcc_precompile_common(false).await;
     }
 
     #[tokio::test]
     async fn test_xcc_precompile_scheduled() {
+        utils::load_library();
         test_xcc_precompile_common(true).await;
     }
 
@@ -521,6 +531,8 @@ pub mod workspace {
     /// `seed.then(accumulate).then(accumulate).then(accumulate).then(accumulate).then(accumulate)`.
     #[tokio::test]
     async fn test_xcc_multiple_callbacks() {
+        utils::load_library();
+
         let XccTestContext {
             aurora,
             mut signer,
@@ -564,6 +576,8 @@ pub mod workspace {
     // Fibonacci numbers through repeated callbacks, it uses the `And` promise combinator.
     #[tokio::test]
     async fn test_xcc_and_combinator() {
+        utils::load_library();
+
         let XccTestContext {
             aurora,
             mut signer,
@@ -630,6 +644,8 @@ pub mod workspace {
     #[allow(clippy::too_many_lines)]
     #[tokio::test]
     async fn test_xcc_upgrade() {
+        utils::load_library();
+
         const DEPOSIT_AMOUNT: u128 = 1;
 
         // Deploy v3.3.1 Engine with the XCC router contract it had at the time.

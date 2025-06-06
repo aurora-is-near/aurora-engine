@@ -44,6 +44,8 @@ fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
 #[test]
 #[should_panic(expected = "ERR_BORSH_DESERIALIZE")]
 fn test_deploy_erc20_token_with_invalid_account_id() {
+    utils::load_library();
+
     let mut runner = deploy_runner();
     let invalid_nep141 = "_";
     runner.deploy_erc20_token(invalid_nep141);
@@ -51,6 +53,8 @@ fn test_deploy_erc20_token_with_invalid_account_id() {
 
 #[test]
 fn hello_world_solidity() {
+    utils::load_library();
+
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let name = "AuroraG".to_string();
@@ -62,6 +66,8 @@ fn hello_world_solidity() {
 
 #[test]
 fn withdraw() {
+    utils::load_library();
+
     let (mut runner, mut signer, token, tester) = setup_test();
 
     let test_data = vec![
@@ -129,6 +135,8 @@ fn withdraw() {
 
 #[test]
 fn withdraw_and_fail() {
+    utils::load_library();
+
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
@@ -148,6 +156,8 @@ fn withdraw_and_fail() {
 
 #[test]
 fn try_withdraw_and_avoid_fail() {
+    utils::load_library();
+
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
@@ -167,6 +177,8 @@ fn try_withdraw_and_avoid_fail() {
 
 #[test]
 fn try_withdraw_and_avoid_fail_and_succeed() {
+    utils::load_library();
+
     let (mut runner, mut signer, _token, tester) = setup_test();
 
     let test_data = vec![
@@ -187,6 +199,8 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
 
 #[test]
 fn withdraw_eth() {
+    utils::load_library();
+
     let (mut runner, mut signer, _token, tester) = setup_test();
     let amount = Wei::new_u64(10);
 

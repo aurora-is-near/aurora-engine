@@ -11,6 +11,8 @@ const INITIAL_NONCE: u64 = 0;
 
 #[test]
 fn test_1inch_liquidity_protocol() {
+    utils::load_library();
+
     let (mut runner, mut source_account) = initialize();
     let mut helper = liquidity_protocol::Helper {
         runner: &mut runner,
@@ -85,6 +87,8 @@ fn test_1inch_liquidity_protocol() {
 
 #[test]
 fn test_1_inch_limit_order_deploy() {
+    utils::load_library();
+
     // set up Aurora runner and accounts
     let (mut runner, mut source_account) = initialize();
 

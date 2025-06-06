@@ -10,6 +10,7 @@ publish = false
 
 [workspace.dependencies]
 aurora-engine = { path = "engine", default-features = false }
+aurora-engine-native = { path = "engine-native" }
 aurora-engine-hashchain = { path = "engine-hashchain", default-features = false }
 aurora-engine-precompiles = { path = "engine-precompiles", version = "1.2.0", default-features = false }
 aurora-engine-sdk = { path = "engine-sdk", version = "1.2.0", default-features = false }
@@ -64,6 +65,9 @@ tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.23"
 wee_alloc = { version = "0.4", default-features = false }
+libloading = { version = "0.8" }
+thiserror = { version = "2" }
+parking_lot = { version = "0.12" }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
@@ -92,6 +96,7 @@ members = [
     "engine-transactions",
     "engine-types",
     "engine-workspace",
+    "engine-native",
 ]
 
 exclude = [

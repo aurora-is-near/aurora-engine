@@ -11,6 +11,8 @@ const MODEXP_ADDRESS: Address = make_address(0, 5);
 
 #[test]
 fn bench_modexp() {
+    utils::load_library();
+
     let mut context = ModExpBenchContext::default();
 
     // Example with even modulus and very large exponent
@@ -88,6 +90,8 @@ fn bench_modexp() {
 #[ignore]
 #[test]
 fn bench_modexp_standalone() {
+    utils::load_library();
+
     const GAS_LIMIT: u64 = 30_000_000;
     let mut standalone = StandaloneRunner::default();
     let mut signer = Signer::random();
@@ -145,6 +149,8 @@ fn bench_modexp_standalone() {
 
 #[test]
 fn test_modexp_oom() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let inputs = [
