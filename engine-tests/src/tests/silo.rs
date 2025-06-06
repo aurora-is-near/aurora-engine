@@ -35,6 +35,8 @@ const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 #[test]
 fn test_address_transfer_success() {
+    utils::load_library();
+
     // set up Aurora runner and accounts
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
@@ -73,6 +75,8 @@ fn test_address_transfer_success() {
 
 #[test]
 fn test_transfer_insufficient_balance() {
+    utils::load_library();
+
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -116,6 +120,8 @@ fn test_transfer_insufficient_balance() {
 
 #[test]
 fn test_transfer_insufficient_balance_fee() {
+    utils::load_library();
+
     const HALF_FIXED_GAS: EthGas = EthGas::new(10u64.pow(18) / 2);
 
     let (mut runner, mut source_account, receiver) = initialize_transfer();
@@ -169,6 +175,8 @@ fn test_transfer_insufficient_balance_fee() {
 
 #[test]
 fn test_eth_transfer_incorrect_nonce() {
+    utils::load_library();
+
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -203,6 +211,8 @@ fn test_eth_transfer_incorrect_nonce() {
 
 #[test]
 fn test_transfer_with_low_gas_limit() {
+    utils::load_library();
+
     let (mut runner, mut signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -239,6 +249,8 @@ fn test_transfer_with_low_gas_limit() {
 
 #[test]
 fn test_relayer_balance_after_transfer() {
+    utils::load_library();
+
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -284,6 +296,8 @@ fn test_relayer_balance_after_transfer() {
 
 #[test]
 fn test_admin_access_right() {
+    utils::load_library();
+
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -323,6 +337,8 @@ fn test_admin_access_right() {
 
 #[test]
 fn test_submit_access_right() {
+    utils::load_library();
+
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -379,6 +395,8 @@ fn test_submit_access_right() {
 
 #[test]
 fn test_submit_access_right_via_batch() {
+    utils::load_library();
+
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -445,6 +463,8 @@ fn test_submit_access_right_via_batch() {
 
 #[test]
 fn test_submit_with_disabled_whitelist() {
+    utils::load_library();
+
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let transaction = utils::transfer_with_price(
@@ -509,6 +529,8 @@ fn test_submit_with_disabled_whitelist() {
 
 #[test]
 fn test_submit_with_removing_entries() {
+    utils::load_library();
+
     let (mut runner, signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
@@ -572,6 +594,8 @@ fn test_submit_with_removing_entries() {
 
 #[test]
 fn test_deploy_access_rights() {
+    utils::load_library();
+
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
@@ -630,6 +654,8 @@ fn test_deploy_access_rights() {
 
 #[test]
 fn test_deploy_with_disabled_whitelist() {
+    utils::load_library();
+
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
@@ -687,6 +713,8 @@ fn test_deploy_with_disabled_whitelist() {
 
 #[test]
 fn test_switch_between_fix_gas() {
+    utils::load_library();
+
     const TRANSFER: Wei = Wei::new_u64(10_000_000);
     let (mut runner, mut signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
@@ -778,12 +806,16 @@ fn test_switch_between_fix_gas() {
 
 #[test]
 fn test_set_erc20_fallback_address() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     set_erc20_fallback_address(&mut runner, Some(Address::from_array([1; 20])));
 }
 
 #[test]
 fn test_set_fixed_gas() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     set_fixed_gas(&mut runner, Some(FIXED_GAS));
 }
@@ -922,6 +954,7 @@ fn call_function<T: BorshSerialize + Debug>(runner: &mut AuroraRunner, func: &st
 pub mod workspace {
     use super::FIXED_GAS;
     use crate::tests::erc20_connector::workspace::{erc20_balance, exit_to_near};
+    use crate::utils;
     use crate::utils::solidity::erc20::ERC20;
     use crate::utils::workspace::{
         deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
@@ -941,6 +974,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_transfer_nep141_to_non_whitelisted_address() {
+        utils::load_library();
+
         let SiloTestContext {
             aurora,
             fallback_account,
@@ -1011,6 +1046,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_transfer_nep141_to_non_whitelisted_address_with_another_fallback_address() {
+        utils::load_library();
+
         let SiloTestContext {
             aurora,
             ft_owner,
@@ -1111,6 +1148,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_transfer_nep141_to_whitelisted_address() {
+        utils::load_library();
+
         let SiloTestContext {
             aurora,
             fallback_account,

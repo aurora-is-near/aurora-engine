@@ -26,6 +26,8 @@ const INPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
 
 #[test]
 fn test_uniswap_input_multihop() {
+    utils::load_library();
+
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
@@ -44,6 +46,8 @@ fn test_uniswap_input_multihop() {
 
 #[test]
 fn test_uniswap_exact_output() {
+    utils::load_library();
+
     let mut context = UniswapTestContext::new("uniswap");
     let (token_a, token_b) = context.create_token_pair(MINT_AMOUNT.into());
     let _pool = context.create_pool(&token_a, &token_b);

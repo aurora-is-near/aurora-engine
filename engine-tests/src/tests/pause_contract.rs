@@ -3,6 +3,8 @@ use aurora_engine::parameters::SetUpgradeDelayBlocksArgs;
 
 #[test]
 fn test_pause_contract_require_owner() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -18,6 +20,8 @@ fn test_pause_contract_require_owner() {
 
 #[test]
 fn test_resume_contract_require_owner() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -36,6 +40,8 @@ fn test_resume_contract_require_owner() {
 
 #[test]
 fn test_pause_contract_require_running() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -48,6 +54,8 @@ fn test_pause_contract_require_running() {
 
 #[test]
 fn test_resume_contract_require_paused() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -63,6 +71,8 @@ fn test_resume_contract_require_paused() {
 
 #[test]
 fn test_pause_contract() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
     let set = borsh::to_vec(&SetUpgradeDelayBlocksArgs {
@@ -95,6 +105,8 @@ fn test_pause_contract() {
 
 #[test]
 fn test_resume_contract() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
     let set = borsh::to_vec(&SetUpgradeDelayBlocksArgs {

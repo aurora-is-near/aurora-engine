@@ -19,6 +19,8 @@ const GAS_PRICE: u64 = 10;
 #[ignore]
 #[test]
 fn bench_memory_get_standalone() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     // This EVM program is an infinite loop which causes a large amount of memory to be
@@ -63,6 +65,8 @@ fn bench_memory_get_standalone() {
 
 #[test]
 fn test_returndatacopy() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let deploy_contract = |runner: &mut utils::AuroraRunner,
@@ -113,6 +117,8 @@ fn test_returndatacopy() {
 
 #[test]
 fn test_total_supply_accounting() {
+    utils::load_library();
+
     let (mut runner, mut signer, benefactor) = initialize_transfer();
 
     let constructor = utils::solidity::ContractConstructor::compile_from_source(
@@ -166,8 +172,7 @@ fn test_total_supply_accounting() {
 
 #[test]
 fn test_transaction_to_zero_address() {
-    // NOTE: The function is not pure, must call early.
-    let mut runner = utils::standalone::StandaloneRunner::default();
+    utils::load_library();
 
     // Transactions that explicit list `0x0000...` as the `to` field in the transaction
     // should not be interpreted as contract creation. Previously this was the case
@@ -185,6 +190,7 @@ fn test_transaction_to_zero_address() {
     let sender = hex::encode(address.as_bytes());
     assert_eq!(sender.as_str(), "63eafba871e0bda44be3cde19df5aa1c0f078142");
 
+    let mut runner = utils::standalone::StandaloneRunner::default();
     // We want the standalone engine to still reproduce the old behaviour for blocks before the bug fix, and
     // to use the correct parsing for blocks after the fix.
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
@@ -212,6 +218,8 @@ fn test_transaction_to_zero_address() {
 
 #[test]
 fn test_state_format() {
+    utils::load_library();
+
     // The purpose of this test is to make sure that if we accidentally
     // change the binary format of the `EngineState` then we will know
     // about it. This is important because changing the state format will
@@ -244,6 +252,8 @@ fn generate_code(len: usize) -> Vec<u8> {
 
 #[test]
 fn test_deploy_contract() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     // Randomly generate some "contract code"
@@ -263,6 +273,8 @@ fn test_deploy_contract() {
 
 #[test]
 fn test_deploy_largest_contract() {
+    utils::load_library();
+
     // Check to see we can deploy the largest allowed contract size within the
     // NEAR gas limit of 200 Tgas.
     let (mut runner, mut signer, _) = initialize_transfer();
@@ -290,6 +302,8 @@ fn test_deploy_largest_contract() {
 
 #[test]
 fn test_log_address() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let mut deploy_contract = |name: &str, signer: &mut utils::Signer| {
@@ -331,6 +345,8 @@ fn test_log_address() {
 
 #[test]
 fn test_is_contract() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
@@ -391,6 +407,8 @@ fn test_is_contract() {
 
 #[test]
 fn test_solidity_pure_bench() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.max_gas_burnt(u64::MAX);
 
@@ -464,6 +482,8 @@ fn test_solidity_pure_bench() {
 
 #[test]
 fn test_revert_during_contract_deploy() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let constructor = utils::solidity::ContractConstructor::compile_from_source(
@@ -495,6 +515,8 @@ fn test_revert_during_contract_deploy() {
 
 #[test]
 fn test_call_too_deep_error() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let constructor = utils::solidity::ContractConstructor::compile_from_source(
@@ -530,6 +552,8 @@ fn test_call_too_deep_error() {
 
 #[test]
 fn test_create_out_of_gas() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
     let constructor_code = {
         // This EVM bytecode caused an integer overflow in the SputnikVM gas calculation prior to
@@ -558,6 +582,8 @@ fn test_create_out_of_gas() {
 
 #[test]
 fn test_timestamp() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let constructor = utils::solidity::ContractConstructor::compile_from_source(
@@ -599,6 +625,8 @@ fn test_timestamp() {
 
 #[test]
 fn test_override_state() {
+    utils::load_library();
+
     let (mut runner, mut account1, viewer_address) = initialize_transfer();
     let account1_address = utils::address_from_secret_key(&account1.secret_key);
     let mut account2 = utils::Signer::random();
@@ -667,6 +695,8 @@ fn test_override_state() {
 
 #[test]
 fn test_num_wasm_functions() {
+    utils::load_library();
+
     // Counts the number of functions in our wasm output.
     // See https://github.com/near/nearcore/issues/4814 for context
     let runner = utils::deploy_runner();
@@ -686,6 +716,8 @@ fn test_num_wasm_functions() {
 /// updated.
 #[test]
 fn test_eth_transfer_success() {
+    utils::load_library();
+
     // set up Aurora runner and accounts
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
@@ -723,6 +755,8 @@ fn test_eth_transfer_success() {
 /// Tests the case where the transfer amount is larger than the address balance
 #[test]
 fn test_eth_transfer_insufficient_balance() {
+    utils::load_library();
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
@@ -762,6 +796,8 @@ fn test_eth_transfer_insufficient_balance() {
 /// Tests the case where the nonce on the transaction does not match the address
 #[test]
 fn test_eth_transfer_incorrect_nonce() {
+    utils::load_library();
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
@@ -801,6 +837,8 @@ fn test_eth_transfer_incorrect_nonce() {
 
 #[test]
 fn test_tx_support_shanghai() {
+    utils::load_library();
+
     let (mut runner, mut source_account, _) = initialize_transfer();
     // Encoded EVM transaction with parameter: `evmVersion: 'shanghai'`.
     let data = "6080604052348015600e575f80fd5b50607480601a5f395ff3fe6080604052348015600e575\
@@ -826,6 +864,8 @@ fn test_tx_support_shanghai() {
 
 #[test]
 fn test_eth_transfer_not_enough_gas() {
+    utils::load_library();
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -865,6 +905,8 @@ fn test_eth_transfer_not_enough_gas() {
 
 #[test]
 fn test_transfer_charging_gas_success() {
+    utils::load_library();
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -922,6 +964,8 @@ fn test_transfer_charging_gas_success() {
 
 #[test]
 fn test_eth_transfer_charging_gas_not_enough_balance() {
+    utils::load_library();
+
     let (mut runner, mut source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
     let transaction = |nonce| {
@@ -986,6 +1030,8 @@ pub fn initialize_transfer() -> (utils::AuroraRunner, utils::Signer, Address) {
 
 #[test]
 fn check_selector() {
+    utils::load_library();
+
     // Selector to call mint function in ERC-20 contract
     //
     // keccak("mint(address,uint256)".as_bytes())[..4];
@@ -997,6 +1043,8 @@ fn check_selector() {
 
 #[test]
 fn test_block_hash() {
+    utils::load_library();
+
     let runner = utils::AuroraRunner::default();
     let chain_id = {
         let number = crate::prelude::U256::from(runner.chain_id);
@@ -1013,6 +1061,8 @@ fn test_block_hash() {
 
 #[test]
 fn test_block_hash_api() {
+    utils::load_library();
+
     let runner = utils::deploy_runner();
     let block_height: u64 = 10;
     let outcome = runner
@@ -1033,6 +1083,8 @@ fn test_block_hash_api() {
 
 #[test]
 fn test_block_hash_contract() {
+    utils::load_library();
+
     let (mut runner, mut source_account, _) = initialize_transfer();
     let test_constructor = utils::solidity::ContractConstructor::compile_from_source(
         ["src", "tests", "res"].iter().collect::<PathBuf>(),
@@ -1060,6 +1112,8 @@ fn test_block_hash_contract() {
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.
 #[test]
 fn test_eth_transfer_with_max_gas_price() {
+    utils::load_library();
+
     // set up Aurora runner and accounts
     let (mut runner, source_account, dest_address) = initialize_transfer();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
@@ -1100,6 +1154,8 @@ fn test_eth_transfer_with_max_gas_price() {
 
 #[test]
 fn test_set_owner() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -1132,6 +1188,8 @@ fn test_set_owner() {
 
 #[test]
 fn test_set_owner_fail_on_same_owner() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -1154,6 +1212,8 @@ fn test_set_owner_fail_on_same_owner() {
 
 #[test]
 fn test_set_upgrade_delay_blocks() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let aurora_account_id = runner.aurora_account_id.clone();
 
@@ -1202,6 +1262,8 @@ mod workspace {
     //       test does not need to be written twice.
     #[tokio::test]
     async fn test_eth_transfer_insufficient_balance() {
+        utils::load_library();
+
         let (aurora, mut signer, address) = initialize_engine().await;
 
         // Run transaction which will fail (transfer more than current balance)
@@ -1240,6 +1302,8 @@ mod workspace {
     // `aurora-engine-workspace`.
     #[tokio::test]
     async fn test_eth_transfer_charging_gas_not_enough_balance() {
+        utils::load_library();
+
         let (aurora, mut signer, address) = initialize_engine().await;
 
         // Run transaction which will fail (not enough balance to cover gas)

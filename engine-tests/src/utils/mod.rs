@@ -986,3 +986,17 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
 
     EngineError { kind, gas_used }
 }
+
+pub fn load_library() {
+    use std::path::PathBuf;
+
+    let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("bin");
+    #[cfg(target_os = "linux")]
+    let lib = "libaurora-engine-native.so";
+    #[cfg(target_os = "macos")]
+    let lib = "libaurora-engine-native.dylib";
+
+    engine_standalone_storage::native_ffi::load_once(lib_path.join(lib));
+}

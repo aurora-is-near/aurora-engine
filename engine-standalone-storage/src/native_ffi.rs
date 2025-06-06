@@ -17,8 +17,11 @@ use aurora_engine::{contract_methods::ContractError, parameters::SubmitResult};
 
 static CONTRACT: Mutex<Option<DynamicContractImpl>> = Mutex::new(None);
 
-pub fn state() -> &'static super::state::State {
-    super::state::STATE.get().expect("state is not initialized")
+pub fn read_state<F, T>(f: F) -> T
+where
+    F: FnOnce(&super::state::State) -> T,
+{
+    super::state::STATE.with(|d| f(&*d))
 }
 
 #[inline]
@@ -43,6 +46,21 @@ pub enum LibLoadingError {
         name: &'static str,
         err: libloading::Error,
     },
+}
+
+/// Returns version of the loaded contract
+pub fn load_once<P>(path: P)
+where
+    P: AsRef<OsStr>,
+{
+    CONTRACT.lock().get_or_insert_with(|| {
+        let library = unsafe {
+            Library::open(Some(path), unix::RTLD_GLOBAL | unix::RTLD_LAZY)
+                .map_err(LibLoadingError::Loading)
+                .unwrap()
+        };
+        DynamicContractImpl { library }
+    });
 }
 
 /// Returns version of the loaded contract

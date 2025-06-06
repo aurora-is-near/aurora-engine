@@ -12,8 +12,7 @@ use crate::utils::{self, Signer};
 #[test]
 #[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
-    // Must call before any SDK use.
-    let mut runner = utils::standalone::StandaloneRunner::default();
+    utils::load_library();
 
     let mut signer = Signer::random();
     let address = utils::address_from_secret_key(&signer.secret_key);
@@ -31,6 +30,7 @@ fn test_replay_transaction() {
             Some(new_total)
         })
         .collect();
+    let mut runner = utils::standalone::StandaloneRunner::default();
     let chain_id = Some(runner.chain_id);
     let create_transfer = |from: &mut Signer, to: Address, amount: Wei| {
         utils::sign_transaction(
@@ -134,7 +134,7 @@ fn test_replay_transaction() {
 
 #[test]
 fn test_consume_transaction() {
-    let mut runner = utils::standalone::StandaloneRunner::default();
+    utils::load_library();
 
     // Some util structures we will use in this test
     let signer = Signer::random();
@@ -144,6 +144,7 @@ fn test_consume_transaction() {
     let nonce = signer.nonce.into();
     let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
 
+    let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm();
     runner.mint_account(address, balance, nonce, None);
 
@@ -167,6 +168,8 @@ fn test_consume_transaction() {
 
 #[test]
 fn test_block_index() {
+    utils::load_library();
+
     let (temp_dir, mut storage) = create_db();
 
     let block_hash = H256([3u8; 32]);
@@ -258,6 +261,8 @@ fn test_block_index() {
 
 #[test]
 fn test_transaction_index() {
+    utils::load_library();
+
     let (temp_dir, mut storage) = create_db();
 
     let block_height = 37u64;
@@ -339,7 +344,7 @@ fn test_transaction_index() {
 
 #[test]
 fn test_track_key() {
-    let mut runner = utils::standalone::StandaloneRunner::default();
+    utils::load_library();
 
     // Set up the test
     let mut signer = Signer::random();
@@ -349,6 +354,7 @@ fn test_track_key() {
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
 
+    let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm();
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
     let created_block_height = runner.env.block_height;

@@ -26,6 +26,8 @@ const EXAMPLE_TX_HEX: &str = "02f8c101010a8207d0833d090094cccccccccccccccccccccc
 // TODO(#170): generally support Ethereum tests
 #[test]
 fn test_eip_1559_tx_encoding_decoding() {
+    utils::load_library();
+
     let secret_key = example_signer().secret_key;
     let transaction = example_transaction();
 
@@ -53,6 +55,8 @@ fn test_eip_1559_tx_encoding_decoding() {
 // but modified slightly because our BASEFEE is always 0.
 #[test]
 fn test_eip_1559_example() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let mut signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -111,6 +115,8 @@ fn test_eip_1559_example() {
 // TODO(#170): generally support Ethereum tests
 #[test]
 fn test_access_list_tx_encoding_decoding() {
+    utils::load_library();
+
     let secret_key = libsecp256k1::SecretKey::parse_slice(
         &hex::decode("45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8").unwrap(),
     )

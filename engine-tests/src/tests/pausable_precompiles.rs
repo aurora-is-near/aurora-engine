@@ -13,6 +13,8 @@ const CALLED_ACCOUNT_ID: &str = "aurora";
 
 #[test]
 fn test_paused_precompile_is_shown_when_viewing() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs {
@@ -34,6 +36,8 @@ fn test_paused_precompile_is_shown_when_viewing() {
 
 #[test]
 fn test_executing_paused_precompile_throws_error() {
+    utils::load_library();
+
     let (mut runner, mut signer, _, tester) = setup_test();
 
     let call_args = PausePrecompilesCallArgs {
@@ -55,6 +59,8 @@ fn test_executing_paused_precompile_throws_error() {
 
 #[test]
 fn test_executing_paused_and_then_resumed_precompile_succeeds() {
+    utils::load_library();
+
     let (mut runner, mut signer, _, tester) = setup_test();
 
     let call_args = PausePrecompilesCallArgs {
@@ -79,6 +85,8 @@ fn test_executing_paused_and_then_resumed_precompile_succeeds() {
 
 #[test]
 fn test_resuming_precompile_does_not_throw_error() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
 
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
@@ -90,6 +98,8 @@ fn test_resuming_precompile_does_not_throw_error() {
 
 #[test]
 fn test_pausing_precompile_does_not_throw_error() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let call_args = PausePrecompilesCallArgs { paused_mask: 0b1 };
     let input = borsh::to_vec(&call_args).unwrap();

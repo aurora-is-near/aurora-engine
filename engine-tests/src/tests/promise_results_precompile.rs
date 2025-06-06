@@ -10,6 +10,8 @@ const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 
 #[test]
 fn test_promise_results_precompile() {
+    utils::load_library();
+
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
 
@@ -40,6 +42,8 @@ fn test_promise_results_precompile() {
 
 #[test]
 fn test_promise_result_gas_cost() {
+    utils::load_library();
+
     let mut runner = utils::deploy_runner();
     let mut signer = utils::Signer::random();
     // Skip to later block height and re-init hashchain

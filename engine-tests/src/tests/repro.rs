@@ -1,6 +1,6 @@
 //! A module containing tests which reproduce transactions sent to live networks.
 
-use crate::utils::{standalone, AuroraRunner, ExecutionProfile};
+use crate::utils::{self, standalone, AuroraRunner, ExecutionProfile};
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_types::borsh::BorshDeserialize;
 use engine_standalone_storage::json_snapshot;
@@ -17,6 +17,8 @@ use engine_standalone_storage::json_snapshot;
 #[allow(non_snake_case)]
 #[test]
 fn repro_GdASJ3KESs() {
+    utils::load_library();
+
     // Note: this snapshot is pruned from the full Engine state on testnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
@@ -42,6 +44,8 @@ fn repro_GdASJ3KESs() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_8ru7VEA() {
+    utils::load_library();
+
     // Note: this snapshot is pruned from the full Engine state on mainnet at that block height.
     // The full snapshot is very large, and all that is necessary for this test are the keys used
     // in the transaction. This pruned snapshot contains precisely those keys, and no others.
@@ -65,6 +69,8 @@ fn repro_8ru7VEA() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_FRcorNv() {
+    utils::load_library();
+
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_FRcorNv.json",
         block_height: 64_328_524,
@@ -82,6 +88,8 @@ fn repro_FRcorNv() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_5bEgfRQ() {
+    utils::load_library();
+
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_5bEgfRQ.json",
         block_height: 64_417_403,
@@ -100,6 +108,8 @@ fn repro_5bEgfRQ() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_D98vwmi() {
+    utils::load_library();
+
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_D98vwmi.json",
         block_height: 64_945_381,
@@ -119,6 +129,8 @@ fn repro_D98vwmi() {
 #[allow(non_snake_case)]
 #[test]
 fn repro_Emufid2() {
+    utils::load_library();
+
     repro_common(&ReproContext {
         snapshot_path: "src/tests/res/aurora_state_Emufid2.json",
         block_height: 99_197_180,

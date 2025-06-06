@@ -9,6 +9,8 @@ use aurora_engine_types::{
 
 #[test]
 fn test_hashchain() {
+    utils::load_library();
+
     let (mut runner, mut signer, _) = crate::tests::sanity::initialize_transfer();
     // Re-init the hashchain so we know the first tx is `start_hashchain`.
     let account_id = runner.aurora_account_id.clone();

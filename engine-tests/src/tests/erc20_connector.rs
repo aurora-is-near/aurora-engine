@@ -222,12 +222,16 @@ impl AuroraRunner {
 
 #[test]
 fn test_deploy_erc20_token() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     runner.deploy_erc20_token("tt.testnet");
 }
 
 #[test]
 fn test_mint() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
@@ -241,6 +245,8 @@ fn test_mint() {
 
 #[test]
 fn test_mint_not_admin() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
     let address = runner.create_account().address;
@@ -254,6 +260,8 @@ fn test_mint_not_admin() {
 
 #[test]
 fn test_ft_on_transfer() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     // Standalone runner presently does not support ft_on_transfer
     runner.standalone_runner = None;
@@ -276,6 +284,8 @@ fn test_ft_on_transfer() {
 
 #[test]
 fn test_ft_on_transfer_fail() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     let nep141 = "tt.testnet";
     let alice = "alice";
@@ -290,6 +300,8 @@ fn test_ft_on_transfer_fail() {
 #[ignore]
 #[test]
 fn test_relayer_charge_fee() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     // Standalone runner presently does not support ft_on_transfer
     runner.standalone_runner = None;
@@ -335,6 +347,8 @@ fn test_relayer_charge_fee() {
 
 #[test]
 fn test_transfer_erc20_token() {
+    utils::load_library();
+
     let mut runner = AuroraRunner::new();
     let token = runner.deploy_erc20_token("tt.testnet");
     let peer0 = runner.create_account();
@@ -407,6 +421,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_ghsa_5c82_x4m4_hcj6_exploit() {
+        utils::load_library();
+
         let TestExitToNearEthContext {
             mut signer,
             signer_address,
@@ -471,6 +487,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near() {
+        utils::load_library();
+
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -508,6 +526,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near_wnear_unwrapped() {
+        utils::load_library();
+
         // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -564,6 +584,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near_wnear() {
+        utils::load_library();
+
         // Deploy Aurora; deploy wnear; bridge wnear to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -620,6 +642,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near_refund() {
+        utils::load_library();
+
         // Deploy Aurora; deploy NEP-141; bridge NEP-141 to ERC-20 on Aurora
         let TestExitToNearContext {
             ft_owner,
@@ -665,6 +689,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near_eth() {
+        utils::load_library();
+
         // Same test as above, but exit ETH instead of a bridged NEP-141
         let TestExitToNearEthContext {
             signer,
@@ -714,6 +740,8 @@ pub mod workspace {
 
     #[tokio::test]
     async fn test_exit_to_near_eth_refund() {
+        utils::load_library();
+
         // Test the case where the ft_transfer promise from the exit call fails;
         // ensure ETH is refunded.
 

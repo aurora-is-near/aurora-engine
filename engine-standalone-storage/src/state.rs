@@ -1,12 +1,6 @@
 #![allow(clippy::as_conversions)]
 
-use std::{
-    borrow::Cow,
-    iter,
-    ops::DerefMut,
-    slice,
-    sync::{Mutex, OnceLock},
-};
+use std::{borrow::Cow, cell::RefCell, iter, slice, sync::LazyLock};
 
 use sha2::digest::{FixedOutput, Update};
 
@@ -14,12 +8,22 @@ use aurora_engine_sdk::env::Fixed;
 
 use super::{Diff, Storage};
 
-pub static STATE: OnceLock<State> = OnceLock::new();
+thread_local! {
+    pub static STATE: LazyLock<State> = LazyLock::new(|| State {
+        inner: RefCell::new(StateInner::default()),
+        registers: RefCell::new(
+            iter::repeat_with(Register::default)
+                .take(REGISTERS_NUMBER)
+                .collect(),
+        ),
+        db: RefCell::new(None),
+    });
+}
 
 pub struct State {
-    inner: Mutex<StateInner>,
-    registers: Mutex<Vec<Register>>,
-    db: Storage,
+    inner: RefCell<StateInner>,
+    registers: RefCell<Vec<Register>>,
+    db: RefCell<Option<Storage>>,
 }
 
 #[derive(Default)]
@@ -53,46 +57,34 @@ impl Default for StateInner {
 }
 
 impl State {
-    pub fn new(storage: Storage) -> Self {
-        Self {
-            inner: Mutex::new(StateInner::default()),
-            registers: Mutex::new(
-                iter::repeat_with(Register::default)
-                    .take(REGISTERS_NUMBER)
-                    .collect(),
-            ),
-            db: storage,
-        }
-    }
-
-    fn inner(&self) -> impl DerefMut<Target = StateInner> + use<'_> {
-        self.inner.lock().expect("poisoned")
+    pub fn set_storage(&self, storage: Storage) {
+        *self.db.borrow_mut() = Some(storage);
     }
 
     pub fn set_env(&self, env: Fixed) {
-        self.inner().env = Some(env);
+        self.inner.borrow_mut().env = Some(env);
     }
 
     pub fn set_promise_handler(&self, promise_data: Box<[Option<Vec<u8>>]>) {
-        self.inner().promise_data = promise_data;
+        self.inner.borrow_mut().promise_data = promise_data;
     }
 
     pub fn set_input(&self, input: Vec<u8>) {
-        self.inner().input = input;
+        self.inner.borrow_mut().input = input;
     }
 
     #[must_use]
     pub fn take_output(&self) -> Vec<u8> {
-        self.inner().output.clone()
+        self.inner.borrow_mut().output.clone()
     }
 
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
-        self.inner().transaction_diff.clone()
+        self.inner.borrow_mut().transaction_diff.clone()
     }
 
     pub fn init(&self, block_height: u64, transaction_position: u16) {
-        let mut lock = self.inner();
+        let mut lock = self.inner.borrow_mut();
         lock.bound_block_height = block_height;
         lock.bound_tx_position = transaction_position;
         lock.output.clear();
@@ -105,7 +97,7 @@ impl State {
         F: FnMut(&Register) -> T,
     {
         let index = usize::try_from(register_id).expect("pointer size must be wide enough");
-        let lock = self.registers.lock().expect("poisoned");
+        let lock = self.registers.borrow();
         let reg = lock
             .get(index)
             .unwrap_or_else(|| panic!("no such register {register_id}"));
@@ -114,7 +106,7 @@ impl State {
 
     fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
         let index = usize::try_from(register_id).expect("pointer size must be wide enough");
-        let mut lock = self.registers.lock().expect("poisoned");
+        let mut lock = self.registers.borrow_mut();
         *lock
             .get_mut(index)
             .unwrap_or_else(|| panic!("no such register {register_id}")) =
@@ -156,68 +148,68 @@ impl State {
     }
 
     fn current_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.current_account_id.as_bytes().into());
     }
 
     fn signer_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.signer_account_id.as_bytes().into());
     }
 
     fn predecessor_account_id(&self, register_id: u64) {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.predecessor_account_id.as_bytes().into());
     }
 
     fn input(&self, register_id: u64) {
-        let input = &self.inner().input;
+        let input = &self.inner.borrow().input;
         self.set_reg(register_id, input.into());
     }
 
     fn block_index(&self) -> u64 {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         env.block_height
     }
 
     fn block_timestamp(&self) -> u64 {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         env.block_timestamp.nanos()
     }
 
     fn attached_deposit(&self, balance_ptr: u64) {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         unsafe { (balance_ptr as *mut u128).write(env.attached_deposit) }
     }
 
     fn prepaid_gas(&self) -> u64 {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         env.prepaid_gas.as_u64()
     }
 
     fn used_gas(&self) -> u64 {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         env.used_gas.as_u64()
     }
 
     fn random_seed(&self, register_id: u64) {
-        let Some(env) = &self.inner().env else {
+        let Some(env) = &self.inner.borrow().env else {
             panic!("environment is not set");
         };
         self.set_reg(register_id, env.random_seed.as_bytes().into());
@@ -261,16 +253,16 @@ impl State {
 
     fn value_return(&self, value_len: u64, value_ptr: u64) {
         let data = self.get_data(value_ptr, value_len);
-        self.inner().output = data.into_owned();
+        self.inner.borrow_mut().output = data.into_owned();
     }
 
     fn promise_results_count(&self) -> u64 {
-        u64::try_from(self.inner().promise_data.len()).unwrap_or_default()
+        u64::try_from(self.inner.borrow().promise_data.len()).unwrap_or_default()
     }
 
     fn promise_result(&self, result_idx: u64, register_id: u64) -> u64 {
         let i = usize::try_from(result_idx).expect("index too big");
-        let lock = self.inner();
+        let lock = self.inner.borrow();
         let Some(data) = lock.promise_data.get(i) else {
             return 3;
         };
@@ -295,7 +287,8 @@ impl State {
         let key = self.get_data(key_ptr, key_len);
         let value = self.get_data(value_ptr, value_len);
 
-        self.inner()
+        self.inner
+            .borrow_mut()
             .transaction_diff
             .modify(key.to_vec(), value.to_vec());
         1
@@ -303,7 +296,7 @@ impl State {
 
     fn storage_read(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
-        let lock = self.inner();
+        let lock = self.inner.borrow();
         if let Some(diff) = lock.transaction_diff.get(&key) {
             if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
@@ -313,6 +306,9 @@ impl State {
 
         let value = self
             .db
+            .borrow()
+            .as_ref()
+            .expect("must set storage")
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
         value.as_ref().map_or(0, |diff| {
             if let Some(bytes) = diff.value() {
@@ -327,18 +323,24 @@ impl State {
         self.storage_read(key_len, key_ptr, register_id);
 
         let key = self.get_data(key_ptr, key_len);
-        self.inner().transaction_diff.delete(key.into_owned());
+        self.inner
+            .borrow_mut()
+            .transaction_diff
+            .delete(key.into_owned());
         1
     }
 
     fn storage_has_key(&self, key_len: u64, key_ptr: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
-        let lock = self.inner();
+        let lock = self.inner.borrow();
         if lock.transaction_diff.get(&key).is_some() {
             return 1;
         }
 
         self.db
+            .borrow()
+            .as_ref()
+            .expect("must set storage")
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
             .is_ok()
             .into()
@@ -354,7 +356,7 @@ mod io {
         type StorageValue = Cow<'a, [u8]>;
 
         fn read_input(&self) -> Self::StorageValue {
-            Cow::Owned(self.inner().input.clone())
+            Cow::Owned(self.inner.borrow().input.clone())
         }
 
         fn return_output(&mut self, value: &[u8]) {
@@ -368,14 +370,17 @@ mod io {
         }
 
         fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
-            let lock = self.inner();
+            let lock = self.inner.borrow();
             let db_value;
             let value = if let Some(diff) = lock.transaction_diff.get(key) {
                 diff.value()
             } else {
-                db_value =
-                    self.db
-                        .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
+                db_value = self
+                    .db
+                    .borrow()
+                    .as_ref()
+                    .expect("must set storage")
+                    .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
                 db_value.as_ref().map_or(None, |diff| diff.value())
             };
 
@@ -388,7 +393,8 @@ mod io {
 
         fn write_storage(&mut self, key: &[u8], value: &[u8]) -> Option<Self::StorageValue> {
             let old = self.read_storage(key);
-            self.inner()
+            self.inner
+                .borrow_mut()
                 .transaction_diff
                 .modify(key.to_vec(), value.to_vec());
             old
@@ -404,7 +410,10 @@ mod io {
 
         fn remove_storage(&mut self, key: &[u8]) -> Option<Self::StorageValue> {
             let v = self.read_storage(key);
-            self.inner().transaction_diff.delete(key.to_vec());
+            self.inner
+                .borrow_mut()
+                .transaction_diff
+                .delete(key.to_vec());
             v
         }
     }
@@ -415,13 +424,13 @@ mod io {
 // #############
 
 #[unsafe(no_mangle)]
-extern "C" fn read_register(register_id: u64, ptr: u64) {
-    STATE.get().unwrap().read_register(register_id, ptr);
+pub extern "C" fn read_register(register_id: u64, ptr: u64) {
+    STATE.with(|state| state.read_register(register_id, ptr));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn register_len(register_id: u64) -> u64 {
-    STATE.get().unwrap().register_len(register_id)
+pub extern "C" fn register_len(register_id: u64) -> u64 {
+    STATE.with(|state| state.register_len(register_id))
 }
 
 // ###############
@@ -429,48 +438,48 @@ extern "C" fn register_len(register_id: u64) -> u64 {
 // ###############
 
 #[unsafe(no_mangle)]
-extern "C" fn current_account_id(register_id: u64) {
-    STATE.get().unwrap().current_account_id(register_id);
+pub extern "C" fn current_account_id(register_id: u64) {
+    STATE.with(|state| state.current_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn signer_account_id(register_id: u64) {
-    STATE.get().unwrap().signer_account_id(register_id);
+pub extern "C" fn signer_account_id(register_id: u64) {
+    STATE.with(|state| state.signer_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn signer_account_pk(register_id: u64) {
+pub extern "C" fn signer_account_pk(register_id: u64) {
     let _ = register_id;
     unimplemented!();
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn predecessor_account_id(register_id: u64) {
-    STATE.get().unwrap().predecessor_account_id(register_id);
+pub extern "C" fn predecessor_account_id(register_id: u64) {
+    STATE.with(|state| state.predecessor_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn input(register_id: u64) {
-    STATE.get().unwrap().input(register_id);
+pub extern "C" fn input(register_id: u64) {
+    STATE.with(|state| state.input(register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn block_index() -> u64 {
-    STATE.get().unwrap().block_index()
+pub extern "C" fn block_index() -> u64 {
+    STATE.with(|state| state.block_index())
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn block_timestamp() -> u64 {
-    STATE.get().unwrap().block_timestamp()
+pub extern "C" fn block_timestamp() -> u64 {
+    STATE.with(|state| state.block_timestamp())
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn epoch_height() -> u64 {
+pub extern "C" fn epoch_height() -> u64 {
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_usage() -> u64 {
+pub extern "C" fn storage_usage() -> u64 {
     unimplemented!()
 }
 
@@ -479,24 +488,24 @@ extern "C" fn storage_usage() -> u64 {
 // #################
 
 #[unsafe(no_mangle)]
-extern "C" fn account_balance(balance_ptr: u64) {
+pub extern "C" fn account_balance(balance_ptr: u64) {
     let _ = balance_ptr;
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn attached_deposit(balance_ptr: u64) {
-    STATE.get().unwrap().attached_deposit(balance_ptr);
+pub extern "C" fn attached_deposit(balance_ptr: u64) {
+    STATE.with(|state| state.attached_deposit(balance_ptr));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn prepaid_gas() -> u64 {
-    STATE.get().unwrap().prepaid_gas()
+pub extern "C" fn prepaid_gas() -> u64 {
+    STATE.with(|state| state.prepaid_gas())
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn used_gas() -> u64 {
-    STATE.get().unwrap().used_gas()
+pub extern "C" fn used_gas() -> u64 {
+    STATE.with(|state| state.used_gas())
 }
 
 // ############
@@ -504,36 +513,27 @@ extern "C" fn used_gas() -> u64 {
 // ############
 
 #[unsafe(no_mangle)]
-extern "C" fn random_seed(register_id: u64) {
-    STATE.get().unwrap().random_seed(register_id);
+pub extern "C" fn random_seed(register_id: u64) {
+    STATE.with(|state| state.random_seed(register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE
-        .get()
-        .unwrap()
-        .digest::<sha2::Sha256>(value_len, value_ptr, register_id);
+pub extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with(|state| state.digest::<sha2::Sha256>(value_len, value_ptr, register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE
-        .get()
-        .unwrap()
-        .digest::<sha3::Keccak256>(value_len, value_ptr, register_id);
+pub extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with(|state| state.digest::<sha3::Keccak256>(value_len, value_ptr, register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE
-        .get()
-        .unwrap()
-        .digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id);
+pub extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with(|state| state.digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id));
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ecrecover(
+pub extern "C" fn ecrecover(
     hash_len: u64,
     hash_ptr: u64,
     sig_len: u64,
@@ -543,31 +543,31 @@ extern "C" fn ecrecover(
     register_id: u64,
 ) -> u64 {
     if malleability_flag == 0 {
-        STATE
-            .get()
-            .unwrap()
-            .ecrecover(hash_len, hash_ptr, sig_len, sig_ptr, v, register_id)
-            .is_ok()
-            .into()
+        STATE.with(|state| {
+            state
+                .ecrecover(hash_len, hash_ptr, sig_len, sig_ptr, v, register_id)
+                .is_ok()
+                .into()
+        })
     } else {
         unimplemented!()
     }
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn alt_bn128_g1_sum(value_len: u64, value_ptr: u64, register_id: u64) {
+pub extern "C" fn alt_bn128_g1_sum(value_len: u64, value_ptr: u64, register_id: u64) {
     let _ = (value_len, value_ptr, register_id);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn alt_bn128_g1_multiexp(value_len: u64, value_ptr: u64, register_id: u64) {
+pub extern "C" fn alt_bn128_g1_multiexp(value_len: u64, value_ptr: u64, register_id: u64) {
     let _ = (value_len, value_ptr, register_id);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
+pub extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
     let _ = (value_len, value_ptr);
     unimplemented!()
 }
@@ -577,17 +577,17 @@ extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
 // #####################
 
 #[unsafe(no_mangle)]
-extern "C" fn value_return(value_len: u64, value_ptr: u64) {
-    STATE.get().unwrap().value_return(value_len, value_ptr);
+pub extern "C" fn value_return(value_len: u64, value_ptr: u64) {
+    STATE.with(|state| state.value_return(value_len, value_ptr));
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn panic() {
+pub const extern "C" fn panic() {
     panic!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn panic_utf8(len: u64, ptr: u64) {
+pub extern "C" fn panic_utf8(len: u64, ptr: u64) {
     let len = usize::try_from(len).expect("pointer size must be wide enough");
     let str =
         unsafe { std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len)) };
@@ -595,7 +595,7 @@ extern "C" fn panic_utf8(len: u64, ptr: u64) {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn log_utf8(len: u64, ptr: u64) {
+pub extern "C" fn log_utf8(len: u64, ptr: u64) {
     let len = usize::try_from(len).expect("pointer size must be wide enough");
     let str =
         unsafe { std::str::from_utf8_unchecked(slice::from_raw_parts(ptr as *const u8, len)) };
@@ -603,13 +603,13 @@ extern "C" fn log_utf8(len: u64, ptr: u64) {
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn log_utf16(len: u64, ptr: u64) {
+pub const extern "C" fn log_utf16(len: u64, ptr: u64) {
     let _ = (len, ptr);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
+pub const extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) {
     let _ = (msg_ptr, filename_ptr, line, col);
 }
 
@@ -618,7 +618,7 @@ const extern "C" fn abort(msg_ptr: u32, filename_ptr: u32, line: u32, col: u32) 
 // ################
 
 #[unsafe(no_mangle)]
-const extern "C" fn promise_create(
+pub const extern "C" fn promise_create(
     account_id_len: u64,
     account_id_ptr: u64,
     method_name_len: u64,
@@ -637,7 +637,7 @@ const extern "C" fn promise_create(
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn promise_then(
+pub const extern "C" fn promise_then(
     promise_index: u64,
     account_id_len: u64,
     account_id_ptr: u64,
@@ -658,21 +658,21 @@ const extern "C" fn promise_then(
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64 {
+pub const extern "C" fn promise_and(promise_idx_ptr: u64, promise_idx_count: u64) -> u64 {
     let _ = (promise_idx_ptr, promise_idx_count);
     // TODO:
     0
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64 {
+pub const extern "C" fn promise_batch_create(account_id_len: u64, account_id_ptr: u64) -> u64 {
     let _ = (account_id_len, account_id_ptr);
     // TODO:
     0
 }
 
 #[unsafe(no_mangle)]
-const extern "C" fn promise_batch_then(
+pub const extern "C" fn promise_batch_then(
     promise_index: u64,
     account_id_len: u64,
     account_id_ptr: u64,
@@ -688,13 +688,13 @@ const extern "C" fn promise_batch_then(
 // #######################
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_create_account(promise_index: u64) {
+pub extern "C" fn promise_batch_action_create_account(promise_index: u64) {
     let _ = promise_index;
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_deploy_contract(
+pub extern "C" fn promise_batch_action_deploy_contract(
     promise_index: u64,
     code_len: u64,
     code_ptr: u64,
@@ -705,7 +705,7 @@ extern "C" fn promise_batch_action_deploy_contract(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_function_call(
+pub extern "C" fn promise_batch_action_function_call(
     promise_index: u64,
     method_name_len: u64,
     method_name_ptr: u64,
@@ -722,14 +722,14 @@ extern "C" fn promise_batch_action_function_call(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
+pub extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
     let _ = promise_index;
     let _ = amount_ptr;
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_stake(
+pub extern "C" fn promise_batch_action_stake(
     promise_index: u64,
     amount_ptr: u64,
     public_key_len: u64,
@@ -742,7 +742,7 @@ extern "C" fn promise_batch_action_stake(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_add_key_with_full_access(
+pub extern "C" fn promise_batch_action_add_key_with_full_access(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -755,7 +755,7 @@ extern "C" fn promise_batch_action_add_key_with_full_access(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_add_key_with_function_call(
+pub extern "C" fn promise_batch_action_add_key_with_function_call(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -776,7 +776,7 @@ extern "C" fn promise_batch_action_add_key_with_function_call(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_delete_key(
+pub extern "C" fn promise_batch_action_delete_key(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -787,7 +787,7 @@ extern "C" fn promise_batch_action_delete_key(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_batch_action_delete_account(
+pub extern "C" fn promise_batch_action_delete_account(
     promise_index: u64,
     beneficiary_id_len: u64,
     beneficiary_id_ptr: u64,
@@ -802,17 +802,17 @@ extern "C" fn promise_batch_action_delete_account(
 // #######################
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_results_count() -> u64 {
-    STATE.get().unwrap().promise_results_count()
+pub extern "C" fn promise_results_count() -> u64 {
+    STATE.with(|state| state.promise_results_count())
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
-    STATE.get().unwrap().promise_result(result_idx, register_id)
+pub extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
+    STATE.with(|state| state.promise_result(result_idx, register_id))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn promise_return(promise_id: u64) {
+pub extern "C" fn promise_return(promise_id: u64) {
     let _ = promise_id;
     unimplemented!()
 }
@@ -822,48 +822,39 @@ extern "C" fn promise_return(promise_id: u64) {
 // ###############
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_write(
+pub extern "C" fn storage_write(
     key_len: u64,
     key_ptr: u64,
     value_len: u64,
     value_ptr: u64,
     register_id: u64,
 ) -> u64 {
-    STATE
-        .get()
-        .unwrap()
-        .storage_write(key_len, key_ptr, value_len, value_ptr, register_id)
+    STATE.with(|state| state.storage_write(key_len, key_ptr, value_len, value_ptr, register_id))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE
-        .get()
-        .unwrap()
-        .storage_read(key_len, key_ptr, register_id)
+pub extern "C" fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
+    STATE.with(|state| state.storage_read(key_len, key_ptr, register_id))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE
-        .get()
-        .unwrap()
-        .storage_remove(key_len, key_ptr, register_id)
+pub extern "C" fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
+    STATE.with(|state| state.storage_remove(key_len, key_ptr, register_id))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_has_key(key_len: u64, key_ptr: u64) -> u64 {
-    STATE.get().unwrap().storage_has_key(key_len, key_ptr)
+pub extern "C" fn storage_has_key(key_len: u64, key_ptr: u64) -> u64 {
+    STATE.with(|state| state.storage_has_key(key_len, key_ptr))
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_iter_prefix(prefix_len: u64, prefix_ptr: u64) -> u64 {
+pub extern "C" fn storage_iter_prefix(prefix_len: u64, prefix_ptr: u64) -> u64 {
     let _ = (prefix_len, prefix_ptr);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_iter_range(
+pub extern "C" fn storage_iter_range(
     start_len: u64,
     start_ptr: u64,
     end_len: u64,
@@ -875,7 +866,7 @@ extern "C" fn storage_iter_range(
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn storage_iter_next(
+pub extern "C" fn storage_iter_next(
     iterator_id: u64,
     key_register_id: u64,
     value_register_id: u64,
@@ -889,13 +880,13 @@ extern "C" fn storage_iter_next(
 // ###############
 
 #[unsafe(no_mangle)]
-extern "C" fn validator_stake(account_id_len: u64, account_id_ptr: u64, stake_ptr: u64) {
+pub extern "C" fn validator_stake(account_id_len: u64, account_id_ptr: u64, stake_ptr: u64) {
     let _ = (account_id_len, account_id_ptr, stake_ptr);
     unimplemented!()
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn validator_total_stake(stake_ptr: u64) {
+pub extern "C" fn validator_total_stake(stake_ptr: u64) {
     let _ = stake_ptr;
     unimplemented!()
 }
