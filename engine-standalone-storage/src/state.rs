@@ -1,29 +1,26 @@
 #![allow(clippy::as_conversions)]
 
-use std::{borrow::Cow, cell::RefCell, iter, slice, sync::LazyLock};
-
-use sha2::digest::{FixedOutput, Update};
-
 use aurora_engine_sdk::env::Fixed;
+use sha2::digest::{FixedOutput, Update};
+use std::cell::RefCell;
+use std::{borrow::Cow, iter, slice};
 
 use super::{Diff, Storage};
 
+/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
+/// address for the mainnet only, since for the testnet it's not so critical.
+const CUSTODIAN_ADDRESS: &[u8] = &[
+    107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
+];
+
 thread_local! {
-    pub static STATE: LazyLock<State> = LazyLock::new(|| State {
-        inner: RefCell::new(StateInner::default()),
-        registers: RefCell::new(
-            iter::repeat_with(Register::default)
-                .take(REGISTERS_NUMBER)
-                .collect(),
-        ),
-        db: RefCell::new(None),
-    });
+    pub static STATE: RefCell<State> = panic!("State is not initialized");
 }
 
 pub struct State {
     inner: RefCell<StateInner>,
     registers: RefCell<Vec<Register>>,
-    db: RefCell<Option<Storage>>,
+    db: Storage,
 }
 
 #[derive(Default)]
@@ -57,8 +54,16 @@ impl Default for StateInner {
 }
 
 impl State {
-    pub fn set_storage(&self, storage: Storage) {
-        *self.db.borrow_mut() = Some(storage);
+    pub fn new(storage: Storage) -> Self {
+        Self {
+            inner: RefCell::new(StateInner::default()),
+            registers: RefCell::new(
+                iter::repeat_with(Register::default)
+                    .take(REGISTERS_NUMBER)
+                    .collect(),
+            ),
+            db: storage,
+        }
     }
 
     pub fn set_env(&self, env: Fixed) {
@@ -97,8 +102,8 @@ impl State {
         F: FnMut(&Register) -> T,
     {
         let index = usize::try_from(register_id).expect("pointer size must be wide enough");
-        let lock = self.registers.borrow();
-        let reg = lock
+        let registers = self.registers.borrow();
+        let reg = registers
             .get(index)
             .unwrap_or_else(|| panic!("no such register {register_id}"));
         op(reg)
@@ -106,8 +111,8 @@ impl State {
 
     fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
         let index = usize::try_from(register_id).expect("pointer size must be wide enough");
-        let mut lock = self.registers.borrow_mut();
-        *lock
+        let mut registers = self.registers.borrow_mut();
+        *registers
             .get_mut(index)
             .unwrap_or_else(|| panic!("no such register {register_id}")) =
             Register(Some(data.into_owned()));
@@ -306,9 +311,6 @@ impl State {
 
         let value = self
             .db
-            .borrow()
-            .as_ref()
-            .expect("must set storage")
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
         value.as_ref().map_or(0, |diff| {
             if let Some(bytes) = diff.value() {
@@ -338,9 +340,6 @@ impl State {
         }
 
         self.db
-            .borrow()
-            .as_ref()
-            .expect("must set storage")
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
             .is_ok()
             .into()
@@ -350,6 +349,7 @@ impl State {
 mod io {
     use std::borrow::Cow;
 
+    use crate::state::CUSTODIAN_ADDRESS;
     use aurora_engine_sdk::io::IO;
 
     impl<'a> IO for &'a super::State {
@@ -360,11 +360,10 @@ mod io {
         }
 
         fn return_output(&mut self, value: &[u8]) {
-            // #[cfg(any(feature = "mainnet", feature = "testnet"))]
-            // assert!(
-            //     !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
-            //     "ERR_ILLEGAL_RETURN"
-            // );
+            assert!(
+                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
+                "ERR_ILLEGAL_RETURN"
+            );
             let len = u64::try_from(value.len()).expect("pointer size must fit in 64");
             super::value_return(len, value.as_ptr() as u64);
         }
@@ -375,12 +374,9 @@ mod io {
             let value = if let Some(diff) = lock.transaction_diff.get(key) {
                 diff.value()
             } else {
-                db_value = self
-                    .db
-                    .borrow()
-                    .as_ref()
-                    .expect("must set storage")
-                    .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
+                db_value =
+                    self.db
+                        .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
                 db_value.as_ref().map_or(None, |diff| diff.value())
             };
 
@@ -424,13 +420,13 @@ mod io {
 // #############
 
 #[unsafe(no_mangle)]
-pub extern "C" fn read_register(register_id: u64, ptr: u64) {
-    STATE.with(|state| state.read_register(register_id, ptr));
+extern "C" fn read_register(register_id: u64, ptr: u64) {
+    STATE.with_borrow(|state| state.read_register(register_id, ptr));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn register_len(register_id: u64) -> u64 {
-    STATE.with(|state| state.register_len(register_id))
+extern "C" fn register_len(register_id: u64) -> u64 {
+    STATE.with_borrow(|state| state.register_len(register_id))
 }
 
 // ###############
@@ -438,13 +434,13 @@ pub extern "C" fn register_len(register_id: u64) -> u64 {
 // ###############
 
 #[unsafe(no_mangle)]
-pub extern "C" fn current_account_id(register_id: u64) {
-    STATE.with(|state| state.current_account_id(register_id));
+extern "C" fn current_account_id(register_id: u64) {
+    STATE.with_borrow(|state| state.current_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn signer_account_id(register_id: u64) {
-    STATE.with(|state| state.signer_account_id(register_id));
+extern "C" fn signer_account_id(register_id: u64) {
+    STATE.with_borrow(|state| state.signer_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
@@ -454,23 +450,23 @@ pub extern "C" fn signer_account_pk(register_id: u64) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn predecessor_account_id(register_id: u64) {
-    STATE.with(|state| state.predecessor_account_id(register_id));
+extern "C" fn predecessor_account_id(register_id: u64) {
+    STATE.with_borrow(|state| state.predecessor_account_id(register_id));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn input(register_id: u64) {
-    STATE.with(|state| state.input(register_id));
+extern "C" fn input(register_id: u64) {
+    STATE.with_borrow(|state| state.input(register_id));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn block_index() -> u64 {
-    STATE.with(|state| state.block_index())
+extern "C" fn block_index() -> u64 {
+    STATE.with_borrow(State::block_index)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn block_timestamp() -> u64 {
-    STATE.with(|state| state.block_timestamp())
+extern "C" fn block_timestamp() -> u64 {
+    STATE.with_borrow(State::block_timestamp)
 }
 
 #[unsafe(no_mangle)]
@@ -494,18 +490,18 @@ pub extern "C" fn account_balance(balance_ptr: u64) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn attached_deposit(balance_ptr: u64) {
-    STATE.with(|state| state.attached_deposit(balance_ptr));
+extern "C" fn attached_deposit(balance_ptr: u64) {
+    STATE.with_borrow(|state| state.attached_deposit(balance_ptr));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn prepaid_gas() -> u64 {
-    STATE.with(|state| state.prepaid_gas())
+extern "C" fn prepaid_gas() -> u64 {
+    STATE.with_borrow(State::prepaid_gas)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn used_gas() -> u64 {
-    STATE.with(|state| state.used_gas())
+extern "C" fn used_gas() -> u64 {
+    STATE.with_borrow(State::used_gas)
 }
 
 // ############
@@ -513,23 +509,29 @@ pub extern "C" fn used_gas() -> u64 {
 // ############
 
 #[unsafe(no_mangle)]
-pub extern "C" fn random_seed(register_id: u64) {
-    STATE.with(|state| state.random_seed(register_id));
+extern "C" fn random_seed(register_id: u64) {
+    STATE.with_borrow(|state| state.random_seed(register_id));
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.with(|state| state.digest::<sha2::Sha256>(value_len, value_ptr, register_id));
+extern "C" fn sha256(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with_borrow(|state| {
+        state.digest::<sha2::Sha256>(value_len, value_ptr, register_id);
+    });
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.with(|state| state.digest::<sha3::Keccak256>(value_len, value_ptr, register_id));
+extern "C" fn keccak256(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with_borrow(|state| {
+        state.digest::<sha3::Keccak256>(value_len, value_ptr, register_id);
+    });
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
-    STATE.with(|state| state.digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id));
+extern "C" fn ripemd160(value_len: u64, value_ptr: u64, register_id: u64) {
+    STATE.with_borrow(|state| {
+        state.digest::<ripemd::Ripemd160>(value_len, value_ptr, register_id);
+    });
 }
 
 #[unsafe(no_mangle)]
@@ -543,7 +545,7 @@ pub extern "C" fn ecrecover(
     register_id: u64,
 ) -> u64 {
     if malleability_flag == 0 {
-        STATE.with(|state| {
+        STATE.with_borrow(|state| {
             state
                 .ecrecover(hash_len, hash_ptr, sig_len, sig_ptr, v, register_id)
                 .is_ok()
@@ -577,8 +579,8 @@ pub extern "C" fn alt_bn128_pairing_check(value_len: u64, value_ptr: u64) {
 // #####################
 
 #[unsafe(no_mangle)]
-pub extern "C" fn value_return(value_len: u64, value_ptr: u64) {
-    STATE.with(|state| state.value_return(value_len, value_ptr));
+extern "C" fn value_return(value_len: u64, value_ptr: u64) {
+    STATE.with_borrow(|state| state.value_return(value_len, value_ptr));
 }
 
 #[unsafe(no_mangle)]
@@ -802,13 +804,13 @@ pub extern "C" fn promise_batch_action_delete_account(
 // #######################
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_results_count() -> u64 {
-    STATE.with(|state| state.promise_results_count())
+extern "C" fn promise_results_count() -> u64 {
+    STATE.with_borrow(State::promise_results_count)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
-    STATE.with(|state| state.promise_result(result_idx, register_id))
+extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
+    STATE.with_borrow(|state| state.promise_result(result_idx, register_id))
 }
 
 #[unsafe(no_mangle)]
@@ -829,22 +831,24 @@ pub extern "C" fn storage_write(
     value_ptr: u64,
     register_id: u64,
 ) -> u64 {
-    STATE.with(|state| state.storage_write(key_len, key_ptr, value_len, value_ptr, register_id))
+    STATE.with_borrow(|state| {
+        state.storage_write(key_len, key_ptr, value_len, value_ptr, register_id)
+    })
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE.with(|state| state.storage_read(key_len, key_ptr, register_id))
+extern "C" fn storage_read(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
+    STATE.with_borrow(|state| state.storage_read(key_len, key_ptr, register_id))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
-    STATE.with(|state| state.storage_remove(key_len, key_ptr, register_id))
+extern "C" fn storage_remove(key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
+    STATE.with_borrow(|state| state.storage_remove(key_len, key_ptr, register_id))
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn storage_has_key(key_len: u64, key_ptr: u64) -> u64 {
-    STATE.with(|state| state.storage_has_key(key_len, key_ptr))
+extern "C" fn storage_has_key(key_len: u64, key_ptr: u64) -> u64 {
+    STATE.with_borrow(|state| state.storage_has_key(key_len, key_ptr))
 }
 
 #[unsafe(no_mangle)]

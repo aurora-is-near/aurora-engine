@@ -423,10 +423,10 @@ where
         used_gas: NearGas::new(0),
     };
 
-    state::STATE.with(|state| {
+    state::STATE.with_borrow(|state| {
         state.set_env(env);
-        // We can ignore promises in the standalone engine because it processes each receipt separately
-        // and it is fed a stream of receipts (it does not schedule them)
+        // We can ignore promises in the standalone engine because it processes each receipt
+        // separately, and it is fed a stream of receipts (it does not schedule them)
         state.set_promise_handler(transaction_message.promise_data.clone().into_boxed_slice());
     });
 
