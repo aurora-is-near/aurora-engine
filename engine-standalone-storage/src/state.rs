@@ -7,6 +7,12 @@ use std::{borrow::Cow, iter, ops::DerefMut, slice};
 
 use super::{Diff, Storage};
 
+/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
+/// address for the mainnet only, since for the testnet it's not so critical.
+const CUSTODIAN_ADDRESS: &[u8] = &[
+    107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
+];
+
 thread_local! {
     pub static STATE: RefCell<State> = panic!("State is not initialized");
 }
@@ -343,6 +349,7 @@ impl State {
 mod io {
     use std::borrow::Cow;
 
+    use crate::state::CUSTODIAN_ADDRESS;
     use aurora_engine_sdk::io::IO;
 
     impl<'a> IO for &'a super::State {
@@ -353,11 +360,10 @@ mod io {
         }
 
         fn return_output(&mut self, value: &[u8]) {
-            // #[cfg(any(feature = "mainnet", feature = "testnet"))]
-            // assert!(
-            //     !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
-            //     "ERR_ILLEGAL_RETURN"
-            // );
+            assert!(
+                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
+                "ERR_ILLEGAL_RETURN"
+            );
             let len = u64::try_from(value.len()).expect("pointer size must fit in 64");
             super::value_return(len, value.as_ptr() as u64);
         }
