@@ -4,7 +4,6 @@ use std::{
 };
 
 use aurora_engine_types::parameters::PromiseOrValue;
-
 use aurora_engine_types::{
     parameters::silo::{SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs},
     types::{Address, EthGas},
@@ -17,14 +16,17 @@ use aurora_engine::{contract_methods::ContractError, parameters::SubmitResult};
 
 static CONTRACT: Mutex<Option<DynamicContractImpl>> = Mutex::new(None);
 
-pub fn state() -> &'static super::state::State {
-    super::state::STATE.get().expect("state is not initialized")
+pub fn read_state<F, T>(f: F) -> T
+where
+    F: FnOnce(&super::state::State) -> T,
+{
+    super::state::STATE.with_borrow(|state| f(state))
 }
 
 #[inline]
 pub fn lock() -> impl Deref<Target = DynamicContractImpl> {
     MutexGuard::map(CONTRACT.lock(), |x| {
-        x.as_mut().expect("must load library before use")
+        x.as_mut().expect("must load a library before use")
     })
 }
 
@@ -67,10 +69,9 @@ impl DynamicContractImpl {
     fn e<T>(&self, name: &str) -> Result<T, ContractError> {
         *unsafe {
             Box::from_raw(
-                (self
-                    .library
+                self.library
                     .get::<extern "C" fn() -> *mut ffi::c_void>(name.as_bytes())
-                    .unwrap_or_else(|_| panic!("symbol {name} not found")))()
+                    .unwrap_or_else(|_| panic!("symbol {name} not found"))()
                 .cast(),
             )
         }

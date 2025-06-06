@@ -68,10 +68,7 @@ pub struct Storage {
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = Arc::new(DB::open_default(path)?);
-        state::STATE
-            .set(state::State::new(Self { db: db.clone() }))
-            .unwrap_or_default();
-
+        state::STATE.set(state::State::new(Self { db: db.clone() }));
         Ok(Self { db })
     }
 
@@ -405,17 +402,20 @@ impl Storage {
     where
         F: FnOnce(&state::State) -> R,
     {
-        let state = state::STATE.get_or_init(|| {
-            state::State::new(Self {
-                db: self.db.clone(),
-            })
-        });
-        state.set_input(input.to_vec());
-        state.init(block_height, transaction_position);
+        state::STATE.set(state::State::new(Self {
+            db: self.db.clone(),
+        }));
 
-        let result = f(state);
-        let diff = state.get_transaction_diff();
-        let engine_output = state.take_output();
+        let (result, engine_output, diff) = state::STATE.with_borrow(|state| {
+            state.set_input(input.to_vec());
+            state.init(block_height, transaction_position);
+
+            let result = f(state);
+            let diff = state.get_transaction_diff();
+            let engine_output = state.take_output();
+
+            (result, engine_output, diff)
+        });
 
         EngineAccessResult {
             result,
