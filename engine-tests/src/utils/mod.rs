@@ -531,7 +531,10 @@ impl AuroraRunner {
                     .iter()
                     .map(|x| x.0.clone())
                     .collect::<std::collections::HashSet<_>>();
-                let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
+                let diff = fake_keys
+                    .difference(&standalone_keys)
+                    .map(|x| hex::encode(x))
+                    .collect::<Vec<_>>();
 
                 panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
@@ -987,7 +990,8 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
     EngineError { kind, gas_used }
 }
 
-pub fn load_library() {
+#[ctor::ctor]
+fn load_library() {
     use std::path::PathBuf;
 
     let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

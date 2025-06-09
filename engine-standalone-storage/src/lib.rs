@@ -407,8 +407,8 @@ impl Storage {
         }));
 
         let (result, engine_output, diff) = state::STATE.with_borrow(|state| {
-            state.set_input(input.to_vec());
             state.init(block_height, transaction_position);
+            state.set_input(input.to_vec());
 
             let result = f(state);
             let diff = state.get_transaction_diff();

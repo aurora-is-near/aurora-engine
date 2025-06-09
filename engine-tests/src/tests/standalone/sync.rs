@@ -361,8 +361,6 @@ fn sample_block() -> sync::types::BlockMessage {
 }
 
 fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
-    utils::load_library();
-
     let mut runner = StandaloneRunner::default();
     runner.init_evm();
 

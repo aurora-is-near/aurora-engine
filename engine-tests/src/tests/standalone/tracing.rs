@@ -19,8 +19,6 @@ use crate::utils::{self, standalone};
 /// * `https://etherscan.io/vmtrace?txhash=0x33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e`
 #[test]
 fn test_evm_tracing_with_storage() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = utils::Signer::random();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -136,8 +134,6 @@ fn test_evm_tracing_with_storage() {
 /// (geth example found at `https://gist.github.com/karalabe/c91f95ac57f5e57f8b950ec65ecc697f`).
 #[test]
 fn test_evm_tracing() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = utils::Signer::random();
 

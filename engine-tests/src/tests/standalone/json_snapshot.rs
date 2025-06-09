@@ -10,8 +10,6 @@ const CODE_PREFIX: [u8; 2] = [0x07, 0x03];
 
 #[test]
 fn test_consume_snapshot() {
-    utils::load_library();
-
     let snapshot = json_snapshot::types::JsonSnapshot::load_from_file(
         "src/tests/res/contract.aurora.block51077328.json",
     )
@@ -43,8 +41,6 @@ fn test_consume_snapshot() {
 
 #[test]
 fn test_produce_snapshot() {
-    utils::load_library();
-
     let snapshot = json_snapshot::types::JsonSnapshot::load_from_file(
         "src/tests/res/contract.aurora.block51077328.json",
     )

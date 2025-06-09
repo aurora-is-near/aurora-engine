@@ -2,8 +2,6 @@ use crate::utils;
 
 #[test]
 fn test_exploit_fix() {
-    utils::load_library();
-
     let (mut runner, mut signer, _) = crate::tests::sanity::initialize_transfer();
 
     let constructor = utils::solidity::ContractConstructor::compile_from_source(

@@ -12,8 +12,6 @@ use crate::utils::{self, Signer};
 #[test]
 #[allow(clippy::too_many_lines)]
 fn test_replay_transaction() {
-    utils::load_library();
-
     let mut signer = Signer::random();
     let address = utils::address_from_secret_key(&signer.secret_key);
     let balance = Wei::new_u64(1000);
@@ -134,8 +132,6 @@ fn test_replay_transaction() {
 
 #[test]
 fn test_consume_transaction() {
-    utils::load_library();
-
     // Some util structures we will use in this test
     let signer = Signer::random();
     let address = utils::address_from_secret_key(&signer.secret_key);
@@ -168,8 +164,6 @@ fn test_consume_transaction() {
 
 #[test]
 fn test_block_index() {
-    utils::load_library();
-
     let (temp_dir, mut storage) = create_db();
 
     let block_hash = H256([3u8; 32]);
@@ -261,8 +255,6 @@ fn test_block_index() {
 
 #[test]
 fn test_transaction_index() {
-    utils::load_library();
-
     let (temp_dir, mut storage) = create_db();
 
     let block_height = 37u64;
@@ -344,8 +336,6 @@ fn test_transaction_index() {
 
 #[test]
 fn test_track_key() {
-    utils::load_library();
-
     // Set up the test
     let mut signer = Signer::random();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);

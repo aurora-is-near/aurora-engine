@@ -18,8 +18,6 @@ use engine_standalone_tracing::{
 #[test]
 #[ignore]
 fn test_trace_contract_deploy() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
 
@@ -49,8 +47,6 @@ fn test_trace_contract_deploy() {
 #[test]
 #[ignore]
 fn test_trace_precompile_direct_call() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
 
@@ -116,8 +112,6 @@ fn test_trace_precompile_direct_call() {
 #[test]
 #[ignore]
 fn test_trace_contract_single_call() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
@@ -171,8 +165,6 @@ fn test_trace_contract_with_sub_call() {
     const MINT_AMOUNT: u64 = 1_000_000_000_000;
     const LIQUIDITY_AMOUNT: u64 = MINT_AMOUNT / 5;
     const OUTPUT_AMOUNT: u64 = LIQUIDITY_AMOUNT / 100;
-
-    utils::load_library();
 
     let mut context = UniswapTestContext::new("uniswap");
     let (token_a, token_b) = context.create_token_pair(MINT_AMOUNT.into());
@@ -241,8 +233,6 @@ fn test_trace_contract_with_sub_call() {
 #[test]
 #[ignore]
 fn test_trace_contract_with_precompile_sub_call() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
 
@@ -285,8 +275,6 @@ fn test_trace_contract_with_precompile_sub_call() {
 #[test]
 #[ignore]
 fn test_contract_create_too_large() {
-    utils::load_library();
-
     let mut runner = standalone::StandaloneRunner::default();
     let signer = Signer::random();
 
@@ -327,8 +315,6 @@ fn test_contract_create_too_large() {
 #[ignore]
 fn test_trace_precompiles_with_subcalls() {
     // The XCC precompile does internal sub-calls. We will trace an XCC call.
-
-    utils::load_library();
 
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();

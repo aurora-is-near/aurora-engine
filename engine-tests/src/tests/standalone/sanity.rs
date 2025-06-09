@@ -6,12 +6,8 @@ use aurora_engine_types::types::{Address, NearGas, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
 use std::cell::RefCell;
 
-use crate::utils;
-
 #[test]
 fn test_deploy_code() {
-    utils::load_library();
-
     let chain_id: [u8; 32] = {
         let value = U256::from(1_313_161_554);
         value.to_big_endian()

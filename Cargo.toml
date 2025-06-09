@@ -68,6 +68,7 @@ wee_alloc = { version = "0.4", default-features = false }
 libloading = { version = "0.8" }
 thiserror = { version = "2" }
 parking_lot = { version = "0.12" }
+ctor = { version = "0.4.2" }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

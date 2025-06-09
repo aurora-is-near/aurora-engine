@@ -23,8 +23,6 @@ const TRANSFER_AMOUNT: u64 = 67;
 
 #[test]
 fn erc20_mint() {
-    utils::load_library();
-
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
 
     // Validate pre-state
@@ -51,8 +49,6 @@ fn erc20_mint() {
 fn erc20_mint_out_of_gas() {
     const GAS_LIMIT: u64 = 67_000;
     const GAS_PRICE: u64 = 10;
-
-    utils::load_library();
 
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
 
@@ -104,8 +100,6 @@ fn erc20_mint_out_of_gas() {
 
 #[test]
 fn profile_erc20_get_balance() {
-    utils::load_library();
-
     let (mut runner, mut source_account, _, contract) = initialize_erc20();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
@@ -132,8 +126,6 @@ fn profile_erc20_get_balance() {
 
 #[test]
 fn erc20_transfer_success() {
-    utils::load_library();
-
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
@@ -173,8 +165,6 @@ fn erc20_transfer_success() {
 
 #[test]
 fn erc20_transfer_insufficient_balance() {
-    utils::load_library();
-
     let (mut runner, mut source_account, dest_address, contract) = initialize_erc20();
     let source_address = utils::address_from_secret_key(&source_account.secret_key);
 
@@ -215,8 +205,6 @@ fn erc20_transfer_insufficient_balance() {
 
 #[test]
 fn deploy_erc_20_out_of_gas() {
-    utils::load_library();
-
     let mut runner = utils::deploy_runner();
     let mut rng = rand::thread_rng();
     let source_account = SecretKey::random(&mut rng);
@@ -258,8 +246,6 @@ fn deploy_erc_20_out_of_gas() {
 
 #[test]
 fn test_erc20_get_and_set_metadata() {
-    utils::load_library();
-
     let mut runner = utils::deploy_runner();
     let token_account_id = "token";
     let erc20_address = runner.deploy_erc20_token(token_account_id);
@@ -312,8 +298,6 @@ fn test_erc20_get_and_set_metadata() {
 
 #[test]
 fn test_erc20_get_and_set_metadata_by_owner() {
-    utils::load_library();
-
     let mut runner = utils::deploy_runner();
     let token_account_id = "token";
     let erc20_address = runner.deploy_erc20_token(token_account_id);

@@ -18,8 +18,6 @@ fn precompile_execution_profile(method: &str) -> ExecutionProfile {
 
 #[test]
 fn test_standard_precompiles() {
-    utils::load_library();
-
     let (mut runner, mut signer, contract) = initialize();
 
     let outcome = runner
@@ -32,72 +30,54 @@ fn test_standard_precompiles() {
 
 #[test]
 fn profile_ecrecover() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_ecrecover");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }
 
 #[test]
 fn profile_sha256() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_sha256");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }
 
 #[test]
 fn profile_ripemd160() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_ripemd160");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }
 
 #[test]
 fn profile_identity() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_identity");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }
 
 #[test]
 fn profile_modexp() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_modexp");
     utils::assert_gas_bound(profile.all_gas(), 6);
 }
 
 #[test]
 fn profile_ecadd() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_ecadd");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }
 
 #[test]
 fn profile_ecmul() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_ecmul");
     utils::assert_gas_bound(profile.all_gas(), 5);
 }
 
 #[test]
 fn profile_ecpair() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_ecpair");
     utils::assert_gas_bound(profile.all_gas(), 114);
 }
 
 #[test]
 fn profile_blake2f() {
-    utils::load_library();
-
     let profile = precompile_execution_profile("test_blake2f");
     utils::assert_gas_bound(profile.all_gas(), 4);
 }

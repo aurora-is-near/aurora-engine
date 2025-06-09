@@ -5,8 +5,6 @@ use rand::SeedableRng;
 
 #[test]
 fn test_random_number_precompile() {
-    utils::load_library();
-
     let random_seed = H256::from_slice(vec![7; 32].as_slice());
     let secret_key = {
         let mut rng = rand::rngs::StdRng::from_seed(random_seed.0);

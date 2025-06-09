@@ -8,8 +8,6 @@ use crate::utils::solidity::self_destruct::{
 // For CANCUN hard fork SELFDESCTRUCT disabled
 #[ignore]
 fn test_self_destruct_reset_state() {
-    utils::load_library();
-
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
 
@@ -44,8 +42,6 @@ fn test_self_destruct_reset_state() {
 
 #[test]
 fn test_self_destruct_with_submit() {
-    utils::load_library();
-
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
 

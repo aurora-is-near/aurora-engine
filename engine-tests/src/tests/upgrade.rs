@@ -1,11 +1,9 @@
 use std::{fs, path::Path};
 
-use crate::utils::{self, workspace::deploy_engine};
+use crate::utils::workspace::deploy_engine;
 
 #[tokio::test]
 async fn test_code_upgrade() {
-    utils::load_library();
-
     let aurora = deploy_engine().await;
     // do upgrade
     let result = aurora
@@ -29,8 +27,6 @@ async fn test_code_upgrade() {
 
 #[tokio::test]
 async fn test_code_upgrade_with_stage() {
-    utils::load_library();
-
     let aurora = deploy_engine().await;
     // do upgrade
     let result = aurora
@@ -59,8 +55,6 @@ async fn test_code_upgrade_with_stage() {
 // we get the TOO EARLY error.
 #[tokio::test]
 async fn test_repeated_calls_to_upgrade_should_fail() {
-    utils::load_library();
-
     let aurora = deploy_engine().await;
     // First upgrade should succeed
     let result = aurora

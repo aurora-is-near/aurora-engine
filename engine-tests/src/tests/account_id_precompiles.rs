@@ -3,8 +3,6 @@ use aurora_engine::parameters::SubmitResult;
 
 #[test]
 fn test_account_id_precompiles() {
-    utils::load_library();
-
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
 

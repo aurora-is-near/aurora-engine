@@ -72,8 +72,6 @@ fn public_key_to_address(public_key: PublicKey) -> Address {
 
 #[test]
 fn test_meta_parsing() {
-    utils::load_library();
-
     let chain_id = 1313161555;
     let signer = InMemorySigner::from_seed("doesnt".parse().unwrap(), KeyType::SECP256K1, "a");
     let signer_addr = public_key_to_address(signer.public_key.clone());

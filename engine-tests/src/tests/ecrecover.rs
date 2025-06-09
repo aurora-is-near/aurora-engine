@@ -9,8 +9,6 @@ const ECRECOVER_ADDRESS: Address = make_address(0, 1);
 /// ecrecover tests taken from geth
 #[test]
 fn test_ecrecover_geth() {
-    utils::load_library();
-
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let inputs = [
@@ -43,8 +41,6 @@ fn test_ecrecover_geth() {
 /// The ecrecover implementation in both the standalone and wasm contract should be the same.
 #[test]
 fn test_ecrecover_standalone() {
-    utils::load_library();
-
     let (mut runner, mut signer, _) = initialize_transfer();
 
     let hash =

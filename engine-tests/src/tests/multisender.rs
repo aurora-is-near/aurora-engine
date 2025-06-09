@@ -9,8 +9,6 @@ const INITIAL_NONCE: u64 = 0;
 
 #[test]
 fn test_multisender_eth() {
-    utils::load_library();
-
     let (mut runner, mut signer, contract_address) = initialize();
     let mut multi_send_eth = |num_addr: usize| -> (u64, u64) {
         let destinations: Vec<(Address, U256)> = (0..num_addr)
@@ -38,8 +36,6 @@ fn test_multisender_eth() {
 
 #[test]
 fn test_multisender_erc20() {
-    utils::load_library();
-
     let (mut runner, mut signer, contract_address) = initialize();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
 

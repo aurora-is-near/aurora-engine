@@ -269,10 +269,10 @@ impl State {
         let i = usize::try_from(result_idx).expect("index too big");
         let lock = self.inner.borrow();
         let Some(data) = lock.promise_data.get(i) else {
-            return 3;
+            return 0;
         };
         let Some(data) = data else {
-            return 2;
+            return 0;
         };
         self.set_reg(register_id, data.as_slice().into());
         1
@@ -341,8 +341,7 @@ impl State {
 
         self.db
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
-            .is_ok()
-            .into()
+            .map_or(0, |diff| diff.value().is_some() as u64)
     }
 }
 
@@ -370,17 +369,15 @@ mod io {
 
         fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
             let lock = self.inner.borrow();
-            let db_value;
-            let value = if let Some(diff) = lock.transaction_diff.get(key) {
-                diff.value()
-            } else {
-                db_value =
-                    self.db
-                        .read_by_key(key, lock.bound_block_height, lock.bound_tx_position);
-                db_value.as_ref().map_or(None, |diff| diff.value())
-            };
+            if let Some(diff) = lock.transaction_diff.get(key) {
+                return diff.value().map(ToOwned::to_owned).map(Cow::Owned);
+            }
 
-            value.map(ToOwned::to_owned).map(Cow::Owned)
+            self.db
+                .read_by_key(key, lock.bound_block_height, lock.bound_tx_position)
+                .ok()?
+                .take_value()
+                .map(Cow::Owned)
         }
 
         fn storage_has_key(&self, key: &[u8]) -> bool {
