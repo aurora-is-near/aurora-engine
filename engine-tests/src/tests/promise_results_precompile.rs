@@ -50,7 +50,7 @@ fn test_promise_result_gas_cost() {
         Some(aurora_engine::engine::ZERO_ADDRESS_FIX_HEIGHT + 1),
     );
 
-    // Baseline transaction that does essentially nothing.
+    // Baseline transaction that essentially does nothing.
     let (_, baseline) = runner
         .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
             nonce,

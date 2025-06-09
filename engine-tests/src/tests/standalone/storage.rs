@@ -139,8 +139,8 @@ fn test_consume_transaction() {
     let transfer_amount = Wei::new_u64(37);
     let nonce = signer.nonce.into();
     let dest_address = utils::address_from_secret_key(&Signer::random().secret_key);
-
     let mut runner = utils::standalone::StandaloneRunner::default();
+
     runner.init_evm();
     runner.mint_account(address, balance, nonce, None);
 
@@ -343,8 +343,8 @@ fn test_track_key() {
     let transfer_amount = Wei::new_u64(37);
     let dest1 = Address::from_array([0x11; 20]);
     let dest2 = Address::from_array([0x22; 20]);
-
     let mut runner = utils::standalone::StandaloneRunner::default();
+
     runner.init_evm();
     runner.mint_account(signer_address, initial_balance, signer.nonce.into(), None);
     let created_block_height = runner.env.block_height;

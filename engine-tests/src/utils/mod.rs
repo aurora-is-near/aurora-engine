@@ -246,7 +246,10 @@ impl AuroraRunner {
                 &self.promise_results,
                 self.block_random_value,
             )?;
-            self.validate_standalone();
+
+            if let Err(e) = self.validate_standalone() {
+                panic!("wasm and standalone outputs for method: {method_name} mismatch: {e}");
+            }
         }
 
         Ok(outcome)
@@ -315,7 +318,10 @@ impl AuroraRunner {
         if let Some(standalone_runner) = &mut self.standalone_runner {
             standalone_runner.env.block_height = self.context.block_height;
             standalone_runner.mint_account(address, init_balance, init_nonce, code);
-            self.validate_standalone();
+
+            if let Err(e) = self.validate_standalone() {
+                panic!("wasm and standalone outputs for minting account mismatch: {e}");
+            }
         }
 
         self.context.block_height += 1;
@@ -511,7 +517,7 @@ impl AuroraRunner {
         self
     }
 
-    fn validate_standalone(&self) {
+    fn validate_standalone(&self) -> anyhow::Result<()> {
         if let Some(standalone_runner) = &self.standalone_runner {
             let standalone_state = standalone_runner.get_current_state();
             // The number of keys in standalone_state may be larger because values are never deleted
@@ -536,18 +542,20 @@ impl AuroraRunner {
                     .map(|x| hex::encode(x))
                     .collect::<Vec<_>>();
 
-                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
+                anyhow::bail!("standalone state has a lower number of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
             }
 
             for (key, value) in standalone_state {
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
-                assert_eq!(
-                    trie_value, standalone_value,
-                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
+                anyhow::ensure!(
+                    trie_value == standalone_value,
+                    "output mismatch for key: {key:?}\nStandalone:\t{standalone_value:?}\nWasm:\t{trie_value:?}",
                 );
             }
         }
+
+        Ok(())
     }
 
     pub fn get_engine_code() -> Vec<u8> {
@@ -994,13 +1002,15 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
 fn load_library() {
     use std::path::PathBuf;
 
-    let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let bin_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("bin");
     #[cfg(target_os = "linux")]
-    let lib = "libaurora-engine-native.so";
+    let lib_path = bin_path.join("libaurora-engine-native.so");
     #[cfg(target_os = "macos")]
-    let lib = "libaurora-engine-native.dylib";
+    let lib_path = bin_path.join("libaurora-engine-native.dylib");
 
-    engine_standalone_storage::native_ffi::load_once(lib_path.join(lib));
+    assert!(lib_path.exists());
+
+    engine_standalone_storage::native_ffi::load_once(lib_path);
 }

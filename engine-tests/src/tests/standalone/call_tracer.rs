@@ -16,7 +16,6 @@ use engine_standalone_tracing::{
 };
 
 #[test]
-#[ignore]
 fn test_trace_contract_deploy() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
@@ -45,7 +44,6 @@ fn test_trace_contract_deploy() {
 }
 
 #[test]
-#[ignore]
 fn test_trace_precompile_direct_call() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
@@ -110,7 +108,6 @@ fn test_trace_precompile_direct_call() {
 }
 
 #[test]
-#[ignore]
 fn test_trace_contract_single_call() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
@@ -231,7 +228,6 @@ fn test_trace_contract_with_sub_call() {
 }
 
 #[test]
-#[ignore]
 fn test_trace_contract_with_precompile_sub_call() {
     let mut runner = standalone::StandaloneRunner::default();
     let mut signer = Signer::random();
@@ -273,7 +269,6 @@ fn test_trace_contract_with_precompile_sub_call() {
 }
 
 #[test]
-#[ignore]
 fn test_contract_create_too_large() {
     let mut runner = standalone::StandaloneRunner::default();
     let signer = Signer::random();
@@ -312,7 +307,6 @@ fn test_contract_create_too_large() {
 
 #[allow(clippy::too_many_lines)]
 #[test]
-#[ignore]
 fn test_trace_precompiles_with_subcalls() {
     // The XCC precompile does internal sub-calls. We will trace an XCC call.
 
