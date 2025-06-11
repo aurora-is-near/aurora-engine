@@ -75,6 +75,7 @@ impl State {
 
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
+        self.store_diff();
         self.inner.borrow_mut().transaction_diff.clone()
     }
 
@@ -128,6 +129,41 @@ impl State {
             hex::encode(&lock.input),
         ));
         self.dbg(format_args!("env: {:?}\n", lock.env));
+        lock.input = input;
+    }
+
+    fn store_diff(&self) {
+        use std::{fs::File, io::Write};
+
+        let mut dst = File::options()
+            .append(true)
+            .create(true)
+            .open("../target/dbg")
+            .unwrap();
+        let lock = self.inner.borrow();
+        write!(&mut dst, "diff: {:?}\n", lock.transaction_diff).unwrap()
+    }
+
+    pub fn store_dbg_info(&self, call: TransactionKindTag) {
+        use std::{fs::File, io::Write};
+
+        let mut dst = File::options()
+            .append(true)
+            .create(true)
+            .open("../target/dbg")
+            .unwrap();
+        let lock = self.inner.borrow();
+        write!(
+            &mut dst,
+            "block: {}.{}\n{:?}\n{}\n{call:?} with input: {}\n",
+            lock.bound_block_height,
+            lock.bound_tx_position,
+            lock.env,
+            lock.promise_data.len(),
+            hex::encode(&lock.input),
+        )
+        .unwrap();
+        dst.flush().unwrap();
     }
 
     #[allow(clippy::significant_drop_tightening)]
