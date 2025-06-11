@@ -428,6 +428,7 @@ where
         // We can ignore promises in the standalone engine because it processes each receipt
         // separately, and it is fed a stream of receipts (it does not schedule them)
         state.set_promise_handler(transaction_message.promise_data.clone().into_boxed_slice());
+        state.store_dbg_info((&transaction_message.transaction).into());
     });
 
     let contract_lock = native_ffi::lock();

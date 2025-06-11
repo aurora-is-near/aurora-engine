@@ -332,7 +332,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(engine_prefix.as_slice()) {
+            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
@@ -402,26 +402,20 @@ impl Storage {
     where
         F: FnOnce(&state::State) -> R,
     {
-        state::STATE.set(state::State::new(Self {
-            db: self.db.clone(),
-        }));
-
-        let (result, engine_output, diff) = state::STATE.with_borrow(|state| {
-            state.init(block_height, transaction_position);
-            state.set_input(input.to_vec());
+        state::STATE.with_borrow(|state| {
+            state.init(block_height, transaction_position, input.to_vec());
 
             let result = f(state);
             let diff = state.get_transaction_diff();
+            state.store_dbg_diff();
             let engine_output = state.take_output();
 
-            (result, engine_output, diff)
-        });
-
-        EngineAccessResult {
-            result,
-            engine_output,
-            diff,
-        }
+            EngineAccessResult {
+                result,
+                engine_output,
+                diff,
+            }
+        })
     }
 
     /// Retrieve data for a key with `CustomData` prefix. A helper method which allows getting

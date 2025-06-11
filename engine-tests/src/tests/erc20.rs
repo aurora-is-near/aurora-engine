@@ -394,7 +394,7 @@ fn parse_erc20_error_message(result: &[u8]) -> &str {
 fn initialize_erc20() -> (utils::AuroraRunner, Signer, Address, ERC20) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
+    let mut rng = <rand::rngs::StdRng as rand::SeedableRng>::from_seed([0x12; 32]);
     let source_account = SecretKey::random(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(

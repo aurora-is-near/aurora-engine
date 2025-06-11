@@ -5,7 +5,7 @@ use sha2::digest::{FixedOutput, Update};
 use std::cell::RefCell;
 use std::{borrow::Cow, iter, slice};
 
-use super::{Diff, Storage};
+use super::{sync::types::TransactionKindTag, Diff, Storage};
 
 /// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
 /// address for the mainnet only, since for the testnet it's not so critical.
@@ -74,10 +74,6 @@ impl State {
         self.inner.borrow_mut().promise_data = promise_data;
     }
 
-    pub fn set_input(&self, input: Vec<u8>) {
-        self.inner.borrow_mut().input = input;
-    }
-
     #[must_use]
     pub fn take_output(&self) -> Vec<u8> {
         self.inner.borrow_mut().output.clone()
@@ -88,12 +84,53 @@ impl State {
         self.inner.borrow_mut().transaction_diff.clone()
     }
 
-    pub fn init(&self, block_height: u64, transaction_position: u16) {
+    pub fn init(&self, block_height: u64, transaction_position: u16, input: Vec<u8>) {
         let mut lock = self.inner.borrow_mut();
         lock.bound_block_height = block_height;
         lock.bound_tx_position = transaction_position;
         lock.output.clear();
         lock.transaction_diff.clear();
+        lock.input = input;
+    }
+
+    pub fn store_dbg_diff(&self) {
+        use std::{fs::File, io::Write};
+
+        let mut dst = File::options()
+            .append(true)
+            .create(true)
+            .open("../target/dbg_branch.txt")
+            .unwrap();
+        let lock = self.inner.borrow();
+        write!(
+            &mut dst,
+            "diff: {:?}\noutput: {}\n",
+            lock.transaction_diff,
+            hex::encode(&lock.output)
+        )
+        .unwrap()
+    }
+
+    pub fn store_dbg_info(&self, call: TransactionKindTag) {
+        use std::{fs::File, io::Write};
+
+        let mut dst = File::options()
+            .append(true)
+            .create(true)
+            .open("../target/dbg_branch.txt")
+            .unwrap();
+        let lock = self.inner.borrow();
+        write!(
+            &mut dst,
+            "block: {}.{}\n{:?}\n{}\n{call:?} with input: {}\n",
+            lock.bound_block_height,
+            lock.bound_tx_position,
+            lock.env,
+            lock.promise_data.len(),
+            hex::encode(&lock.input),
+        )
+        .unwrap();
+        dst.flush().unwrap();
     }
 
     #[allow(clippy::significant_drop_tightening)]
