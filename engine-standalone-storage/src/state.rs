@@ -116,6 +116,7 @@ impl State {
         self.dbg(format_args!("output: {}\n", hex::encode(&lock.output)));
     }
 
+    #[cfg(not(feature = "integration-test"))]
     pub fn store_dbg_info(&self, call: TransactionKindTag) {
         let lock = self.inner.borrow();
         self.dbg(format_args!(
@@ -129,7 +130,6 @@ impl State {
             hex::encode(&lock.input),
         ));
         self.dbg(format_args!("env: {:?}\n", lock.env));
-        lock.input = input;
     }
 
     fn store_diff(&self) {
@@ -144,6 +144,7 @@ impl State {
         write!(&mut dst, "diff: {:?}\n", lock.transaction_diff).unwrap()
     }
 
+    #[cfg(feature = "integration-test")]
     pub fn store_dbg_info(&self, call: TransactionKindTag) {
         use std::{fs::File, io::Write};
 
@@ -721,7 +722,7 @@ pub const extern "C" fn promise_batch_then(
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_batch_action_create_account(promise_index: u64) {
     let _ = promise_index;
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -732,7 +733,7 @@ pub extern "C" fn promise_batch_action_deploy_contract(
 ) {
     let _ = promise_index;
     let _ = (code_len, code_ptr);
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -749,14 +750,14 @@ pub extern "C" fn promise_batch_action_function_call(
     let _ = (method_name_len, method_name_ptr);
     let _ = (arguments_len, arguments_ptr);
     let _ = (amount_ptr, gas);
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
     let _ = promise_index;
     let _ = amount_ptr;
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -769,7 +770,7 @@ pub extern "C" fn promise_batch_action_stake(
     let _ = promise_index;
     let _ = amount_ptr;
     let _ = (public_key_len, public_key_ptr);
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -782,7 +783,7 @@ pub extern "C" fn promise_batch_action_add_key_with_full_access(
     let _ = promise_index;
     let _ = (public_key_len, public_key_ptr);
     let _ = nonce;
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -803,7 +804,7 @@ pub extern "C" fn promise_batch_action_add_key_with_function_call(
     let _ = allowance_ptr;
     let _ = (receiver_id_len, receiver_id_ptr);
     let _ = (method_names_len, method_names_ptr);
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -814,7 +815,7 @@ pub extern "C" fn promise_batch_action_delete_key(
 ) {
     let _ = promise_index;
     let _ = (public_key_len, public_key_ptr);
-    unimplemented!()
+    // unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -825,7 +826,7 @@ pub extern "C" fn promise_batch_action_delete_account(
 ) {
     let _ = promise_index;
     let _ = (beneficiary_id_len, beneficiary_id_ptr);
-    unimplemented!()
+    // unimplemented!()
 }
 
 // #######################
@@ -845,7 +846,7 @@ extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_return(promise_id: u64) {
     let _ = promise_id;
-    unimplemented!()
+    // unimplemented!()
 }
 
 // ###############

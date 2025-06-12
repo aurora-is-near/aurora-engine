@@ -367,6 +367,8 @@ args = [
 
 [tasks.bench-modexp-test]
 category = "Test"
+dependencies = ["set-env-linux", "set-env-macos", "copy-dynamic-lib"]
+env = { "RUSTFLAGS" = "${RUSTC_FLAGS_EXPORT_DYNAMIC} ${RUSTC_FLAGS_ALLOW_UNDEFINED}" }
 command = "${CARGO}"
 args = [
     "test",
