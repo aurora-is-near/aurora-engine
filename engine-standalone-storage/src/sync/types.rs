@@ -1,5 +1,6 @@
 use crate::Storage;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
+use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::FtTransferMessageData;
@@ -291,8 +292,8 @@ impl TransactionKind {
                         storage,
                     );
                     let to = storage
-                        .with_engine_access(block_height, transaction_position, &[], |io| {
-                            aurora_engine::engine::get_erc20_from_nep141(&io, caller)
+                        .with_engine_access(block_height, transaction_position, &[], |_| {
+                            aurora_engine::engine::get_erc20_from_nep141(&Runtime, caller)
                         })
                         .result
                         .unwrap_or_default();
@@ -390,8 +391,8 @@ impl TransactionKind {
                 ))
                 .unwrap_or_else(|_| engine_account.clone());
                 let wnear_address = storage
-                    .with_engine_access(block_height, transaction_position, &[], |io| {
-                        aurora_engine_precompiles::xcc::state::get_wnear_address(&io)
+                    .with_engine_access(block_height, transaction_position, &[], |_| {
+                        aurora_engine_precompiles::xcc::state::get_wnear_address(&Runtime)
                     })
                     .result;
                 let call_args = aurora_engine::xcc::withdraw_wnear_call_args(
@@ -497,8 +498,8 @@ impl TransactionKind {
         storage: &Storage,
     ) -> U256 {
         storage
-            .with_engine_access(block_height, transaction_position, &[], |io| {
-                aurora_engine::engine::get_nonce(&io, from)
+            .with_engine_access(block_height, transaction_position, &[], |_| {
+                aurora_engine::engine::get_nonce(&Runtime, from)
             })
             .result
     }

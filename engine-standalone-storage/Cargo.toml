@@ -26,6 +26,13 @@ postgres.workspace = true
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
 strum.workspace = true
+sha2.workspace = true
+sha3.workspace = true
+ripemd.workspace = true
+libsecp256k1.workspace = true
+libloading.workspace = true
+thiserror.workspace = true
+parking_lot.workspace = true
 
 [lints]
 workspace = true
@@ -37,3 +44,4 @@ lz4 = ["rocksdb/lz4"]
 zstd = ["rocksdb/zstd"]
 zlib = ["rocksdb/zlib"]
 bzip2 = ["rocksdb/bzip2"]
+integration-test = []

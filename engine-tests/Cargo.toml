@@ -29,7 +29,7 @@ borsh.workspace = true
 bstr.workspace = true
 cargo-near-build = { workspace = true, features = ["build_internal"] }
 criterion.workspace = true
-engine-standalone-storage.workspace = true
+engine-standalone-storage = { workspace = true, features = ["integration-test"] }
 engine-standalone-tracing.workspace = true
 ethabi = { workspace = true, features = ["full-serde"] }
 aurora-evm = { workspace = true, features = ["std", "tracing"] }
@@ -50,6 +50,7 @@ sha3.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 walrus.workspace = true
+ctor.workspace = true
 
 [lints]
 workspace = true
