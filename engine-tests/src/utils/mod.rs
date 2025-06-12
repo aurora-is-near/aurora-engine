@@ -539,7 +539,7 @@ impl AuroraRunner {
                     .collect::<std::collections::HashSet<_>>();
                 let diff = fake_keys
                     .difference(&standalone_keys)
-                    .map(|x| hex::encode(x))
+                    .map(hex::encode)
                     .collect::<Vec<_>>();
 
                 anyhow::bail!("standalone state has a lower number of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
@@ -550,7 +550,7 @@ impl AuroraRunner {
                 let standalone_value = value.value();
                 anyhow::ensure!(
                     trie_value == standalone_value,
-                    "output mismatch for key: {key:?}\nStandalone:\t{standalone_value:?}\nWasm:\t{trie_value:?}",
+                    "output mismatch for key: {key:?}\nStandalone:\t{standalone_value:?}\nWasm:\t\t{trie_value:?}",
                 );
             }
         }

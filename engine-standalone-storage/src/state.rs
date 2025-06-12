@@ -440,7 +440,7 @@ impl State {
 
         self.db
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
-            .map_or(0, |diff| diff.value().is_some() as u64)
+            .map_or(0, |diff| u64::from(diff.value().is_some()))
     }
 }
 
