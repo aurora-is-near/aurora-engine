@@ -407,8 +407,9 @@ impl Storage {
 
             let result = f(state);
             let diff = state.get_transaction_diff();
-            state.store_dbg_diff();
             let engine_output = state.take_output();
+            state.store_dbg_diff();
+            state.reset();
 
             EngineAccessResult {
                 result,

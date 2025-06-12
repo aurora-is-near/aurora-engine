@@ -1,5 +1,6 @@
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
+use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
@@ -125,8 +126,8 @@ fn test_consume_deploy_erc20_message() {
 
     let erc20_address = runner
         .storage
-        .with_engine_access(runner.env.block_height + 1, 0, &[], |io| {
-            aurora_engine::engine::get_erc20_from_nep141(&io, &token)
+        .with_engine_access(runner.env.block_height + 1, 0, &[], |_| {
+            aurora_engine::engine::get_erc20_from_nep141(&Runtime, &token)
         })
         .result
         .unwrap();

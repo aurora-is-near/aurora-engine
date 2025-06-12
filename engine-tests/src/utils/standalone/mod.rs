@@ -2,6 +2,7 @@ use aurora_engine::engine;
 use aurora_engine::parameters::{SubmitResult, TransactionStatus};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
+use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
@@ -44,9 +45,9 @@ impl StandaloneRunner {
         env.block_height += 1;
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
-        let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
-            mocks::init_evm(io, env, chain_id);
-            mocks::init_connector(io);
+        let result = storage.with_engine_access(env.block_height, 0, &[], |_| {
+            mocks::init_evm(Runtime, env, chain_id);
+            mocks::init_connector(Runtime);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -80,8 +81,8 @@ impl StandaloneRunner {
         env.block_height += 1;
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
 
-        let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
-            mocks::mint_evm_account(address, balance, nonce, code, io, env);
+        let result = storage.with_engine_access(env.block_height, 0, &[], |_| {
+            mocks::mint_evm_account(address, balance, nonce, code, Runtime, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -275,24 +276,24 @@ impl StandaloneRunner {
 
     pub fn get_balance(&self, address: &Address) -> Wei {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
-                engine::get_balance(&io, address)
+            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+                engine::get_balance(&Runtime, address)
             })
             .result
     }
 
     pub fn get_nonce(&self, address: &Address) -> U256 {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
-                engine::get_nonce(&io, address)
+            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+                engine::get_nonce(&Runtime, address)
             })
             .result
     }
 
     pub fn get_code(&self, address: &Address) -> Vec<u8> {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |io| {
-                engine::get_code(&io, address)
+            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+                engine::get_code(&Runtime, address)
             })
             .result
     }

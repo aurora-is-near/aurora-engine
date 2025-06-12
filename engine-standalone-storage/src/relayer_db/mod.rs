@@ -1,6 +1,7 @@
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::{engine, state};
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NearGas;
@@ -108,9 +109,9 @@ where
             tx_data: transaction_bytes.clone(),
             ..Default::default()
         };
-        let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
+        let result = storage.with_engine_access(block_height, transaction_position, &[], |_| {
             engine::submit(
-                io,
+                Runtime,
                 &env,
                 &args,
                 engine_state.clone(),
@@ -206,6 +207,7 @@ mod test {
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
     use aurora_engine::state;
+    use aurora_engine_sdk::near_runtime::Runtime;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -238,9 +240,8 @@ mod test {
             storage
                 .set_block_data(block_hash, block_height, &block_metadata)
                 .unwrap();
-            let result = storage.with_engine_access(block_height, 0, &[], |io| {
-                let mut local_io = io;
-                state::set_state(&mut local_io, &engine_state)
+            let result = storage.with_engine_access(block_height, 0, &[], |_| {
+                state::set_state(&mut Runtime, &engine_state)
             });
 
             result.result.ok().unwrap();

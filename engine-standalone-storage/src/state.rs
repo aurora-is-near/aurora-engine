@@ -7,12 +7,6 @@ use std::{borrow::Cow, iter, slice};
 
 use super::{sync::types::TransactionKindTag, Diff, Storage};
 
-/// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
-/// address for the mainnet only, since for the testnet it's not so critical.
-const CUSTODIAN_ADDRESS: &[u8] = &[
-    107, 250, 212, 44, 252, 78, 252, 150, 245, 41, 215, 134, 214, 67, 255, 74, 139, 137, 250, 82,
-];
-
 thread_local! {
     pub static STATE: RefCell<State> = panic!("State is not initialized");
 }
@@ -88,49 +82,52 @@ impl State {
         let mut lock = self.inner.borrow_mut();
         lock.bound_block_height = block_height;
         lock.bound_tx_position = transaction_position;
-        lock.output.clear();
-        lock.transaction_diff.clear();
         lock.input = input;
     }
 
-    pub fn store_dbg_diff(&self) {
+    pub fn reset(&self) {
+        *self.inner.borrow_mut() = StateInner::default();
+        *self.registers.borrow_mut() = iter::repeat_with(Register::default)
+            .take(REGISTERS_NUMBER)
+            .collect();
+    }
+
+    #[cfg(not(feature = "integration-test"))]
+    fn dbg(&self, _args: std::fmt::Arguments) {}
+
+    #[cfg(feature = "integration-test")]
+    fn dbg(&self, args: std::fmt::Arguments) {
         use std::{fs::File, io::Write};
 
         let mut dst = File::options()
             .append(true)
             .create(true)
-            .open("../target/dbg_branch.txt")
+            .open("../target/dbg.txt")
             .unwrap();
+        dst.write_fmt(format_args!("{:?}: {args}", self as *const Self))
+            .unwrap();
+        dst.flush().unwrap();
+    }
+
+    pub fn store_dbg_diff(&self) {
         let lock = self.inner.borrow();
-        write!(
-            &mut dst,
-            "diff: {:?}\noutput: {}\n",
-            lock.transaction_diff,
-            hex::encode(&lock.output)
-        )
-        .unwrap()
+        self.dbg(format_args!("diff: {:?}\n", lock.transaction_diff));
+        self.dbg(format_args!("output: {}\n", hex::encode(&lock.output)));
     }
 
     pub fn store_dbg_info(&self, call: TransactionKindTag) {
-        use std::{fs::File, io::Write};
-
-        let mut dst = File::options()
-            .append(true)
-            .create(true)
-            .open("../target/dbg_branch.txt")
-            .unwrap();
         let lock = self.inner.borrow();
-        write!(
-            &mut dst,
-            "block: {}.{}\n{:?}\n{}\n{call:?} with input: {}\n",
+        self.dbg(format_args!(
+            "block {}.{}, promise {}\n",
             lock.bound_block_height,
             lock.bound_tx_position,
-            lock.env,
             lock.promise_data.len(),
+        ));
+        self.dbg(format_args!(
+            "{call:?} with input \"{}\"\n",
             hex::encode(&lock.input),
-        )
-        .unwrap();
-        dst.flush().unwrap();
+        ));
+        self.dbg(format_args!("env: {:?}\n", lock.env));
     }
 
     #[allow(clippy::significant_drop_tightening)]
@@ -143,11 +140,29 @@ impl State {
         let reg = registers
             .get(index)
             .unwrap_or_else(|| panic!("no such register {register_id}"));
+        self.dbg(format_args!(
+            "register {register_id} -> {}\n",
+            reg.0
+                .as_ref()
+                .map_or("deadbeef".to_string(), |x| hex::encode(x))
+        ));
         op(reg)
+    }
+
+    fn clear_reg(&self, register_id: u64) {
+        let index = usize::try_from(register_id).expect("pointer size must be wide enough");
+        self.dbg(format_args!("register {index} <- clear\n"));
+
+        let mut registers = self.registers.borrow_mut();
+        *registers
+            .get_mut(index)
+            .unwrap_or_else(|| panic!("no such register {register_id}")) = Register(None);
     }
 
     fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
         let index = usize::try_from(register_id).expect("pointer size must be wide enough");
+        self.dbg(format_args!("register {index} <- {}\n", hex::encode(&data)));
+
         let mut registers = self.registers.borrow_mut();
         *registers
             .get_mut(index)
@@ -323,11 +338,18 @@ impl State {
         value_ptr: u64,
         register_id: u64,
     ) -> u64 {
+        // preserve the register value
+        let value = self.get_data(value_ptr, value_len);
+
         // fetch original value into register
         self.storage_read(key_len, key_ptr, register_id);
 
         let key = self.get_data(key_ptr, key_len);
-        let value = self.get_data(value_ptr, value_len);
+        self.dbg(format_args!(
+            "diff write {register_id} {} <- {}\n",
+            hex::encode(&key),
+            hex::encode(&value)
+        ));
 
         self.inner
             .borrow_mut()
@@ -342,6 +364,8 @@ impl State {
         if let Some(diff) = lock.transaction_diff.get(&key) {
             if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
+            } else {
+                self.clear_reg(register_id);
             }
             return 1;
         }
@@ -352,6 +376,8 @@ impl State {
         value.as_ref().map_or(0, |diff| {
             if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
+            } else {
+                self.clear_reg(register_id);
             }
             1
         })
@@ -379,73 +405,6 @@ impl State {
         self.db
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
             .map_or(0, |diff| diff.value().is_some() as u64)
-    }
-}
-
-mod io {
-    use std::borrow::Cow;
-
-    use crate::state::CUSTODIAN_ADDRESS;
-    use aurora_engine_sdk::io::IO;
-
-    impl<'a> IO for &'a super::State {
-        type StorageValue = Cow<'a, [u8]>;
-
-        fn read_input(&self) -> Self::StorageValue {
-            Cow::Owned(self.inner.borrow().input.clone())
-        }
-
-        fn return_output(&mut self, value: &[u8]) {
-            assert!(
-                !(value.len() >= 56 && &value[36..56] == CUSTODIAN_ADDRESS),
-                "ERR_ILLEGAL_RETURN"
-            );
-            let len = u64::try_from(value.len()).expect("pointer size must fit in 64");
-            super::value_return(len, value.as_ptr() as u64);
-        }
-
-        fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
-            let lock = self.inner.borrow();
-            if let Some(diff) = lock.transaction_diff.get(key) {
-                return diff.value().map(ToOwned::to_owned).map(Cow::Owned);
-            }
-
-            self.db
-                .read_by_key(key, lock.bound_block_height, lock.bound_tx_position)
-                .ok()?
-                .take_value()
-                .map(Cow::Owned)
-        }
-
-        fn storage_has_key(&self, key: &[u8]) -> bool {
-            super::storage_has_key(key.len() as _, key.as_ptr() as _) == 1
-        }
-
-        fn write_storage(&mut self, key: &[u8], value: &[u8]) -> Option<Self::StorageValue> {
-            let old = self.read_storage(key);
-            self.inner
-                .borrow_mut()
-                .transaction_diff
-                .modify(key.to_vec(), value.to_vec());
-            old
-        }
-
-        fn write_storage_direct(
-            &mut self,
-            key: &[u8],
-            value: Self::StorageValue,
-        ) -> Option<Self::StorageValue> {
-            self.write_storage(key, value.as_ref())
-        }
-
-        fn remove_storage(&mut self, key: &[u8]) -> Option<Self::StorageValue> {
-            let v = self.read_storage(key);
-            self.inner
-                .borrow_mut()
-                .transaction_diff
-                .delete(key.to_vec());
-            v
-        }
     }
 }
 

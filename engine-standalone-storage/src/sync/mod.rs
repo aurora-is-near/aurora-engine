@@ -8,6 +8,7 @@ use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
     env::{self, DEFAULT_PREPAID_GAS},
     io::IO,
+    near_runtime::Runtime,
 };
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::parameters::{connector, engine, PromiseOrValue};
@@ -327,14 +328,14 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                     block_height,
                     transaction_position,
                     &transaction_message.raw_input,
-                    |io| {
+                    |_| {
                         execute_transaction::<_, M, _>(
                             transaction_message.as_ref(),
                             block_height,
                             &block_metadata,
                             engine_account_id,
-                            io,
-                            |s| s.get_transaction_diff(),
+                            Runtime,
+                            |_| state::STATE.with_borrow(state::State::get_transaction_diff),
                         )
                     },
                 )
@@ -365,14 +366,14 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
         block_height,
         transaction_position,
         &transaction_message.raw_input,
-        |io| {
+        |_| {
             execute_transaction::<_, M, _>(
                 &transaction_message,
                 block_height,
                 &block_metadata,
                 engine_account_id,
-                io,
-                |s| s.get_transaction_diff(),
+                Runtime,
+                |_| state::STATE.with_borrow(state::State::get_transaction_diff),
             )
         },
     );
