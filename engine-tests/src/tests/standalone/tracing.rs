@@ -2,6 +2,7 @@
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
+use engine_standalone_storage::native_ffi;
 use engine_standalone_tracing::{sputnik, types::TransactionTrace};
 use serde::Deserialize;
 use std::path::Path;
@@ -93,7 +94,10 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
+    let lock = native_ffi::lock();
+    let native_fn = lock.traced_call_with_transaction_trace_builder();
+    drop(lock);
+    let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
     });
     assert!(result.status.is_ok());
@@ -116,7 +120,10 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
+    let lock = native_ffi::lock();
+    let native_fn = lock.traced_call_with_transaction_trace_builder();
+    drop(lock);
+    let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
     });
     assert!(result.status.is_ok());
@@ -164,7 +171,10 @@ fn test_evm_tracing() {
         data: hex::decode(CONTRACT_INPUT).unwrap(),
     };
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
+    let lock = native_ffi::lock();
+    let native_fn = lock.traced_call_with_transaction_trace_builder();
+    drop(lock);
+    let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_transaction(&signer.secret_key, tx).unwrap()
     });
     assert!(result.status.is_ok());

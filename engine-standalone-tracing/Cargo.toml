@@ -18,6 +18,7 @@ aurora-engine-types = { workspace = true, features = ["std"] }
 aurora-evm = { workspace = true, features = ["std", "tracing"] }
 hex = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["std"], optional = true }
+libloading.workspace = true
 
 [lints]
 workspace = true

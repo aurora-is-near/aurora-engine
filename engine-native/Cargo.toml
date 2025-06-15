@@ -17,6 +17,7 @@ crate-type = ["cdylib"]
 aurora-engine = { workspace = true, features = ["std", "tracing"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-types.workspace = true
+engine-standalone-tracing.workspace = true
 
 [lints]
 workspace = true

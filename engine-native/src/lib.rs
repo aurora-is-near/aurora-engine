@@ -19,6 +19,18 @@ use aurora_engine_types::{
     H256,
 };
 
+#[no_mangle]
+pub extern "C" fn _native_traced_call_with_transaction_trace_builder(
+    listener: *mut ffi::c_void,
+    closure: *mut ffi::c_void,
+    callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
+) -> *mut ffi::c_void {
+    use engine_standalone_tracing::sputnik;
+
+    let listener = unsafe { &mut *listener.cast::<sputnik::TransactionTraceBuilder>() };
+    sputnik::traced_call(listener, || callback(closure))
+}
+
 /// ADMINISTRATIVE METHODS
 /// Sets the configuration for the Engine.
 /// Should be called on deployment.

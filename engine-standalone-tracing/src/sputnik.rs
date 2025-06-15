@@ -1,8 +1,9 @@
 use aurora_engine_types::types::EthGas;
 use aurora_evm::{Capture, Opcode};
-use std::cell::RefCell;
+use libloading::os::unix::Symbol;
 use std::ptr::NonNull;
 use std::rc::Rc;
+use std::{cell::RefCell, ffi};
 
 use crate::types::{
     LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace,
@@ -26,6 +27,35 @@ where
             aurora_evm::tracing::using(&mut evm_listener, f)
         })
     })
+}
+
+type TracedCallNativeFn = extern "C" fn(
+    listener: *mut ffi::c_void,
+    closure: *mut ffi::c_void,
+    callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
+) -> *mut ffi::c_void;
+
+pub fn traced_call_lib<T, R, F>(listener: &mut T, native_fn: Symbol<TracedCallNativeFn>, f: F) -> R
+where
+    T: aurora_evm::gasometer::tracing::EventListener
+        + aurora_evm::runtime::tracing::EventListener
+        + aurora_evm::tracing::EventListener
+        + 'static,
+    F: FnOnce() -> R,
+{
+    extern "C" fn trampoline<R>(ctx: *mut ffi::c_void) -> *mut ffi::c_void {
+        Box::into_raw(Box::new((unsafe {
+            Box::<Box<dyn FnOnce() -> R>>::from_raw(ctx.cast())
+        })()))
+        .cast()
+    }
+
+    let closure: Box<Box<dyn FnOnce() -> R>> = Box::new(Box::new(f));
+    let ctx_ptr = Box::into_raw(closure) as *mut ffi::c_void;
+
+    *unsafe {
+        Box::from_raw(native_fn((listener as *mut T).cast(), ctx_ptr, trampoline::<R>).cast())
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

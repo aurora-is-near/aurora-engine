@@ -8,7 +8,7 @@ use aurora_engine_types::{
     parameters::silo::{SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs},
     types::{Address, EthGas},
 };
-use libloading::os::unix::{self, Library};
+use libloading::os::unix::{self, Library, Symbol};
 use parking_lot::{Mutex, MutexGuard};
 use thiserror::Error;
 
@@ -80,7 +80,22 @@ where
     Ok(())
 }
 
+type TracedCallNativeFn = extern "C" fn(
+    *mut ffi::c_void,
+    *mut ffi::c_void,
+    extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
+) -> *mut ffi::c_void;
+
 impl DynamicContractImpl {
+    pub fn traced_call_with_transaction_trace_builder(&self) -> Symbol<TracedCallNativeFn> {
+        let name = "_native_traced_call_with_transaction_trace_builder";
+        unsafe {
+            self.library
+                .get::<TracedCallNativeFn>(name.as_bytes())
+                .unwrap_or_else(|_| panic!("symbol {name} not found"))
+        }
+    }
+
     fn e<T>(&self, name: &str) -> Result<T, ContractError> {
         *unsafe {
             Box::from_raw(
