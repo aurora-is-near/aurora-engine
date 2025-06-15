@@ -14,7 +14,7 @@ thread_local! {
 pub struct State {
     inner: RefCell<StateInner>,
     registers: RefCell<Vec<Register>>,
-    db: Storage,
+    db: RefCell<Storage>,
 }
 
 #[derive(Default)]
@@ -56,7 +56,7 @@ impl State {
                     .take(REGISTERS_NUMBER)
                     .collect(),
             ),
-            db: storage,
+            db: RefCell::new(storage),
         }
     }
 
@@ -75,11 +75,17 @@ impl State {
 
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
-        self.store_diff();
         self.inner.borrow_mut().transaction_diff.clone()
     }
 
-    pub fn init(&self, block_height: u64, transaction_position: u16, input: Vec<u8>) {
+    pub fn init(
+        &self,
+        storage: Storage,
+        block_height: u64,
+        transaction_position: u16,
+        input: Vec<u8>,
+    ) {
+        *self.db.borrow_mut() = storage;
         let mut lock = self.inner.borrow_mut();
         lock.bound_block_height = block_height;
         lock.bound_tx_position = transaction_position;
@@ -129,41 +135,6 @@ impl State {
             hex::encode(&lock.input),
         ));
         self.dbg(format_args!("env: {:?}\n", lock.env));
-        lock.input = input;
-    }
-
-    fn store_diff(&self) {
-        use std::{fs::File, io::Write};
-
-        let mut dst = File::options()
-            .append(true)
-            .create(true)
-            .open("../target/dbg")
-            .unwrap();
-        let lock = self.inner.borrow();
-        write!(&mut dst, "diff: {:?}\n", lock.transaction_diff).unwrap()
-    }
-
-    pub fn store_dbg_info(&self, call: TransactionKindTag) {
-        use std::{fs::File, io::Write};
-
-        let mut dst = File::options()
-            .append(true)
-            .create(true)
-            .open("../target/dbg")
-            .unwrap();
-        let lock = self.inner.borrow();
-        write!(
-            &mut dst,
-            "block: {}.{}\n{:?}\n{}\n{call:?} with input: {}\n",
-            lock.bound_block_height,
-            lock.bound_tx_position,
-            lock.env,
-            lock.promise_data.len(),
-            hex::encode(&lock.input),
-        )
-        .unwrap();
-        dst.flush().unwrap();
     }
 
     #[allow(clippy::significant_drop_tightening)]
@@ -183,16 +154,6 @@ impl State {
                 .map_or("deadbeef".to_string(), |x| hex::encode(x))
         ));
         op(reg)
-    }
-
-    fn clear_reg(&self, register_id: u64) {
-        let index = usize::try_from(register_id).expect("pointer size must be wide enough");
-        self.dbg(format_args!("register {index} <- clear\n"));
-
-        let mut registers = self.registers.borrow_mut();
-        *registers
-            .get_mut(index)
-            .unwrap_or_else(|| panic!("no such register {register_id}")) = Register(None);
     }
 
     fn set_reg(&self, register_id: u64, data: Cow<[u8]>) {
@@ -378,7 +339,7 @@ impl State {
         let value = self.get_data(value_ptr, value_len);
 
         // fetch original value into register
-        self.storage_read(key_len, key_ptr, register_id);
+        let res = self.storage_read(key_len, key_ptr, register_id);
 
         let key = self.get_data(key_ptr, key_len);
         self.dbg(format_args!(
@@ -391,44 +352,62 @@ impl State {
             .borrow_mut()
             .transaction_diff
             .modify(key.to_vec(), value.to_vec());
-        1
+        res
     }
 
     fn storage_read(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
+        self.dbg(format_args!(
+            "try to read {register_id} {}\n",
+            hex::encode(&key),
+        ));
+
         let lock = self.inner.borrow();
         if let Some(diff) = lock.transaction_diff.get(&key) {
-            if let Some(bytes) = diff.value() {
+            return if let Some(bytes) = diff.value() {
                 self.set_reg(register_id, bytes.into());
+                self.dbg(format_args!(
+                    "diff read {register_id} {} <- {}\n",
+                    hex::encode(&key),
+                    hex::encode(&bytes),
+                ));
+                1
             } else {
-                self.clear_reg(register_id);
-            }
-            return 1;
+                0
+            };
         }
 
-        let value = self
-            .db
-            .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position);
-        value.as_ref().map_or(0, |diff| {
-            if let Some(bytes) = diff.value() {
+        if let Ok(value) =
+            self.db
+                .borrow()
+                .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
+        {
+            return if let Some(bytes) = value.value() {
                 self.set_reg(register_id, bytes.into());
+                self.dbg(format_args!(
+                    "db read {register_id} {} <- {}\n",
+                    hex::encode(&key),
+                    hex::encode(&bytes),
+                ));
+                1
             } else {
-                self.clear_reg(register_id);
-            }
-            1
-        })
+                0
+            };
+        }
+
+        0
     }
 
     fn storage_remove(&self, key_len: u64, key_ptr: u64, register_id: u64) -> u64 {
         // fetch original value into register
-        self.storage_read(key_len, key_ptr, register_id);
+        let res = self.storage_read(key_len, key_ptr, register_id);
 
         let key = self.get_data(key_ptr, key_len);
         self.inner
             .borrow_mut()
             .transaction_diff
             .delete(key.into_owned());
-        1
+        res
     }
 
     fn storage_has_key(&self, key_len: u64, key_ptr: u64) -> u64 {
@@ -439,6 +418,7 @@ impl State {
         }
 
         self.db
+            .borrow()
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
             .map_or(0, |diff| diff.value().is_some() as u64)
     }
@@ -721,7 +701,6 @@ pub const extern "C" fn promise_batch_then(
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_batch_action_create_account(promise_index: u64) {
     let _ = promise_index;
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -732,7 +711,6 @@ pub extern "C" fn promise_batch_action_deploy_contract(
 ) {
     let _ = promise_index;
     let _ = (code_len, code_ptr);
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -749,14 +727,12 @@ pub extern "C" fn promise_batch_action_function_call(
     let _ = (method_name_len, method_name_ptr);
     let _ = (arguments_len, arguments_ptr);
     let _ = (amount_ptr, gas);
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
     let _ = promise_index;
     let _ = amount_ptr;
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -769,7 +745,6 @@ pub extern "C" fn promise_batch_action_stake(
     let _ = promise_index;
     let _ = amount_ptr;
     let _ = (public_key_len, public_key_ptr);
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -782,7 +757,6 @@ pub extern "C" fn promise_batch_action_add_key_with_full_access(
     let _ = promise_index;
     let _ = (public_key_len, public_key_ptr);
     let _ = nonce;
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -803,7 +777,6 @@ pub extern "C" fn promise_batch_action_add_key_with_function_call(
     let _ = allowance_ptr;
     let _ = (receiver_id_len, receiver_id_ptr);
     let _ = (method_names_len, method_names_ptr);
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -814,7 +787,6 @@ pub extern "C" fn promise_batch_action_delete_key(
 ) {
     let _ = promise_index;
     let _ = (public_key_len, public_key_ptr);
-    unimplemented!()
 }
 
 #[unsafe(no_mangle)]
@@ -825,7 +797,6 @@ pub extern "C" fn promise_batch_action_delete_account(
 ) {
     let _ = promise_index;
     let _ = (beneficiary_id_len, beneficiary_id_ptr);
-    unimplemented!()
 }
 
 // #######################

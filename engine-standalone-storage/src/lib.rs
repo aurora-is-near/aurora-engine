@@ -61,6 +61,7 @@ impl From<StoragePrefix> for u8 {
 
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
+#[derive(Clone)]
 pub struct Storage {
     db: Arc<DB>,
 }
@@ -403,7 +404,12 @@ impl Storage {
         F: FnOnce(&state::State) -> R,
     {
         state::STATE.with_borrow(|state| {
-            state.init(block_height, transaction_position, input.to_vec());
+            state.init(
+                self.clone(),
+                block_height,
+                transaction_position,
+                input.to_vec(),
+            );
 
             let result = f(state);
             let diff = state.get_transaction_diff();

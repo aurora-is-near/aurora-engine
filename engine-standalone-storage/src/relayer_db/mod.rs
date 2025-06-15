@@ -1,5 +1,4 @@
-use aurora_engine::parameters::SubmitArgs;
-use aurora_engine::{engine, state};
+use aurora_engine::state;
 use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_sdk::near_runtime::Runtime;
 use aurora_engine_transactions::EthTransactionKind;
@@ -8,7 +7,7 @@ use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
-use crate::{BlockMetadata, Storage};
+use crate::{native_ffi, BlockMetadata, Storage};
 
 pub mod types;
 
@@ -74,8 +73,6 @@ where
     let signer_account_id = "relayer.aurora".parse().unwrap();
     let predecessor_account_id: AccountId = "relayer.aurora".parse().unwrap();
     let current_account_id = "aurora".parse().unwrap();
-    let relayer_address =
-        aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
     let mut env = env::Fixed {
         signer_account_id,
         current_account_id,
@@ -87,8 +84,6 @@ where
         prepaid_gas: DEFAULT_PREPAID_GAS,
         used_gas: NearGas::new(0),
     };
-    // We use the Noop handler here since the relayer DB does not contain any promise information.
-    let mut handler = aurora_engine_sdk::promise::Noop;
 
     while let Some(row) = rows.next()? {
         let near_tx_hash = row.near_hash;
@@ -105,20 +100,19 @@ where
         env.block_timestamp = block_metadata.timestamp;
         env.random_seed = block_metadata.random_seed;
 
-        let args = SubmitArgs {
-            tx_data: transaction_bytes.clone(),
-            ..Default::default()
-        };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |_| {
-            engine::submit(
-                Runtime,
-                &env,
-                &args,
-                engine_state.clone(),
-                env.current_account_id(),
-                relayer_address,
-                &mut handler,
-            )
+            crate::state::STATE.with_borrow(|state| {
+                state.init(
+                    storage.clone(),
+                    block_height,
+                    transaction_position,
+                    transaction_bytes.clone(),
+                );
+                state.set_env(env.clone());
+                state.store_dbg_info(crate::sync::types::TransactionKindTag::Submit);
+            });
+            state::set_state(&mut Runtime, &engine_state).unwrap();
+            native_ffi::lock().submit()
         });
         match result.result {
             // Engine errors would always turn into panics on the NEAR side, so we do not need to persist
