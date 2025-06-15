@@ -420,7 +420,7 @@ impl State {
         self.db
             .borrow()
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
-            .map_or(0, |diff| diff.value().is_some() as u64)
+            .map_or(0, |diff| u64::from(diff.value().is_some()))
     }
 }
 
@@ -816,7 +816,7 @@ extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn promise_return(promise_id: u64) {
     let _ = promise_id;
-    unimplemented!()
+    // unimplemented!()
 }
 
 // ###############

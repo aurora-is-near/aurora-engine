@@ -3,7 +3,7 @@ use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::rc::Rc;
 use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
@@ -63,12 +63,12 @@ const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 #[derive(Clone)]
 pub struct Storage {
-    db: Arc<DB>,
+    db: Rc<DB>,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
-        let db = Arc::new(DB::open_default(path)?);
+        let db = Rc::new(DB::open_default(path)?);
         state::STATE.set(state::State::new(Self { db: db.clone() }));
         Ok(Self { db })
     }
