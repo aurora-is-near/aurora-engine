@@ -318,11 +318,14 @@ impl State {
         let i = usize::try_from(result_idx).expect("index too big");
         let lock = self.inner.borrow();
         let Some(data) = lock.promise_data.get(i) else {
+            // not ready
             return 0;
         };
         let Some(data) = data else {
-            return 0;
+            // failed
+            return 2;
         };
+        // ready
         self.set_reg(register_id, data.as_slice().into());
         1
     }
