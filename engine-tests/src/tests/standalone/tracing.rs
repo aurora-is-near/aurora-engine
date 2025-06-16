@@ -94,9 +94,7 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let lock = native_ffi::lock();
-    let native_fn = lock.traced_call_with_transaction_trace_builder();
-    drop(lock);
+    let native_fn = native_ffi::lock().traced_call_with_transaction_trace_builder();
     let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
     });
@@ -120,9 +118,7 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let lock = native_ffi::lock();
-    let native_fn = lock.traced_call_with_transaction_trace_builder();
-    drop(lock);
+    let native_fn = native_ffi::lock().traced_call_with_transaction_trace_builder();
     let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
     });
@@ -171,9 +167,7 @@ fn test_evm_tracing() {
         data: hex::decode(CONTRACT_INPUT).unwrap(),
     };
     let mut listener = sputnik::TransactionTraceBuilder::default();
-    let lock = native_ffi::lock();
-    let native_fn = lock.traced_call_with_transaction_trace_builder();
-    drop(lock);
+    let native_fn = native_ffi::lock().traced_call_with_transaction_trace_builder();
     let result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_transaction(&signer.secret_key, tx).unwrap()
     });

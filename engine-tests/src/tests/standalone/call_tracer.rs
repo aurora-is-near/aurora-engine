@@ -9,7 +9,7 @@ use aurora_engine_types::{
     types::{Address, NearGas, Wei, Yocto},
     U256,
 };
-use engine_standalone_storage::sync;
+use engine_standalone_storage::{native_ffi, sync};
 use engine_standalone_tracing::{
     sputnik,
     types::call_tracer::{self, CallTracer},
@@ -25,7 +25,8 @@ fn test_trace_contract_deploy() {
     let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
     let mut listener = CallTracer::default();
-    let deploy_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let deploy_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner
             .submit_transaction(&signer.secret_key, deploy_tx)
             .unwrap()
@@ -81,7 +82,8 @@ fn test_trace_precompile_direct_call() {
     };
 
     let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let standalone_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_transaction(&signer.secret_key, tx).unwrap()
     });
     assert!(standalone_result.status.is_ok());
@@ -128,7 +130,8 @@ fn test_trace_contract_single_call() {
 
     let tx = contract.balance_of(signer_address, signer.use_nonce().into());
     let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let standalone_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner
             .submit_transaction(&signer.secret_key, tx.clone())
             .unwrap()
@@ -176,7 +179,8 @@ fn test_trace_contract_with_sub_call() {
         UniswapTestContext::exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
 
     let mut listener = CallTracer::default();
-    let (_amount_in, _profile) = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let (_amount_in, _profile) = sputnik::traced_call_lib(&mut listener, native_fn, || {
         context
             .runner
             .submit_with_signer_profiled(&mut context.signer, |nonce| {
@@ -251,7 +255,8 @@ fn test_trace_contract_with_precompile_sub_call() {
     // So the trace is one top-level call with multiple sub-calls (and the sub-calls contain no further sub-calls).
     let tx = contract.call_method("test_all", signer.use_nonce().into());
     let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let standalone_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner
             .submit_transaction(&signer.secret_key, tx.clone())
             .unwrap()
@@ -296,7 +301,8 @@ fn test_contract_create_too_large() {
     };
 
     let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let standalone_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner.submit_transaction(&signer.secret_key, tx)
     });
     assert!(matches!(
@@ -428,7 +434,8 @@ fn test_trace_precompiles_with_subcalls() {
         data: borsh::to_vec(&xcc_args).unwrap(),
     };
     let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
+    let native_fn = native_ffi::lock().traced_call_with_call_tracer();
+    let standalone_result = sputnik::traced_call_lib(&mut listener, native_fn, || {
         runner
             .submit_transaction(&signer.secret_key, tx.clone())
             .unwrap()

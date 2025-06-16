@@ -95,6 +95,14 @@ impl DynamicContractImpl {
                 .unwrap_or_else(|_| panic!("symbol {name} not found"))
         }
     }
+    pub fn traced_call_with_call_tracer(&self) -> Symbol<TracedCallNativeFn> {
+        let name = "_native_traced_call_with_call_tracer";
+        unsafe {
+            self.library
+                .get::<TracedCallNativeFn>(name.as_bytes())
+                .unwrap_or_else(|_| panic!("symbol {name} not found"))
+        }
+    }
 
     fn e<T>(&self, name: &str) -> Result<T, ContractError> {
         *unsafe {

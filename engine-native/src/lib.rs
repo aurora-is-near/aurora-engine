@@ -18,6 +18,7 @@ use aurora_engine_types::{
     types::{u256_to_arr, Address},
     H256,
 };
+use engine_standalone_tracing::{sputnik, types::call_tracer::CallTracer};
 
 #[no_mangle]
 pub extern "C" fn _native_traced_call_with_transaction_trace_builder(
@@ -25,9 +26,17 @@ pub extern "C" fn _native_traced_call_with_transaction_trace_builder(
     closure: *mut ffi::c_void,
     callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
 ) -> *mut ffi::c_void {
-    use engine_standalone_tracing::sputnik;
-
     let listener = unsafe { &mut *listener.cast::<sputnik::TransactionTraceBuilder>() };
+    sputnik::traced_call(listener, || callback(closure))
+}
+
+#[no_mangle]
+pub extern "C" fn _native_traced_call_with_call_tracer(
+    listener: *mut ffi::c_void,
+    closure: *mut ffi::c_void,
+    callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
+) -> *mut ffi::c_void {
+    let listener = unsafe { &mut *listener.cast::<CallTracer>() };
     sputnik::traced_call(listener, || callback(closure))
 }
 
