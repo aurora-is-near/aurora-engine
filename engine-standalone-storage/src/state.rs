@@ -104,14 +104,14 @@ impl State {
 
     #[cfg(feature = "integration-test")]
     fn dbg(&self, args: std::fmt::Arguments) {
-        use std::{fs::File, io::Write};
+        use std::{fs::File, io::Write, ptr};
 
         let mut dst = File::options()
             .append(true)
             .create(true)
             .open("../target/dbg.txt")
             .unwrap();
-        dst.write_fmt(format_args!("{:?}: {args}", self as *const Self))
+        dst.write_fmt(format_args!("{:?}: {args}", ptr::from_ref(self)))
             .unwrap();
         dst.flush().unwrap();
     }
@@ -149,9 +149,7 @@ impl State {
             .unwrap_or_else(|| panic!("no such register {register_id}"));
         self.dbg(format_args!(
             "register {register_id} -> {}\n",
-            reg.0
-                .as_ref()
-                .map_or("deadbeef".to_string(), |x| hex::encode(x))
+            reg.0.as_ref().map_or("deadbeef".to_string(), hex::encode)
         ));
         op(reg)
     }
@@ -367,17 +365,15 @@ impl State {
 
         let lock = self.inner.borrow();
         if let Some(diff) = lock.transaction_diff.get(&key) {
-            return if let Some(bytes) = diff.value() {
+            return diff.value().map_or(0, |bytes| {
                 self.set_reg(register_id, bytes.into());
                 self.dbg(format_args!(
                     "diff read {register_id} {} <- {}\n",
                     hex::encode(&key),
-                    hex::encode(&bytes),
+                    hex::encode(bytes),
                 ));
                 1
-            } else {
-                0
-            };
+            });
         }
 
         if let Ok(value) =
@@ -385,17 +381,15 @@ impl State {
                 .borrow()
                 .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
         {
-            return if let Some(bytes) = value.value() {
+            return value.value().map_or(0, |bytes| {
                 self.set_reg(register_id, bytes.into());
                 self.dbg(format_args!(
                     "db read {register_id} {} <- {}\n",
                     hex::encode(&key),
-                    hex::encode(&bytes),
+                    hex::encode(bytes),
                 ));
                 1
-            } else {
-                0
-            };
+            });
         }
 
         0
@@ -702,12 +696,12 @@ pub const extern "C" fn promise_batch_then(
 // #######################
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_create_account(promise_index: u64) {
+pub const extern "C" fn promise_batch_action_create_account(promise_index: u64) {
     let _ = promise_index;
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_deploy_contract(
+pub const extern "C" fn promise_batch_action_deploy_contract(
     promise_index: u64,
     code_len: u64,
     code_ptr: u64,
@@ -717,7 +711,7 @@ pub extern "C" fn promise_batch_action_deploy_contract(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_function_call(
+pub const extern "C" fn promise_batch_action_function_call(
     promise_index: u64,
     method_name_len: u64,
     method_name_ptr: u64,
@@ -733,13 +727,13 @@ pub extern "C" fn promise_batch_action_function_call(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
+pub const extern "C" fn promise_batch_action_transfer(promise_index: u64, amount_ptr: u64) {
     let _ = promise_index;
     let _ = amount_ptr;
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_stake(
+pub const extern "C" fn promise_batch_action_stake(
     promise_index: u64,
     amount_ptr: u64,
     public_key_len: u64,
@@ -751,7 +745,7 @@ pub extern "C" fn promise_batch_action_stake(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_add_key_with_full_access(
+pub const extern "C" fn promise_batch_action_add_key_with_full_access(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -763,7 +757,7 @@ pub extern "C" fn promise_batch_action_add_key_with_full_access(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_add_key_with_function_call(
+pub const extern "C" fn promise_batch_action_add_key_with_function_call(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -783,7 +777,7 @@ pub extern "C" fn promise_batch_action_add_key_with_function_call(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_delete_key(
+pub const extern "C" fn promise_batch_action_delete_key(
     promise_index: u64,
     public_key_len: u64,
     public_key_ptr: u64,
@@ -793,7 +787,7 @@ pub extern "C" fn promise_batch_action_delete_key(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_batch_action_delete_account(
+pub const extern "C" fn promise_batch_action_delete_account(
     promise_index: u64,
     beneficiary_id_len: u64,
     beneficiary_id_ptr: u64,
@@ -817,7 +811,7 @@ extern "C" fn promise_result(result_idx: u64, register_id: u64) -> u64 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn promise_return(promise_id: u64) {
+pub const extern "C" fn promise_return(promise_id: u64) {
     let _ = promise_id;
     // unimplemented!()
 }

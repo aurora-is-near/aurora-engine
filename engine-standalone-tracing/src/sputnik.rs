@@ -1,7 +1,7 @@
 use aurora_engine_types::types::EthGas;
 use aurora_evm::{Capture, Opcode};
 use libloading::os::unix::Symbol;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 use std::rc::Rc;
 use std::{cell::RefCell, ffi};
 
@@ -35,7 +35,7 @@ type TracedCallNativeFn = extern "C" fn(
     callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
 ) -> *mut ffi::c_void;
 
-pub fn traced_call_lib<T, R, F>(listener: &mut T, native_fn: Symbol<TracedCallNativeFn>, f: F) -> R
+pub fn traced_call_lib<T, R, F>(listener: &mut T, native_fn: &Symbol<TracedCallNativeFn>, f: F) -> R
 where
     T: aurora_evm::gasometer::tracing::EventListener
         + aurora_evm::runtime::tracing::EventListener
@@ -51,10 +51,17 @@ where
     }
 
     let closure: Box<Box<dyn FnOnce() -> R>> = Box::new(Box::new(f));
-    let ctx_ptr = Box::into_raw(closure) as *mut ffi::c_void;
+    let ctx_ptr = Box::into_raw(closure);
 
     *unsafe {
-        Box::from_raw(native_fn((listener as *mut T).cast(), ctx_ptr, trampoline::<R>).cast())
+        Box::from_raw(
+            native_fn(
+                ptr::from_mut(listener).cast(),
+                ctx_ptr.cast(),
+                trampoline::<R>,
+            )
+            .cast(),
+        )
     }
 }
 

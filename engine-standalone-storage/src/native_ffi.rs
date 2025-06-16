@@ -87,6 +87,7 @@ type TracedCallNativeFn = extern "C" fn(
 ) -> *mut ffi::c_void;
 
 impl DynamicContractImpl {
+    #[must_use]
     pub fn traced_call_with_transaction_trace_builder(&self) -> Symbol<TracedCallNativeFn> {
         let name = "_native_traced_call_with_transaction_trace_builder";
         unsafe {
@@ -95,6 +96,8 @@ impl DynamicContractImpl {
                 .unwrap_or_else(|_| panic!("symbol {name} not found"))
         }
     }
+
+    #[must_use]
     pub fn traced_call_with_call_tracer(&self) -> Symbol<TracedCallNativeFn> {
         let name = "_native_traced_call_with_call_tracer";
         unsafe {

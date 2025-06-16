@@ -111,7 +111,7 @@ where
                 state.set_env(env.clone());
                 state.store_dbg_info(crate::sync::types::TransactionKindTag::Submit);
             });
-            state::set_state(&mut Runtime, &engine_state).unwrap();
+            state::set_state(&mut Runtime, engine_state).unwrap();
             native_ffi::lock().submit()
         });
         match result.result {
