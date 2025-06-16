@@ -23,6 +23,7 @@ engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 
 anyhow = "1"
+aurora-evm = { version = "2.0.0-rc.1", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 bn = { version = "0.5", package = "zeropool-bn", default-features = false }
@@ -31,14 +32,15 @@ bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"]
 bstr = "1"
 cargo-near-build = "0.7"
 criterion = "0.5"
+ctor = "0.4"
 ethabi = { version = "18", default-features = false }
-aurora-evm = { version = "2.0.0-rc.1", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.20"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
+libloading = "0.8"
 libsecp256k1 = { version = "0.7", default-features = false }
 near-crypto = "0.30"
 near-gas = "0.3"
@@ -49,6 +51,7 @@ near-sdk = "5"
 near-vm-runner = { version = "0.30", features = ["wasmtime_vm", "wasmer2_vm", "near_vm"] }
 near-workspaces = "0.20"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
+parking_lot = "0.12"
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"
@@ -61,14 +64,11 @@ sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 strum = { version = "0.27", features = ["derive"] }
 tempfile = "3"
-tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["macros"] }
 walrus = "0.23"
 wee_alloc = { version = "0.4", default-features = false }
-libloading = { version = "0.8" }
-thiserror = { version = "2" }
-parking_lot = { version = "0.12" }
-ctor = { version = "0.4.2" }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

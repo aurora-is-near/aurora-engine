@@ -6,23 +6,21 @@ use std::path::Path;
 use std::rc::Rc;
 use sync::types::TransactionMessage;
 
-const VERSION: u8 = 0;
+pub use self::state::State as GlobalState;
+pub use diff::{Diff, DiffValue};
+pub use error::Error;
 
 pub mod diff;
 pub mod error;
 pub mod json_snapshot;
+pub mod native_ffi;
 pub mod promise;
 pub mod relayer_db;
+mod state;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
 
-pub use diff::{Diff, DiffValue};
-pub use error::Error;
-
-mod state;
-pub use self::state::State as GlobalState;
-
-pub mod native_ffi;
+const VERSION: u8 = 0;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
