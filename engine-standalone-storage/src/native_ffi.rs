@@ -1,6 +1,7 @@
 use std::{
     ffi::{self, OsStr},
     ops::Deref,
+    ptr,
 };
 
 use aurora_engine_types::parameters::PromiseOrValue;
@@ -8,6 +9,7 @@ use aurora_engine_types::{
     parameters::silo::{SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs},
     types::{Address, EthGas},
 };
+use engine_standalone_tracing::TracingNativeFn;
 use libloading::os::unix::{self, Library, Symbol};
 use parking_lot::{Mutex, MutexGuard};
 use thiserror::Error;
@@ -81,29 +83,47 @@ where
 }
 
 type TracedCallNativeFn = extern "C" fn(
-    *mut ffi::c_void,
-    *mut ffi::c_void,
-    extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
+    listener: *mut ffi::c_void,
+    closure: *mut ffi::c_void,
+    callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
 ) -> *mut ffi::c_void;
+
+pub fn traced_call<T, R, F>(listener: &mut T, f: F) -> R
+where
+    T: TracingNativeFn,
+    F: FnOnce() -> R,
+{
+    extern "C" fn trampoline<R>(ctx: *mut ffi::c_void) -> *mut ffi::c_void {
+        Box::into_raw(Box::new((unsafe {
+            Box::<Box<dyn FnOnce() -> R>>::from_raw(ctx.cast())
+        })()))
+        .cast()
+    }
+
+    let native_fn = lock().traced_call(T::TRACING_NATIVE_FN);
+
+    let closure: Box<Box<dyn FnOnce() -> R>> = Box::new(Box::new(f));
+    let ctx_ptr = Box::into_raw(closure);
+
+    *unsafe {
+        Box::from_raw(
+            native_fn(
+                ptr::from_mut(listener).cast(),
+                ctx_ptr.cast(),
+                trampoline::<R>,
+            )
+            .cast(),
+        )
+    }
+}
 
 impl DynamicContractImpl {
     #[must_use]
-    pub fn traced_call_with_transaction_trace_builder(&self) -> Symbol<TracedCallNativeFn> {
-        let name = "_native_traced_call_with_transaction_trace_builder";
+    fn traced_call(&self, label: &str) -> Symbol<TracedCallNativeFn> {
         unsafe {
             self.library
-                .get::<TracedCallNativeFn>(name.as_bytes())
-                .unwrap_or_else(|_| panic!("symbol {name} not found"))
-        }
-    }
-
-    #[must_use]
-    pub fn traced_call_with_call_tracer(&self) -> Symbol<TracedCallNativeFn> {
-        let name = "_native_traced_call_with_call_tracer";
-        unsafe {
-            self.library
-                .get::<TracedCallNativeFn>(name.as_bytes())
-                .unwrap_or_else(|_| panic!("symbol {name} not found"))
+                .get::<TracedCallNativeFn>(label.as_bytes())
+                .unwrap_or_else(|_| panic!("symbol {label} not found"))
         }
     }
 

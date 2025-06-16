@@ -384,7 +384,6 @@ dependencies = [
  "ethabi",
  "git2",
  "hex",
- "libloading",
  "libsecp256k1",
  "near-crypto",
  "near-parameters",
@@ -1854,6 +1853,7 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-transactions",
  "aurora-engine-types",
+ "engine-standalone-tracing",
  "hex",
  "libloading",
  "libsecp256k1",
@@ -1876,7 +1876,6 @@ dependencies = [
  "aurora-engine-types",
  "aurora-evm",
  "hex",
- "libloading",
  "serde",
 ]
 

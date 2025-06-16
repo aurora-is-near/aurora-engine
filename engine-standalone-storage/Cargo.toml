@@ -20,6 +20,7 @@ aurora-engine-precompiles = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-transactions = { workspace = true, features = ["std"] }
 aurora-engine-types = { workspace = true, features = ["std"] }
+engine-standalone-tracing.workspace = true
 hex = { workspace = true, features = ["std"] }
 rocksdb.workspace = true
 postgres.workspace = true

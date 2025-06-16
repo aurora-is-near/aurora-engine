@@ -3,6 +3,8 @@
 
 use aurora_engine_types::{types::Address, U256};
 
+use crate::TracingNativeFn;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallFrame {
     pub call_type: CallType,
@@ -21,6 +23,10 @@ pub struct CallFrame {
 pub struct CallTracer {
     pub call_stack: Vec<CallFrame>,
     pub top_level_transact: Option<CallFrame>,
+}
+
+impl TracingNativeFn for CallTracer {
+    const TRACING_NATIVE_FN: &'static str = "_native_traced_call_with_call_tracer";
 }
 
 impl CallTracer {

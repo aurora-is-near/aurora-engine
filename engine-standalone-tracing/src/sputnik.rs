@@ -1,12 +1,12 @@
 use aurora_engine_types::types::EthGas;
 use aurora_evm::{Capture, Opcode};
-use libloading::os::unix::Symbol;
-use std::ptr::{self, NonNull};
+use std::cell::RefCell;
+use std::ptr::NonNull;
 use std::rc::Rc;
-use std::{cell::RefCell, ffi};
 
-use crate::types::{
-    LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace,
+use crate::{
+    types::{LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace},
+    TracingNativeFn,
 };
 
 /// Capture all events from `SputnikVM` emitted from within the given closure using the given listener.
@@ -29,42 +29,6 @@ where
     })
 }
 
-type TracedCallNativeFn = extern "C" fn(
-    listener: *mut ffi::c_void,
-    closure: *mut ffi::c_void,
-    callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
-) -> *mut ffi::c_void;
-
-pub fn traced_call_lib<T, R, F>(listener: &mut T, native_fn: &Symbol<TracedCallNativeFn>, f: F) -> R
-where
-    T: aurora_evm::gasometer::tracing::EventListener
-        + aurora_evm::runtime::tracing::EventListener
-        + aurora_evm::tracing::EventListener
-        + 'static,
-    F: FnOnce() -> R,
-{
-    extern "C" fn trampoline<R>(ctx: *mut ffi::c_void) -> *mut ffi::c_void {
-        Box::into_raw(Box::new((unsafe {
-            Box::<Box<dyn FnOnce() -> R>>::from_raw(ctx.cast())
-        })()))
-        .cast()
-    }
-
-    let closure: Box<Box<dyn FnOnce() -> R>> = Box::new(Box::new(f));
-    let ctx_ptr = Box::into_raw(closure);
-
-    *unsafe {
-        Box::from_raw(
-            native_fn(
-                ptr::from_mut(listener).cast(),
-                ctx_ptr.cast(),
-                trampoline::<R>,
-            )
-            .cast(),
-        )
-    }
-}
-
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TransactionTraceBuilder {
     logs: Vec<TraceLog>,
@@ -73,6 +37,10 @@ pub struct TransactionTraceBuilder {
     gas_used: EthGas,
     failed: bool,
     output: Vec<u8>,
+}
+
+impl TracingNativeFn for TransactionTraceBuilder {
+    const TRACING_NATIVE_FN: &'static str = "_native_traced_call_with_transaction_trace_builder";
 }
 
 impl TransactionTraceBuilder {

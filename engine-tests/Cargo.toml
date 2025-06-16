@@ -51,7 +51,6 @@ tempfile.workspace = true
 tokio.workspace = true
 walrus.workspace = true
 ctor.workspace = true
-libloading.workspace = true
 
 [lints]
 workspace = true
