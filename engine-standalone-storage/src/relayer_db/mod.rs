@@ -100,7 +100,7 @@ where
         env.block_timestamp = block_metadata.timestamp;
         env.random_seed = block_metadata.random_seed;
 
-        let result = storage.with_engine_access(block_height, transaction_position, &[], |_| {
+        let result = storage.with_engine_access(block_height, transaction_position, &[], || {
             crate::state::STATE.with_borrow(|state| {
                 state.init(
                     storage.clone(),
@@ -234,7 +234,7 @@ mod test {
             storage
                 .set_block_data(block_hash, block_height, &block_metadata)
                 .unwrap();
-            let result = storage.with_engine_access(block_height, 0, &[], |_| {
+            let result = storage.with_engine_access(block_height, 0, &[], || {
                 state::set_state(&mut Runtime, &engine_state)
             });
 

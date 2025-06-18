@@ -45,7 +45,7 @@ impl StandaloneRunner {
         env.block_height += 1;
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
-        let result = storage.with_engine_access(env.block_height, 0, &[], |_| {
+        let result = storage.with_engine_access(env.block_height, 0, &[], || {
             mocks::init_evm(Runtime, env, chain_id);
             mocks::init_connector(Runtime);
         });
@@ -81,7 +81,7 @@ impl StandaloneRunner {
         env.block_height += 1;
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
 
-        let result = storage.with_engine_access(env.block_height, 0, &[], |_| {
+        let result = storage.with_engine_access(env.block_height, 0, &[], || {
             mocks::mint_evm_account(address, balance, nonce, code, Runtime, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
@@ -276,7 +276,7 @@ impl StandaloneRunner {
 
     pub fn get_balance(&self, address: &Address) -> Wei {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+            .with_engine_access(self.env.block_height + 1, 0, &[], || {
                 engine::get_balance(&Runtime, address)
             })
             .result
@@ -284,7 +284,7 @@ impl StandaloneRunner {
 
     pub fn get_nonce(&self, address: &Address) -> U256 {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+            .with_engine_access(self.env.block_height + 1, 0, &[], || {
                 engine::get_nonce(&Runtime, address)
             })
             .result
@@ -292,7 +292,7 @@ impl StandaloneRunner {
 
     pub fn get_code(&self, address: &Address) -> Vec<u8> {
         self.storage
-            .with_engine_access(self.env.block_height + 1, 0, &[], |_| {
+            .with_engine_access(self.env.block_height + 1, 0, &[], || {
                 engine::get_code(&Runtime, address)
             })
             .result

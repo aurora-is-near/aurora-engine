@@ -126,7 +126,7 @@ fn test_consume_deploy_erc20_message() {
 
     let erc20_address = runner
         .storage
-        .with_engine_access(runner.env.block_height + 1, 0, &[], |_| {
+        .with_engine_access(runner.env.block_height + 1, 0, &[], || {
             aurora_engine::engine::get_erc20_from_nep141(&Runtime, &token)
         })
         .result

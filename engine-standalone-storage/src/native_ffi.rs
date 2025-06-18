@@ -49,7 +49,7 @@ pub enum LibLoadingError {
     },
 }
 
-/// Returns version of the loaded contract
+/// Load the contract library if it hasn't been loaded yet.
 pub fn load_once<P>(path: P)
 where
     P: AsRef<OsStr>,
@@ -64,7 +64,7 @@ where
     });
 }
 
-/// Returns version of the loaded contract
+/// Reload the contract library from the given path to update the contract implementation.
 pub fn load<P>(path: P) -> Result<(), LibLoadingError>
 where
     P: AsRef<OsStr>,
@@ -88,33 +88,34 @@ type TracedCallNativeFn = extern "C" fn(
     callback: extern "C" fn(*mut ffi::c_void) -> *mut ffi::c_void,
 ) -> *mut ffi::c_void;
 
+/// Performs a traced call from within the native library.
 pub fn traced_call<T, R, F>(listener: &mut T, f: F) -> R
 where
     T: TracingNativeFn,
     F: FnOnce() -> R,
 {
     extern "C" fn trampoline<R>(ctx: *mut ffi::c_void) -> *mut ffi::c_void {
-        Box::into_raw(Box::new((unsafe {
-            Box::<Box<dyn FnOnce() -> R>>::from_raw(ctx.cast())
-        })()))
-        .cast()
+        // `ctx` is a pointer to a boxed closure. It need to be boxed because `dyn Trait` is so called fat pointer.
+        let closure_ptr = ctx.cast::<Box<dyn FnOnce() -> R>>();
+        // Convert the pointer to a boxed closure and call it.
+        let closure = unsafe { Box::from_raw(closure_ptr) };
+        let result = closure();
+        // Convert the result to a raw pointer and cast it to ffi safe void.
+        Box::into_raw(Box::new(result)).cast::<ffi::c_void>()
     }
 
     let native_fn = lock().traced_call(T::TRACING_NATIVE_FN);
 
+    // put the closure into a box to pass it to the native function.
     let closure: Box<Box<dyn FnOnce() -> R>> = Box::new(Box::new(f));
-    let ctx_ptr = Box::into_raw(closure);
+    let ctx_ptr = Box::into_raw(closure).cast::<ffi::c_void>();
 
-    *unsafe {
-        Box::from_raw(
-            native_fn(
-                ptr::from_mut(listener).cast(),
-                ctx_ptr.cast(),
-                trampoline::<R>,
-            )
-            .cast(),
-        )
-    }
+    // Erase the listener type to a raw pointer. The type will be restored in the corresponding native function.
+    let listener = ptr::from_mut(listener).cast::<ffi::c_void>();
+
+    let result = native_fn(listener, ctx_ptr, trampoline::<R>);
+    // Restore the result type.
+    *unsafe { Box::from_raw(result.cast::<R>()) }
 }
 
 impl DynamicContractImpl {
@@ -133,7 +134,7 @@ impl DynamicContractImpl {
                 self.library
                     .get::<extern "C" fn() -> *mut ffi::c_void>(name.as_bytes())
                     .unwrap_or_else(|_| panic!("symbol {name} not found"))()
-                .cast(),
+                .cast::<Result<T, ContractError>>(),
             )
         }
     }
@@ -143,7 +144,7 @@ impl DynamicContractImpl {
             self.library
                 .get::<extern "C" fn(*mut ffi::c_void)>(name.as_bytes())
                 .unwrap_or_else(|_| panic!("symbol {name} not found"))(
-                Box::into_raw(Box::new(arg)).cast(),
+                Box::into_raw(Box::new(arg)).cast::<ffi::c_void>(),
             );
         }
     }

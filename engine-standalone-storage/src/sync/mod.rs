@@ -328,7 +328,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                     block_height,
                     transaction_position,
                     &transaction_message.raw_input,
-                    |_| {
+                    || {
                         execute_transaction::<_, M, _>(
                             transaction_message.as_ref(),
                             block_height,
@@ -366,7 +366,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
         block_height,
         transaction_position,
         &transaction_message.raw_input,
-        |_| {
+        || {
             execute_transaction::<_, M, _>(
                 &transaction_message,
                 block_height,

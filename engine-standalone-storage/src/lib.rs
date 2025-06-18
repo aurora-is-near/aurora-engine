@@ -24,6 +24,8 @@ pub use self::state::State as GlobalState;
 
 pub mod native_ffi;
 
+mod near_api;
+
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
 /// 16 bits for the transaction position.
@@ -401,7 +403,7 @@ impl Storage {
         f: F,
     ) -> EngineAccessResult<R>
     where
-        F: FnOnce(&state::State) -> R,
+        F: FnOnce() -> R,
     {
         state::STATE.with_borrow(|state| {
             state.init(
@@ -411,7 +413,7 @@ impl Storage {
                 input.to_vec(),
             );
 
-            let result = f(state);
+            let result = f();
             let diff = state.get_transaction_diff();
             let engine_output = state.take_output();
             state.store_dbg_diff();

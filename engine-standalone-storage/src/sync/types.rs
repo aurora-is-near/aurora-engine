@@ -292,7 +292,7 @@ impl TransactionKind {
                         storage,
                     );
                     let to = storage
-                        .with_engine_access(block_height, transaction_position, &[], |_| {
+                        .with_engine_access(block_height, transaction_position, &[], || {
                             aurora_engine::engine::get_erc20_from_nep141(&Runtime, caller)
                         })
                         .result
@@ -391,7 +391,7 @@ impl TransactionKind {
                 ))
                 .unwrap_or_else(|_| engine_account.clone());
                 let wnear_address = storage
-                    .with_engine_access(block_height, transaction_position, &[], |_| {
+                    .with_engine_access(block_height, transaction_position, &[], || {
                         aurora_engine_precompiles::xcc::state::get_wnear_address(&Runtime)
                     })
                     .result;
@@ -498,7 +498,7 @@ impl TransactionKind {
         storage: &Storage,
     ) -> U256 {
         storage
-            .with_engine_access(block_height, transaction_position, &[], |_| {
+            .with_engine_access(block_height, transaction_position, &[], || {
                 aurora_engine::engine::get_nonce(&Runtime, from)
             })
             .result
