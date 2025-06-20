@@ -361,13 +361,12 @@ command = "${CARGO}"
 dependencies = ["build-test", "set-env-linux", "set-env-macos", "copy-dynamic-lib", "clone-aurora-eth-connector"]
 args = [
     "test",
-    "--package=aurora-engine-tests",
+    "--workspace",
     "${@}",
 ]
 
 [tasks.bench-modexp-test]
 category = "Test"
-dependencies = ["set-env-linux", "set-env-macos", "copy-dynamic-lib"]
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_EXPORT_DYNAMIC} ${RUSTC_FLAGS_ALLOW_UNDEFINED}" }
 command = "${CARGO}"
 args = [
@@ -407,6 +406,9 @@ dependencies = [
 [tasks.bench-modexp]
 category = "Test"
 dependencies = [
+    "set-env-linux",
+    "set-env-macos",
+    "copy-dynamic-lib",
     "build-test",
     "bench-modexp-test",
 ]

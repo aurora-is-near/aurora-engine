@@ -182,9 +182,9 @@ fn test_transaction_to_zero_address() {
     let sender = hex::encode(address.as_bytes());
     assert_eq!(sender.as_str(), "63eafba871e0bda44be3cde19df5aa1c0f078142");
 
-    let mut runner = utils::standalone::StandaloneRunner::default();
     // We want the standalone engine to still reproduce the old behaviour for blocks before the bug fix, and
     // to use the correct parsing for blocks after the fix.
+    let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
     let mut context = utils::AuroraRunner::default().context;
     context.input = tx_bytes;

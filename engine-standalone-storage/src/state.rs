@@ -443,6 +443,7 @@ mod tests {
     };
 
     #[test]
+    #[allow(clippy::too_many_lines)] // TODO: split this test into smaller ones
     fn init_evm() {
         // do not test dynamic library, just test the state for now.
         // load_library();
