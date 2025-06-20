@@ -337,7 +337,7 @@ env = { "RUSTC_FLAGS_EXPORT_DYNAMIC" = "-C link-args=-rdynamic", "RUSTC_FLAGS_AL
 
 [tasks.set-env-linux]
 condition = { platforms = ["linux"] }
-env = { "RUSTC_FLAGS_EXPORT_DYNAMIC" = "-C link-arg=-Wl,--export-dynamic", "RUSTC_FLAGS_ALLOW_UNDEFINED" = "", "LIB_EXT" = "so" }
+env = { "RUSTC_FLAGS_EXPORT_DYNAMIC" = "-C link-arg=-Wl,--export-dynamic -C link-arg=-rdynamic", "RUSTC_FLAGS_ALLOW_UNDEFINED" = "", "LIB_EXT" = "so" }
 
 [tasks.build-dynamic-lib]
 category = "Test"

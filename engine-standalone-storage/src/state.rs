@@ -420,3 +420,164 @@ impl State {
             .map_or(0, |diff| u64::from(diff.value().is_some()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use aurora_engine::contract_methods::connector;
+    use aurora_engine::engine::{self, Engine};
+    use aurora_engine_sdk::near_runtime::Runtime;
+    use aurora_engine_types::account_id::AccountId;
+    use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+    use aurora_engine_types::parameters::engine::NewCallArgsV2;
+    use aurora_engine_types::types::{Address, NearGas, Wei};
+    use aurora_engine_types::{H256, U256};
+    use aurora_evm::backend::ApplyBackend;
+    use libsecp256k1::{PublicKey, SecretKey};
+    use sha2::Digest;
+    use sha3::Keccak256;
+    use tempfile::TempDir;
+
+    use crate::{
+        sync::types::{TransactionKind, TransactionMessage},
+        BlockMetadata, Storage,
+    };
+
+    #[test]
+    fn init_evm() {
+        // do not test dynamic library, just test the state for now.
+        // load_library();
+
+        // constants and utils
+        let aurora_id = "aurora".parse::<AccountId>().unwrap();
+        let eth_connector = "aurora_eth_connector.root".parse().unwrap();
+        let random_seed = rand::random::<H256>();
+        let action_hash = |transaction_hash: H256, block_hash: H256, position: u16| -> H256 {
+            let mut bytes = Vec::with_capacity(32 + 32 + 8);
+            bytes.extend_from_slice(transaction_hash.as_bytes());
+            bytes.extend_from_slice(block_hash.as_bytes());
+            bytes.extend_from_slice(&(u64::MAX - u64::from(position)).to_le_bytes());
+            aurora_engine_sdk::sha256(&bytes)
+        };
+        let tx_msg = |transaction_hash: H256, block_height: u64| -> TransactionMessage {
+            let block_hash =
+                engine::compute_block_hash([0u8; 32], block_height, aurora_id.as_bytes());
+            TransactionMessage {
+                block_hash,
+                near_receipt_id: transaction_hash,
+                position: 0,
+                succeeded: true,
+                signer: aurora_id.clone(),
+                caller: aurora_id.clone(),
+                attached_near: 0,
+                transaction: TransactionKind::Unknown,
+                promise_data: vec![],
+                raw_input: vec![],
+                action_hash: action_hash(transaction_hash, block_hash, 0),
+            }
+        };
+
+        // create storage
+        let dir = TempDir::new().unwrap();
+        let mut storage = Storage::open(dir.path()).unwrap();
+        storage.set_engine_account_id(&aurora_id).unwrap();
+
+        // initialize evm
+        {
+            let transaction_hash = H256::zero();
+            let tx_msg = tx_msg(transaction_hash, 1);
+
+            let block_metadata = BlockMetadata {
+                timestamp: aurora_engine_sdk::env::Timestamp::new(0),
+                random_seed,
+            };
+            storage
+                .set_block_data(tx_msg.block_hash, 1, &block_metadata)
+                .unwrap();
+
+            let result = storage.with_engine_access(1, 0, &[], || {
+                let new_args = NewCallArgsV2 {
+                    chain_id: aurora_engine_types::types::u256_to_arr(&U256::from(1_313_161_556)),
+                    owner_id: aurora_id.clone(),
+                    upgrade_delay_blocks: 1,
+                };
+
+                aurora_engine::state::set_state(&mut Runtime, &new_args.into()).unwrap();
+                connector::set_connector_account_id(Runtime, &eth_connector);
+                connector::set_connector_withdraw_serialization_type(
+                    Runtime,
+                    &WithdrawSerializeType::Borsh,
+                );
+            });
+            storage
+                .set_transaction_included(transaction_hash, &tx_msg, dbg!(&result.diff))
+                .unwrap();
+            assert!(!result.diff.is_empty());
+        }
+
+        // mint account
+        {
+            let sk = SecretKey::random(&mut rand::thread_rng());
+            let pk = PublicKey::from_secret_key(&sk);
+            let nonce = U256::zero();
+            let hash = H256::from_slice(Keccak256::digest(&pk.serialize()[1..]).as_slice());
+            let address = Address::try_from_slice(&hash[12..]).unwrap();
+            let balance = Wei::new_u64(1000);
+
+            let transaction_hash = {
+                let bytes = [
+                    address.raw().as_ref(),
+                    &balance.to_bytes(),
+                    &aurora_engine_types::types::u256_to_arr(&nonce),
+                ]
+                .concat();
+                aurora_engine_sdk::keccak(&bytes)
+            };
+            let tx_msg = tx_msg(transaction_hash, 2);
+
+            let block_metadata = BlockMetadata {
+                timestamp: aurora_engine_sdk::env::Timestamp::new(0),
+                random_seed,
+            };
+            storage
+                .set_block_data(tx_msg.block_hash, 2, &block_metadata)
+                .unwrap();
+
+            let result = storage.with_engine_access(2, 0, &[], || {
+                let env = aurora_engine_sdk::env::Fixed {
+                    signer_account_id: aurora_id.clone(),
+                    current_account_id: aurora_id.clone(),
+                    predecessor_account_id: aurora_id.clone(),
+                    block_height: 2,
+                    block_timestamp: aurora_engine_sdk::env::Timestamp::new(0),
+                    attached_deposit: 0,
+                    random_seed: H256::zero(),
+                    prepaid_gas: NearGas::new(300_000_000_000_000),
+                    used_gas: NearGas::new(0),
+                };
+                let mut engine: Engine<_, _> =
+                    Engine::new(address, aurora_id.clone(), Runtime, &env).unwrap();
+                let state_change = aurora_evm::backend::Apply::Modify {
+                    address: address.raw(),
+                    basic: aurora_evm::backend::Basic {
+                        balance: balance.raw(),
+                        nonce,
+                    },
+                    code: None,
+                    storage: std::iter::empty(),
+                    reset_storage: false,
+                };
+
+                engine.apply(Some(state_change), None, false);
+            });
+            storage
+                .set_transaction_included(transaction_hash, &tx_msg, dbg!(&result.diff))
+                .unwrap();
+            assert!(!result.diff.is_empty());
+
+            let actual_balance = storage
+                .with_engine_access(3, 0, &[], || engine::get_balance(&Runtime, &address))
+                .result;
+            assert_eq!(actual_balance, balance);
+        }
+    }
+}

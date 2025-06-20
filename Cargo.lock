@@ -1853,12 +1853,14 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-transactions",
  "aurora-engine-types",
+ "aurora-evm",
  "engine-standalone-tracing",
  "hex",
  "libloading",
  "libsecp256k1",
  "parking_lot",
  "postgres",
+ "rand 0.8.5",
  "ripemd",
  "rocksdb",
  "serde",
@@ -1866,6 +1868,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "strum 0.27.1",
+ "tempfile",
  "thiserror 2.0.12",
 ]
 

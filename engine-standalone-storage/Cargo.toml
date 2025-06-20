@@ -35,6 +35,12 @@ libloading.workspace = true
 thiserror.workspace = true
 parking_lot.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+rand.workspace = true
+libsecp256k1.workspace = true
+aurora-evm = { workspace = true, features = ["std", "tracing"] }
+
 [lints]
 workspace = true
 
