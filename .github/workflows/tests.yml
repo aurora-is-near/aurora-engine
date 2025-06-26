@@ -11,30 +11,25 @@ jobs:
   test:
     name: Test suite
     runs-on: k8s-infrastructure-native
+    container:
+      image: rust:1.87
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Cargo Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: aurora-cargo-test
+      # - name: Cargo Cache
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       ~/.cargo/bin/
+      #       ~/.cargo/registry/index/
+      #       ~/.cargo/registry/cache/
+      #       ~/.cargo/git/db/
+      #       target/
+      #     key: aurora-cargo-test
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: yarn
-          cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
