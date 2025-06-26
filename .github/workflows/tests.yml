@@ -32,6 +32,9 @@ jobs:
           node-version: 18
       - name: Install Yarn
         run: npm install -g yarn
+      - name: Install clang
+        run: apt update && apt install -y clang=1:14.0*
+
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
