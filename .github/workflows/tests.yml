@@ -22,7 +22,9 @@ jobs:
         run: |
           scripts/ci-deps/native.sh
       - name: do docker
-        run: apt install docker.io
+        run: |
+          apt-get update -y
+          apt-get install -y --no-install-recommends docker.io
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
