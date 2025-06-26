@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
-          node-version: 18          
+          node-version: 18
           cache: yarn
           cache-dependency-path: |
             etc/eth-contracts
@@ -51,8 +51,9 @@ jobs:
 
   test_modexp:
     name: Test modexp suite
-    runs-on: selfhosted-heavy
-    container: rust:latest
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:1.87
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -82,8 +83,9 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: selfhosted
-    container: rust:latest
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:1.87
     steps:
       - name: Potential broken submodules fix
         run: |
