@@ -30,6 +30,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Install Yarn
+        run: npm install -g yarn
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
