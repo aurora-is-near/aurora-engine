@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: github-hosted-heavy-runner
+    runs-on: k8s-infrastructure-native
     steps:
       - name: Potential broken submodules fix
         run: |
