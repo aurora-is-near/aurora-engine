@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted-heavy
     container:
       image: rust:1.87
     steps:
