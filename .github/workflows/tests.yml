@@ -18,11 +18,11 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: do docker
-        run: apt install docker.io
       - name: Install ci deps
         run: |
           scripts/ci-deps/native.sh
+      - name: do docker
+        run: apt install docker.io
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
