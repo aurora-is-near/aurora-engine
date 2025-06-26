@@ -19,10 +19,8 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Install clang
-        run: apt update && apt install -y clang=1:14.0*
+      - name: Install clang and yarn
+        run: apt update && apt install -y clang=1:14.0* yarn
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
