@@ -21,7 +21,7 @@ jobs:
         run: docker ps
       - name: Install ci deps
         run: |
-          scripts/ci-deps/native.sh
+          sudo scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -41,9 +41,9 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: cargo +stable make -V || cargo +stable install cargo-make
+        run: sudo cargo +stable install cargo-make
       - name: Tests
-        run: cargo make test-flow
+        run: sudo cargo make test-flow
 
   # test_modexp:
   #   name: Test modexp suite
