@@ -11,6 +11,8 @@ jobs:
   test:
     name: Test suite
     runs-on: selfhosted-heavy
+    container:
+      image: rust:1.86
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -21,7 +23,7 @@ jobs:
         run: docker ps
       - name: Install ci deps
         run: |
-          sudo scripts/ci-deps/native.sh
+          scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -41,9 +43,9 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: sudo cargo +stable install cargo-make
+        run: cargo +stable install cargo-make
       - name: Tests
-        run: sudo cargo make test-flow
+        run: cargo make test-flow
 
   # test_modexp:
   #   name: Test modexp suite
