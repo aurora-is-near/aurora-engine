@@ -19,10 +19,9 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install clang and yarn
+      - name: Install ci deps
         run: |
-          apt update 
-          apt install -y clang=1:14.0* yarn
+          scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -43,8 +42,6 @@ jobs:
             etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Tests
         run: cargo make test-flow
 
