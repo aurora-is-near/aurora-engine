@@ -11,16 +11,15 @@ jobs:
   test:
     name: Test suite
     runs-on: selfhosted-heavy
-    container:
-      image: rust:1.86
+    container: rust:1.86
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Test docker
-        run: docker ps
+      - name: is docker
+        run: ls -la /usr/bin
       - name: Install ci deps
         run: |
           scripts/ci-deps/native.sh
