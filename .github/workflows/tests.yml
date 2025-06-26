@@ -20,7 +20,9 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install clang and yarn
-        run: apt update && apt install -y clang=1:14.0* yarn
+        run: |
+          apt update 
+          apt install -y clang=1:14.0* yarn
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -35,10 +37,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: yarn
-          cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
