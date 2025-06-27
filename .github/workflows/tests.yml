@@ -11,20 +11,25 @@ jobs:
   test:
     name: Test suite
     runs-on: selfhosted-heavy
-    container: rust:1.86
+    # container: rust:1.86
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      # - name: Potential broken submodules fix
+      #   run: |
+      #     git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install ci deps
         run: |
-          scripts/ci-deps/native.sh
-      - name: do docker
-        run: |
-          apt-get update -y
-          apt-get install -y --no-install-recommends docker.io
+          sudo scripts/ci-deps/native.sh
+      # - name: do docker
+      #   run: |
+      #     apt-get update -y
+      #     apt-get install -y --no-install-recommends docker.io
+# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+# \. "$HOME/.nvm/nvm.sh"
+# nvm install 18
+# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# . "$HOME/.cargo/env"
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -35,6 +40,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: aurora-cargo-test
+      - uses: dtolnay/rust-toolchain@stable
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -44,18 +50,18 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: cargo +stable install cargo-make
+        run: sudo cargo +stable install cargo-make
       
-      - name: Build Tests
-        run: cargo make build-test
-      - name: Build Contracts
-        run: cargo make build-contracts
-      - name: Test Contracts
-        run: cargo make test-contracts
-      - name: Build Tests
-        run: cargo make test-workspace
-      # - name: Tests
-      #   run: cargo make test-flow
+      # - name: Build Tests
+      #   run: cargo make build-test
+      # - name: Build Contracts
+      #   run: cargo make build-contracts
+      # - name: Test Contracts
+      #   run: cargo make test-contracts
+      # - name: Test Workspace
+      #   run: cargo make test-workspace
+      - name: Tests
+        run: sudo cargo make test-flow
 
   # test_modexp:
   #   name: Test modexp suite
