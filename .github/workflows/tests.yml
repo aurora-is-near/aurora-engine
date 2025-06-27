@@ -45,8 +45,17 @@ jobs:
             etc/tests/uniswap
       - name: Install dependencies
         run: cargo +stable install cargo-make
-      - name: Tests
-        run: cargo make test-flow
+      
+      - name: Build Tests
+        run: cargo make build-test
+      - name: Build Contracts
+        run: cargo make build-contracts
+      - name: Test Contracts
+        run: cargo make test-contracts
+      - name: Build Tests
+        run: cargo make test-workspace
+      # - name: Tests
+      #   run: cargo make test-flow
 
   # test_modexp:
   #   name: Test modexp suite
