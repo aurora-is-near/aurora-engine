@@ -10,26 +10,13 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: selfhosted-heavy
-    # container: rust:1.86
+    runs-on: k8s-infrastructure-dind
     steps:
-      # - name: Potential broken submodules fix
-      #   run: |
-      #     git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install ci deps
         run: |
           sudo scripts/ci-deps/native.sh
-      # - name: do docker
-      #   run: |
-      #     apt-get update -y
-      #     apt-get install -y --no-install-recommends docker.io
-# curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-# \. "$HOME/.nvm/nvm.sh"
-# nvm install 18
-# curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-# . "$HOME/.cargo/env"
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -51,77 +38,68 @@ jobs:
             etc/tests/uniswap
       - name: Install dependencies
         run: sudo cargo +stable install cargo-make
-      
-      # - name: Build Tests
-      #   run: cargo make build-test
-      # - name: Build Contracts
-      #   run: cargo make build-contracts
-      # - name: Test Contracts
-      #   run: cargo make test-contracts
-      # - name: Test Workspace
-      #   run: cargo make test-workspace
       - name: Tests
         run: sudo cargo make test-flow
 
-  # test_modexp:
-  #   name: Test modexp suite
-  #   runs-on: k8s-infrastructure-native
-  #   container:
-  #     image: rust:1.87
-  #   steps:
-  #     - name: Potential broken submodules fix
-  #       run: |
-  #         git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-  #     - name: Clone the repository
-  #       uses: actions/checkout@v4
-  #     - name: Install dependencies
-  #       run: scripts/ci-deps/native.sh
-  #     - name: Cargo Cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/registry/index/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/git/db/
-  #           target/
-  #         key: aurora-modexp-test
-  #     - name: Install dependencies
-  #       run: cargo +stable make -V || cargo +stable install cargo-make
-  #     - name: Setup Node and cache
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 18
-  #     - name: Test bench-modexp
-  #       run: cargo make bench-modexp
+  test_modexp:
+    name: Test modexp suite
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:1.87
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: aurora-modexp-test
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Test bench-modexp
+        run: cargo make bench-modexp
 
-  # build_xcc_router:
-  #   name: Build XCC router
-  #   runs-on: k8s-infrastructure-native
-  #   container:
-  #     image: rust:1.87
-  #   steps:
-  #     - name: Potential broken submodules fix
-  #       run: |
-  #         git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-  #     - name: Clone the repository
-  #       uses: actions/checkout@v4
-  #     - name: Install dependencies
-  #       run: scripts/ci-deps/native.sh
-  #     - name: Cargo Cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           ~/.cargo/bin/
-  #           ~/.cargo/registry/index/
-  #           ~/.cargo/registry/cache/
-  #           ~/.cargo/git/db/
-  #           etc/xcc-router/target/
-  #         key: cargo-build-xcc-router
-  #     - name: Install dependencies
-  #       run: cargo +stable make -V || cargo +stable install cargo-make
-  #     - name: Build
-  #       run: cargo make build-xcc-router
+  build_xcc_router:
+    name: Build XCC router
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:1.87
+    steps:
+      - name: Potential broken submodules fix
+        run: |
+          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Clone the repository
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            etc/xcc-router/target/
+          key: cargo-build-xcc-router
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Build
+        run: cargo make build-xcc-router
 
 env:
   CARGO_TERM_COLOR: always
