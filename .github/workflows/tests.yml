@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: k8s-infrastructure-dind  # Runner with string main container and weak docker container
+    runs-on: k8s-infrastructure-dind  # strong main container and weak docker container
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
