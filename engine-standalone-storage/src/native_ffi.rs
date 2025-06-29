@@ -302,4 +302,14 @@ impl DynamicContractImpl {
     pub(crate) fn silo_set_whitelists_statuses(&self, args: Vec<WhitelistStatusArgs>) {
         self.a("_native_silo_set_whitelists_statuses", args);
     }
+
+    #[cfg(test)]
+    pub(crate) fn test_mock(&self) {
+        let name = "_native_test_mock";
+        (unsafe {
+            self.library
+                .get::<extern "C" fn()>(name.as_bytes())
+                .unwrap_or_else(|_| panic!("symbol {name} not found"))
+        })();
+    }
 }

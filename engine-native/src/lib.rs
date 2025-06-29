@@ -14,8 +14,8 @@ use aurora_engine_sdk::{
 };
 use aurora_engine_types::{
     borsh,
-    parameters::silo::FixedGasArgs,
-    types::{u256_to_arr, Address},
+    parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistStatusArgs},
+    types::{u256_to_arr, Address, EthGas},
     H256,
 };
 use engine_standalone_tracing::{sputnik, types::call_tracer::CallTracer};
@@ -661,7 +661,7 @@ pub extern "C" fn _native_get_fixed_gas() -> *mut ffi::c_void {
 
 #[no_mangle]
 pub extern "C" fn _native_silo_set_fixed_gas(args: *mut ffi::c_void) {
-    let fixed_gas = *unsafe { Box::from_raw(args.cast()) };
+    let fixed_gas = *unsafe { Box::from_raw(args.cast::<Option<EthGas>>()) };
 
     let mut io = Runtime;
     silo::set_fixed_gas(&mut io, fixed_gas);
@@ -669,7 +669,7 @@ pub extern "C" fn _native_silo_set_fixed_gas(args: *mut ffi::c_void) {
 
 #[no_mangle]
 pub extern "C" fn _native_silo_set_erc20_fallback_address(args: *mut ffi::c_void) {
-    let address = *unsafe { Box::from_raw(args.cast()) };
+    let address = *unsafe { Box::from_raw(args.cast::<Option<Address>>()) };
 
     let mut io = Runtime;
     silo::set_erc20_fallback_address(&mut io, address);
@@ -677,7 +677,7 @@ pub extern "C" fn _native_silo_set_erc20_fallback_address(args: *mut ffi::c_void
 
 #[no_mangle]
 pub extern "C" fn _native_silo_set_silo_params(args: *mut ffi::c_void) {
-    let args = *unsafe { Box::from_raw(args.cast()) };
+    let args = *unsafe { Box::from_raw(args.cast::<Option<SiloParamsArgs>>()) };
 
     let mut io = Runtime;
     silo::set_silo_params(&mut io, args);
@@ -685,15 +685,15 @@ pub extern "C" fn _native_silo_set_silo_params(args: *mut ffi::c_void) {
 
 #[no_mangle]
 pub extern "C" fn _native_silo_add_entry_to_whitelist(args: *mut ffi::c_void) {
-    let args = *unsafe { Box::from_raw(args.cast()) };
+    let args = unsafe { Box::from_raw(args.cast::<WhitelistArgs>()) };
 
     let io = Runtime;
-    silo::add_entry_to_whitelist(&io, &args);
+    silo::add_entry_to_whitelist(&io, &*args);
 }
 
 #[no_mangle]
 pub extern "C" fn _native_silo_add_entry_to_whitelist_batch(args: *mut ffi::c_void) {
-    let entries: Vec<_> = *unsafe { Box::from_raw(args.cast()) };
+    let entries = *unsafe { Box::from_raw(args.cast::<Vec<WhitelistArgs>>()) };
 
     let io = Runtime;
     silo::add_entry_to_whitelist_batch(&io, entries);
@@ -701,24 +701,104 @@ pub extern "C" fn _native_silo_add_entry_to_whitelist_batch(args: *mut ffi::c_vo
 
 #[no_mangle]
 pub extern "C" fn _native_silo_remove_entry_from_whitelist(args: *mut ffi::c_void) {
-    let args = *unsafe { Box::from_raw(args.cast()) };
+    let args = unsafe { Box::from_raw(args.cast::<WhitelistArgs>()) };
 
     let io = Runtime;
-    silo::remove_entry_from_whitelist(&io, &args);
+    silo::remove_entry_from_whitelist(&io, &*args);
 }
 
 #[no_mangle]
 pub extern "C" fn _native_silo_set_whitelist_status(args: *mut ffi::c_void) {
-    let args = *unsafe { Box::from_raw(args.cast()) };
+    let args = unsafe { Box::from_raw(args.cast::<WhitelistStatusArgs>()) };
 
     let io = Runtime;
-    silo::set_whitelist_status(&io, &args);
+    silo::set_whitelist_status(&io, &*args);
 }
 
 #[no_mangle]
 pub extern "C" fn _native_silo_set_whitelists_statuses(args: *mut ffi::c_void) {
-    let args: Vec<_> = *unsafe { Box::from_raw(args.cast()) };
+    let args = *unsafe { Box::from_raw(args.cast::<Vec<WhitelistStatusArgs>>()) };
 
     let io = Runtime;
     silo::set_whitelists_statuses(&io, args);
+}
+
+#[cfg(feature = "integration-test")]
+#[no_mangle]
+pub extern "C" fn _native_test_mock() {
+    let mut buffer = [0; 0x100];
+    let reg = Runtime.read_input();
+    reg.copy_to_slice(&mut buffer);
+    let input = &buffer[..reg.len()];
+
+    let inner = |input: &[u8]| {
+        let mut buffer = [0; 0x100];
+        match input {
+            b"input_output" => true,
+            b"read_storage" => {
+                let value = Runtime.read_storage(b"test key").unwrap();
+                value.copy_to_slice(&mut buffer);
+                &buffer[..value.len()] == b"test value"
+            }
+            b"read_storage_after_remove" => {
+                let value = Runtime.read_storage(b"test key").unwrap();
+                value.copy_to_slice(&mut buffer);
+                if &buffer[..value.len()] != b"test value" {
+                    return false;
+                }
+                let removed_value = Runtime.remove_storage(b"test key").unwrap();
+                removed_value.copy_to_slice(&mut buffer);
+                if &buffer[..removed_value.len()] != b"test value" {
+                    return false;
+                }
+                Runtime.read_storage(b"test key").is_none()
+            }
+            b"write_storage" => Runtime
+                .write_storage(b"test key", b"test value written")
+                .is_none(),
+            b"write_and_read_storage" => {
+                Runtime.write_storage(b"test key", b"test value written");
+                if let Some(value) = Runtime.read_storage(b"test key") {
+                    value.copy_to_slice(&mut buffer);
+                    if &buffer[..value.len()] != b"test value" {
+                        return true;
+                    }
+                }
+                false
+            }
+            b"overwrite_storage" => {
+                let value = Runtime.read_storage(b"test key to overwrite").unwrap();
+                value.copy_to_slice(&mut buffer);
+                if &buffer[..value.len()] != b"some value" {
+                    return false;
+                }
+                if Runtime
+                    .write_storage(b"test key to overwrite", b"value overwritten")
+                    .is_none()
+                {
+                    return false;
+                }
+                let value = Runtime.read_storage(b"test key to overwrite").unwrap();
+                value.copy_to_slice(&mut buffer);
+                if &buffer[..value.len()] != b"value overwritten" {
+                    return false;
+                }
+                true
+            }
+            b"storage_has_key" => Runtime.storage_has_key(b"must be present"),
+            b"storage_has_key_negative" => !Runtime.storage_has_key(b"must be absent"),
+            b"storage_remove" => {
+                if Runtime.remove_storage(b"test key to remove").is_none() {
+                    return false;
+                }
+                Runtime.read_storage(b"test key to remove").is_none()
+            }
+            _ => false,
+        }
+    };
+
+    let ok = inner(input);
+    let mut name = input.to_vec();
+    name.extend_from_slice(if ok { b" pass" } else { b" fail" });
+    Runtime.return_output(&name);
 }

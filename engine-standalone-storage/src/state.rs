@@ -5,6 +5,8 @@ use sha2::digest::{FixedOutput, Update};
 use std::cell::RefCell;
 use std::{borrow::Cow, iter, slice};
 
+use crate::DiffValue;
+
 use super::{sync::types::TransactionKindTag, Diff, Storage};
 
 thread_local! {
@@ -410,14 +412,124 @@ impl State {
     pub(crate) fn storage_has_key(&self, key_len: u64, key_ptr: u64) -> u64 {
         let key = self.get_data(key_ptr, key_len);
         let lock = self.inner.borrow();
-        if lock.transaction_diff.get(&key).is_some() {
-            return 1;
+        if let Some(value) = lock.transaction_diff.get(&key) {
+            return matches!(value, DiffValue::Modified(..)).into();
         }
 
         self.db
             .borrow()
             .read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
             .map_or(0, |diff| u64::from(diff.value().is_some()))
+    }
+}
+
+// # cargo make copy-dynamic-lib
+// # RUSTFLAGS="-Clink-arg=-Wl,--export-dynamic" cargo test -p engine-standalone-storage -- state::small_tests
+#[cfg(test)]
+mod small_tests {
+    use aurora_engine_sdk::{
+        io::{StorageIntermediate, IO},
+        near_runtime::Runtime,
+    };
+    use tempfile::TempDir;
+
+    use crate::{native_ffi, Storage};
+
+    fn load_library() {
+        use std::path::PathBuf;
+
+        let bin_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("bin");
+        #[cfg(target_os = "linux")]
+        let lib_path = bin_path.join("libaurora-engine-native.so");
+        #[cfg(target_os = "macos")]
+        let lib_path = bin_path.join("libaurora-engine-native.dylib");
+
+        assert!(lib_path.exists());
+
+        native_ffi::load_once(lib_path);
+    }
+
+    fn test_generic(name: &str, f: impl Fn()) {
+        load_library();
+        let dir = TempDir::new().unwrap();
+        let storage = Storage::open(dir.path()).unwrap();
+
+        let result = storage.with_engine_access(0, 0, name.as_bytes(), f);
+        assert_eq!(result.engine_output, format!("{name} pass").as_bytes());
+    }
+
+    #[test]
+    fn input_output() {
+        test_generic("input_output", || native_ffi::lock().test_mock());
+    }
+
+    #[test]
+    fn read_storage() {
+        test_generic("read_storage", || {
+            Runtime.write_storage(b"test key", b"test value");
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn read_storage_after_remove() {
+        test_generic("read_storage_after_remove", || {
+            Runtime.write_storage(b"test key", b"test value");
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn write_storage() {
+        test_generic("write_storage", || {
+            native_ffi::lock().test_mock();
+            let value = Runtime.read_storage(b"test key").unwrap();
+            let mut buffer = [0; 0x100];
+            value.copy_to_slice(&mut buffer);
+            assert_eq!(&buffer[..value.len()], b"test value written");
+        });
+    }
+
+    #[test]
+    fn write_and_read_storage() {
+        test_generic("write_and_read_storage", || {
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn overwrite_storage() {
+        test_generic("overwrite_storage", || {
+            Runtime.write_storage(b"test key to overwrite", b"some value");
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn storage_has_key() {
+        test_generic("storage_has_key", || {
+            Runtime.write_storage(b"must be present", b"");
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn storage_has_key_negative() {
+        test_generic("storage_has_key_negative", || {
+            // just in case
+            Runtime.remove_storage(b"must be absent");
+            native_ffi::lock().test_mock();
+        });
+    }
+
+    #[test]
+    fn storage_remove() {
+        test_generic("storage_remove", || {
+            Runtime.write_storage(b"test key to remove", b"some value");
+            native_ffi::lock().test_mock();
+        });
     }
 }
 
