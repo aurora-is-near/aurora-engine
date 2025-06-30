@@ -688,7 +688,7 @@ pub extern "C" fn _native_silo_add_entry_to_whitelist(args: *mut ffi::c_void) {
     let args = unsafe { Box::from_raw(args.cast::<WhitelistArgs>()) };
 
     let io = Runtime;
-    silo::add_entry_to_whitelist(&io, &*args);
+    silo::add_entry_to_whitelist(&io, &args);
 }
 
 #[no_mangle]
@@ -704,7 +704,7 @@ pub extern "C" fn _native_silo_remove_entry_from_whitelist(args: *mut ffi::c_voi
     let args = unsafe { Box::from_raw(args.cast::<WhitelistArgs>()) };
 
     let io = Runtime;
-    silo::remove_entry_from_whitelist(&io, &*args);
+    silo::remove_entry_from_whitelist(&io, &args);
 }
 
 #[no_mangle]
@@ -712,7 +712,7 @@ pub extern "C" fn _native_silo_set_whitelist_status(args: *mut ffi::c_void) {
     let args = unsafe { Box::from_raw(args.cast::<WhitelistStatusArgs>()) };
 
     let io = Runtime;
-    silo::set_whitelist_status(&io, &*args);
+    silo::set_whitelist_status(&io, &args);
 }
 
 #[no_mangle]

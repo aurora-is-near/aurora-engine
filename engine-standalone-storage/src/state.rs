@@ -423,8 +423,10 @@ impl State {
     }
 }
 
-// # cargo make copy-dynamic-lib
-// # RUSTFLAGS="-Clink-arg=-Wl,--export-dynamic" cargo test -p engine-standalone-storage -- state::small_tests
+// cargo make copy-dynamic-lib
+// macos: RUSTFLAGS="-Clink-args=-rdynamic"
+// linux: RUSTFLAGS="-Clink-arg=-Wl,--export-dynamic"
+// cargo test -p engine-standalone-storage -- state::small_tests
 #[cfg(test)]
 mod small_tests {
     use aurora_engine_sdk::{

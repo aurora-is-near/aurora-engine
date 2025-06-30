@@ -348,7 +348,7 @@ args = ["build", "--package=aurora-engine-native", "--release", "--features=inte
 
 [tasks.copy-dynamic-lib]
 command = "cp"
-dependencies = ["build-dynamic-lib"]
+dependencies = ["make-bin-directory", "build-dynamic-lib"]
 args = [
     "target/release/libaurora_engine_native.${LIB_EXT}",
     "bin/libaurora-engine-native.${LIB_EXT}",
