@@ -45,7 +45,7 @@ jobs:
     name: Test modexp suite
     runs-on: k8s-infrastructure-native
     container:
-      image: rust:1.87
+      image: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -77,7 +77,7 @@ jobs:
     name: Build XCC router
     runs-on: k8s-infrastructure-native
     container:
-      image: rust:1.87
+      image: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
