@@ -1,12 +1,10 @@
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
-use std::collections::HashMap;
 use std::path::Path;
-use std::rc::Rc;
+use std::{collections::HashMap, sync::Arc};
 use sync::types::TransactionMessage;
 
-pub use self::state::State as GlobalState;
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
 
@@ -63,12 +61,12 @@ const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 #[derive(Clone)]
 pub struct Storage {
-    db: Rc<DB>,
+    db: Arc<DB>,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
-        let db = Rc::new(DB::open_default(path)?);
+        let db = Arc::new(DB::open_default(path)?);
         state::STATE.set(state::State::new(Self { db: db.clone() }));
         Ok(Self { db })
     }
