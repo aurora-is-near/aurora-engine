@@ -515,11 +515,11 @@ fn exit_base_token_to_near(
     match exit_params.message {
         Some(Message::Omni(msg)) => Ok((
             eth_connector_account_id,
-            format!(
-                r#"{{"receiver_id":"{}","amount":"{}","msg":"{msg}"}}"#,
-                exit_params.receiver_account_id,
-                context.apparent_value.as_u128(),
-            ),
+            ft_transfer_call_args(
+                &exit_params.receiver_account_id,
+                context.apparent_value,
+                msg,
+            )?,
             events::ExitToNear::Omni(ExitToNearOmni {
                 sender: Address::new(context.caller),
                 erc20_address: events::ETH_ADDRESS,
@@ -607,11 +607,7 @@ fn exit_erc20_token_to_near<I: IO>(
         // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
         Some(Message::Omni(msg)) => (
             nep141_account_id,
-            format!(
-                r#"{{"receiver_id":"{}","amount":"{}","msg":"{msg}"}}"#,
-                exit_params.receiver_account_id, // the locker's account id in case of OMNI
-                exit_params.amount.as_u128(),
-            ),
+            ft_transfer_call_args(&exit_params.receiver_account_id, exit_params.amount, msg)?,
             "ft_transfer_call",
             None,
             events::ExitToNear::Omni(ExitToNearOmni {
@@ -789,6 +785,26 @@ fn parse_input(input: &[u8]) -> Result<(Address, &[u8]), ExitError> {
 fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
     validate_input_size(input, MIN_INPUT_SIZE, MAX_INPUT_SIZE)?;
     Ok(&input[1..])
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct FtTransferCallArgs {
+    receiver_id: AccountId,
+    amount: String,
+    msg: String,
+}
+
+fn ft_transfer_call_args(
+    receiver_id: &AccountId,
+    amount: U256,
+    msg: &str,
+) -> Result<String, ExitError> {
+    serde_json::to_string(&FtTransferCallArgs {
+        receiver_id: receiver_id.clone(),
+        amount: format!("{amount}"),
+        msg: msg.to_string(),
+    })
+    .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
 }
 
 pub struct ExitToEthereum<I> {
@@ -1250,5 +1266,33 @@ mod tests {
                 message: Some(Message::Omni("{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}")),
             })
         );
+    }
+
+    #[test]
+    fn test_ft_transfer_call_args() {
+        let receiver_id = "test.near".parse().unwrap();
+        let amount = U256::from(100);
+        let msg = "some message";
+
+        let args = super::ft_transfer_call_args(&receiver_id, amount, msg).unwrap();
+        let expected = format!(
+            r#"{{"receiver_id":"{}","amount":"{}","msg":"{}"}}"#,
+            receiver_id, amount, msg
+        );
+        assert_eq!(args, expected);
+    }
+
+    #[test]
+    fn test_ft_transfer_call_args_json_injection() {
+        let receiver_id = "test.near".parse().unwrap();
+        let amount = U256::from(100);
+        let msg = "some message\", \"amount\": \"1000"; // attempt to increase amount
+
+        let args = super::ft_transfer_call_args(&receiver_id, amount, msg).unwrap();
+        let expected = format!(
+            r#"{{"receiver_id":"{}","amount":"{}","msg":"some message\", \"amount\": \"1000"}}"#,
+            receiver_id, amount
+        );
+        assert_eq!(args, expected);
     }
 }
