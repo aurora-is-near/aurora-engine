@@ -1275,10 +1275,8 @@ mod tests {
         let msg = "some message";
 
         let args = super::ft_transfer_call_args(&receiver_id, amount, msg).unwrap();
-        let expected = format!(
-            r#"{{"receiver_id":"{}","amount":"{}","msg":"{}"}}"#,
-            receiver_id, amount, msg
-        );
+        let expected =
+            format!(r#"{{"receiver_id":"{receiver_id}","amount":"{amount}","msg":"{msg}"}}"#,);
         assert_eq!(args, expected);
     }
 
@@ -1290,8 +1288,7 @@ mod tests {
 
         let args = super::ft_transfer_call_args(&receiver_id, amount, msg).unwrap();
         let expected = format!(
-            r#"{{"receiver_id":"{}","amount":"{}","msg":"some message\", \"amount\": \"1000"}}"#,
-            receiver_id, amount
+            r#"{{"receiver_id":"{receiver_id}","amount":"{amount}","msg":"some message\", \"amount\": \"1000"}}"#
         );
         assert_eq!(args, expected);
     }
