@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.1] 2025-07-09
+
+- Improve security of the `exit_to_near` precompile by [@aleksuss]. ([#1024])
+
+[#1024]: https://github.com/aurora-is-near/aurora-engine/pull/1024
+
 ## [3.9.0] 2025-04-07
 
 ### Additions
@@ -756,7 +762,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...develop
+[3.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...3.9.1
 [3.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...3.7.0
