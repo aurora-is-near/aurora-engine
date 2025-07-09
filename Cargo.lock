@@ -334,6 +334,8 @@ dependencies = [
  "num",
  "rand 0.8.5",
  "ripemd",
+ "serde",
+ "serde_json",
  "sha2 0.10.8",
  "sha3",
  "zeropool-bn",

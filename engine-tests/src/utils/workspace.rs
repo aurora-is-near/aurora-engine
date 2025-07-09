@@ -29,7 +29,7 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .with_code(code)
         .with_custodian_address("d045f7e19B2488924B97F9c145b5E51D0D895A65")
         .unwrap()
-        .with_root_balance(NearToken::from_near(10000))
+        .with_root_balance(NearToken::from_near(5000))
         .with_contract_balance(NearToken::from_near(1000))
         .deploy_and_init()
         .await
