@@ -787,11 +787,11 @@ fn parse_input(input: &[u8]) -> Result<&[u8], ExitError> {
     Ok(&input[1..])
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct FtTransferCallArgs {
-    receiver_id: AccountId,
+#[derive(serde::Serialize)]
+struct FtTransferCallArgs<'a> {
+    receiver_id: &'a AccountId,
     amount: String,
-    msg: String,
+    msg: &'a str,
 }
 
 fn ft_transfer_call_args(
@@ -804,9 +804,9 @@ fn ft_transfer_call_args(
     }
 
     serde_json::to_string(&FtTransferCallArgs {
-        receiver_id: receiver_id.clone(),
+        receiver_id,
         amount: format!("{amount}"),
-        msg: msg.to_string(),
+        msg,
     })
     .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
 }
