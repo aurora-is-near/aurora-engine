@@ -10,13 +10,13 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: github-hosted-heavy-runner
+    runs-on: k8s-infrastructure-dind  # strong main container and weak docker container
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install ci deps
+        run: |
+          sudo scripts/ci-deps/native.sh
       - name: Cargo Cache
         uses: actions/cache@v4
         with:
@@ -27,6 +27,7 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: aurora-cargo-test
+      - uses: dtolnay/rust-toolchain@stable
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -36,16 +37,15 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Install dependencies
-        run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo cargo +stable install cargo-make
       - name: Tests
-        run: cargo make test-flow
+        run: sudo cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: selfhosted-heavy
-    container: rust:latest
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -75,8 +75,9 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: selfhosted
-    container: rust:latest
+    runs-on: k8s-infrastructure-native
+    container:
+      image: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
