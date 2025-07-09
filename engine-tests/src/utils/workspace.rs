@@ -24,7 +24,7 @@ pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
         .unwrap()
         .with_chain_id(chain_id)
         .with_code(code)
-        .with_root_balance(NearToken::from_near(10000))
+        .with_root_balance(NearToken::from_near(5000))
         .with_contract_balance(NearToken::from_near(1000))
         .deploy_and_init()
         .await
