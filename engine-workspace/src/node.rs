@@ -66,12 +66,9 @@ impl Node {
                 .transact()
                 .await?
         } else {
-            let testnet = near_workspaces::testnet()
-                .await
-                .map_err(|err| anyhow::anyhow!("Failed init testnet: {:?}", err))?;
             let registrar = "registrar".parse()?;
             worker
-                .import_contract(&registrar, &testnet)
+                .import_contract(&registrar, &worker)
                 .transact()
                 .await?
         };

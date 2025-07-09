@@ -21,7 +21,7 @@ pub mod types {
 }
 
 const AURORA_LOCAL_CHAIN_ID: u64 = 1313161556;
-const OWNER_ACCOUNT_ID: &str = "aurora.test.near";
+const OWNER_ACCOUNT_ID: &str = "aurora.root";
 const ROOT_BALANCE: NearToken = NearToken::from_near(400);
 const CONTRACT_BALANCE: NearToken = NearToken::from_near(200);
 

@@ -491,7 +491,7 @@ pub mod workspace {
         assert!(result.is_ok(), "{:?}", result.err());
 
         // This is known because we are using a fixed private key for the signer
-        let deployed_address = Address::decode("f8e4277b41b501232d5bbc0cbcc934f118ac0d04").unwrap();
+        let deployed_address = Address::decode("bda6e7f87c816d25718c38b1c753e280f9455350").unwrap();
         let code = aurora.get_code(deployed_address).await.unwrap().result;
 
         assert_eq!(

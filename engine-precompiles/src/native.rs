@@ -799,6 +799,10 @@ fn ft_transfer_call_args(
     amount: U256,
     msg: &str,
 ) -> Result<String, ExitError> {
+    if amount > U256::from(u128::MAX) {
+        return Err(ExitError::Other(Cow::from("ERR_INVALID_AMOUNT")));
+    }
+
     serde_json::to_string(&FtTransferCallArgs {
         receiver_id: receiver_id.clone(),
         amount: format!("{amount}"),
