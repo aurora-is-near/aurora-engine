@@ -71,13 +71,10 @@ impl TestContract {
         let worker = near_workspaces::sandbox()
             .await
             .map_err(|err| anyhow::anyhow!("Failed init sandbox: {:?}", err))?;
-        let testnet = near_workspaces::testnet()
-            .await
-            .map_err(|err| anyhow::anyhow!("Failed init testnet: {:?}", err))?;
         let registrar: AccountId = "registrar".parse()?;
         let sk = SecretKey::from_seed(KeyType::ED25519, registrar.as_str());
         let registrar = worker
-            .import_contract(&registrar, &testnet)
+            .import_contract(&registrar, &worker)
             .transact()
             .await?;
         Self::waiting_account_creation(&worker, registrar.id()).await?;
