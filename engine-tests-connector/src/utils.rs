@@ -10,7 +10,7 @@ use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract
 use std::path::Path;
 use std::sync::LazyLock;
 
-pub const DEPOSITED_RECIPIENT: &str = "eth_recipient.root";
+pub const DEPOSITED_RECIPIENT: &str = "eth_recipient.test.near";
 pub const DEPOSITED_RECIPIENT_NAME: &str = "eth_recipient";
 pub const DEPOSITED_AMOUNT: u128 = 800400;
 pub const DEPOSITED_EVM_AMOUNT: u128 = 10200;
