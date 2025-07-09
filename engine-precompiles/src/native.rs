@@ -1296,4 +1296,13 @@ mod tests {
         );
         assert_eq!(args, expected);
     }
+
+    #[test]
+    #[should_panic(expected = "ERR_INVALID_AMOUNT")]
+    fn test_ft_transfer_call_args_u256() {
+        let receiver_id = "test.near".parse().unwrap();
+        let amount = U256::from(u128::MAX) + 1;
+        let msg = "some message";
+        let _ = super::ft_transfer_call_args(&receiver_id, amount, msg).unwrap();
+    }
 }

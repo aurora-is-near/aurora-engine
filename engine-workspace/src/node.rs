@@ -68,7 +68,7 @@ impl Node {
         } else {
             let registrar = "registrar".parse()?;
             worker
-                .import_contract(&registrar, &worker)
+                .import_contract(&registrar, worker)
                 .transact()
                 .await?
         };
