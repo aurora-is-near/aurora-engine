@@ -7,9 +7,11 @@ CARGO = "cargo"
 ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
+CARGO_FEATURES_BUILD_BOREALIS = "contract,tracing"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
 WASM_FILE = "aurora-engine.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
+WASM_FILE_BOREALIS = "aurora-engine-borealis.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
 BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
@@ -297,6 +299,11 @@ run_task = "wasm-opt-common"
 
 [tasks.build]
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+category = "Build"
+run_task = "build-engine-flow"
+
+[tasks.build-for-borealis]
+env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_BOREALIS}", "WASM_FILE" = "${WASM_FILE_BOREALIS}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
