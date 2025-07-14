@@ -1,6 +1,18 @@
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use std::sync::{Mutex, OnceLock};
+
 use rocksdb::DB;
-use std::cell::{Cell, RefCell};
+
+use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use near_crypto::PublicKey;
+use near_primitives_core::{
+    hash::CryptoHash,
+    types::{AccountId, Balance, Gas, GasWeight},
+};
+use near_vm_runner::logic::{
+    mocks::mock_external::{MockAction, MockedValuePtr},
+    types::ReceiptIndex,
+    External, StorageAccessTracker, VMLogicError, ValuePtr,
+};
 
 use crate::diff::{Diff, DiffValue};
 use crate::StoragePrefix;
@@ -39,8 +51,8 @@ pub struct EngineStateAccess<'db, 'input, 'output> {
     input: &'input [u8],
     bound_block_height: u64,
     bound_tx_position: u16,
-    transaction_diff: &'output RefCell<Diff>,
-    output: &'output Cell<Vec<u8>>,
+    transaction_diff: &'output Mutex<Diff>,
+    output: &'output OnceLock<Vec<u8>>,
     db: &'db DB,
 }
 
@@ -49,8 +61,8 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
         input: &'input [u8],
         bound_block_height: u64,
         bound_tx_position: u16,
-        transaction_diff: &'output RefCell<Diff>,
-        output: &'output Cell<Vec<u8>>,
+        transaction_diff: &'output Mutex<Diff>,
+        output: &'output OnceLock<Vec<u8>>,
         db: &'db DB,
     ) -> Self {
         Self {
@@ -65,7 +77,7 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
 
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
-        self.transaction_diff.borrow().clone()
+        self.transaction_diff.lock().unwrap().clone()
     }
 
     fn construct_engine_read(&self, key: &[u8]) -> rocksdb::ReadOptions {
@@ -87,11 +99,11 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
     }
 
     fn return_output(&mut self, value: &[u8]) {
-        self.output.set(value.to_vec());
+        self.output.set(value.to_vec()).unwrap_or_default();
     }
 
     fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
-        if let Some(diff) = self.transaction_diff.borrow().get(key) {
+        if let Some(diff) = self.transaction_diff.lock().unwrap().get(key) {
             return diff
                 .value()
                 .map(|bytes| EngineStorageValue::Vec(bytes.to_vec()));
@@ -115,7 +127,8 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
         let original_value = self.read_storage(key);
 
         self.transaction_diff
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .modify(key.to_vec(), value.to_vec());
 
         original_value
@@ -132,8 +145,243 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
     fn remove_storage(&mut self, key: &[u8]) -> Option<Self::StorageValue> {
         let original_value = self.read_storage(key);
 
-        self.transaction_diff.borrow_mut().delete(key.to_vec());
+        self.transaction_diff.lock().unwrap().delete(key.to_vec());
 
         original_value
+    }
+}
+
+pub struct EngineStateVMAccess<I: IO> {
+    pub io: I,
+    pub action_log: Vec<MockAction>,
+}
+
+impl<I: IO> External for EngineStateVMAccess<I>
+where
+    I::StorageValue: AsRef<[u8]>,
+{
+    fn storage_set(
+        &mut self,
+        _access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<Option<Vec<u8>>, VMLogicError> {
+        Ok(self.io.write_storage(key, value).map(|v| v.to_vec()))
+    }
+
+    fn storage_get<'a>(
+        &'a self,
+        _access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+    ) -> Result<Option<Box<dyn ValuePtr + 'a>>, VMLogicError> {
+        Ok(self
+            .io
+            .read_storage(key)
+            .map(|value| Box::new(MockedValuePtr::new(value)) as Box<dyn ValuePtr>))
+    }
+
+    fn storage_remove(
+        &mut self,
+        _access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, VMLogicError> {
+        Ok(self.io.remove_storage(key).map(|v| v.as_ref().to_vec()))
+    }
+
+    fn storage_has_key(
+        &mut self,
+        _access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+    ) -> Result<bool, VMLogicError> {
+        Ok(self.io.storage_has_key(key))
+    }
+
+    fn generate_data_id(&mut self) -> CryptoHash {
+        unimplemented!()
+    }
+
+    fn get_recorded_storage_size(&self) -> usize {
+        0
+    }
+
+    fn validator_stake(&self, account_id: &AccountId) -> Result<Option<Balance>, VMLogicError> {
+        let _ = account_id;
+        unimplemented!()
+    }
+
+    fn validator_total_stake(&self) -> Result<Balance, VMLogicError> {
+        unimplemented!()
+    }
+
+    fn create_action_receipt(
+        &mut self,
+        receipt_indices: Vec<ReceiptIndex>,
+        receiver_id: AccountId,
+    ) -> Result<ReceiptIndex, VMLogicError> {
+        let index = self.action_log.len();
+        self.action_log.push(MockAction::CreateReceipt {
+            receipt_indices,
+            receiver_id,
+        });
+        Ok(index as u64)
+    }
+
+    fn create_promise_yield_receipt(
+        &mut self,
+        receiver_id: AccountId,
+    ) -> Result<(ReceiptIndex, CryptoHash), VMLogicError> {
+        let index = self.action_log.len();
+        let data_id = self.generate_data_id();
+        self.action_log.push(MockAction::YieldCreate {
+            data_id,
+            receiver_id,
+        });
+        Ok((index as u64, data_id))
+    }
+
+    fn submit_promise_resume_data(
+        &mut self,
+        data_id: CryptoHash,
+        data: Vec<u8>,
+    ) -> Result<bool, VMLogicError> {
+        self.action_log
+            .push(MockAction::YieldResume { data_id, data });
+        for action in &self.action_log {
+            let MockAction::YieldCreate { data_id: did, .. } = action else {
+                continue;
+            };
+            // FIXME: should also check that receiver_id matches current account_id, but there
+            // isn't one tracked by `Self`...
+            if data_id == *did {
+                // NB: does not actually handle timeouts.
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn append_action_create_account(
+        &mut self,
+        receipt_index: ReceiptIndex,
+    ) -> Result<(), VMLogicError> {
+        self.action_log
+            .push(MockAction::CreateAccount { receipt_index });
+        Ok(())
+    }
+
+    fn append_action_deploy_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        code: Vec<u8>,
+    ) -> Result<(), VMLogicError> {
+        self.action_log.push(MockAction::DeployContract {
+            receipt_index,
+            code,
+        });
+        Ok(())
+    }
+
+    fn append_action_function_call_weight(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        method_name: Vec<u8>,
+        args: Vec<u8>,
+        attached_deposit: Balance,
+        prepaid_gas: Gas,
+        gas_weight: GasWeight,
+    ) -> Result<(), VMLogicError> {
+        self.action_log.push(MockAction::FunctionCallWeight {
+            receipt_index,
+            method_name,
+            args,
+            attached_deposit,
+            prepaid_gas,
+            gas_weight,
+        });
+        Ok(())
+    }
+
+    fn append_action_transfer(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        deposit: Balance,
+    ) -> Result<(), VMLogicError> {
+        self.action_log.push(MockAction::Transfer {
+            receipt_index,
+            deposit,
+        });
+        Ok(())
+    }
+
+    fn append_action_stake(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        stake: Balance,
+        public_key: PublicKey,
+    ) {
+        self.action_log.push(MockAction::Stake {
+            receipt_index,
+            stake,
+            public_key,
+        });
+    }
+
+    fn append_action_add_key_with_full_access(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        nonce: u64,
+    ) {
+        self.action_log.push(MockAction::AddKeyWithFullAccess {
+            receipt_index,
+            public_key,
+            nonce,
+        });
+    }
+
+    fn append_action_add_key_with_function_call(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        nonce: u64,
+        allowance: Option<Balance>,
+        receiver_id: AccountId,
+        method_names: Vec<Vec<u8>>,
+    ) -> Result<(), VMLogicError> {
+        self.action_log.push(MockAction::AddKeyWithFunctionCall {
+            receipt_index,
+            public_key,
+            nonce,
+            allowance,
+            receiver_id,
+            method_names,
+        });
+        Ok(())
+    }
+
+    fn append_action_delete_key(&mut self, receipt_index: ReceiptIndex, public_key: PublicKey) {
+        self.action_log.push(MockAction::DeleteKey {
+            receipt_index,
+            public_key,
+        });
+    }
+
+    fn append_action_delete_account(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        beneficiary_id: AccountId,
+    ) -> Result<(), VMLogicError> {
+        self.action_log.push(MockAction::DeleteAccount {
+            receipt_index,
+            beneficiary_id,
+        });
+        Ok(())
+    }
+
+    fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {
+        match &self.action_log[receipt_index as usize] {
+            MockAction::CreateReceipt { receiver_id, .. } => receiver_id,
+            _ => panic!("not a valid receipt index!"),
+        }
     }
 }

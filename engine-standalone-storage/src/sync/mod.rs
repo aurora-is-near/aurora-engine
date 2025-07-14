@@ -1,10 +1,11 @@
-use crate::engine_state::EngineStateAccess;
+use std::{io, str::FromStr};
+
 use aurora_engine::contract_methods::silo;
 use aurora_engine::{contract_methods, parameters::SubmitResult};
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
     env::{self, DEFAULT_PREPAID_GAS},
-    io::IO,
+    io::{StorageIntermediate, IO},
 };
 use aurora_engine_transactions::EthTransactionKind;
 use aurora_engine_types::parameters::{connector, engine, PromiseOrValue};
@@ -16,10 +17,12 @@ use aurora_engine_types::{
     types::Address,
     H256,
 };
-use std::{io, str::FromStr};
+use near_vm_runner::logic::types::PromiseResult;
 
 pub mod types;
 
+use crate::engine_state::{EngineStateAccess, EngineStateVMAccess};
+use crate::runner::{Context, ContractRunner};
 use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
@@ -317,6 +320,11 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
             let block_height = storage.get_block_height_by_hash(block_hash)?;
             let block_metadata = storage.get_block_metadata(block_hash)?;
             let engine_account_id = storage.get_engine_account_id()?;
+            let mut context = storage
+                .get_custom_data(b"more_context")?
+                .and_then(|data| data.try_into().ok())
+                .map(Context::deserialize)
+                .unwrap_or_else(Context::initial);
 
             let (tx_hash, diff, result) = storage
                 .with_engine_access(
@@ -330,11 +338,14 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                             &block_metadata,
                             engine_account_id,
                             io,
+                            &mut context,
                             EngineStateAccess::get_transaction_diff,
                         )
                     },
                 )
                 .result;
+            storage.set_custom_data(b"more_context", &context.serialize())?;
+
             let outcome = TransactionIncludedOutcome {
                 hash: tx_hash,
                 info: *transaction_message,
@@ -357,6 +368,11 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
+    let mut context = storage
+        .get_custom_data(b"more_context")?
+        .and_then(|data| data.try_into().ok())
+        .map(Context::deserialize)
+        .unwrap_or_else(Context::initial);
     let result = storage.with_engine_access(
         block_height,
         transaction_position,
@@ -368,10 +384,12 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 &block_metadata,
                 engine_account_id,
                 io,
+                &mut context,
                 EngineStateAccess::get_transaction_diff,
             )
         },
     );
+    storage.set_custom_data(b"more_context", &context.serialize())?;
     let (tx_hash, diff, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
         hash: tx_hash,
@@ -382,12 +400,13 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     Ok(outcome)
 }
 
-pub fn execute_transaction<I, M, F>(
+fn execute_transaction<I, M, F>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    io: I,
+    mut io: I,
+    context: &mut Context,
     get_diff: F,
 ) -> (
     H256,
@@ -395,7 +414,8 @@ pub fn execute_transaction<I, M, F>(
     Result<Option<TransactionExecutionResult>, error::Error>,
 )
 where
-    I: IO + Copy,
+    I: IO + Send + Copy,
+    I::StorageValue: AsRef<[u8]>,
     M: ModExpAlgorithm + 'static,
     F: FnOnce(&I) -> Diff,
 {
@@ -419,19 +439,49 @@ where
         used_gas: NearGas::new(0),
     };
 
+    // TODO: load code dynamically and check hash
+    let code = include_bytes!("../../../bin/aurora-engine-borealis.wasm").to_vec();
+    let runner = ContractRunner::new(code, None);
+
     let (tx_hash, result) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
-                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
-                .map_err(Into::into);
-
+            // let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
+            //     .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
+            //     .map_err(Into::into);
+            let mut ext = EngineStateVMAccess {
+                io,
+                action_log: vec![],
+            };
+            let promise_results = transaction_message
+                .promise_data
+                .iter()
+                .map(|data| match data {
+                    None => PromiseResult::Failed,
+                    Some(data) => PromiseResult::Successful(data.clone()),
+                })
+                .collect::<Vec<_>>();
+            let result = runner.call(
+                "submit",
+                io.read_input().to_vec(),
+                promise_results.into(),
+                &env,
+                &mut ext,
+                context,
+            );
+            let result = match result {
+                Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
+                    io.return_output(&data);
+                    let res = SubmitResult::try_from_slice(&data).unwrap();
+                    TransactionExecutionResult::Submit(Ok(res))
+                })),
+                Err(err) => {
+                    panic!("Failed to submit transaction: {err:?}")
+                }
+            };
             (tx_hash, result)
         }
         TransactionKind::SubmitWithArgs(args) => {

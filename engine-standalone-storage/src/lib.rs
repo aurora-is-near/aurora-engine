@@ -1,9 +1,10 @@
+use std::path::Path;
+use std::sync::OnceLock;
+use std::{collections::HashMap, sync::Mutex};
+
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
 use rocksdb::DB;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::path::Path;
 use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
@@ -14,6 +15,7 @@ pub mod error;
 pub mod json_snapshot;
 pub mod promise;
 pub mod relayer_db;
+mod runner;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
 
@@ -309,7 +311,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
+            if db_key.get(0..engine_prefix_len) != Some(engine_prefix.as_ref()) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
@@ -377,10 +379,10 @@ impl Storage {
         f: F,
     ) -> EngineAccessResult<R>
     where
-        F: for<'output> FnOnce(engine_state::EngineStateAccess<'db, 'input, 'output>) -> R,
+        F: FnOnce(engine_state::EngineStateAccess<'db, 'input, '_>) -> R,
     {
-        let diff = RefCell::new(Diff::default());
-        let engine_output = Cell::new(Vec::new());
+        let diff = Mutex::new(Diff::default());
+        let engine_output = OnceLock::new();
 
         let engine_state = engine_state::EngineStateAccess::new(
             input,
@@ -393,7 +395,7 @@ impl Storage {
 
         let result = f(engine_state);
         let diff = engine_state.get_transaction_diff();
-        let engine_output = engine_output.into_inner();
+        let engine_output = engine_output.into_inner().unwrap_or_default();
 
         EngineAccessResult {
             result,
