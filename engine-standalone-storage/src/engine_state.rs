@@ -177,7 +177,7 @@ where
         Ok(self
             .io
             .read_storage(key)
-            .map(|value| Box::new(MockedValuePtr::new(value)) as Box<dyn ValuePtr>))
+            .map::<Box<dyn ValuePtr>, _>(|value| Box::new(MockedValuePtr::new(value))))
     }
 
     fn storage_remove(
@@ -218,25 +218,33 @@ where
         receipt_indices: Vec<ReceiptIndex>,
         receiver_id: AccountId,
     ) -> Result<ReceiptIndex, VMLogicError> {
-        let index = self.action_log.len();
+        let index = self
+            .action_log
+            .len()
+            .try_into()
+            .expect("pointer size must fit in 64 bit");
         self.action_log.push(MockAction::CreateReceipt {
             receipt_indices,
             receiver_id,
         });
-        Ok(index as u64)
+        Ok(index)
     }
 
     fn create_promise_yield_receipt(
         &mut self,
         receiver_id: AccountId,
     ) -> Result<(ReceiptIndex, CryptoHash), VMLogicError> {
-        let index = self.action_log.len();
+        let index = self
+            .action_log
+            .len()
+            .try_into()
+            .expect("pointer size must fit in 64 bit");
         let data_id = self.generate_data_id();
         self.action_log.push(MockAction::YieldCreate {
             data_id,
             receiver_id,
         });
-        Ok((index as u64, data_id))
+        Ok((index, data_id))
     }
 
     fn submit_promise_resume_data(
@@ -379,8 +387,11 @@ where
     }
 
     fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {
-        match &self.action_log[receipt_index as usize] {
-            MockAction::CreateReceipt { receiver_id, .. } => receiver_id,
+        let index: usize = receipt_index
+            .try_into()
+            .expect("pointer size is long enough");
+        match self.action_log.get(index) {
+            Some(MockAction::CreateReceipt { receiver_id, .. }) => receiver_id,
             _ => panic!("not a valid receipt index!"),
         }
     }

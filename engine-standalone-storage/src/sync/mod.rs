@@ -323,8 +323,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
             let mut context = storage
                 .get_custom_data(b"more_context")?
                 .and_then(|data| data.try_into().ok())
-                .map(Context::deserialize)
-                .unwrap_or_else(Context::initial);
+                .map_or_else(Context::initial, Context::deserialize);
 
             let (tx_hash, diff, result) = storage
                 .with_engine_access(
@@ -371,8 +370,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     let mut context = storage
         .get_custom_data(b"more_context")?
         .and_then(|data| data.try_into().ok())
-        .map(Context::deserialize)
-        .unwrap_or_else(Context::initial);
+        .map_or_else(Context::initial, Context::deserialize);
     let result = storage.with_engine_access(
         block_height,
         transaction_position,
@@ -400,7 +398,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     Ok(outcome)
 }
 
-fn execute_transaction<I, M, F>(
+pub fn execute_transaction<I, M, F>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
@@ -459,10 +457,8 @@ where
             let promise_results = transaction_message
                 .promise_data
                 .iter()
-                .map(|data| match data {
-                    None => PromiseResult::Failed,
-                    Some(data) => PromiseResult::Successful(data.clone()),
-                })
+                .cloned()
+                .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
                 .collect::<Vec<_>>();
             let result = runner.call(
                 "submit",

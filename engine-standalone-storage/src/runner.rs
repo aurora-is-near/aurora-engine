@@ -60,7 +60,7 @@ impl Contract for CodeWrapper {
     }
 
     fn hash(&self) -> near_primitives_core::hash::CryptoHash {
-        self.0.hash().clone()
+        *self.0.hash()
     }
 }
 
