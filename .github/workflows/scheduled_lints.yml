@@ -2,12 +2,11 @@
 on:
   schedule:
     - cron: '0 8 * * 1-5'
-  pull_request:
 
 name: Scheduled checks
 jobs:
   tests:
-    name: Run tests
+    name: Run tests (${{ matrix.version }} neard)
     runs-on: k8s-infrastructure-dind
     strategy:
       fail-fast: false
@@ -30,6 +29,8 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
+          key: ${{matrix.version}}
+          cache-on-failure: "true"
           cache-all-crates: "true"
       - name: Setup Node and cache
         uses: actions/setup-node@v4
@@ -45,7 +46,7 @@ jobs:
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
-      - name: Run tests using neard from ${{ matrix.version }}
+      - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
