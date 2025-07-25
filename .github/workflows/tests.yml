@@ -14,16 +14,15 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install ci deps
-        run: |
-          sudo scripts/ci-deps/native.sh
+      - name: Install CI deps
+        run: sudo scripts/ci-deps/native.sh
+      - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           key: aurora-cargo-tests
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - uses: dtolnay/rust-toolchain@stable
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -32,9 +31,9 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install dependencies
+      - name: Install cargo-make
         run: sudo cargo +stable install cargo-make
-      - name: Tests
+      - name: Run tests
         run: sudo cargo make test-flow
 
   test_modexp:
@@ -48,7 +47,7 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
+      - name: Install CI deps
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -56,13 +55,13 @@ jobs:
           key: aurora-modexp-tests
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Install dependencies
+      - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Test bench-modexp
+      - name: Run bench-modexp tests
         run: cargo make bench-modexp
 
   build_xcc_router:
@@ -76,7 +75,7 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
+      - name: Install CI deps
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -84,9 +83,9 @@ jobs:
           key: cargo-build-xcc-router
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Install dependencies
+      - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Build
+      - name: Build XCC router
         run: cargo make build-xcc-router
 
 env:
