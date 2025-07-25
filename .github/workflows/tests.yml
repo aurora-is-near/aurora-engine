@@ -17,16 +17,12 @@ jobs:
       - name: Install ci deps
         run: |
           sudo scripts/ci-deps/native.sh
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: aurora-cargo-test
+          key: aurora-cargo-tests
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Node and cache
         uses: actions/setup-node@v4
@@ -54,16 +50,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: aurora-modexp-test
+          key: aurora-modexp-tests
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
@@ -86,16 +78,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            etc/xcc-router/target/
           key: cargo-build-xcc-router
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Install dependencies
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build
