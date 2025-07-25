@@ -2,12 +2,17 @@
 on:
   schedule:
     - cron: '0 8 * * 1-5'
+  pull_request:
 
 name: Scheduled checks
 jobs:
   tests:
     name: Run tests
     runs-on: k8s-infrastructure-dind
+    strategy:
+      fail-fast: false
+      matrix:
+        network: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -44,10 +49,10 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh
+        run: scripts/build-neard-sandbox.sh ${{ matrix.network }}
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
-      - name: Tests
+      - name: Run tests on ${{ matrix.network }}
         run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
