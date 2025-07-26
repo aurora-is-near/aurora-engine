@@ -22,6 +22,12 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aurora-${{ matrix.command }}-check
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Install Rust toolchain and components

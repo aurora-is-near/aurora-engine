@@ -6,8 +6,12 @@ on:
 name: Scheduled checks
 jobs:
   tests:
-    name: Run tests
+    name: Run tests (${{ matrix.version }} neard)
     runs-on: k8s-infrastructure-dind
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ mainnet, testnet ]
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -15,24 +19,19 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install ci deps
-        run: |
-          sudo scripts/ci-deps/native.sh
+        run: sudo scripts/ci-deps/native.sh
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache: false
           toolchain: stable
           override: false
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: scheduled-tests-key
+          key: ${{matrix.version}}
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -44,10 +43,10 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
-        run: scripts/build-neard-sandbox.sh
+        run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
-      - name: Tests
+      - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
         if: failure()
@@ -73,6 +72,10 @@ jobs:
         run: |
           rustup component add rustfmt clippy
           rustup toolchain add nightly
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-all-crates: "true"
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
