@@ -406,6 +406,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-traced"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-evm",
+ "borsh 1.5.7",
+ "engine-standalone-tracing",
+ "primitive-types 0.13.1",
+]
+
+[[package]]
 name = "aurora-engine-transactions"
 version = "1.2.0"
 dependencies = [
@@ -1813,6 +1825,7 @@ dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-transactions",
  "aurora-engine-types",
+ "engine-standalone-tracing",
  "hex",
  "memoffset 0.9.1",
  "near-crypto",
@@ -1832,6 +1845,7 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine-types",
  "aurora-evm",
+ "borsh 1.5.7",
  "hex",
  "serde",
 ]

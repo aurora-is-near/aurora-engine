@@ -7,11 +7,10 @@ CARGO = "cargo"
 ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
-CARGO_FEATURES_BUILD_BOREALIS = "contract,tracing"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
 WASM_FILE = "aurora-engine.wasm"
+WASM_FILE_TRACED = "aurora-engine-traced.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
-WASM_FILE_BOREALIS = "aurora-engine-borealis.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
 BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
@@ -191,6 +190,14 @@ args = [
     "bin/${WASM_FILE}",
 ]
 
+[tasks.copy-traced-engine-build]
+category = "Post"
+command = "cp"
+args = [
+    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine_traced.wasm",
+    "bin/${WASM_FILE_TRACED}",
+]
+
 [tasks.copy-xcc-router-build]
 category = "Post"
 command = "cp"
@@ -229,14 +236,29 @@ args = [
     "aurora-engine"
 ]
 
+[tasks.build-traced-engine]
+category = "Build"
+command = "${CARGO}"
+args = [
+    "build",
+    "--target",
+    "${ENGINE_CARGO_TARGET}",
+    "@@remove-empty(RELEASE)",
+    "--features=contract",
+    "--package=aurora-engine-traced",
+]
+
 [tasks.build-engine-flow]
 category = "Build"
 dependencies = [
     "build-contracts",
     "build-engine",
+    "build-traced-engine",
     "make-bin-directory",
     "copy-engine-build",
+    "copy-traced-engine-build",
     "wasm-opt",
+    "wasm-opt-traced",
     "post-engine-build-env",
 ]
 
@@ -292,6 +314,11 @@ env = { "CONTRACT_FILE" = "${WASM_FILE}" }
 category = "Build"
 run_task = "wasm-opt-common"
 
+[tasks.wasm-opt-traced]
+env = { "CONTRACT_FILE" = "${WASM_FILE_TRACED}" }
+category = "Build"
+run_task = "wasm-opt-common"
+
 [tasks.wasm-opt-xcc-router]
 env = { "CONTRACT_FILE" = "${XCC_ROUTER_WASM_FILE}" }
 category = "Build"
@@ -299,11 +326,6 @@ run_task = "wasm-opt-common"
 
 [tasks.build]
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
-category = "Build"
-run_task = "build-engine-flow"
-
-[tasks.build-for-borealis]
-env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_BOREALIS}", "WASM_FILE" = "${WASM_FILE_BOREALIS}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 

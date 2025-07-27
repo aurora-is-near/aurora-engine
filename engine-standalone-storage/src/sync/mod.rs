@@ -17,6 +17,7 @@ use aurora_engine_types::{
     types::Address,
     H256,
 };
+use engine_standalone_tracing::{Logs, TraceLog};
 use near_vm_runner::logic::types::PromiseResult;
 
 pub mod types;
@@ -325,7 +326,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                 .and_then(|data| data.try_into().ok())
                 .map_or_else(Context::initial, Context::deserialize);
 
-            let (tx_hash, diff, result) = storage
+            let (tx_hash, diff, trace_log, result) = storage
                 .with_engine_access(
                     block_height,
                     transaction_position,
@@ -336,6 +337,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                             block_height,
                             &block_metadata,
                             engine_account_id,
+                            false,
                             io,
                             &mut context,
                             EngineStateAccess::get_transaction_diff,
@@ -350,6 +352,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                 info: *transaction_message,
                 diff,
                 maybe_result: result,
+                trace_log,
             };
             Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
                 outcome,
@@ -361,6 +364,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     storage: &Storage,
     transaction_message: TransactionMessage,
+    trace_transaction: bool,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
     let transaction_position = transaction_message.position;
     let block_hash = transaction_message.block_hash;
@@ -381,6 +385,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 block_height,
                 &block_metadata,
                 engine_account_id,
+                trace_transaction,
                 io,
                 &mut context,
                 EngineStateAccess::get_transaction_diff,
@@ -388,27 +393,30 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
         },
     );
     storage.set_custom_data(b"more_context", &context.serialize())?;
-    let (tx_hash, diff, maybe_result) = result.result;
+    let (tx_hash, diff, trace_log, maybe_result) = result.result;
     let outcome = TransactionIncludedOutcome {
         hash: tx_hash,
         info: transaction_message,
         diff,
         maybe_result,
+        trace_log,
     };
     Ok(outcome)
 }
 
-pub fn execute_transaction<I, M, F>(
+fn execute_transaction<I, M, F>(
     transaction_message: &TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
+    trace_transaction: bool,
     mut io: I,
     context: &mut Context,
     get_diff: F,
 ) -> (
     H256,
     Diff,
+    Option<Vec<TraceLog>>,
     Result<Option<TransactionExecutionResult>, error::Error>,
 )
 where
@@ -438,28 +446,60 @@ where
     };
 
     // TODO: load code dynamically and check hash
-    let code = include_bytes!("../../../bin/aurora-engine-borealis.wasm").to_vec();
+    let code = include_bytes!("../../../bin/aurora-engine-traced.wasm").to_vec();
     let runner = ContractRunner::new(code, None);
 
-    let (tx_hash, result) = match &transaction_message.transaction {
+    let promise_results = transaction_message
+        .promise_data
+        .iter()
+        .cloned()
+        .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
+        .collect::<Vec<_>>();
+    let mut ext = EngineStateVMAccess {
+        io,
+        action_log: vec![],
+    };
+
+    let (tx_hash, result, trace_log) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            // let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
-            //     .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
-            //     .map_err(Into::into);
-            let mut ext = EngineStateVMAccess {
-                io,
-                action_log: vec![],
+            let method = if trace_transaction {
+                "submit_trace_tx"
+            } else {
+                "submit"
             };
-            let promise_results = transaction_message
-                .promise_data
-                .iter()
-                .cloned()
-                .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
-                .collect::<Vec<_>>();
+            let result = runner.call(
+                method,
+                io.read_input().to_vec(),
+                promise_results.into(),
+                &env,
+                &mut ext,
+                context,
+            );
+            let mut trace_log = None;
+            let result = match result {
+                Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
+                    let mut slice = data.as_slice();
+                    io.return_output(&data);
+                    let res = SubmitResult::deserialize_reader(&mut slice)
+                        .expect("cannot deserialize output");
+                    if !slice.is_empty() {
+                        trace_log = Logs::deserialize_reader(&mut slice).ok().map(|Logs(l)| l)
+                    };
+                    TransactionExecutionResult::Submit(Ok(res))
+                })),
+                Err(err) => {
+                    // TODO: convert error
+                    panic!("Failed to submit transaction: {err:?}")
+                }
+            };
+            (tx_hash, result, trace_log)
+        }
+        TransactionKind::SubmitWithArgs(args) => {
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
             let result = runner.call(
                 "submit",
                 io.read_input().to_vec(),
@@ -471,38 +511,27 @@ where
             let result = match result {
                 Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
                     io.return_output(&data);
-                    let res = SubmitResult::try_from_slice(&data).unwrap();
+                    let res =
+                        SubmitResult::try_from_slice(&data).expect("cannot deserialize output");
                     TransactionExecutionResult::Submit(Ok(res))
                 })),
                 Err(err) => {
+                    // TODO: convert error
                     panic!("Failed to submit transaction: {err:?}")
                 }
             };
-            (tx_hash, result)
-        }
-        TransactionKind::SubmitWithArgs(args) => {
-            let mut handler = crate::promise::NoScheduler {
-                promise_data: &transaction_message.promise_data,
-            };
-            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let result =
-                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
-                    .map(|submit_result| {
-                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
-                    })
-                    .map_err(Into::into);
 
-            (tx_hash, result)
+            (tx_hash, result, None)
         }
         other => {
             let result = non_submit_execute(other, io, &env, &transaction_message.promise_data);
-            (near_receipt_id, result)
+            (near_receipt_id, result, None)
         }
     };
 
     let diff = get_diff(&io);
 
-    (tx_hash, diff, result)
+    (tx_hash, diff, trace_log, result)
 }
 
 /// Based on nearcore implementation:
@@ -764,6 +793,7 @@ pub struct TransactionIncludedOutcome {
     pub info: TransactionMessage,
     pub diff: Diff,
     pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
+    pub trace_log: Option<Vec<TraceLog>>,
 }
 
 impl TransactionIncludedOutcome {

@@ -1,8 +1,9 @@
+use core::{cell::RefCell, ptr::NonNull};
+
+use alloc::{rc::Rc, vec::Vec};
+
 use aurora_engine_types::types::EthGas;
 use aurora_evm::{Capture, Opcode};
-use std::cell::RefCell;
-use std::ptr::NonNull;
-use std::rc::Rc;
 
 use crate::types::{
     LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace,

@@ -1,0 +1,29 @@
+[package]
+name = "aurora-engine-traced"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+aurora-engine = { workspace = true, default-features = false, features = ["tracing"] }
+aurora-engine-sdk.workspace = true
+engine-standalone-tracing.workspace = true
+aurora-evm = { workspace = true, features = ["tracing"] }
+borsh.workspace = true
+primitive-types.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+integration-test = ["aurora-engine/integration-test"]
+contract = ["aurora-engine/contract", "aurora-engine-sdk/contract"]
