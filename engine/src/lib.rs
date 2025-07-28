@@ -23,25 +23,24 @@ pub mod xcc;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "std"))]
 #[panic_handler]
-#[cfg_attr(not(feature = "log"), allow(unused_variables))]
-#[no_mangle]
-pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
+pub fn on_panic(info: &core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
         use prelude::ToString;
 
         let msg = info.message();
-        let msg = if let Some(log) = info.location() {
-            prelude::format!("{msg} [{log}]")
-        } else {
-            msg.to_string()
-        };
+        let msg = info
+            .location()
+            .map_or_else(|| msg.to_string(), |loc| prelude::format!("{msg} [{loc}]"));
         prelude::sdk::panic_utf8(msg.as_bytes());
     }
     #[cfg(not(feature = "log"))]
-    ::core::arch::wasm32::unreachable();
+    {
+        let _ = info;
+        core::arch::wasm32::unreachable();
+    }
 }
 
 #[cfg(feature = "contract")]

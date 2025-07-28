@@ -1,3 +1,4 @@
+use std::mem;
 use std::{io, str::FromStr};
 
 use aurora_engine::contract_methods::silo;
@@ -326,34 +327,25 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                 .and_then(|data| data.try_into().ok())
                 .map_or_else(Context::initial, Context::deserialize);
 
-            let (tx_hash, diff, trace_log, result) = storage
-                .with_engine_access(
-                    block_height,
-                    transaction_position,
-                    &transaction_message.raw_input,
-                    |io| {
-                        execute_transaction::<_, M, _>(
-                            transaction_message.as_ref(),
-                            block_height,
-                            &block_metadata,
-                            engine_account_id,
-                            false,
-                            io,
-                            &mut context,
-                            EngineStateAccess::get_transaction_diff,
-                        )
-                    },
-                )
+            let mut transaction_message = *transaction_message;
+            let raw_input = mem::take(&mut transaction_message.raw_input);
+            let mut outcome = storage
+                .with_engine_access(block_height, transaction_position, &raw_input, |io| {
+                    execute_transaction(
+                        transaction_message,
+                        block_height,
+                        &block_metadata,
+                        engine_account_id,
+                        false,
+                        io,
+                        &mut context,
+                        EngineStateAccess::get_transaction_diff,
+                    )
+                })
                 .result;
+            outcome.info.raw_input = raw_input;
             storage.set_custom_data(b"more_context", &context.serialize())?;
 
-            let outcome = TransactionIncludedOutcome {
-                hash: tx_hash,
-                info: *transaction_message,
-                diff,
-                maybe_result: result,
-                trace_log,
-            };
             Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
                 outcome,
             )))
@@ -363,7 +355,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
 
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     storage: &Storage,
-    transaction_message: TransactionMessage,
+    mut transaction_message: TransactionMessage,
     trace_transaction: bool,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
     let transaction_position = transaction_message.position;
@@ -375,13 +367,11 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
         .get_custom_data(b"more_context")?
         .and_then(|data| data.try_into().ok())
         .map_or_else(Context::initial, Context::deserialize);
-    let result = storage.with_engine_access(
-        block_height,
-        transaction_position,
-        &transaction_message.raw_input,
-        |io| {
-            execute_transaction::<_, M, _>(
-                &transaction_message,
+    let raw_input = mem::take(&mut transaction_message.raw_input);
+    let mut result =
+        storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
+            execute_transaction(
+                transaction_message,
                 block_height,
                 &block_metadata,
                 engine_account_id,
@@ -390,22 +380,15 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 &mut context,
                 EngineStateAccess::get_transaction_diff,
             )
-        },
-    );
+        });
+    result.result.info.raw_input = raw_input;
     storage.set_custom_data(b"more_context", &context.serialize())?;
-    let (tx_hash, diff, trace_log, maybe_result) = result.result;
-    let outcome = TransactionIncludedOutcome {
-        hash: tx_hash,
-        info: transaction_message,
-        diff,
-        maybe_result,
-        trace_log,
-    };
-    Ok(outcome)
+    Ok(result.result)
 }
 
-fn execute_transaction<I, M, F>(
-    transaction_message: &TransactionMessage,
+#[allow(clippy::too_many_arguments)]
+fn execute_transaction<I, F>(
+    transaction_message: TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
@@ -413,16 +396,10 @@ fn execute_transaction<I, M, F>(
     mut io: I,
     context: &mut Context,
     get_diff: F,
-) -> (
-    H256,
-    Diff,
-    Option<Vec<TraceLog>>,
-    Result<Option<TransactionExecutionResult>, error::Error>,
-)
+) -> TransactionIncludedOutcome
 where
     I: IO + Send + Copy,
     I::StorageValue: AsRef<[u8]>,
-    M: ModExpAlgorithm + 'static,
     F: FnOnce(&I) -> Diff,
 {
     let signer_account_id = transaction_message.signer.clone();
@@ -454,7 +431,8 @@ where
         .iter()
         .cloned()
         .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+        .into();
     let mut ext = EngineStateVMAccess {
         io,
         action_log: vec![],
@@ -471,14 +449,8 @@ where
             } else {
                 "submit"
             };
-            let result = runner.call(
-                method,
-                io.read_input().to_vec(),
-                promise_results.into(),
-                &env,
-                &mut ext,
-                context,
-            );
+            let input = io.read_input().to_vec();
+            let result = runner.call(method, input, promise_results, &env, &mut ext, context);
             let mut trace_log = None;
             let result = match result {
                 Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
@@ -487,8 +459,8 @@ where
                     let res = SubmitResult::deserialize_reader(&mut slice)
                         .expect("cannot deserialize output");
                     if !slice.is_empty() {
-                        trace_log = Logs::deserialize_reader(&mut slice).ok().map(|Logs(l)| l)
-                    };
+                        trace_log = Logs::deserialize_reader(&mut slice).ok().map(|Logs(l)| l);
+                    }
                     TransactionExecutionResult::Submit(Ok(res))
                 })),
                 Err(err) => {
@@ -500,14 +472,8 @@ where
         }
         TransactionKind::SubmitWithArgs(args) => {
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let result = runner.call(
-                "submit",
-                io.read_input().to_vec(),
-                promise_results.into(),
-                &env,
-                &mut ext,
-                context,
-            );
+            let input = io.read_input().to_vec();
+            let result = runner.call("submit", input, promise_results, &env, &mut ext, context);
             let result = match result {
                 Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
                     io.return_output(&data);
@@ -531,7 +497,13 @@ where
 
     let diff = get_diff(&io);
 
-    (tx_hash, diff, trace_log, result)
+    TransactionIncludedOutcome {
+        hash: tx_hash,
+        info: transaction_message,
+        diff,
+        maybe_result: result,
+        trace_log,
+    }
 }
 
 /// Based on nearcore implementation:

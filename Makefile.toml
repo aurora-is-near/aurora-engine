@@ -86,6 +86,7 @@ args = [
     "clippy",
     "--workspace",
     "--all-targets",
+    "--exclude=aurora-engine-traced",
     "--",
     "-D",
     "warnings",

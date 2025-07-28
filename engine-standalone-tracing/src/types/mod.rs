@@ -394,6 +394,7 @@ mod opcode_borsh {
         BorshDeserialize, BorshSerialize,
     };
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<W: Write>(value: &Opcode, writer: &mut W) -> Result<()> {
         value.0.serialize(writer)
     }

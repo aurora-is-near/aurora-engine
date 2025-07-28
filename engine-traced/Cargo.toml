@@ -15,11 +15,14 @@ crate-type = ["cdylib"]
 
 [dependencies]
 aurora-engine = { workspace = true, default-features = false, features = ["tracing"] }
-aurora-engine-sdk.workspace = true
+aurora-engine-sdk = { workspace = true, default-features = false }
 engine-standalone-tracing.workspace = true
 aurora-evm = { workspace = true, features = ["tracing"] }
 borsh.workspace = true
 primitive-types.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wee_alloc.workspace = true
 
 [lints]
 workspace = true
