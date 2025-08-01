@@ -98,8 +98,5 @@ fn is_dir_empty<P: AsRef<Path>>(path: P) -> bool {
         return false;
     }
 
-    match std::fs::read_dir(path) {
-        Ok(mut entries) => entries.next().is_none(),
-        Err(_) => false,
-    }
+    std::fs::read_dir(path).is_ok_and(|mut entries| entries.next().is_none())
 }
