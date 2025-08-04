@@ -13,6 +13,7 @@
 # ENV
 .env/custom.env
 etc/eth-contracts/.env
+engine-tests-connector/etc
 
 # Rust artifacts
 bin/

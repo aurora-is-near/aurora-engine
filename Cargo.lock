@@ -1838,6 +1838,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum 0.27.1",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -3782,9 +3783,9 @@ dependencies = [
 
 [[package]]
 name = "near-vm-compiler"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33bdd92d947d030503ad901eb3fe2205a0f4c57128221f28873f2ebcb24099c9"
+checksum = "592699c0c7098bb4897a3712fb319a3cc8d6cc135a4da88cfd9fdda1042b05eb"
 dependencies = [
  "enumset",
  "finite-wasm",
@@ -3799,9 +3800,9 @@ dependencies = [
 
 [[package]]
 name = "near-vm-compiler-singlepass"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d137fc7b3e6c87dff412f0b9c2e0056c960d499b6c8fb4a0749e35e210a8fefc"
+checksum = "f4ff7029861a2abc10ec4cda55295fadaa184c4004f46aa332d57aee14c96052"
 dependencies = [
  "dynasm 2.0.0",
  "dynasmrt 2.0.0",
@@ -3820,9 +3821,9 @@ dependencies = [
 
 [[package]]
 name = "near-vm-engine"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ace6533d08b98b16d0676ef0814a43b293e8f49b556ea6d24beca118898e69d"
+checksum = "812c90f82dbfda02e5a917f1b0376af21fdbeb72008bd8f498e8054edb160294"
 dependencies = [
  "backtrace",
  "cfg-if 1.0.0",
@@ -3899,9 +3900,9 @@ dependencies = [
 
 [[package]]
 name = "near-vm-types"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35cebea51b123caddac163b45c302fe1fcd50b0d8a26b54314a8873789017ff0"
+checksum = "373d1c6c603613500a95d9913a7d48f5b6531103362562f500d56255a35ddadf"
 dependencies = [
  "indexmap 2.9.0",
  "num-traits",
@@ -3911,9 +3912,9 @@ dependencies = [
 
 [[package]]
 name = "near-vm-vm"
-version = "0.30.1"
+version = "0.30.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0449ac7f47181f331f125cf45e54c2728a071f2c848fe2d5b75b8505f8f6a5e2"
+checksum = "57354b96ab2a3d586b01edfab367422b3c98476920bbf5d0e5ed4ee17bd62422"
 dependencies = [
  "backtrace",
  "cc",

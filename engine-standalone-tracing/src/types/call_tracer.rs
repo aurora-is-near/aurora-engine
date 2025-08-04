@@ -4,12 +4,17 @@
 use alloc::{format, string::String, vec::Vec};
 
 use aurora_engine_types::{types::Address, U256};
+use borsh::{BorshDeserialize, BorshSerialize};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct CallFrame {
     pub call_type: CallType,
     pub from: Address,
     pub to: Option<Address>,
+    #[borsh(
+        serialize_with = "u256_borsh::serialize",
+        deserialize_with = "u256_borsh::deserialize"
+    )]
     pub value: U256,
     pub gas: u64,
     pub gas_used: u64,
@@ -19,7 +24,7 @@ pub struct CallFrame {
     pub calls: Vec<CallFrame>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct CallTracer {
     pub call_stack: Vec<CallFrame>,
     pub top_level_transact: Option<CallFrame>,
@@ -143,7 +148,7 @@ impl CallTracer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum CallType {
     Call,
     StaticCall,
@@ -403,5 +408,22 @@ impl From<CallFrame> for SerializableCallFrame {
             error: frame.error,
             calls: frame.calls.into_iter().map(Into::into).collect(),
         }
+    }
+}
+
+mod u256_borsh {
+    use aurora_engine_types::U256;
+    use borsh::{
+        io::{Read, Result, Write},
+        BorshDeserialize, BorshSerialize,
+    };
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<W: Write>(value: &U256, writer: &mut W) -> Result<()> {
+        value.0.serialize(writer)
+    }
+
+    pub fn deserialize<R: Read>(reader: &mut R) -> Result<U256> {
+        <[u64; 4] as BorshDeserialize>::deserialize_reader(reader).map(U256)
     }
 }

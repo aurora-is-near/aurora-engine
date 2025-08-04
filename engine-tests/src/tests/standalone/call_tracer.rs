@@ -356,7 +356,7 @@ fn test_trace_precompiles_with_subcalls() {
         );
         tx.transaction = tx_kind;
         let mut outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx, false).unwrap();
+            sync::execute_transaction_message::<AuroraModExp>(storage, tx, None).unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
         let key =
@@ -387,7 +387,7 @@ fn test_trace_precompiles_with_subcalls() {
         tx
     };
     let outcome =
-        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, factory_update, false)
+        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, factory_update, None)
             .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
     let set_wnear_address = {
@@ -407,12 +407,9 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = tx_kind;
         tx
     };
-    let outcome = sync::execute_transaction_message::<AuroraModExp>(
-        &runner.storage,
-        set_wnear_address,
-        false,
-    )
-    .unwrap();
+    let outcome =
+        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, set_wnear_address, None)
+            .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
 
     // User calls XCC precompile
@@ -432,16 +429,14 @@ fn test_trace_precompiles_with_subcalls() {
         value: Wei::zero(),
         data: borsh::to_vec(&xcc_args).unwrap(),
     };
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
+    let (standalone_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let mut call_tracer = call_tracer.unwrap();
     assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
     assert_eq!(trace.calls.len(), 1);
     let subcall = trace.calls.first().unwrap();
     assert_eq!(subcall.call_type, call_tracer::CallType::Call);

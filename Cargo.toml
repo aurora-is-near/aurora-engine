@@ -21,6 +21,7 @@ aurora-engine-workspace = { path = "engine-workspace" }
 engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 
+thiserror = "2"
 anyhow = "1"
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }

@@ -1,15 +1,18 @@
+use std::fmt::Debug;
 use std::mem;
+use std::sync::Arc;
 use std::{io, str::FromStr};
 
-use aurora_engine::contract_methods::silo;
-use aurora_engine::{contract_methods, parameters::SubmitResult};
+use aurora_engine::engine::EngineError;
+use aurora_engine::parameters::SubmitResult;
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
     env::{self, DEFAULT_PREPAID_GAS},
-    io::{StorageIntermediate, IO},
+    io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
-use aurora_engine_types::parameters::{connector, engine, PromiseOrValue};
+use aurora_engine_types::borsh;
+use aurora_engine_types::parameters::{connector, engine};
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -18,12 +21,15 @@ use aurora_engine_types::{
     types::Address,
     H256,
 };
+use engine_standalone_tracing::types::call_tracer::CallTracer;
 use engine_standalone_tracing::{Logs, TraceLog};
+use near_vm_runner::logic::errors::VMRunnerError;
 use near_vm_runner::logic::types::PromiseResult;
+use thiserror::Error;
 
 pub mod types;
 
-use crate::engine_state::{EngineStateAccess, EngineStateVMAccess};
+use crate::engine_state::EngineStateAccess;
 use crate::runner::{Context, ContractRunner};
 use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
@@ -336,7 +342,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                         block_height,
                         &block_metadata,
                         engine_account_id,
-                        false,
+                        None,
                         io,
                         &mut context,
                         EngineStateAccess::get_transaction_diff,
@@ -353,10 +359,16 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum TraceKind {
+    Transaction,
+    CallFrame,
+}
+
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     storage: &Storage,
     mut transaction_message: TransactionMessage,
-    trace_transaction: bool,
+    trace_kind: Option<TraceKind>,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
     let transaction_position = transaction_message.position;
     let block_hash = transaction_message.block_hash;
@@ -375,7 +387,7 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
                 block_height,
                 &block_metadata,
                 engine_account_id,
-                trace_transaction,
+                trace_kind,
                 io,
                 &mut context,
                 EngineStateAccess::get_transaction_diff,
@@ -387,12 +399,12 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn execute_transaction<I, F>(
+pub fn execute_transaction<I, F>(
     transaction_message: TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    trace_transaction: bool,
+    trace_kind: Option<TraceKind>,
     mut io: I,
     context: &mut Context,
     get_diff: F,
@@ -433,65 +445,68 @@ where
         .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
         .collect::<Vec<_>>()
         .into();
-    let mut ext = EngineStateVMAccess {
-        io,
-        action_log: vec![],
-    };
 
-    let (tx_hash, result, trace_log) = match &transaction_message.transaction {
+    let (tx_hash, result, trace_log, call_tracer) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
             // We can ignore promises in the standalone engine because it processes each receipt separately
             // and it is fed a stream of receipts (it does not schedule them)
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
-            let method = if trace_transaction {
-                "submit_trace_tx"
-            } else {
-                "submit"
+            let method = match trace_kind {
+                None => "submit",
+                Some(TraceKind::Transaction) => "submit_trace_tx",
+                Some(TraceKind::CallFrame) => "submit_trace_call",
             };
-            let input = io.read_input().to_vec();
-            let result = runner.call(method, input, promise_results, &env, &mut ext, context);
             let mut trace_log = None;
-            let result = match result {
-                Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
-                    let mut slice = data.as_slice();
-                    io.return_output(&data);
-                    let res = SubmitResult::deserialize_reader(&mut slice)
-                        .expect("cannot deserialize output");
-                    if !slice.is_empty() {
-                        trace_log = Logs::deserialize_reader(&mut slice).ok().map(|Logs(l)| l);
-                    }
-                    TransactionExecutionResult::Submit(Ok(res))
-                })),
-                Err(err) => {
-                    // TODO: convert error
-                    panic!("Failed to submit transaction: {err:?}")
-                }
-            };
-            (tx_hash, result, trace_log)
+            let mut trace_call_stack = None;
+            let result = runner
+                .call_helper(method, promise_results, &env, io, context, None)
+                .map_err(ExecutionError::from)
+                .and_then(|data| {
+                    data.map(|data| {
+                        let mut slice = data.as_slice();
+                        io.return_output(&data);
+                        let res = SubmitResult::deserialize_reader(&mut slice)
+                            .map_err(ExecutionError::Deserialize)?;
+                        if !slice.is_empty() {
+                            match trace_kind {
+                                Some(TraceKind::Transaction) => {
+                                    trace_log =
+                                        Logs::deserialize_reader(&mut slice).ok().map(|Logs(l)| l);
+                                }
+                                Some(TraceKind::CallFrame) => {
+                                    trace_call_stack =
+                                        CallTracer::deserialize_reader(&mut slice).ok();
+                                }
+                                None => {}
+                            }
+                        }
+                        Ok(TransactionExecutionResult::Submit(Ok(res)))
+                    })
+                    .transpose()
+                });
+            (tx_hash, result, trace_log, trace_call_stack)
         }
         TransactionKind::SubmitWithArgs(args) => {
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-            let input = io.read_input().to_vec();
-            let result = runner.call("submit", input, promise_results, &env, &mut ext, context);
-            let result = match result {
-                Ok(vm_outcome) => Ok(vm_outcome.return_data.as_value().map(|data| {
-                    io.return_output(&data);
-                    let res =
-                        SubmitResult::try_from_slice(&data).expect("cannot deserialize output");
-                    TransactionExecutionResult::Submit(Ok(res))
-                })),
-                Err(err) => {
-                    // TODO: convert error
-                    panic!("Failed to submit transaction: {err:?}")
-                }
-            };
+            let result = runner
+                .call_helper("submit", promise_results, &env, io, context, None)
+                .map_err(ExecutionError::from)
+                .and_then(|data| {
+                    data.map(|data| {
+                        io.return_output(&data);
+                        let res = SubmitResult::try_from_slice(&data)
+                            .map_err(ExecutionError::Deserialize)?;
+                        Ok(TransactionExecutionResult::Submit(Ok(res)))
+                    })
+                    .transpose()
+                });
 
-            (tx_hash, result, None)
+            (tx_hash, result, None, None)
         }
         other => {
-            let result = non_submit_execute(other, io, &env, &transaction_message.promise_data);
-            (near_receipt_id, result, None)
+            let result = non_submit_execute(other, &runner, io, &env, promise_results, context);
+            (near_receipt_id, result, None, None)
         }
     };
 
@@ -503,6 +518,7 @@ where
         diff,
         maybe_result: result,
         trace_log,
+        call_tracer,
     }
 }
 
@@ -524,53 +540,87 @@ fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
     clippy::match_same_arms,
     clippy::cognitive_complexity
 )]
-fn non_submit_execute<I: IO + Copy>(
+fn non_submit_execute<I: IO + Send + Copy>(
     transaction: &TransactionKind,
-    mut io: I,
+    runner: &ContractRunner,
+    io: I,
     env: &env::Fixed,
-    promise_data: &[Option<Vec<u8>>],
-) -> Result<Option<TransactionExecutionResult>, error::Error> {
+    promise_results: Arc<[PromiseResult]>,
+    ctx: &mut Context,
+) -> Result<Option<TransactionExecutionResult>, ExecutionError>
+where
+    I::StorageValue: AsRef<[u8]>,
+{
     let result = match transaction {
         TransactionKind::Call(_) => {
             // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::evm_transactions::call(io, env, &mut handler)?;
+            let data = runner
+                .call_helper("call", promise_results, env, io, ctx, None)?
+                .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
+            let result =
+                SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
 
         TransactionKind::Deploy(_) => {
-            // We can ignore promises in the standalone engine (see above)
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::evm_transactions::deploy_code(io, env, &mut handler)?;
+            let data = runner
+                .call_helper("deploy_code", promise_results, env, io, ctx, None)?
+                .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
+            let result =
+                SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::DeployErc20(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
+            let data =
+                runner.call_helper("deploy_erc20_token", promise_results, env, io, ctx, None)?;
 
-            Some(match result {
-                PromiseOrValue::Value(address) => TransactionExecutionResult::DeployErc20(address),
-                PromiseOrValue::Promise(promise_args) => {
-                    TransactionExecutionResult::Promise(promise_args)
+            Some(match data {
+                Some(data) => {
+                    let mut slice = data.as_slice();
+                    let address =
+                        Address::deserialize(&mut slice).map_err(ExecutionError::Deserialize)?;
+                    TransactionExecutionResult::DeployErc20(address)
+                }
+                None => {
+                    //
+                    // TransactionExecutionResult::Promise(promise_args)
+                    panic!("cannot handle case where `deploy_erc20_token` returns promise")
                 }
             })
         }
         TransactionKind::DeployErc20Callback(_) => {
-            // No promises can be created by `deploy_erc20_token_callback`
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result =
-                contract_methods::connector::deploy_erc20_token_callback(io, env, &mut handler)?;
+            let data = runner
+                .call_helper(
+                    "deploy_erc20_token_callback",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )?
+                .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
+            let mut slice = data.as_slice();
+            let address = Address::deserialize(&mut slice).map_err(ExecutionError::Deserialize)?;
 
-            Some(TransactionExecutionResult::DeployErc20(result))
+            Some(TransactionExecutionResult::DeployErc20(address))
         }
         TransactionKind::FtOnTransfer(_) => {
-            // No promises can be created by `ft_on_transfer`
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_output = contract_methods::connector::ft_on_transfer(io, env, &mut handler)?;
+            let data = runner
+                .call_helper(
+                    "ft_on_transfer_with_return",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )?
+                .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
+            let submit_result = Option::<SubmitResult>::try_from_slice(&data)
+                .map_err(ExecutionError::Deserialize)?;
 
-            maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
+            submit_result.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::FtTransferCall(_) => None,
         TransactionKind::ResolveTransfer(_, _) => None,
@@ -583,54 +633,88 @@ fn non_submit_execute<I: IO + Copy>(
         TransactionKind::StorageWithdraw(_) => None,
         TransactionKind::SetPausedFlags(_) => None,
         TransactionKind::RegisterRelayer(_) => {
-            contract_methods::admin::register_relayer(io, env)?;
+            runner.call_helper("register_relayer", promise_results, env, io, ctx, None)?;
+
             None
         }
         TransactionKind::ExitToNear(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
-                io,
+            runner.call_helper(
+                "exit_to_near_precompile_callback",
+                promise_results,
                 env,
-                &mut handler,
+                io,
+                ctx,
+                None,
             )?;
 
-            maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
+            // maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
+            None
         }
         TransactionKind::SetConnectorData(_) => None,
         TransactionKind::NewConnector(_) => None,
         TransactionKind::NewEngine(_) => {
-            contract_methods::admin::new(io, env)?;
+            runner.call_helper("new", promise_results, env, io, ctx, None)?;
             None
         }
         TransactionKind::SetEthConnectorContractAccount(_) => {
-            contract_methods::connector::set_eth_connector_contract_account(io, env)?;
+            runner.call_helper(
+                "set_eth_connector_contract_account",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
+
             None
         }
         TransactionKind::FactoryUpdate(_) => {
-            contract_methods::xcc::factory_update(io, env)?;
+            runner.call_helper("factory_update", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::FactoryUpdateAddressVersion(_) => {
-            let handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::xcc::factory_update_address_version(io, env, &handler)?;
+            runner.call_helper(
+                "factory_update_address_version",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
 
             None
         }
         TransactionKind::FactorySetWNearAddress(_) => {
-            contract_methods::xcc::factory_set_wnear_address(io, env)?;
+            runner.call_helper(
+                "factory_set_wnear_address",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
 
             None
         }
         TransactionKind::FundXccSubAccount(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::xcc::fund_xcc_sub_account(io, env, &mut handler)?;
+            runner.call_helper("fund_xcc_sub_account", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::WithdrawWnearToRouter(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
+            let data = runner
+                .call_helper(
+                    "withdraw_wnear_to_router",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )?
+                .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
+            let result =
+                SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
 
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
@@ -638,103 +722,185 @@ fn non_submit_execute<I: IO + Copy>(
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(_) => {
-            contract_methods::admin::pause_precompiles(io, env)?;
+            runner.call_helper("pause_precompiles", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::ResumePrecompiles(_) => {
-            contract_methods::admin::resume_precompiles(io, env)?;
+            runner.call_helper("resume_precompiles", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::SetOwner(_) => {
-            contract_methods::admin::set_owner(io, env)?;
+            runner.call_helper("set_owner", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::SetUpgradeDelayBlocks(_) => {
-            contract_methods::admin::set_upgrade_delay_blocks(io, env)?;
+            runner.call_helper(
+                "set_upgrade_delay_blocks",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
 
             None
         }
         TransactionKind::PauseContract => {
-            contract_methods::admin::pause_contract(io, env)?;
+            runner.call_helper("pause_contract", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::ResumeContract => {
-            contract_methods::admin::resume_contract(io, env)?;
+            runner.call_helper("resume_contract", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::SetKeyManager(_) => {
-            contract_methods::admin::set_key_manager(io, env)?;
+            runner.call_helper("set_key_manager", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::AddRelayerKey(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::admin::add_relayer_key(io, env, &mut handler)?;
+            runner.call_helper("add_relayer_key", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::StoreRelayerKeyCallback(_) => {
-            contract_methods::admin::store_relayer_key_callback(io, env)?;
+            runner.call_helper(
+                "store_relayer_key_callback",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
 
             None
         }
         TransactionKind::RemoveRelayerKey(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::admin::remove_relayer_key(io, env, &mut handler)?;
+            runner.call_helper("remove_relayer_key", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::StartHashchain(_) => {
-            contract_methods::admin::start_hashchain(io, env)?;
+            runner.call_helper("start_hashchain", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::SetErc20Metadata(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::set_erc20_metadata(io, env, &mut handler)?;
+            runner.call_helper("set_erc20_metadata", promise_results, env, io, ctx, None)?;
 
             None
         }
         TransactionKind::SetFixedGas(args) => {
-            silo::set_fixed_gas(&mut io, args.fixed_gas);
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper("set_fixed_gas", promise_results, env, io, ctx, Some(input))?;
+
             None
         }
         TransactionKind::SetErc20FallbackAddress(args) => {
-            silo::set_erc20_fallback_address(&mut io, args.address);
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "set_erc20_fallback_address",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::SetSiloParams(args) => {
-            silo::set_silo_params(&mut io, args.clone());
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "set_silo_params",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::AddEntryToWhitelist(args) => {
-            silo::add_entry_to_whitelist(&io, args);
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "add_entry_to_whitelist",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::AddEntryToWhitelistBatch(args) => {
-            silo::add_entry_to_whitelist_batch(&io, args.clone());
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "add_entry_to_whitelist_batch",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::RemoveEntryFromWhitelist(args) => {
-            silo::remove_entry_from_whitelist(&io, args);
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "remove_entry_from_whitelist",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::SetWhitelistStatus(args) => {
-            silo::set_whitelist_status(&io, args);
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "set_whitelist_status",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::SetWhitelistsStatuses(args) => {
-            silo::set_whitelists_statuses(&io, args.clone());
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
+            runner.call_helper(
+                "set_whitelists_statuses",
+                promise_results,
+                env,
+                io,
+                ctx,
+                Some(input),
+            )?;
+
             None
         }
         TransactionKind::MirrorErc20TokenCallback(_) => {
-            let mut handler = crate::promise::NoScheduler { promise_data };
-            contract_methods::connector::mirror_erc20_token_callback(io, env, &mut handler)?;
+            runner.call_helper(
+                "mirror_erc20_token_callback",
+                promise_results,
+                env,
+                io,
+                ctx,
+                None,
+            )?;
 
             None
         }
@@ -764,8 +930,9 @@ pub struct TransactionIncludedOutcome {
     pub hash: H256,
     pub info: TransactionMessage,
     pub diff: Diff,
-    pub maybe_result: Result<Option<TransactionExecutionResult>, error::Error>,
+    pub maybe_result: Result<Option<TransactionExecutionResult>, ExecutionError>,
     pub trace_log: Option<Vec<TraceLog>>,
+    pub call_tracer: Option<CallTracer>,
 }
 
 impl TransactionIncludedOutcome {
@@ -785,24 +952,22 @@ pub enum TransactionExecutionResult {
     Promise(PromiseWithCallbackArgs),
 }
 
-pub mod error {
-    use aurora_engine::{contract_methods, engine};
+#[derive(Debug, Error)]
+pub enum ExecutionError {
+    #[error("{0:?}")]
+    VMRunnerError(Box<dyn Debug + Send + Sync + 'static>),
+    #[error("engine: {0:?}")]
+    Engine(EngineError),
+    #[error("serialize arguments: {0}")]
+    SerializeArg(io::Error),
+    #[error("deserialize: {0}")]
+    Deserialize(io::Error),
+    #[error("deserialize: unexpected end of stream")]
+    DeserializeUnexpectedEnd,
+}
 
-    #[derive(Debug)]
-    pub enum Error {
-        Engine(engine::EngineError),
-        ContractError(contract_methods::ContractError),
-    }
-
-    impl From<engine::EngineError> for Error {
-        fn from(e: engine::EngineError) -> Self {
-            Self::Engine(e)
-        }
-    }
-
-    impl From<contract_methods::ContractError> for Error {
-        fn from(e: contract_methods::ContractError) -> Self {
-            Self::ContractError(e)
-        }
+impl From<VMRunnerError> for ExecutionError {
+    fn from(value: VMRunnerError) -> Self {
+        Self::VMRunnerError(Box::new(value))
     }
 }

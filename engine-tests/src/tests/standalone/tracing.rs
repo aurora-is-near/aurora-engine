@@ -2,6 +2,7 @@
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
+use engine_standalone_storage::sync::TraceKind;
 use engine_standalone_tracing::TraceLog;
 use serde::Deserialize;
 use std::path::Path;
@@ -80,6 +81,7 @@ fn test_evm_tracing_with_storage() {
         diff,
         maybe_result: Ok(None),
         trace_log: None,
+        call_tracer: None,
     };
     standalone::storage::commit(&mut runner.storage, &tx);
 
@@ -94,7 +96,7 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let (result, trace_log) = runner
-        .submit_raw_transaction_bytes(&tx_bytes, true)
+        .submit_raw_transaction_bytes(&tx_bytes, Some(TraceKind::Transaction))
         .unwrap();
     assert!(result.status.is_ok());
     assert_eq!(result.gas_used, 45_038);
@@ -116,7 +118,7 @@ fn test_evm_tracing_with_storage() {
         None,
     );
     let (result, trace_log) = runner
-        .submit_raw_transaction_bytes(&tx_bytes, true)
+        .submit_raw_transaction_bytes(&tx_bytes, Some(TraceKind::Transaction))
         .unwrap();
     assert!(result.status.is_ok());
     assert_eq!(result.gas_used, 27_938);

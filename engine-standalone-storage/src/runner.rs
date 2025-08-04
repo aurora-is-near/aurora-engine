@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::{env::Env, io::IO};
 use near_parameters::{RuntimeConfig, RuntimeConfigStore};
 use near_primitives_core::{hash::CryptoHash, types::AccountId};
 use near_vm_runner::{
     logic::{errors::VMRunnerError, types::PromiseResult, External, VMContext, VMOutcome},
     Contract, ContractCode,
 };
+
+use crate::engine_state::EngineStateVMAccess;
 
 pub struct ContractRunner {
     contract: CodeWrapper,
@@ -19,30 +21,29 @@ pub struct Context {
 }
 
 impl Context {
+    #[must_use]
     pub const fn initial() -> Self {
         Self {
             balance: 0,
-            storage_usage: 0,
+            storage_usage: 100,
         }
     }
 
+    #[must_use]
     pub fn serialize(&self) -> [u8; size_of::<Self>()] {
         let mut out = <[u8; size_of::<Self>()]>::default();
-        out[memoffset::offset_of!(Self, balance)..][..size_of::<u128>()]
-            .clone_from_slice(&self.balance.to_le_bytes());
-        out[memoffset::offset_of!(Self, storage_usage)..][..size_of::<u64>()]
+        out[memoffset::span_of!(Self, balance)].clone_from_slice(&self.balance.to_le_bytes());
+        out[memoffset::span_of!(Self, storage_usage)]
             .clone_from_slice(&self.storage_usage.to_le_bytes());
         out
     }
 
+    #[must_use]
     pub fn deserialize(v: [u8; size_of::<Self>()]) -> Self {
-        let balance = u128::from_le_bytes(
-            v[memoffset::offset_of!(Self, balance)..][..size_of::<u128>()]
-                .try_into()
-                .unwrap(),
-        );
+        let balance =
+            u128::from_le_bytes(v[memoffset::span_of!(Self, balance)].try_into().unwrap());
         let storage_usage = u64::from_le_bytes(
-            v[memoffset::offset_of!(Self, storage_usage)..][..size_of::<u64>()]
+            v[memoffset::span_of!(Self, storage_usage)]
                 .try_into()
                 .unwrap(),
         );
@@ -135,4 +136,45 @@ impl ContractRunner {
             },
         )
     }
+
+    pub fn call_helper<I>(
+        &self,
+        method: &str,
+        promise_results: Arc<[PromiseResult]>,
+        env: &impl Env,
+        io: I,
+        more_ctx: &mut Context,
+        input: Option<Vec<u8>>,
+    ) -> Result<Option<Vec<u8>>, VMRunnerError>
+    where
+        I: IO + Send + Copy,
+        I::StorageValue: AsRef<[u8]>,
+    {
+        let mut ext = EngineStateVMAccess {
+            io,
+            action_log: vec![],
+        };
+
+        let input = input.unwrap_or_else(|| io.read_input().as_ref().to_vec());
+        let vm_outcome = self.call(method, input, promise_results, env, &mut ext, more_ctx)?;
+        let output = vm_outcome.return_data.as_value();
+        if let Some(data) = &output {
+            ext.io.return_output(data);
+        }
+        Ok(output)
+    }
+}
+
+// TODO: define it in borealis and call abstractly from standalone storage
+#[allow(dead_code)]
+pub trait AbstractVMRunner {
+    type Error;
+
+    fn call<E: Env, I: IO + Send + Copy>(
+        method: &str,
+        promise_data: Vec<Option<Vec<u8>>>,
+        env: &E,
+        io: I,
+        more_ctx: &mut [u8; 32],
+    ) -> Result<(), Self::Error>;
 }

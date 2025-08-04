@@ -5,6 +5,7 @@ use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
+use engine_standalone_storage::sync::TraceKind;
 use engine_standalone_storage::{
     sync::{
         self,
@@ -13,6 +14,7 @@ use engine_standalone_storage::{
     },
     BlockMetadata, Diff, Storage,
 };
+use engine_standalone_tracing::types::call_tracer::CallTracer;
 use engine_standalone_tracing::TraceLog;
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
@@ -56,6 +58,7 @@ impl StandaloneRunner {
             diff: result.diff,
             maybe_result: Ok(None),
             trace_log: None,
+            call_tracer: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
@@ -92,6 +95,7 @@ impl StandaloneRunner {
             diff: result.diff,
             maybe_result: Ok(None),
             trace_log: None,
+            call_tracer: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
@@ -102,7 +106,7 @@ impl StandaloneRunner {
         signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
-    ) -> Result<SubmitResult, sync::error::Error> {
+    ) -> Result<SubmitResult, sync::ExecutionError> {
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: U256::zero(),
@@ -118,9 +122,21 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::error::Error> {
-        let mut outcome = self.submit_transaction_inner(account, transaction, true);
+    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::ExecutionError> {
+        let mut outcome =
+            self.submit_transaction_inner(account, transaction, Some(TraceKind::Transaction));
         let trace_log = outcome.trace_log.take();
+        unwrap_result(outcome).map(|res| (res, trace_log))
+    }
+
+    pub fn submit_transaction_with_call_stack_tracing(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+    ) -> Result<(SubmitResult, Option<CallTracer>), sync::ExecutionError> {
+        let mut outcome =
+            self.submit_transaction_inner(account, transaction, Some(TraceKind::CallFrame));
+        let trace_log = outcome.call_tracer.take();
         unwrap_result(outcome).map(|res| (res, trace_log))
     }
 
@@ -128,8 +144,8 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, sync::error::Error> {
-        let outcome = self.submit_transaction_inner(account, transaction, false);
+    ) -> Result<SubmitResult, sync::ExecutionError> {
+        let outcome = self.submit_transaction_inner(account, transaction, None);
         unwrap_result(outcome)
     }
 
@@ -137,7 +153,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-        trace_transaction: bool,
+        trace_kind: Option<TraceKind>,
     ) -> TransactionIncludedOutcome {
         let storage = &mut self.storage;
         let env = &mut self.env;
@@ -148,7 +164,7 @@ impl StandaloneRunner {
         Self::internal_submit_transaction(
             &transaction_bytes,
             0,
-            trace_transaction,
+            trace_kind,
             storage,
             env,
             &mut self.cumulative_diff,
@@ -159,8 +175,8 @@ impl StandaloneRunner {
     pub fn submit_raw_transaction_bytes(
         &mut self,
         transaction_bytes: &[u8],
-        trace_transaction: bool,
-    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::error::Error> {
+        trace_kind: Option<TraceKind>,
+    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::ExecutionError> {
         self.env.predecessor_account_id = "some-account.near".parse().unwrap();
         let storage = &mut self.storage;
         let env = &mut self.env;
@@ -169,7 +185,7 @@ impl StandaloneRunner {
         let mut outcome = Self::internal_submit_transaction(
             transaction_bytes,
             0,
-            trace_transaction,
+            trace_kind,
             storage,
             env,
             &mut self.cumulative_diff,
@@ -205,7 +221,7 @@ impl StandaloneRunner {
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
         let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, false).unwrap();
+            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, None).unwrap();
 
         match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
             sync::TransactionExecutionResult::Submit(result) => {
@@ -281,7 +297,7 @@ impl StandaloneRunner {
         }
 
         let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, false).unwrap();
+            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, None).unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -381,7 +397,7 @@ impl StandaloneRunner {
     fn internal_submit_transaction(
         transaction_bytes: &[u8],
         transaction_position: u16,
-        trace_transaction: bool,
+        trace_kind: Option<TraceKind>,
         storage: &mut Storage,
         env: &env::Fixed,
         cumulative_diff: &mut Diff,
@@ -399,8 +415,7 @@ impl StandaloneRunner {
         tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
 
         let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, trace_transaction)
-                .unwrap();
+            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, trace_kind).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -410,9 +425,11 @@ impl StandaloneRunner {
 
 fn unwrap_result(
     outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResult, sync::error::Error> {
+) -> Result<SubmitResult, sync::ExecutionError> {
     match outcome.maybe_result?.unwrap() {
-        sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
+        sync::TransactionExecutionResult::Submit(result) => {
+            result.map_err(sync::ExecutionError::Engine)
+        }
         sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
         sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }

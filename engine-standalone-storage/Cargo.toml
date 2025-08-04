@@ -32,6 +32,7 @@ near-vm-runner.workspace = true
 near-primitives-core.workspace = true
 near-parameters.workspace = true
 near-crypto.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true
