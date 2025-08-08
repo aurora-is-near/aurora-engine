@@ -61,27 +61,37 @@ impl AsRef<[u8]> for ErrorMessage {
     }
 }
 
-fn require_running(state: &state::EngineState) -> Result<(), ContractError> {
+pub fn require_running(state: &state::EngineState) -> Result<(), ContractError> {
     if state.is_paused {
         return Err(errors::ERR_PAUSED.into());
     }
     Ok(())
 }
 
-fn require_paused(state: &state::EngineState) -> Result<(), ContractError> {
+pub fn require_paused(state: &state::EngineState) -> Result<(), ContractError> {
     if !state.is_paused {
         return Err(errors::ERR_RUNNING.into());
     }
     Ok(())
 }
 
-fn require_owner_only(
+pub fn require_owner_only(
     state: &state::EngineState,
     predecessor_account_id: &AccountId,
 ) -> Result<(), ContractError> {
     if &state.owner_id != predecessor_account_id {
         return Err(errors::ERR_NOT_ALLOWED.into());
     }
+    Ok(())
+}
+
+pub fn require_owner_and_running(
+    state: &state::EngineState,
+    predecessor_account_id: &AccountId,
+) -> Result<(), ContractError> {
+    require_running(state)?;
+    require_owner_only(state, predecessor_account_id)?;
+
     Ok(())
 }
 
