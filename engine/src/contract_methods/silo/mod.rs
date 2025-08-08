@@ -1,6 +1,4 @@
 use aurora_engine_sdk::io::{StorageIntermediate, IO};
-#[cfg(feature = "contract")]
-use aurora_engine_sdk::{env::Env, types::SdkUnwrap};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo::{
     SiloParamsArgs, WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
@@ -9,8 +7,6 @@ use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
 use aurora_engine_types::types::{Address, EthGas};
 use aurora_engine_types::AsBytes;
 
-#[cfg(feature = "contract")]
-use crate::engine::EngineErrorKind;
 use crate::prelude::Vec;
 
 use whitelist::Whitelist;
@@ -48,7 +44,7 @@ pub fn get_fixed_gas<I: IO>(io: &I) -> Option<EthGas> {
         .and_then(|bytes| bytes.to_value().ok())
 }
 
-/// Set gas amount per transaction.
+/// Set an amount of gas per transaction.
 pub fn set_fixed_gas<I: IO>(io: &mut I, gas: Option<EthGas>) {
     let key = fixed_gas_key();
 
@@ -76,13 +72,13 @@ pub fn set_erc20_fallback_address<I: IO>(io: &mut I, address: Option<Address>) {
     }
 }
 
-/// Add an entry to a white list depending on a kind of list types in provided arguments.
+/// Add an entry to a whitelist depending on a kind of list types in provided arguments.
 pub fn add_entry_to_whitelist<I: IO + Copy>(io: &I, args: &WhitelistArgs) {
     let (kind, entry) = get_kind_and_entry(args);
     Whitelist::init(io, kind).add(entry);
 }
 
-/// Add an entries to a white list depending on a kind of list types in provided arguments.
+/// Add entries to a whitelist depending on a kind of list types in provided arguments.
 pub fn add_entry_to_whitelist_batch<I: IO + Copy, A: IntoIterator<Item = WhitelistArgs>>(
     io: &I,
     entries: A,
@@ -92,18 +88,18 @@ pub fn add_entry_to_whitelist_batch<I: IO + Copy, A: IntoIterator<Item = Whiteli
     }
 }
 
-/// Remove an entries to a white list depending on a kind of list types in provided arguments.
+/// Remove an entry from a whitelist depending on a kind of list types in provided arguments.
 pub fn remove_entry_from_whitelist<I: IO + Copy>(io: &I, args: &WhitelistArgs) {
     let (kind, entry) = get_kind_and_entry(args);
     Whitelist::init(io, kind).remove(entry);
 }
 
-/// Set status of the provided white list.
+/// Set the given status of the provided whitelist.
 pub fn set_whitelist_status<I: IO + Copy>(io: &I, args: &WhitelistStatusArgs) {
     whitelist::set_whitelist_status(io, args);
 }
 
-/// Set status of the provided white lists.
+/// Set given statuses of the provided whitelists.
 pub fn set_whitelists_statuses<I: IO + Copy, A: IntoIterator<Item = WhitelistStatusArgs>>(
     io: &I,
     args: A,
@@ -113,12 +109,12 @@ pub fn set_whitelists_statuses<I: IO + Copy, A: IntoIterator<Item = WhitelistSta
     }
 }
 
-/// Return status of the provided white list.
+/// Return a status of the given whitelist.
 pub fn get_whitelist_status<I: IO + Copy>(io: &I, args: &WhitelistKindArgs) -> WhitelistStatusArgs {
     whitelist::get_whitelist_status(io, args)
 }
 
-/// Return status of the all white list.
+/// Return status of the all whitelists.
 pub fn get_whitelists_statuses<I: IO + Copy>(io: &I) -> Vec<WhitelistStatusArgs> {
     [
         WhitelistKind::Admin,
@@ -131,21 +127,9 @@ pub fn get_whitelists_statuses<I: IO + Copy>(io: &I) -> Vec<WhitelistStatusArgs>
     .collect()
 }
 
-/// Check if the calling user is admin or owner of the contract.
-#[cfg(feature = "contract")]
-pub fn assert_admin<I: IO + Env + Copy>(io: &I) -> Result<(), EngineErrorKind> {
-    let predecessor = io.predecessor_account_id();
-
-    if is_owner(io, &predecessor) || is_admin(io, &predecessor) {
-        return Ok(());
-    }
-
-    Err(EngineErrorKind::NotAllowed)
-}
-
 /// Check if a user has the right to deploy EVM code.
 pub fn is_allow_deploy<I: IO + Copy>(io: &I, account: &AccountId, address: &Address) -> bool {
-    is_admin(io, account) && is_evm_admin(io, address)
+    is_account_allowed_deploy(io, account) && is_address_allowed_deploy(io, address)
 }
 
 /// Check if a user has the right to submit transactions.
@@ -158,20 +142,14 @@ pub fn is_allow_receive_erc20_tokens<I: IO + Copy>(io: &I, address: &Address) ->
     is_address_allowed(io, address)
 }
 
-fn is_admin<I: IO + Copy>(io: &I, account_id: &AccountId) -> bool {
+fn is_account_allowed_deploy<I: IO + Copy>(io: &I, account_id: &AccountId) -> bool {
     let list = Whitelist::init(io, WhitelistKind::Admin);
     !list.is_enabled() || list.is_exist(account_id)
 }
 
-fn is_evm_admin<I: IO + Copy>(io: &I, address: &Address) -> bool {
+fn is_address_allowed_deploy<I: IO + Copy>(io: &I, address: &Address) -> bool {
     let list = Whitelist::init(io, WhitelistKind::EvmAdmin);
     !list.is_enabled() || list.is_exist(address)
-}
-
-#[cfg(feature = "contract")]
-fn is_owner<I: IO + Copy>(io: &I, account_id: &AccountId) -> bool {
-    let state = crate::state::get_state(io).sdk_unwrap();
-    &state.owner_id == account_id
 }
 
 fn is_address_allowed<I: IO + Copy>(io: &I, address: &Address) -> bool {
