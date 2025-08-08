@@ -64,6 +64,7 @@ pub fn ft_on_transfer<I: IO + Copy, E: Env, H: PromiseHandler>(
     handler: &mut H,
 ) -> Result<Option<SubmitResult>, ContractError> {
     with_hashchain(io, env, function_name!(), |mut io| {
+        require_running(&state::get_state(&io)?)?;
         let current_account_id = env.current_account_id();
         let predecessor_account_id = env.predecessor_account_id();
         let mut engine: Engine<_, _> = Engine::new(
