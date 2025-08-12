@@ -21,7 +21,7 @@ pub mod sync;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
-pub use runner::Context;
+pub use runner::AbstractContractRunner;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,

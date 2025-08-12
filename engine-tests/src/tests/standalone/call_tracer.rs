@@ -355,8 +355,13 @@ fn test_trace_precompiles_with_subcalls() {
             tx_kind.raw_bytes(),
         );
         tx.transaction = tx_kind;
-        let mut outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx, None).unwrap();
+        let mut outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+            storage,
+            &runner.wasm_runner,
+            tx,
+            None,
+        )
+        .unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
         let key =
@@ -386,9 +391,13 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = tx_kind;
         tx
     };
-    let outcome =
-        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, factory_update, None)
-            .unwrap();
+    let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+        &runner.storage,
+        &runner.wasm_runner,
+        factory_update,
+        None,
+    )
+    .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
     let set_wnear_address = {
         runner.env.block_height += 1;
@@ -407,9 +416,13 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = tx_kind;
         tx
     };
-    let outcome =
-        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, set_wnear_address, None)
-            .unwrap();
+    let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+        &runner.storage,
+        &runner.wasm_runner,
+        set_wnear_address,
+        None,
+    )
+    .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
 
     // User calls XCC precompile

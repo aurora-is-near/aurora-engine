@@ -31,6 +31,7 @@ pub struct StandaloneRunner {
     pub chain_id: u64,
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
+    pub wasm_runner: utils::runner::ContractRunner,
 }
 
 impl StandaloneRunner {
@@ -166,6 +167,7 @@ impl StandaloneRunner {
             0,
             trace_kind,
             storage,
+            &self.wasm_runner,
             env,
             &mut self.cumulative_diff,
             &[],
@@ -187,6 +189,7 @@ impl StandaloneRunner {
             0,
             trace_kind,
             storage,
+            &self.wasm_runner,
             env,
             &mut self.cumulative_diff,
             &[],
@@ -220,8 +223,13 @@ impl StandaloneRunner {
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
-        let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, None).unwrap();
+        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+            storage,
+            &self.wasm_runner,
+            tx_msg,
+            None,
+        )
+        .unwrap();
 
         match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
             sync::TransactionExecutionResult::Submit(result) => {
@@ -296,8 +304,13 @@ impl StandaloneRunner {
             );
         }
 
-        let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, None).unwrap();
+        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+            storage,
+            &self.wasm_runner,
+            tx_msg,
+            None,
+        )
+        .unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -399,6 +412,7 @@ impl StandaloneRunner {
         transaction_position: u16,
         trace_kind: Option<TraceKind>,
         storage: &mut Storage,
+        runner: &utils::runner::ContractRunner,
         env: &env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
@@ -414,8 +428,10 @@ impl StandaloneRunner {
         );
         tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
 
-        let outcome =
-            sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg, trace_kind).unwrap();
+        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+            storage, runner, tx_msg, trace_kind,
+        )
+        .unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -448,6 +464,7 @@ impl Default for StandaloneRunner {
             env,
             chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
+            wasm_runner: utils::runner::ContractRunner::bundled(),
         }
     }
 }

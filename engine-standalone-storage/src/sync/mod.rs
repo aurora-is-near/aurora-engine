@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::mem;
-use std::sync::Arc;
 use std::{io, str::FromStr};
 
 use aurora_engine::engine::EngineError;
@@ -23,14 +22,12 @@ use aurora_engine_types::{
 };
 use engine_standalone_tracing::types::call_tracer::CallTracer;
 use engine_standalone_tracing::{Logs, TraceLog};
-use near_vm_runner::logic::errors::VMRunnerError;
-use near_vm_runner::logic::types::PromiseResult;
 use thiserror::Error;
 
 pub mod types;
 
 use crate::engine_state::EngineStateAccess;
-use crate::runner::{Context, ContractRunner};
+use crate::runner::AbstractContractRunner;
 use crate::{error::ParseTransactionKindError, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionKind, TransactionKindTag, TransactionMessage};
 
@@ -302,10 +299,15 @@ pub fn parse_transaction_kind(
 /// Note: this function does not automatically commit transaction messages to the storage.
 /// If you want the transaction diff committed then you must call the `commit` method on
 /// the outcome of this function.
-pub fn consume_message<M: ModExpAlgorithm + 'static>(
+pub fn consume_message<M: ModExpAlgorithm + 'static, R>(
     storage: &mut Storage,
+    runner: &R,
     message: Message,
-) -> Result<ConsumeMessageOutcome, crate::Error> {
+) -> Result<ConsumeMessageOutcome, crate::Error>
+where
+    R: AbstractContractRunner,
+    R::Error: Debug + Send + Sync + 'static,
+{
     match message {
         Message::Block(block_message) => {
             let block_hash = block_message.hash;
@@ -331,13 +333,14 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
             let mut context = storage
                 .get_custom_data(b"more_context")?
                 .and_then(|data| data.try_into().ok())
-                .map_or_else(Context::initial, Context::deserialize);
+                .unwrap_or_default();
 
             let mut transaction_message = *transaction_message;
             let raw_input = mem::take(&mut transaction_message.raw_input);
             let mut outcome = storage
                 .with_engine_access(block_height, transaction_position, &raw_input, |io| {
                     execute_transaction(
+                        runner,
                         transaction_message,
                         block_height,
                         &block_metadata,
@@ -350,7 +353,7 @@ pub fn consume_message<M: ModExpAlgorithm + 'static>(
                 })
                 .result;
             outcome.info.raw_input = raw_input;
-            storage.set_custom_data(b"more_context", &context.serialize())?;
+            storage.set_custom_data(b"more_context", &context)?;
 
             Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
                 outcome,
@@ -365,11 +368,16 @@ pub enum TraceKind {
     CallFrame,
 }
 
-pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
+pub fn execute_transaction_message<M: ModExpAlgorithm + 'static, R>(
     storage: &Storage,
+    runner: &R,
     mut transaction_message: TransactionMessage,
     trace_kind: Option<TraceKind>,
-) -> Result<TransactionIncludedOutcome, crate::Error> {
+) -> Result<TransactionIncludedOutcome, crate::Error>
+where
+    R: AbstractContractRunner,
+    R::Error: Debug + Send + Sync + 'static,
+{
     let transaction_position = transaction_message.position;
     let block_hash = transaction_message.block_hash;
     let block_height = storage.get_block_height_by_hash(block_hash)?;
@@ -378,11 +386,12 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
     let mut context = storage
         .get_custom_data(b"more_context")?
         .and_then(|data| data.try_into().ok())
-        .map_or_else(Context::initial, Context::deserialize);
+        .unwrap_or_default();
     let raw_input = mem::take(&mut transaction_message.raw_input);
     let mut result =
         storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
             execute_transaction(
+                runner,
                 transaction_message,
                 block_height,
                 &block_metadata,
@@ -394,25 +403,28 @@ pub fn execute_transaction_message<M: ModExpAlgorithm + 'static>(
             )
         });
     result.result.info.raw_input = raw_input;
-    storage.set_custom_data(b"more_context", &context.serialize())?;
+    storage.set_custom_data(b"more_context", &context)?;
     Ok(result.result)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn execute_transaction<I, F>(
+pub fn execute_transaction<I, F, R>(
+    runner: &R,
     transaction_message: TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
     trace_kind: Option<TraceKind>,
     mut io: I,
-    context: &mut Context,
+    context: &mut [u8; 32],
     get_diff: F,
 ) -> TransactionIncludedOutcome
 where
     I: IO + Send + Copy,
     I::StorageValue: AsRef<[u8]>,
     F: FnOnce(&I) -> Diff,
+    R: AbstractContractRunner,
+    R::Error: Debug + Send + Sync + 'static,
 {
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
@@ -435,16 +447,10 @@ where
     };
 
     // TODO: load code dynamically and check hash
-    let code = include_bytes!("../../../bin/aurora-engine-traced.wasm").to_vec();
-    let runner = ContractRunner::new(code, None);
+    // let code = include_bytes!("../../../bin/aurora-engine-traced.wasm").to_vec();
+    // let runner = ContractRunner::new(code, None);
 
-    let promise_results = transaction_message
-        .promise_data
-        .iter()
-        .cloned()
-        .map(|data| data.map_or(PromiseResult::Failed, PromiseResult::Successful))
-        .collect::<Vec<_>>()
-        .into();
+    let promise_data = transaction_message.promise_data.clone();
 
     let (tx_hash, result, trace_log, call_tracer) = match &transaction_message.transaction {
         TransactionKind::Submit(tx) => {
@@ -460,8 +466,8 @@ where
             let mut trace_log = None;
             let mut trace_call_stack = None;
             let result = runner
-                .call_helper(method, promise_results, &env, io, context, None)
-                .map_err(ExecutionError::from)
+                .call_contract(method, promise_data, &env, io, context, None)
+                .map_err(ExecutionError::from_vm_err)
                 .and_then(|data| {
                     data.map(|data| {
                         let mut slice = data.as_slice();
@@ -490,8 +496,8 @@ where
         TransactionKind::SubmitWithArgs(args) => {
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
             let result = runner
-                .call_helper("submit", promise_results, &env, io, context, None)
-                .map_err(ExecutionError::from)
+                .call_contract("submit", promise_data, &env, io, context, None)
+                .map_err(ExecutionError::from_vm_err)
                 .and_then(|data| {
                     data.map(|data| {
                         io.return_output(&data);
@@ -505,7 +511,7 @@ where
             (tx_hash, result, None, None)
         }
         other => {
-            let result = non_submit_execute(other, &runner, io, &env, promise_results, context);
+            let result = non_submit_execute(other, runner, io, &env, promise_data, context);
             (near_receipt_id, result, None, None)
         }
     };
@@ -540,22 +546,25 @@ fn compute_random_seed(action_hash: &H256, block_random_value: &H256) -> H256 {
     clippy::match_same_arms,
     clippy::cognitive_complexity
 )]
-fn non_submit_execute<I: IO + Send + Copy>(
+fn non_submit_execute<I: IO + Send + Copy, R>(
     transaction: &TransactionKind,
-    runner: &ContractRunner,
+    runner: &R,
     io: I,
     env: &env::Fixed,
-    promise_results: Arc<[PromiseResult]>,
-    ctx: &mut Context,
+    promise_results: Vec<Option<Vec<u8>>>,
+    ctx: &mut [u8; 32],
 ) -> Result<Option<TransactionExecutionResult>, ExecutionError>
 where
     I::StorageValue: AsRef<[u8]>,
+    R: AbstractContractRunner,
+    R::Error: Debug + Send + Sync + 'static,
 {
     let result = match transaction {
         TransactionKind::Call(_) => {
             // We can ignore promises in the standalone engine (see above)
             let data = runner
-                .call_helper("call", promise_results, env, io, ctx, None)?
+                .call_contract("call", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
                 SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
@@ -565,7 +574,8 @@ where
 
         TransactionKind::Deploy(_) => {
             let data = runner
-                .call_helper("deploy_code", promise_results, env, io, ctx, None)?
+                .call_contract("deploy_code", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
                 SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
@@ -573,8 +583,9 @@ where
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::DeployErc20(_) => {
-            let data =
-                runner.call_helper("deploy_erc20_token", promise_results, env, io, ctx, None)?;
+            let data = runner
+                .call_contract("deploy_erc20_token", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             Some(match data {
                 Some(data) => {
@@ -592,14 +603,15 @@ where
         }
         TransactionKind::DeployErc20Callback(_) => {
             let data = runner
-                .call_helper(
+                .call_contract(
                     "deploy_erc20_token_callback",
                     promise_results,
                     env,
                     io,
                     ctx,
                     None,
-                )?
+                )
+                .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let mut slice = data.as_slice();
             let address = Address::deserialize(&mut slice).map_err(ExecutionError::Deserialize)?;
@@ -608,14 +620,15 @@ where
         }
         TransactionKind::FtOnTransfer(_) => {
             let data = runner
-                .call_helper(
+                .call_contract(
                     "ft_on_transfer_with_return",
                     promise_results,
                     env,
                     io,
                     ctx,
                     None,
-                )?
+                )
+                .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let submit_result = Option::<SubmitResult>::try_from_slice(&data)
                 .map_err(ExecutionError::Deserialize)?;
@@ -633,19 +646,23 @@ where
         TransactionKind::StorageWithdraw(_) => None,
         TransactionKind::SetPausedFlags(_) => None,
         TransactionKind::RegisterRelayer(_) => {
-            runner.call_helper("register_relayer", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("register_relayer", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::ExitToNear(_) => {
-            runner.call_helper(
-                "exit_to_near_precompile_callback",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "exit_to_near_precompile_callback",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             // maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
             None
@@ -653,65 +670,78 @@ where
         TransactionKind::SetConnectorData(_) => None,
         TransactionKind::NewConnector(_) => None,
         TransactionKind::NewEngine(_) => {
-            runner.call_helper("new", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("new", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
             None
         }
         TransactionKind::SetEthConnectorContractAccount(_) => {
-            runner.call_helper(
-                "set_eth_connector_contract_account",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "set_eth_connector_contract_account",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::FactoryUpdate(_) => {
-            runner.call_helper("factory_update", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("factory_update", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::FactoryUpdateAddressVersion(_) => {
-            runner.call_helper(
-                "factory_update_address_version",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "factory_update_address_version",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::FactorySetWNearAddress(_) => {
-            runner.call_helper(
-                "factory_set_wnear_address",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "factory_set_wnear_address",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::FundXccSubAccount(_) => {
-            runner.call_helper("fund_xcc_sub_account", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("fund_xcc_sub_account", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::WithdrawWnearToRouter(_) => {
             let data = runner
-                .call_helper(
+                .call_contract(
                     "withdraw_wnear_to_router",
                     promise_results,
                     env,
                     io,
                     ctx,
                     None,
-                )?
+                )
+                .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
                 SubmitResult::try_from_slice(&data).map_err(ExecutionError::Deserialize)?;
@@ -722,185 +752,229 @@ where
         // Not handled in this function; is handled by the general `execute_transaction` function
         TransactionKind::Submit(_) | TransactionKind::SubmitWithArgs(_) => unreachable!(),
         TransactionKind::PausePrecompiles(_) => {
-            runner.call_helper("pause_precompiles", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("pause_precompiles", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::ResumePrecompiles(_) => {
-            runner.call_helper("resume_precompiles", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("resume_precompiles", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetOwner(_) => {
-            runner.call_helper("set_owner", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("set_owner", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetUpgradeDelayBlocks(_) => {
-            runner.call_helper(
-                "set_upgrade_delay_blocks",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "set_upgrade_delay_blocks",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::PauseContract => {
-            runner.call_helper("pause_contract", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("pause_contract", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::ResumeContract => {
-            runner.call_helper("resume_contract", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("resume_contract", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetKeyManager(_) => {
-            runner.call_helper("set_key_manager", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("set_key_manager", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::AddRelayerKey(_) => {
-            runner.call_helper("add_relayer_key", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("add_relayer_key", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::StoreRelayerKeyCallback(_) => {
-            runner.call_helper(
-                "store_relayer_key_callback",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "store_relayer_key_callback",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::RemoveRelayerKey(_) => {
-            runner.call_helper("remove_relayer_key", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("remove_relayer_key", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::StartHashchain(_) => {
-            runner.call_helper("start_hashchain", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("start_hashchain", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetErc20Metadata(_) => {
-            runner.call_helper("set_erc20_metadata", promise_results, env, io, ctx, None)?;
+            runner
+                .call_contract("set_erc20_metadata", promise_results, env, io, ctx, None)
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetFixedGas(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper("set_fixed_gas", promise_results, env, io, ctx, Some(input))?;
+            runner
+                .call_contract("set_fixed_gas", promise_results, env, io, ctx, Some(input))
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetErc20FallbackAddress(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "set_erc20_fallback_address",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "set_erc20_fallback_address",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetSiloParams(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "set_silo_params",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "set_silo_params",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::AddEntryToWhitelist(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "add_entry_to_whitelist",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "add_entry_to_whitelist",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::AddEntryToWhitelistBatch(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "add_entry_to_whitelist_batch",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "add_entry_to_whitelist_batch",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::RemoveEntryFromWhitelist(args) => {
-            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "remove_entry_from_whitelist",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            let input = borsh::to_vec(args)
+                .map_err(ExecutionError::SerializeArg)
+                .map_err(ExecutionError::from_vm_err)?;
+            runner
+                .call_contract(
+                    "remove_entry_from_whitelist",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetWhitelistStatus(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "set_whitelist_status",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "set_whitelist_status",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::SetWhitelistsStatuses(args) => {
             let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
-            runner.call_helper(
-                "set_whitelists_statuses",
-                promise_results,
-                env,
-                io,
-                ctx,
-                Some(input),
-            )?;
+            runner
+                .call_contract(
+                    "set_whitelists_statuses",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    Some(input),
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKind::MirrorErc20TokenCallback(_) => {
-            runner.call_helper(
-                "mirror_erc20_token_callback",
-                promise_results,
-                env,
-                io,
-                ctx,
-                None,
-            )?;
+            runner
+                .call_contract(
+                    "mirror_erc20_token_callback",
+                    promise_results,
+                    env,
+                    io,
+                    ctx,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
@@ -966,8 +1040,11 @@ pub enum ExecutionError {
     DeserializeUnexpectedEnd,
 }
 
-impl From<VMRunnerError> for ExecutionError {
-    fn from(value: VMRunnerError) -> Self {
+impl ExecutionError {
+    fn from_vm_err<E>(value: E) -> Self
+    where
+        E: Debug + Send + Sync + 'static,
+    {
         Self::VMRunnerError(Box::new(value))
     }
 }

@@ -60,8 +60,9 @@ fn test_consume_deploy_message() {
         action_hash: H256::default(),
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -116,8 +117,9 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -159,8 +161,9 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -216,8 +219,9 @@ fn test_consume_ft_on_transfer_message() {
         action_hash: H256::default(),
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -265,8 +269,9 @@ fn test_consume_call_message() {
         action_hash: H256::default(),
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -320,8 +325,9 @@ fn test_consume_submit_message() {
         action_hash: H256::default(),
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -365,8 +371,9 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     runner.init_evm();
 
     let block_message = sample_block();
-    sync::consume_message::<AuroraModExp>(
+    sync::consume_message::<AuroraModExp, _>(
         &mut runner.storage,
+        &runner.wasm_runner,
         sync::types::Message::Block(block_message.clone()),
     )
     .unwrap();

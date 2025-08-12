@@ -27,11 +27,6 @@ postgres.workspace = true
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
 strum.workspace = true
-memoffset.workspace = true
-near-vm-runner.workspace = true
-near-primitives-core.workspace = true
-near-parameters.workspace = true
-near-crypto.workspace = true
 thiserror.workspace = true
 
 [lints]
