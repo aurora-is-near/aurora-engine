@@ -1,4 +1,4 @@
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 
 use rocksdb::DB;
 
@@ -42,7 +42,7 @@ pub struct EngineStateAccess<'db, 'input, 'output> {
     bound_block_height: u64,
     bound_tx_position: u16,
     transaction_diff: &'output Mutex<Diff>,
-    output: &'output OnceLock<Vec<u8>>,
+    output: &'output Mutex<Vec<u8>>,
     db: &'db DB,
 }
 
@@ -52,7 +52,7 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
         bound_block_height: u64,
         bound_tx_position: u16,
         transaction_diff: &'output Mutex<Diff>,
-        output: &'output OnceLock<Vec<u8>>,
+        output: &'output Mutex<Vec<u8>>,
         db: &'db DB,
     ) -> Self {
         Self {
@@ -89,7 +89,8 @@ impl<'db, 'input: 'db, 'output: 'db> IO for EngineStateAccess<'db, 'input, 'outp
     }
 
     fn return_output(&mut self, value: &[u8]) {
-        self.output.set(value.to_vec()).unwrap_or_default();
+        let mut lock = self.output.lock().unwrap();
+        *lock = value.to_vec();
     }
 
     fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {

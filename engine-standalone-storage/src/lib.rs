@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::OnceLock;
 use std::{collections::HashMap, sync::Mutex};
 
 use aurora_engine_sdk::env::Timestamp;
@@ -383,7 +382,7 @@ impl Storage {
         F: FnOnce(engine_state::EngineStateAccess<'db, 'input, '_>) -> R,
     {
         let diff = Mutex::new(Diff::default());
-        let engine_output = OnceLock::new();
+        let engine_output = Mutex::new(vec![]);
 
         let engine_state = engine_state::EngineStateAccess::new(
             input,
