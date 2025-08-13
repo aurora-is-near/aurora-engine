@@ -311,7 +311,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(engine_prefix.as_ref()) {
+            if !db_key.starts_with(&engine_prefix) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix

@@ -918,9 +918,7 @@ where
             None
         }
         TransactionKind::RemoveEntryFromWhitelist(args) => {
-            let input = borsh::to_vec(args)
-                .map_err(ExecutionError::SerializeArg)
-                .map_err(ExecutionError::from_vm_err)?;
+            let input = borsh::to_vec(args).map_err(ExecutionError::SerializeArg)?;
             runner
                 .call_contract(
                     "remove_entry_from_whitelist",
