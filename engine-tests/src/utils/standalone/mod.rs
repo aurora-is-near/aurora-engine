@@ -222,7 +222,7 @@ impl StandaloneRunner {
         );
         tx_msg.position = transaction_position;
         tx_msg.transaction =
-            TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
+            TransactionKind::submit(&transaction_bytes.as_slice().try_into().unwrap());
         let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
             storage,
             &self.wasm_runner,
@@ -270,11 +270,10 @@ impl StandaloneRunner {
                 PromiseResult::Failed | PromiseResult::NotReady => None,
             })
             .collect();
-        let transaction_kind =
-            sync::parse_transaction_kind(method_name, ctx.input.clone(), &promise_data)
-                .expect("All method names must be known by standalone");
+        let transaction_kind = TransactionKind::new(method_name, ctx.input.clone(), &promise_data)
+            .expect("All method names must be known by standalone");
 
-        let transaction_hash = if let TransactionKind::SubmitWithArgs(args) = &transaction_kind {
+        let transaction_hash = if let Some(args) = transaction_kind.get_submit_args() {
             aurora_engine_sdk::keccak(&args.tx_data)
         } else {
             aurora_engine_sdk::keccak(&ctx.input)
@@ -400,7 +399,7 @@ impl StandaloneRunner {
             signer: env.signer_account_id(),
             caller: env.predecessor_account_id(),
             attached_near: env.attached_deposit,
-            transaction: TransactionKind::Unknown,
+            transaction: TransactionKind::unknown(),
             promise_data,
             raw_input,
             action_hash,
@@ -426,7 +425,7 @@ impl StandaloneRunner {
             promise_results,
             transaction_bytes.to_vec(),
         );
-        tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
+        tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
 
         let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
             storage, runner, tx_msg, trace_kind,

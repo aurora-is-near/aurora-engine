@@ -270,7 +270,7 @@ fn test_transaction_index() {
         signer: "placeholder.near".parse().unwrap(),
         caller: "placeholder.near".parse().unwrap(),
         attached_near: 0,
-        transaction: TransactionKind::Unknown,
+        transaction: TransactionKind::unknown(),
         promise_data: Vec::new(),
         raw_input: Vec::new(),
         action_hash: H256::default(),

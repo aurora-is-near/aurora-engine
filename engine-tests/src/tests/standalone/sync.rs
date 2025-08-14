@@ -43,7 +43,7 @@ fn test_consume_deploy_message() {
 
     let code = b"hello_world!".to_vec();
     let input = utils::create_deploy_transaction(code.clone(), U256::zero()).data;
-    let tx_kind = sync::types::TransactionKind::Deploy(input);
+    let tx_kind = sync::types::TransactionKind::new_deploy(input);
     let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
@@ -100,7 +100,7 @@ fn test_consume_deploy_erc20_message() {
     let dest_address = Address::new(H160([170u8; 20]));
 
     let args = aurora_engine::parameters::DeployErc20TokenArgs::Legacy(token.clone());
-    let tx_kind = sync::types::TransactionKind::DeployErc20(args);
+    let tx_kind = sync::types::TransactionKind::deploy_erc20(args);
     let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -144,7 +144,7 @@ fn test_consume_deploy_erc20_message() {
         amount: Balance::new(mint_amount),
         msg: hex::encode(dest_address.as_bytes()),
     };
-    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
+    let tx_kind = sync::types::TransactionKind::new_ft_on_transfer(&args);
     let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
@@ -202,7 +202,7 @@ fn test_consume_ft_on_transfer_message() {
         ]
         .concat(),
     };
-    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
+    let tx_kind = sync::types::TransactionKind::new_ft_on_transfer(&args);
     let raw_input = tx_kind.raw_bytes();
     let caller = utils::standalone::mocks::EXT_ETH_CONNECTOR.parse().unwrap();
     let transaction_message = sync::types::TransactionMessage {
@@ -250,10 +250,8 @@ fn test_consume_call_message() {
     utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
     let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 
-    let tx_kind = sync::types::TransactionKind::Call(simple_transfer_args(
-        recipient_address,
-        transfer_amount,
-    ));
+    let args = simple_transfer_args(recipient_address, transfer_amount);
+    let tx_kind = sync::types::TransactionKind::new_call(&args);
     let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
@@ -308,7 +306,7 @@ fn test_consume_submit_message() {
         utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let eth_transaction =
         crate::prelude::transactions::EthTransactionKind::Legacy(signed_transaction);
-    let tx_kind = sync::types::TransactionKind::Submit(eth_transaction);
+    let tx_kind = sync::types::TransactionKind::submit(&eth_transaction);
     let raw_input = tx_kind.raw_bytes();
 
     let transaction_message = sync::types::TransactionMessage {
