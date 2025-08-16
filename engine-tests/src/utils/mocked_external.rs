@@ -2,7 +2,9 @@ use near_crypto::PublicKey;
 use near_primitives_core::hash::CryptoHash;
 use near_primitives_core::types::GasWeight;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
-use near_vm_runner::logic::types::{AccountId, Balance, Gas, ReceiptIndex};
+use near_vm_runner::logic::types::{
+    AccountId, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier, ReceiptIndex,
+};
 use near_vm_runner::logic::{StorageAccessTracker, VMLogicError};
 use std::cell::Cell;
 
@@ -142,6 +144,25 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
     ) -> Result<(), VMLogicError> {
         self.underlying
             .append_action_deploy_contract(receipt_index, code)
+    }
+
+    fn append_action_deploy_global_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        code: Vec<u8>,
+        mode: GlobalContractDeployMode,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_deploy_global_contract(receipt_index, code, mode)
+    }
+
+    fn append_action_use_global_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        contract_id: GlobalContractIdentifier,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_use_global_contract(receipt_index, contract_id)
     }
 
     fn append_action_function_call_weight(
