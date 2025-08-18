@@ -295,11 +295,11 @@ impl StandaloneRunner {
                 use near_primitives_core::hash::CryptoHash;
                 let action_hash = CryptoHash(tx_msg.action_hash.0);
                 let random_seed = CryptoHash(env.random_seed.0);
-                near_primitives::utils::create_random_seed(u32::MAX, action_hash, random_seed)
+                near_primitives::utils::create_random_seed(action_hash, random_seed)
             };
             assert_eq!(
                 ctx.random_seed, runtime_random_value,
-                "Runtime random value should match computed value when it is specified"
+                "Runtime random value should match a computed value when it is specified"
             );
         }
 

@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.9.2] 2025-08-08
+
+### Fixes
+
+- Access to the silo-related transactions to the owner only by [@aleksuss]. ([#1030])
+
+[#1030]: https://github.com/aurora-is-near/aurora-engine/pull/1030
+
 ## [3.9.1] 2025-07-09
+
+### Fixes
 
 - Improve security of the `exit_to_near` precompile by [@aleksuss]. ([#1024])
 
@@ -762,7 +772,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.2...develop
+[3.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...3.9.2
 [3.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...3.9.1
 [3.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...3.8.0
