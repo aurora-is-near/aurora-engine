@@ -127,10 +127,10 @@ impl TransactionKind {
         }
     }
 
-    pub fn deploy_erc20(args: DeployErc20TokenArgs) -> Self {
+    pub fn deploy_erc20(args: &DeployErc20TokenArgs) -> Self {
         TransactionKind {
             method_name: TransactionKindTag::DeployErc20,
-            args: borsh::to_vec(&args).unwrap(),
+            args: borsh::to_vec(args).unwrap(),
             promise_result: None,
         }
     }
@@ -146,7 +146,7 @@ impl TransactionKind {
     pub fn new_ft_on_transfer(args: &FtOnTransferArgs) -> Self {
         TransactionKind {
             method_name: TransactionKindTag::FtOnTransfer,
-            args: borsh::to_vec(&args).unwrap(),
+            args: serde_json::to_vec(args).unwrap(),
             promise_result: None,
         }
     }

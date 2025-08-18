@@ -344,7 +344,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::deploy_erc20(
-            aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
+            &aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
         let mut tx = standalone::StandaloneRunner::template_tx_msg(
             storage,

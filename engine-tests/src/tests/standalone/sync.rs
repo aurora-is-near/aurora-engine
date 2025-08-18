@@ -100,7 +100,7 @@ fn test_consume_deploy_erc20_message() {
     let dest_address = Address::new(H160([170u8; 20]));
 
     let args = aurora_engine::parameters::DeployErc20TokenArgs::Legacy(token.clone());
-    let tx_kind = sync::types::TransactionKind::deploy_erc20(args);
+    let tx_kind = sync::types::TransactionKind::deploy_erc20(&args);
     let raw_input = tx_kind.raw_bytes();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
