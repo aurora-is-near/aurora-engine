@@ -48,7 +48,7 @@ impl StandaloneRunner {
             .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
             mocks::init_connector(io);
@@ -85,7 +85,7 @@ impl StandaloneRunner {
         };
 
         env.block_height += 1;
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::mint_evm_account(address, balance, nonce, code, io, env);
@@ -212,14 +212,7 @@ impl StandaloneRunner {
         let transaction_bytes = rlp::encode(signed_tx).to_vec();
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-        let mut tx_msg = Self::template_tx_msg(
-            storage,
-            env,
-            0,
-            transaction_hash,
-            &[],
-            transaction_bytes.clone(),
-        );
+        let mut tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::submit(&transaction_bytes.as_slice().try_into().unwrap());
@@ -280,14 +273,7 @@ impl StandaloneRunner {
         };
 
         let storage = &mut self.storage;
-        let mut tx_msg = Self::template_tx_msg(
-            storage,
-            &env,
-            0,
-            transaction_hash,
-            promise_results,
-            ctx.input.clone(),
-        );
+        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
         tx_msg.transaction = transaction_kind;
 
         if ctx.random_seed.len() == 32 {
@@ -367,7 +353,6 @@ impl StandaloneRunner {
         transaction_position: u16,
         transaction_hash: H256,
         promise_results: &[PromiseResult],
-        raw_input: Vec<u8>,
     ) -> TransactionMessage {
         let block_hash = mocks::compute_block_hash(env.block_height);
         let block_metadata = BlockMetadata {
@@ -401,7 +386,6 @@ impl StandaloneRunner {
             attached_near: env.attached_deposit,
             transaction: TransactionKind::unknown(),
             promise_data,
-            raw_input,
             action_hash,
         }
     }
@@ -423,7 +407,6 @@ impl StandaloneRunner {
             transaction_position,
             transaction_hash,
             promise_results,
-            transaction_bytes.to_vec(),
         );
         tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
 

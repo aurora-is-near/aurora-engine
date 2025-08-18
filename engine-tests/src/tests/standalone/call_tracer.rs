@@ -346,14 +346,8 @@ fn test_trace_precompiles_with_subcalls() {
         let tx_kind = sync::types::TransactionKind::deploy_erc20(
             &aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = tx_kind;
         let mut outcome = sync::execute_transaction_message::<AuroraModExp, _>(
             storage,
@@ -380,14 +374,8 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::new_factory_update(xcc_router_bytes);
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = tx_kind;
         tx
     };
@@ -405,14 +393,8 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::new_factory_set_wnear_address(wnear_address);
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = tx_kind;
         tx
     };

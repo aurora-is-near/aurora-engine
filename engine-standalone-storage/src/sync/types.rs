@@ -49,8 +49,6 @@ pub struct TransactionMessage {
     /// Results from previous NEAR receipts
     /// (only present when this transaction is a callback of another transaction).
     pub promise_data: Vec<Option<Vec<u8>>>,
-    /// Raw bytes passed as input when executed in the Near Runtime.
-    pub raw_input: Vec<u8>,
     /// A Near protocol quantity equal to
     /// `sha256(receipt_id || block_hash || le_bytes(u64 - action_index))`.
     /// This quantity is used together with the block random seed
@@ -117,6 +115,10 @@ impl TransactionKind {
                 _ => None,
             },
         })
+    }
+
+    pub fn clone_raw_input(&self) -> Vec<u8> {
+        self.args.clone()
     }
 
     pub fn submit(tx: &EthTransactionKind) -> Self {
@@ -373,7 +375,6 @@ struct BorshableTransactionMessageV3<'a> {
     pub attached_near: u128,
     pub transaction: BorshableTransactionKind<'a>,
     pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
-    pub raw_input: Cow<'a, Vec<u8>>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -404,7 +405,6 @@ impl<'a> From<&'a TransactionMessage> for BorshableTransactionMessage<'a> {
             attached_near: t.attached_near,
             transaction: (&t.transaction).into(),
             promise_data: Cow::Borrowed(&t.promise_data),
-            raw_input: Cow::Borrowed(&t.raw_input),
         })
     }
 }
@@ -414,7 +414,6 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
         match t {
             BorshableTransactionMessage::V1(t) => {
                 let transaction: TransactionKind = t.transaction.into();
-                let raw_input = transaction.raw_bytes();
                 Self {
                     block_hash: H256(t.block_hash),
                     near_receipt_id: H256(t.near_receipt_id),
@@ -425,13 +424,11 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                     attached_near: t.attached_near,
                     transaction,
                     promise_data: Vec::new(),
-                    raw_input,
                     action_hash: H256::default(),
                 }
             }
             BorshableTransactionMessage::V2(t) => {
                 let transaction: TransactionKind = t.transaction.into();
-                let raw_input = transaction.raw_bytes();
                 Self {
                     block_hash: H256(t.block_hash),
                     near_receipt_id: H256(t.near_receipt_id),
@@ -442,7 +439,6 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                     attached_near: t.attached_near,
                     transaction,
                     promise_data: t.promise_data.into_owned(),
-                    raw_input,
                     action_hash: H256::default(),
                 }
             }
@@ -456,7 +452,6 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                 attached_near: t.attached_near,
                 transaction: t.transaction.into(),
                 promise_data: t.promise_data.into_owned(),
-                raw_input: t.raw_input.into_owned(),
                 action_hash: H256::default(),
             },
             BorshableTransactionMessage::V4(t) => Self {
@@ -469,7 +464,6 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                 attached_near: t.attached_near,
                 transaction: t.transaction.into(),
                 promise_data: t.promise_data.into_owned(),
-                raw_input: t.raw_input.into_owned(),
                 action_hash: H256(t.action_hash),
             },
         }

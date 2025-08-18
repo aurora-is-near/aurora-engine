@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::io;
-use std::mem;
 
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::SubmitResult;
@@ -68,9 +67,9 @@ where
                 .and_then(|data| data.try_into().ok())
                 .unwrap_or_default();
 
-            let mut transaction_message = *transaction_message;
-            let raw_input = mem::take(&mut transaction_message.raw_input);
-            let mut outcome = storage
+            let transaction_message = *transaction_message;
+            let raw_input = transaction_message.transaction.args.clone();
+            let outcome = storage
                 .with_engine_access(block_height, transaction_position, &raw_input, |io| {
                     execute_transaction(
                         runner,
@@ -85,7 +84,6 @@ where
                     )
                 })
                 .result;
-            outcome.info.raw_input = raw_input;
             storage.set_custom_data(b"more_context", &context)?;
 
             Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
@@ -104,7 +102,7 @@ pub enum TraceKind {
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static, R>(
     storage: &Storage,
     runner: &R,
-    mut transaction_message: TransactionMessage,
+    transaction_message: TransactionMessage,
     trace_kind: Option<TraceKind>,
 ) -> Result<TransactionIncludedOutcome, crate::Error>
 where
@@ -120,22 +118,20 @@ where
         .get_custom_data(b"more_context")?
         .and_then(|data| data.try_into().ok())
         .unwrap_or_default();
-    let raw_input = mem::take(&mut transaction_message.raw_input);
-    let mut result =
-        storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
-            execute_transaction(
-                runner,
-                transaction_message,
-                block_height,
-                &block_metadata,
-                engine_account_id,
-                trace_kind,
-                io,
-                &mut context,
-                EngineStateAccess::get_transaction_diff,
-            )
-        });
-    result.result.info.raw_input = raw_input;
+    let raw_input = transaction_message.transaction.args.clone();
+    let result = storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
+        execute_transaction(
+            runner,
+            transaction_message,
+            block_height,
+            &block_metadata,
+            engine_account_id,
+            trace_kind,
+            io,
+            &mut context,
+            EngineStateAccess::get_transaction_diff,
+        )
+    });
     storage.set_custom_data(b"more_context", &context)?;
     Ok(result.result)
 }

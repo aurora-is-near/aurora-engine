@@ -105,7 +105,7 @@ where
         env.random_seed = block_metadata.random_seed;
 
         let args = SubmitArgs {
-            tx_data: transaction_bytes.clone(),
+            tx_data: transaction_bytes,
             ..Default::default()
         };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
@@ -156,7 +156,6 @@ where
             attached_near: 0,
             transaction: crate::sync::types::TransactionKind::submit(&tx),
             promise_data: Vec::new(),
-            raw_input: transaction_bytes,
             action_hash: H256::default(),
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
@@ -258,7 +257,6 @@ mod test {
                         attached_near: 0,
                         transaction: TransactionKind::unknown(),
                         promise_data: Vec::new(),
-                        raw_input: Vec::new(),
                         action_hash: H256::default(),
                     },
                     &diff,

@@ -272,7 +272,6 @@ fn test_transaction_index() {
         attached_near: 0,
         transaction: TransactionKind::unknown(),
         promise_data: Vec::new(),
-        raw_input: Vec::new(),
         action_hash: H256::default(),
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
