@@ -45,6 +45,7 @@ pub fn on_panic(info: &core::panic::PanicInfo) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
+    use crate::contract_methods::{require_owner_and_running, require_running};
     use crate::engine::{self, Engine};
     use crate::errors;
     use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
@@ -171,7 +172,9 @@ mod contract {
         // because it only makes sense in the context of the NEAR runtime.
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
-        require_running(&state);
+        require_running(&state)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
         let index = internal_get_upgrade_index();
         if io.block_height() <= index {
             sdk::panic_utf8(errors::ERR_NOT_ALLOWED_TOO_EARLY);
@@ -779,8 +782,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_fixed_gas() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_fixed_gas(&mut io, args.fixed_gas);
@@ -799,8 +804,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_erc20_fallback_address() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: Erc20FallbackAddressArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_erc20_fallback_address(&mut io, args.address);
@@ -821,8 +828,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_silo_params() {
         let mut io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: Option<SiloParamsArgs> = io.read_input_borsh().sdk_unwrap();
         silo::set_silo_params(&mut io, args);
@@ -831,8 +840,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_whitelist_status() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: WhitelistStatusArgs = io.read_input_borsh().sdk_unwrap();
         silo::set_whitelist_status(&io, &args);
@@ -841,8 +852,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn set_whitelists_statuses() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: Vec<WhitelistStatusArgs> = io.read_input_borsh().sdk_unwrap();
         silo::set_whitelists_statuses(&io, args);
@@ -872,8 +885,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
         silo::add_entry_to_whitelist(&io, &args);
@@ -882,8 +897,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn add_entry_to_whitelist_batch() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: Vec<WhitelistArgs> = io.read_input_borsh().sdk_unwrap();
         silo::add_entry_to_whitelist_batch(&io, args);
@@ -892,8 +909,10 @@ mod contract {
     #[no_mangle]
     pub extern "C" fn remove_entry_from_whitelist() {
         let io = Runtime;
-        require_running(&state::get_state(&io).sdk_unwrap());
-        silo::assert_admin(&io).sdk_unwrap();
+        let state = state::get_state(&io).sdk_unwrap();
+        require_owner_and_running(&state, &io.predecessor_account_id())
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
 
         let args: WhitelistArgs = io.read_input_borsh().sdk_unwrap();
         silo::remove_entry_from_whitelist(&io, &args);
@@ -908,12 +927,6 @@ mod contract {
                 sdk::panic_utf8(errors::ERR_INVALID_UPGRADE)
             }
             Err(sdk::error::ReadU64Error::MissingValue) => sdk::panic_utf8(errors::ERR_NO_UPGRADE),
-        }
-    }
-
-    fn require_running(state: &state::EngineState) {
-        if state.is_paused {
-            sdk::panic_utf8(errors::ERR_PAUSED);
         }
     }
 }

@@ -1,3 +1,7 @@
+use crate::{
+    prelude::{Address, Wei},
+    utils::{self, validate_address_balance_and_nonce, AuroraRunner},
+};
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
@@ -11,11 +15,6 @@ use aurora_engine_types::types::EthGas;
 use libsecp256k1::SecretKey;
 use rand::{rngs::ThreadRng, Rng, RngCore};
 use std::fmt::Debug;
-
-use crate::{
-    prelude::{Address, Wei},
-    utils::{self, validate_address_balance_and_nonce, AuroraRunner},
-};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(10u64.pow(18) * 10);
 const ZERO_BALANCE: Wei = Wei::zero();
@@ -38,13 +37,8 @@ fn test_address_transfer_success() {
     // set up Aurora runner and accounts
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-
-    // Allow to submit transactions
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -75,11 +69,8 @@ fn test_address_transfer_success() {
 fn test_transfer_insufficient_balance() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -120,11 +111,8 @@ fn test_transfer_insufficient_balance_fee() {
 
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -171,11 +159,8 @@ fn test_transfer_insufficient_balance_fee() {
 fn test_eth_transfer_incorrect_nonce() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -205,11 +190,8 @@ fn test_eth_transfer_incorrect_nonce() {
 fn test_transfer_with_low_gas_limit() {
     let (mut runner, mut signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     let transaction = |nonce| {
         let mut tx = utils::transfer(receiver, TRANSFER_AMOUNT, nonce);
@@ -241,13 +223,10 @@ fn test_transfer_with_low_gas_limit() {
 fn test_relayer_balance_after_transfer() {
     let (mut runner, mut source_account, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&source_account.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
     let transaction =
         |nonce| utils::transfer_with_price(receiver, TRANSFER_AMOUNT, nonce, ONE_GAS_PRICE.raw());
 
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -283,16 +262,21 @@ fn test_relayer_balance_after_transfer() {
 }
 
 #[test]
-fn test_admin_access_right() {
+fn test_add_entry_access_right_whitelists_disabled() {
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
 
-    set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
-    enable_whitelist(&mut runner, WhitelistKind::Admin);
-
-    // Allow to submit transactions.
-
+    let deployer = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        account_id: caller.clone(),
+        kind: WhitelistKind::Admin,
+    }))
+    .unwrap();
+    let evm_deployer = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        account_id: caller.clone(),
+        kind: WhitelistKind::EvmAdmin,
+    }))
+    .unwrap();
     let account = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
         account_id: caller.clone(),
         kind: WhitelistKind::Account,
@@ -304,6 +288,19 @@ fn test_admin_access_right() {
     }))
     .unwrap();
 
+    // Check that the arbitrary caller can't add entries to the whitelist.
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), deployer.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+    let err = runner
+        .call(
+            "add_entry_to_whitelist",
+            caller.as_ref(),
+            evm_deployer.clone(),
+        )
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
     let err = runner
         .call("add_entry_to_whitelist", caller.as_ref(), account.clone())
         .unwrap_err();
@@ -313,12 +310,152 @@ fn test_admin_access_right() {
         .unwrap_err();
     assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 
-    add_admin(&mut runner, caller.clone());
+    // But the owner can.
+    let owner = runner.aurora_account_id.clone();
+    let result = runner.call("add_entry_to_whitelist", &owner, deployer);
+    assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", &owner, evm_deployer);
+    assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", &owner, account);
+    assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", &owner, address);
+    assert!(result.is_ok());
+}
 
-    let result = runner.call("add_entry_to_whitelist", caller.as_ref(), account);
+#[test]
+fn test_add_entry_access_right_whitelists_enabled() {
+    let (mut runner, signer, _) = initialize_transfer();
+    let sender = utils::address_from_secret_key(&signer.secret_key);
+    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
+
+    enable_all_whitelists(&mut runner);
+
+    let deployer = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        account_id: caller.clone(),
+        kind: WhitelistKind::Admin,
+    }))
+    .unwrap();
+    let evm_deployer = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        account_id: caller.clone(),
+        kind: WhitelistKind::EvmAdmin,
+    }))
+    .unwrap();
+    let account = borsh::to_vec(&WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
+        account_id: caller.clone(),
+        kind: WhitelistKind::Account,
+    }))
+    .unwrap();
+    let address = borsh::to_vec(&WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
+        address: sender,
+        kind: WhitelistKind::Address,
+    }))
+    .unwrap();
+
+    // Check that the arbitrary caller can't add entries to the whitelist.
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), deployer.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+    let err = runner
+        .call(
+            "add_entry_to_whitelist",
+            caller.as_ref(),
+            evm_deployer.clone(),
+        )
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), account.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+    let err = runner
+        .call("add_entry_to_whitelist", caller.as_ref(), address.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+
+    // But the owner can.
+    let owner = runner.aurora_account_id.clone();
+    let result = runner.call("add_entry_to_whitelist", &owner, deployer);
     assert!(result.is_ok());
-    let result = runner.call("add_entry_to_whitelist", caller.as_ref(), address);
+    let result = runner.call("add_entry_to_whitelist", &owner, evm_deployer);
     assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", &owner, account);
+    assert!(result.is_ok());
+    let result = runner.call("add_entry_to_whitelist", &owner, address);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_restriction_to_enable_whitelists_by_anyone() {
+    let (mut runner, _, _) = initialize_transfer();
+    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
+
+    let args = vec![
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Admin,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::EvmAdmin,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Account,
+            active: true,
+        },
+        WhitelistStatusArgs {
+            kind: WhitelistKind::Address,
+            active: true,
+        },
+    ];
+
+    let validate = |args: Vec<WhitelistStatusArgs>, runner: &mut AuroraRunner| {
+        for arg in args {
+            let err = runner
+                .call(
+                    "set_whitelists_statuses",
+                    caller.as_ref(),
+                    borsh::to_vec(&arg).unwrap(),
+                )
+                .unwrap_err();
+            assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+        }
+    };
+
+    validate(args.clone(), &mut runner);
+
+    enable_all_whitelists(&mut runner);
+
+    add_account_deployer(&mut runner, caller.clone());
+    add_account_to_whitelist(&mut runner, caller.clone());
+
+    validate(args, &mut runner);
+}
+
+#[test]
+fn test_restriction_to_set_fallback_address_by_anyone() {
+    let (mut runner, _, _) = initialize_transfer();
+    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
+
+    let args = borsh::to_vec(&Erc20FallbackAddressArgs {
+        address: Some(Address::zero()),
+    })
+    .unwrap();
+
+    let err = runner
+        .call("set_erc20_fallback_address", caller.as_ref(), args.clone())
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
+
+    enable_all_whitelists(&mut runner);
+
+    add_account_deployer(&mut runner, caller.clone());
+    add_account_to_whitelist(&mut runner, caller.clone());
+
+    let err = runner
+        .call("set_erc20_fallback_address", caller.as_ref(), args)
+        .unwrap_err();
+    assert_eq!(err.kind, EngineErrorKind::NotAllowed);
 }
 
 #[test]
@@ -340,8 +477,6 @@ fn test_submit_access_right() {
         .unwrap();
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
         .unwrap();
-
-    // Allow to submit transactions.
 
     // perform transfer
     let err = runner
@@ -396,8 +531,6 @@ fn test_submit_access_right_via_batch() {
         .unwrap();
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
         .unwrap();
-
-    // Allow to submit transactions.
 
     // perform transfer
     let err = runner
@@ -462,8 +595,6 @@ fn test_submit_with_disabled_whitelist() {
     validate_address_balance_and_nonce(&runner, receiver, ZERO_BALANCE, INITIAL_NONCE.into())
         .unwrap();
 
-    // Allow to submit transactions.
-
     // perform transfer
     let err = runner
         .submit_transaction(&signer.secret_key, transaction.clone())
@@ -522,7 +653,7 @@ fn test_submit_with_removing_entries() {
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     enable_all_whitelists(&mut runner);
 
-    // Allow to submit transactions.
+    // Allow submitting transactions.
     add_account_to_whitelist(&mut runner, caller.clone());
     add_address_to_whitelist(&mut runner, sender);
 
@@ -548,7 +679,7 @@ fn test_submit_with_removing_entries() {
     validate_address_balance_and_nonce(&runner, receiver, TRANSFER_AMOUNT, INITIAL_NONCE.into())
         .unwrap();
 
-    // Remove account id and address from white lists.
+    // Remove account id and address from whitelists.
     remove_account_from_whitelist(&mut runner, caller);
     remove_address_from_whitelist(&mut runner, sender);
 
@@ -594,7 +725,7 @@ fn test_deploy_access_rights() {
     set_silo_params(&mut runner, Some(SILO_PARAMS_ARGS));
     enable_all_whitelists(&mut runner);
 
-    // Try to deploy code without adding to admins white list.
+    // Try to deploy code without adding the caller to admin's whitelist.
     let err = runner
         .submit_transaction(&signer.secret_key, deploy_tx.clone())
         .unwrap_err();
@@ -605,8 +736,8 @@ fn test_deploy_access_rights() {
         .unwrap();
 
     // Add caller's account id and sender address to admins list to allow deploying a code.
-    add_admin(&mut runner, caller);
-    add_evm_admin(&mut runner, sender);
+    add_account_deployer(&mut runner, caller);
+    add_address_deployer(&mut runner, sender);
 
     // Deploy that code
     let result = runner
@@ -690,10 +821,6 @@ fn test_switch_between_fix_gas() {
     const TRANSFER: Wei = Wei::new_u64(10_000_000);
     let (mut runner, mut signer, receiver) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
-    let caller: AccountId = CALLER_ACCOUNT_ID.parse().unwrap();
-
-    add_account_to_whitelist(&mut runner, caller);
-    add_address_to_whitelist(&mut runner, sender);
 
     // validate pre-state
     validate_address_balance_and_nonce(&runner, sender, INITIAL_BALANCE, INITIAL_NONCE.into())
@@ -807,7 +934,7 @@ fn keys(rng: &mut ThreadRng) -> (Address, SecretKey) {
     (address, sk)
 }
 
-fn add_admin(runner: &mut AuroraRunner, account_id: AccountId) {
+fn add_account_deployer(runner: &mut AuroraRunner, account_id: AccountId) {
     let args = WhitelistArgs::WhitelistAccountArgs(WhitelistAccountArgs {
         kind: WhitelistKind::Admin,
         account_id,
@@ -815,7 +942,7 @@ fn add_admin(runner: &mut AuroraRunner, account_id: AccountId) {
     call_function(runner, "add_entry_to_whitelist", args);
 }
 
-fn add_evm_admin(runner: &mut AuroraRunner, address: Address) {
+fn add_address_deployer(runner: &mut AuroraRunner, address: Address) {
     let args = WhitelistArgs::WhitelistAddressArgs(WhitelistAddressArgs {
         kind: WhitelistKind::EvmAdmin,
         address,
