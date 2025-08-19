@@ -24,20 +24,18 @@ fn test_trace_contract_deploy() {
 
     let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let deploy_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, deploy_tx)
-            .unwrap()
-    });
+    let (deploy_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, deploy_tx)
+        .unwrap();
+    let mut call_tracer = call_tracer.unwrap();
     let contract_address = {
         let bytes = utils::unwrap_success_slice(&deploy_result);
         Address::try_from_slice(bytes).unwrap()
     };
     let code = runner.get_code(&contract_address);
 
-    assert_eq!(listener.call_stack.len(), 1);
-    let trace = listener.call_stack.pop().unwrap();
+    assert_eq!(call_tracer.call_stack.len(), 1);
+    let trace = call_tracer.call_stack.pop().unwrap();
 
     assert_eq!(trace.to, Some(contract_address));
     assert_eq!(trace.output, code);
@@ -80,14 +78,14 @@ fn test_trace_precompile_direct_call() {
             .unwrap()
     };
 
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner.submit_transaction(&signer.secret_key, tx).unwrap()
-    });
+    let (standalone_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let mut call_tracer = call_tracer.unwrap();
     assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
 
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
@@ -127,16 +125,14 @@ fn test_trace_contract_single_call() {
     let contract = ERC20(constructor.0.deployed_at(contract_address));
 
     let tx = contract.balance_of(signer_address, signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
+    let (standalone_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx.clone())
+        .unwrap();
+    let mut call_tracer = call_tracer.unwrap();
     assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
 
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
@@ -250,16 +246,14 @@ fn test_trace_contract_with_precompile_sub_call() {
     // This transaction calls the standard precompiles (`ecrecover`, `sha256`, etc) one aft the other.
     // So the trace is one top-level call with multiple sub-calls (and the sub-calls contain no further sub-calls).
     let tx = contract.call_method("test_all", signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
+    let (standalone_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx.clone())
+        .unwrap();
+    let mut call_tracer = call_tracer.unwrap();
     assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
     assert_eq!(trace.calls.len(), 8);
     for call in trace.calls {
         assert!(call.calls.is_empty());
@@ -295,12 +289,12 @@ fn test_contract_create_too_large() {
         data: tx_data,
     };
 
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner.submit_transaction(&signer.secret_key, tx)
-    });
+    let (standalone_result, call_tracer) = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let _call_tracer = call_tracer.unwrap();
     assert!(matches!(
-        standalone_result.unwrap().status,
+        standalone_result.status,
         TransactionStatus::CreateContractLimit
     ));
 }
