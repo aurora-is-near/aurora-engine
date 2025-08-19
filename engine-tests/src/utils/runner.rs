@@ -162,6 +162,23 @@ where
         Ok(())
     }
 
+    fn append_action_deploy_global_contract(
+        &mut self,
+        _receipt_index: ReceiptIndex,
+        _code: Vec<u8>,
+        _mode: near_vm_runner::logic::types::GlobalContractDeployMode,
+    ) -> Result<(), VMLogicError> {
+        Ok(())
+    }
+
+    fn append_action_use_global_contract(
+        &mut self,
+        _receipt_index: ReceiptIndex,
+        _contract_id: near_vm_runner::logic::types::GlobalContractIdentifier,
+    ) -> Result<(), VMLogicError> {
+        Ok(())
+    }
+
     fn append_action_function_call_weight(
         &mut self,
         receipt_index: ReceiptIndex,
