@@ -25,7 +25,10 @@ jobs:
           cache-on-failure: "true"
           cache-all-crates: "true"
       - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install Rust toolchain and components
+        run: |
+          rustup toolchain add nightly
       - name: Run ${{ matrix.command }}
         run: cargo make ${{ matrix.command }}
 
