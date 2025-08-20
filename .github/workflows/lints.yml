@@ -10,7 +10,7 @@ name: Lints
 jobs:
   rust:
     name: Run ${{ matrix.command }}
-    runs-on: k8s-worker-8
+    runs-on: k8s-worker-4
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +34,7 @@ jobs:
 
   contracts:
     name: Contracts
-    runs-on: k8s-worker-8
+    runs-on: k8s-worker-4
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4

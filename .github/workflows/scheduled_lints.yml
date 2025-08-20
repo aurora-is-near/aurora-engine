@@ -7,7 +7,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: k8s-worker-8
+    runs-on: k8s-worker-6
     strategy:
       fail-fast: false
       matrix:
@@ -45,7 +45,7 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: k8s-worker-8
+    runs-on: k8s-worker-6
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4

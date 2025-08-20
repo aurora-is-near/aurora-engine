@@ -56,7 +56,7 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: k8s-worker-8
+    runs-on: k8s-worker-4
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
