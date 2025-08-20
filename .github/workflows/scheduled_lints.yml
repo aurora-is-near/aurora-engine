@@ -7,25 +7,14 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: k8s-infrastructure-dind
+    runs-on: k8s-worker-8
     strategy:
       fail-fast: false
       matrix:
         version: [ mainnet, testnet ]
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install ci deps
-        run: sudo scripts/ci-deps/native.sh
-      - name: Install Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          cache: false
-          toolchain: stable
-          override: false
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -40,8 +29,6 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
@@ -58,26 +45,14 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: k8s-infrastructure-native
-    container: rust:latest
+    runs-on: k8s-worker-8
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/native.sh
-      - name: Install Rust toolchain and components
-        run: |
-          rustup component add rustfmt clippy
-          rustup toolchain add nightly
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
