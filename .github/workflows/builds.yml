@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Compile smart contracts
         run: |
           cargo make build-docker
