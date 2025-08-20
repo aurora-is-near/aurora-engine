@@ -25,7 +25,7 @@ jobs:
           cache-on-failure: "true"
           cache-all-crates: "true"
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Install Rust toolchain and components
         run: |
           rustup toolchain add nightly

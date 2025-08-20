@@ -15,7 +15,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -40,7 +40,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -61,7 +61,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:

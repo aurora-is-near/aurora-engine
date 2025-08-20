@@ -32,7 +32,7 @@ jobs:
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
