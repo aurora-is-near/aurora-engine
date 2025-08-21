@@ -16,6 +16,9 @@ pub mod secp256k1;
 mod utils;
 pub mod xcc;
 
+pub use aurora_engine_types::types::EthGas;
+pub use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
+
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
@@ -23,7 +26,6 @@ use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
-use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
@@ -39,7 +41,6 @@ use aurora_evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
