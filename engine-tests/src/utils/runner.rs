@@ -427,7 +427,9 @@ impl AbstractContractRunner for ContractRunner {
     {
         let mut ctx = Context::deserialize(*more_ctx);
         if ctx.storage_usage == 0 {
-            ctx.storage_usage = 100;
+            ctx.storage_usage =
+                100 + u64::try_from(self.contract.0.code().len()).expect("usize must fit in 64");
+            ctx.balance = 10u128.pow(25);
         }
         let promise_results = promise_data
             .iter()
