@@ -7,23 +7,12 @@ name: Build
 jobs:
   build:
     name: Build contracts
-    runs-on: k8s-infrastructure-dind
+    runs-on: k8s-worker-8
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install ci deps
-        run: |
-          sudo scripts/ci-deps/native.sh
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - name: Install cargo-make
-        run: cargo install --no-default-features --force cargo-make
+      - name: Install dependencies
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Compile smart contracts
         run: |
           cargo make build-docker
@@ -36,7 +25,7 @@ jobs:
 
   publish:
     name: Publish contracts
-    runs-on: k8s-infrastructure-generic
+    runs-on: k8s-worker-2
     needs: build
     steps:
       - name: Download artifacts
