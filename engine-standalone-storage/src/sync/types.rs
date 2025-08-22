@@ -491,7 +491,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
                 Some(PromiseResult::Successful(v)) => Some(Some(Cow::Borrowed(&*v))),
                 Some(PromiseResult::Failed) => Some(None),
                 Some(PromiseResult::NotReady) => {
-                    debug_assert!(false, "should never happen"); // is that correct?
+                    debug_assert!(false, "should never happen");
                     Some(None)
                 }
                 _ => None,

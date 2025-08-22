@@ -319,11 +319,7 @@ where
                         Address::deserialize(&mut slice).map_err(ExecutionError::Deserialize)?;
                     Some(TransactionExecutionResult::DeployErc20(address))
                 }
-                None => {
-                    //
-                    // TransactionExecutionResult::Promise(promise_args)
-                    panic!("cannot handle case where `deploy_erc20_token` returns promise")
-                }
+                None => None,
             }
         }
         TransactionKindTag::DeployErc20Callback => {
@@ -380,6 +376,7 @@ where
                 )
                 .map_err(ExecutionError::from_vm_err)?;
 
+            // TODO: add a wrapper over the call that returns the submit result for refund tx
             // maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
             None
         }
