@@ -10,13 +10,12 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: k8s-infrastructure-dind  # strong main container and weak docker container
+    runs-on: k8s-worker-8  # strong main container and weak docker container
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install CI deps
-        run: sudo scripts/ci-deps/native.sh
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -31,32 +30,23 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install cargo-make
-        run: sudo cargo +stable install cargo-make
       - name: Run tests
-        run: sudo cargo make test-flow
+        run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: k8s-infrastructure-native
-    container:
-      image: rust:latest
+    runs-on: k8s-worker-8
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install CI deps
-        run: scripts/ci-deps/native.sh
+      - name: Install dependencies
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           key: aurora-modexp-tests
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -66,25 +56,18 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: k8s-infrastructure-native
-    container:
-      image: rust:latest
+    runs-on: k8s-worker-4
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install CI deps
-        run: scripts/ci-deps/native.sh
+      - name: Install dependencies
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           key: cargo-build-xcc-router
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build XCC router
         run: cargo make build-xcc-router
 
