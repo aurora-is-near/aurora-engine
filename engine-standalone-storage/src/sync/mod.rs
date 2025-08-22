@@ -62,10 +62,6 @@ where
             let block_height = storage.get_block_height_by_hash(block_hash)?;
             let block_metadata = storage.get_block_metadata(block_hash)?;
             let engine_account_id = storage.get_engine_account_id()?;
-            let mut context = storage
-                .get_custom_data(b"more_context")?
-                .and_then(|data| data.try_into().ok())
-                .unwrap_or_default();
 
             let transaction_message = *transaction_message;
             let raw_input = transaction_message.transaction.args.clone();
@@ -79,12 +75,10 @@ where
                         engine_account_id,
                         None,
                         io,
-                        &mut context,
                         EngineStateAccess::get_transaction_diff,
                     )
                 })
                 .result;
-            storage.set_custom_data(b"more_context", &context)?;
 
             Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
                 outcome,
@@ -114,10 +108,6 @@ where
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
-    let mut context = storage
-        .get_custom_data(b"more_context")?
-        .and_then(|data| data.try_into().ok())
-        .unwrap_or_default();
     let raw_input = transaction_message.transaction.args.clone();
     let result = storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
         execute_transaction(
@@ -128,11 +118,9 @@ where
             engine_account_id,
             trace_kind,
             io,
-            &mut context,
             EngineStateAccess::get_transaction_diff,
         )
     });
-    storage.set_custom_data(b"more_context", &context)?;
     Ok(result.result)
 }
 
@@ -145,7 +133,6 @@ pub fn execute_transaction<I, F, R>(
     engine_account_id: AccountId,
     trace_kind: Option<TraceKind>,
     mut io: I,
-    context: &mut [u8; 32],
     get_diff: F,
 ) -> TransactionIncludedOutcome
 where
@@ -196,7 +183,7 @@ where
                 let mut trace_log = None;
                 let mut trace_call_stack = None;
                 let result = runner
-                    .call_contract(method, promise_data, &env, io, context, None)
+                    .call_contract(method, promise_data, &env, io, None)
                     .map_err(ExecutionError::from_vm_err)
                     .and_then(|data| {
                         data.map(|data| {
@@ -229,7 +216,7 @@ where
 
                 let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
                 let result = runner
-                    .call_contract("submit", promise_data, &env, io, context, None)
+                    .call_contract("submit", promise_data, &env, io, None)
                     .map_err(ExecutionError::from_vm_err)
                     .and_then(|data| {
                         data.map(|data| {
@@ -250,7 +237,6 @@ where
                     io,
                     &env,
                     promise_data,
-                    context,
                 );
                 (near_receipt_id, result, None, None)
             }
@@ -292,7 +278,6 @@ fn non_submit_execute<I: IO + Send + Copy, R>(
     io: I,
     env: &env::Fixed,
     promise_results: Vec<Option<Vec<u8>>>,
-    ctx: &mut [u8; 32],
 ) -> Result<Option<TransactionExecutionResult>, ExecutionError>
 where
     I::StorageValue: AsRef<[u8]>,
@@ -303,7 +288,7 @@ where
         TransactionKindTag::Call => {
             // We can ignore promises in the standalone engine (see above)
             let data = runner
-                .call_contract("call", promise_results, env, io, ctx, None)
+                .call_contract("call", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -314,7 +299,7 @@ where
 
         TransactionKindTag::Deploy => {
             let data = runner
-                .call_contract("deploy_code", promise_results, env, io, ctx, None)
+                .call_contract("deploy_code", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -324,22 +309,22 @@ where
         }
         TransactionKindTag::DeployErc20 => {
             let data = runner
-                .call_contract("deploy_erc20_token", promise_results, env, io, ctx, None)
+                .call_contract("deploy_erc20_token", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
-            Some(match data {
+            match data {
                 Some(data) => {
                     let mut slice = data.as_slice();
                     let address =
                         Address::deserialize(&mut slice).map_err(ExecutionError::Deserialize)?;
-                    TransactionExecutionResult::DeployErc20(address)
+                    Some(TransactionExecutionResult::DeployErc20(address))
                 }
                 None => {
                     //
                     // TransactionExecutionResult::Promise(promise_args)
                     panic!("cannot handle case where `deploy_erc20_token` returns promise")
                 }
-            })
+            }
         }
         TransactionKindTag::DeployErc20Callback => {
             let data = runner
@@ -348,7 +333,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     None,
                 )
                 .map_err(ExecutionError::from_vm_err)?
@@ -360,14 +344,7 @@ where
         }
         TransactionKindTag::FtOnTransfer => {
             let data = runner
-                .call_contract(
-                    "ft_on_transfer_with_return",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    None,
-                )
+                .call_contract("ft_on_transfer_with_return", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let submit_result = Option::<SubmitResult>::try_from_slice(&data)
@@ -387,7 +364,7 @@ where
         TransactionKindTag::SetPausedFlags => None,
         TransactionKindTag::RegisterRelayer => {
             runner
-                .call_contract("register_relayer", promise_results, env, io, ctx, None)
+                .call_contract("register_relayer", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -399,7 +376,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     None,
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -411,7 +387,7 @@ where
         TransactionKindTag::NewConnector => None,
         TransactionKindTag::NewEngine => {
             runner
-                .call_contract("new", promise_results, env, io, ctx, None)
+                .call_contract("new", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
             None
         }
@@ -422,7 +398,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     None,
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -431,7 +406,7 @@ where
         }
         TransactionKindTag::FactoryUpdate => {
             runner
-                .call_contract("factory_update", promise_results, env, io, ctx, None)
+                .call_contract("factory_update", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -443,7 +418,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     None,
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -452,35 +426,21 @@ where
         }
         TransactionKindTag::FactorySetWNearAddress => {
             runner
-                .call_contract(
-                    "factory_set_wnear_address",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    None,
-                )
+                .call_contract("factory_set_wnear_address", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::FundXccSubAccount => {
             runner
-                .call_contract("fund_xcc_sub_account", promise_results, env, io, ctx, None)
+                .call_contract("fund_xcc_sub_account", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::WithdrawWnearToRouter => {
             let data = runner
-                .call_contract(
-                    "withdraw_wnear_to_router",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    None,
-                )
+                .call_contract("withdraw_wnear_to_router", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -493,98 +453,84 @@ where
         TransactionKindTag::Submit | TransactionKindTag::SubmitWithArgs => unreachable!(),
         TransactionKindTag::PausePrecompiles => {
             runner
-                .call_contract("pause_precompiles", promise_results, env, io, ctx, None)
+                .call_contract("pause_precompiles", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::ResumePrecompiles => {
             runner
-                .call_contract("resume_precompiles", promise_results, env, io, ctx, None)
+                .call_contract("resume_precompiles", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::SetOwner => {
             runner
-                .call_contract("set_owner", promise_results, env, io, ctx, None)
+                .call_contract("set_owner", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::SetUpgradeDelayBlocks => {
             runner
-                .call_contract(
-                    "set_upgrade_delay_blocks",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    None,
-                )
+                .call_contract("set_upgrade_delay_blocks", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::PauseContract => {
             runner
-                .call_contract("pause_contract", promise_results, env, io, ctx, None)
+                .call_contract("pause_contract", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::ResumeContract => {
             runner
-                .call_contract("resume_contract", promise_results, env, io, ctx, None)
+                .call_contract("resume_contract", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::SetKeyManager => {
             runner
-                .call_contract("set_key_manager", promise_results, env, io, ctx, None)
+                .call_contract("set_key_manager", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::AddRelayerKey => {
             runner
-                .call_contract("add_relayer_key", promise_results, env, io, ctx, None)
+                .call_contract("add_relayer_key", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::StoreRelayerKeyCallback => {
             runner
-                .call_contract(
-                    "store_relayer_key_callback",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    None,
-                )
+                .call_contract("store_relayer_key_callback", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::RemoveRelayerKey => {
             runner
-                .call_contract("remove_relayer_key", promise_results, env, io, ctx, None)
+                .call_contract("remove_relayer_key", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::StartHashchain => {
             runner
-                .call_contract("start_hashchain", promise_results, env, io, ctx, None)
+                .call_contract("start_hashchain", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::SetErc20Metadata => {
             runner
-                .call_contract("set_erc20_metadata", promise_results, env, io, ctx, None)
+                .call_contract("set_erc20_metadata", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -593,7 +539,7 @@ where
             let args = silo_params::FixedGasArgs::try_from_slice(&transaction.args).unwrap();
             let input = borsh::to_vec(&args).map_err(ExecutionError::SerializeArg)?;
             runner
-                .call_contract("set_fixed_gas", promise_results, env, io, ctx, Some(input))
+                .call_contract("set_fixed_gas", promise_results, env, io, Some(input))
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -608,7 +554,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -620,14 +565,7 @@ where
                 BorshDeserialize::try_from_slice(&transaction.args).unwrap();
             let input = borsh::to_vec(&args).map_err(ExecutionError::SerializeArg)?;
             runner
-                .call_contract(
-                    "set_silo_params",
-                    promise_results,
-                    env,
-                    io,
-                    ctx,
-                    Some(input),
-                )
+                .call_contract("set_silo_params", promise_results, env, io, Some(input))
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -641,7 +579,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -658,7 +595,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -674,7 +610,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -690,7 +625,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -707,7 +641,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     Some(input),
                 )
                 .map_err(ExecutionError::from_vm_err)?;
@@ -721,7 +654,6 @@ where
                     promise_results,
                     env,
                     io,
-                    ctx,
                     None,
                 )
                 .map_err(ExecutionError::from_vm_err)?;

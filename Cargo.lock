@@ -376,7 +376,6 @@ dependencies = [
  "git2",
  "hex",
  "libsecp256k1",
- "memoffset 0.9.1",
  "near-crypto",
  "near-parameters",
  "near-primitives",
@@ -3228,15 +3227,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "memoffset"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
 name = "memory_units"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3738,7 +3728,7 @@ dependencies = [
  "dynasmrt",
  "enumset",
  "finite-wasm",
- "memoffset 0.8.0",
+ "memoffset",
  "near-vm-compiler",
  "near-vm-types",
  "near-vm-vm",
@@ -3782,7 +3772,7 @@ dependencies = [
  "enum-map",
  "finite-wasm",
  "lru",
- "memoffset 0.8.0",
+ "memoffset",
  "near-crypto",
  "near-o11y",
  "near-parameters",
@@ -3838,7 +3828,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "finite-wasm",
  "libc",
- "memoffset 0.8.0",
+ "memoffset",
  "more-asserts",
  "near-vm-types",
  "parking_lot",
