@@ -31,7 +31,7 @@ jobs:
             etc/eth-contracts
             etc/tests/uniswap
       - name: Run tests
-        run: sudo cargo make test-flow
+        run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
