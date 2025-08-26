@@ -245,7 +245,7 @@ args = [
     "--target",
     "${ENGINE_CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
-    "--features=contract,backward-compatibility",
+    "--features=contract",
     "--package=aurora-engine-traced",
 ]
 

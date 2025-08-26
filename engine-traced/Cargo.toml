@@ -33,4 +33,3 @@ workspace = true
 [features]
 integration-test = ["aurora-engine/integration-test"]
 contract = ["aurora-engine/contract", "aurora-engine-sdk/contract"]
-backward-compatibility = ["aurora-engine/backward-compatibility"]

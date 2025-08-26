@@ -996,14 +996,14 @@ pub fn submit_with_alt_modexp<
     relayer_address: Address,
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
-    #[cfg(not(feature = "backward-compatibility"))]
+    #[cfg(feature = "contract")]
     let transaction = NormalizedEthTransaction::try_from(
         EthTransactionKind::try_from(args.tx_data.as_slice())
             .map_err(EngineErrorKind::FailedTransactionParse)?,
     )
     .map_err(|_e| EngineErrorKind::InvalidSignature)?;
 
-    #[cfg(feature = "backward-compatibility")]
+    #[cfg(not(feature = "contract"))]
     // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
     // but the contract itself does not need to make such checks because it never executes historical
     // transactions.
