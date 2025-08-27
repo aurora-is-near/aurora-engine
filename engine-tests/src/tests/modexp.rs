@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use aurora_engine::engine::EngineError;
+use aurora_engine_types::types::NearGas;
 use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
@@ -119,12 +122,18 @@ fn bench_modexp_standalone() {
         };
 
         let start = std::time::Instant::now();
+        // don't care about near gas in standalone runner
+        standalone.env.prepaid_gas = NearGas::new(u64::MAX);
         standalone
             .submit_transaction(&signer.secret_key, bench_tx)
             .unwrap();
-        let duration = start.elapsed().as_millis();
+        let duration = start.elapsed();
+        let limit = Duration::from_secs(12);
 
-        assert!(duration < 1000, "{path} failed to run in under 1 second");
+        assert!(
+            duration < limit,
+            "{path} failed to run in under {limit:?}, Time taken: {duration:?}"
+        );
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting

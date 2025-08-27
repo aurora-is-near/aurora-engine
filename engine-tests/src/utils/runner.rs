@@ -330,6 +330,10 @@ impl ContractRunner {
         }
     }
 
+    pub fn wasm_config_mut(&mut self) -> &mut near_parameters::vm::Config {
+        Arc::get_mut(&mut self.wasm_config).unwrap()
+    }
+
     pub fn call(
         &self,
         method: &str,

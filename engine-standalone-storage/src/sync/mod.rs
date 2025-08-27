@@ -159,10 +159,6 @@ where
         used_gas: NearGas::new(0),
     };
 
-    // TODO: load code dynamically and check hash
-    // let code = include_bytes!("../../../bin/aurora-engine-traced.wasm").to_vec();
-    // let runner = ContractRunner::new(code, None);
-
     let promise_data = transaction_message.promise_data.clone();
 
     let (tx_hash, result, trace_log, call_tracer) =

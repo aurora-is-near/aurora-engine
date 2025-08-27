@@ -426,7 +426,10 @@ impl StandaloneRunner {
 fn unwrap_result(
     outcome: sync::TransactionIncludedOutcome,
 ) -> Result<SubmitResult, sync::ExecutionError> {
-    match outcome.maybe_result?.unwrap() {
+    match outcome
+        .maybe_result?
+        .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
+    {
         sync::TransactionExecutionResult::Submit(result) => {
             result.map_err(sync::ExecutionError::Engine)
         }
@@ -438,7 +441,10 @@ fn unwrap_result(
 fn unwrap_result_ext(
     mut outcome: sync::TransactionIncludedOutcome,
 ) -> Result<SubmitResultExt, sync::ExecutionError> {
-    match outcome.maybe_result?.unwrap() {
+    match outcome
+        .maybe_result?
+        .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
+    {
         sync::TransactionExecutionResult::Submit(result) => result
             .map_err(sync::ExecutionError::Engine)
             .map(|inner| SubmitResultExt {

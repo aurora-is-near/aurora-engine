@@ -5,11 +5,13 @@ use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_H
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::BorshDeserialize;
+use aurora_engine_types::types::NearGas;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -34,30 +36,36 @@ fn bench_memory_get_standalone() {
         .unwrap();
     let address = Address::try_from_slice(&utils::unwrap_success(result)).unwrap();
 
-    runner.standalone_runner.as_mut().unwrap().env.block_height += 100;
+    let env = &mut runner.standalone_runner.as_mut().unwrap().env;
+    env.block_height += 100;
+    // don't care about near gas in standalone runner
+    env.prepaid_gas = NearGas::new(u64::MAX);
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
-        gas_limit: 10_000_000_u64.into(),
+        gas_limit: 4_000_000_u64.into(),
         to: Some(address),
         value: Wei::zero(),
         data: Vec::new(),
     };
 
+    let mut standalone_runner = runner.standalone_runner.unwrap();
+    let limit_config = &mut standalone_runner.wasm_runner.wasm_config_mut().limit_config;
+    limit_config.max_memory_pages = 1 << 16;
+
     let start = std::time::Instant::now();
-    let result = runner
-        .standalone_runner
-        .unwrap()
+    let result = standalone_runner
         .submit_transaction(&signer.secret_key, tx)
         .unwrap();
-    let duration = start.elapsed().as_secs_f32();
+    let duration = dbg!(start.elapsed());
+    let limit = Duration::from_secs(6);
     assert!(
         matches!(result.status, TransactionStatus::OutOfGas),
         "Infinite loops in the EVM run out of gas"
     );
     assert!(
-        duration < 8.0,
-        "Must complete this task in under 8s (in release build). Time taken: {duration} s",
+        duration < limit,
+        "Must complete this task in under {limit:?} (in release build). Time taken: {duration:?}",
     );
 }
 
