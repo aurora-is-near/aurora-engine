@@ -542,7 +542,8 @@ impl AuroraRunner {
                 let standalone_value = value.value();
                 assert_eq!(
                     trie_value, standalone_value,
-                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
+                    "Standalone mismatch at {}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
+                    hex::encode(key),
                 );
             }
         }

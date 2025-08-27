@@ -4,10 +4,7 @@ use std::io;
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_modexp::ModExpAlgorithm;
-use aurora_engine_sdk::{
-    env::{self, DEFAULT_PREPAID_GAS},
-    io::IO,
-};
+use aurora_engine_sdk::{env, io::IO};
 use aurora_engine_types::borsh;
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
@@ -158,7 +155,7 @@ where
         block_timestamp: block_metadata.timestamp,
         attached_deposit: transaction_message.attached_near,
         random_seed,
-        prepaid_gas: DEFAULT_PREPAID_GAS,
+        prepaid_gas: transaction_message.prepaid_gas,
         used_gas: NearGas::new(0),
     };
 
@@ -216,7 +213,7 @@ where
 
                 let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
                 let result = runner
-                    .call_contract("submit", promise_data, &env, io, None)
+                    .call_contract("submit_with_args", promise_data, &env, io, None)
                     .map_err(ExecutionError::from_vm_err)
                     .and_then(|data| {
                         data.map(|data| {

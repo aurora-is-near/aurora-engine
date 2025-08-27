@@ -3,7 +3,7 @@ use std::sync::Arc;
 use aurora_engine_sdk::{env::Env, io::IO};
 use engine_standalone_storage::AbstractContractRunner;
 use near_crypto::PublicKey;
-use near_parameters::{RuntimeConfig, RuntimeConfigStore};
+use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives_core::{
     hash::CryptoHash,
     types::{AccountId, Balance, Gas, GasWeight},
@@ -12,11 +12,10 @@ use near_vm_runner::{
     logic::{
         errors::VMRunnerError,
         mocks::mock_external::{MockAction, MockedValuePtr},
-        types::PromiseResult,
-        types::ReceiptIndex,
+        types::{PromiseResult, ReceiptIndex},
         External, StorageAccessTracker, VMContext, VMLogicError, VMOutcome, ValuePtr,
     },
-    Contract, ContractCode,
+    Contract, ContractCode, MockContractRuntimeCache,
 };
 
 pub struct EngineStateVMAccess<I: IO> {
@@ -287,7 +286,9 @@ where
 
 pub struct ContractRunner {
     contract: CodeWrapper,
-    runtime_config: Arc<RuntimeConfig>,
+    cache: MockContractRuntimeCache,
+    wasm_config: Arc<near_parameters::vm::Config>,
+    fees_config: Arc<RuntimeFeesConfig>,
 }
 
 struct CodeWrapper(Arc<ContractCode>);
@@ -309,13 +310,23 @@ impl ContractRunner {
     }
 
     pub fn new(code: Vec<u8>, hash: Option<CryptoHash>) -> Self {
-        let runtime_config_store =
-            RuntimeConfigStore::for_chain_id(near_primitives_core::chains::TESTNET);
+        let runtime_config_store = RuntimeConfigStore::test();
         let runtime_config =
             runtime_config_store.get_config(near_primitives_core::version::PROTOCOL_VERSION);
+        let fees_config = runtime_config.fees.clone();
+        let mut wasm_config = runtime_config.wasm_config.clone();
+        drop(runtime_config_store);
+        // needed for `tests::sanity::test_solidity_pure_bench`
+        Arc::get_mut(&mut wasm_config)
+            .unwrap()
+            .limit_config
+            .max_gas_burnt = u64::MAX;
+
         Self {
             contract: CodeWrapper(Arc::new(ContractCode::new(code, hash))),
-            runtime_config: runtime_config.clone(),
+            cache: MockContractRuntimeCache::default(),
+            wasm_config,
+            fees_config,
         }
     }
 
@@ -342,6 +353,8 @@ impl ContractRunner {
             .to_string()
             .parse::<AccountId>()
             .expect("incompatible account id");
+        let storage_usage =
+            100 + u64::try_from(self.contract.0.code().len()).expect("usize must fit in 64");
         let ctx = VMContext {
             current_account_id,
             signer_account_id,
@@ -354,8 +367,7 @@ impl ContractRunner {
             epoch_height: 0,
             account_balance: 10u128.pow(25),
             account_locked_balance: 0,
-            storage_usage: 100
-                + u64::try_from(self.contract.0.code().len()).expect("usize must fit in 64"),
+            storage_usage,
             attached_deposit: env.attached_deposit(),
             prepaid_gas: env.prepaid_gas().as_u64(),
             random_seed: env.random_seed().0.to_vec(),
@@ -365,13 +377,13 @@ impl ContractRunner {
 
         let contract = near_vm_runner::prepare(
             &self.contract,
-            self.runtime_config.wasm_config.clone(),
-            None,
-            ctx.make_gas_counter(&self.runtime_config.wasm_config),
+            self.wasm_config.clone(),
+            Some(&self.cache),
+            ctx.make_gas_counter(&self.wasm_config),
             method,
         );
 
-        near_vm_runner::run(contract, ext, &ctx, self.runtime_config.fees.clone())
+        near_vm_runner::run(contract, ext, &ctx, self.fees_config.clone())
     }
 }
 

@@ -1,5 +1,5 @@
 // For the future: #![allow(clippy::doc_lazy_continuation)]
-use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::sync::TraceKind;
@@ -76,6 +76,7 @@ fn test_evm_tracing_with_storage() {
             transaction: engine_standalone_storage::sync::types::TransactionKind::unknown(),
             promise_data: Vec::new(),
             action_hash: H256::default(),
+            prepaid_gas: DEFAULT_PREPAID_GAS,
         },
         diff,
         maybe_result: Ok(None),

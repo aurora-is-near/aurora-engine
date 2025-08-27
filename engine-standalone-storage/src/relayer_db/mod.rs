@@ -157,6 +157,7 @@ where
             transaction: crate::sync::types::TransactionKind::submit(&tx),
             promise_data: Vec::new(),
             action_hash: H256::default(),
+            prepaid_gas: DEFAULT_PREPAID_GAS,
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -205,6 +206,7 @@ mod test {
     use crate::relayer_db::types::ConnectionParams;
     use crate::sync::types::{TransactionKind, TransactionMessage};
     use aurora_engine::state;
+    use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
     use aurora_engine_types::H256;
 
     #[allow(clippy::doc_markdown)]
@@ -258,6 +260,7 @@ mod test {
                         transaction: TransactionKind::unknown(),
                         promise_data: Vec::new(),
                         action_hash: H256::default(),
+                        prepaid_gas: DEFAULT_PREPAID_GAS,
                     },
                     &diff,
                 )

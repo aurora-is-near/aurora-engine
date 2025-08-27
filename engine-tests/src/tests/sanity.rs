@@ -165,6 +165,10 @@ fn test_total_supply_accounting() {
 }
 
 #[test]
+#[ignore = "\
+    we are using different versions of WASM to ensure backward compatibility, \
+    the test should be in the borealis repository where dynamic contract reloading is implemented\
+"]
 fn test_transaction_to_zero_address() {
     // Transactions that explicit list `0x0000...` as the `to` field in the transaction
     // should not be interpreted as contract creation. Previously this was the case
@@ -420,7 +424,7 @@ fn test_solidity_pure_bench() {
 
     assert!(
         result.gas_used > 37_000_000,
-        "Over 37 million EVM gas is used {}",
+        "Expected over 37 million EVM gas used, actually used {}",
         result.gas_used
     );
     let near_gas = profile.all_gas();

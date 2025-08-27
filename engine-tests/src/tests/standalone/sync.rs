@@ -1,5 +1,5 @@
 use aurora_engine_modexp::AuroraModExp;
-use aurora_engine_sdk::env::{Env, Timestamp};
+use aurora_engine_sdk::env::{Env, Timestamp, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
 use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
@@ -56,6 +56,7 @@ fn test_consume_deploy_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     let outcome = sync::consume_message::<AuroraModExp, _>(
@@ -110,6 +111,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
@@ -152,6 +154,7 @@ fn test_consume_deploy_erc20_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
@@ -209,6 +212,7 @@ fn test_consume_ft_on_transfer_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     let outcome = sync::consume_message::<AuroraModExp, _>(
@@ -255,6 +259,7 @@ fn test_consume_call_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     let outcome = sync::consume_message::<AuroraModExp, _>(
@@ -309,6 +314,7 @@ fn test_consume_submit_message() {
         transaction: tx_kind,
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
 
     let outcome = sync::consume_message::<AuroraModExp, _>(

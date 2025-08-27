@@ -387,6 +387,7 @@ impl StandaloneRunner {
             transaction: TransactionKind::unknown(),
             promise_data,
             action_hash,
+            prepaid_gas: env.prepaid_gas,
         }
     }
 

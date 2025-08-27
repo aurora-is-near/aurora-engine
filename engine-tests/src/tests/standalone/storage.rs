@@ -1,4 +1,4 @@
-use aurora_engine_sdk::env::Timestamp;
+use aurora_engine_sdk::env::{Timestamp, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::{
@@ -273,6 +273,7 @@ fn test_transaction_index() {
         transaction: TransactionKind::unknown(),
         promise_data: Vec::new(),
         action_hash: H256::default(),
+        prepaid_gas: DEFAULT_PREPAID_GAS,
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,
