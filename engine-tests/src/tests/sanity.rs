@@ -273,17 +273,18 @@ fn test_deploy_largest_contract() {
     let code = generate_code(len);
 
     // Deploy that code
-    let (result, profile) = runner
+    let result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
+    let profile = result.execution_profile.unwrap();
 
     // At least 5 million EVM gas
     assert!(
-        result.gas_used >= 5_000_000,
+        result.inner.gas_used >= 5_000_000,
         "{:?} not greater than 5 million",
-        result.gas_used,
+        result.inner.gas_used,
     );
 
     // Less than 10 NEAR Tgas
@@ -412,7 +413,7 @@ fn test_solidity_pure_bench() {
 
     // Number of iterations to do
     let loop_limit: u32 = 10_000;
-    let (result, profile) = runner
+    let result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             contract.call_method_with_args(
                 "cpu_ram_soak_test",
@@ -421,11 +422,12 @@ fn test_solidity_pure_bench() {
             )
         })
         .unwrap();
+    let profile = result.execution_profile.unwrap();
 
     assert!(
-        result.gas_used > 37_000_000,
+        result.inner.gas_used > 37_000_000,
         "Expected over 37 million EVM gas used, actually used {}",
-        result.gas_used
+        result.inner.gas_used
     );
     let near_gas = profile.all_gas();
     assert!(

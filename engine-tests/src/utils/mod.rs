@@ -9,6 +9,8 @@ use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use aurora_evm::ExitFatal;
+use engine_standalone_tracing::types::call_tracer::CallTracer;
+use engine_standalone_tracing::TraceLog;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
@@ -328,14 +330,33 @@ impl AuroraRunner {
         make_tx: F,
     ) -> Result<SubmitResult, EngineError> {
         self.submit_with_signer_profiled(signer, make_tx)
-            .map(|(result, _)| result)
+            .map(|result| result.inner)
+    }
+
+    pub fn submit_with_signer_profiled_with_call_trace<F: FnOnce(U256) -> TransactionLegacy>(
+        &mut self,
+        signer: &mut Signer,
+        make_tx: F,
+    ) -> Result<SubmitResultExt, EngineError> {
+        let nonce = signer.use_nonce();
+        let tx = make_tx(nonce.into());
+        let signed_tx = sign_transaction(tx, Some(self.chain_id), &signer.secret_key);
+        // TODO: enable call trace
+        let outcome = self.call_with_signer(
+            SUBMIT,
+            CALLER_ACCOUNT_ID,
+            CALLER_ACCOUNT_ID,
+            rlp::encode(&signed_tx).to_vec(),
+        )?;
+        let ext = Self::profile_outcome(outcome);
+        Ok(ext)
     }
 
     pub fn submit_with_signer_profiled<F: FnOnce(U256) -> TransactionLegacy>(
         &mut self,
         signer: &mut Signer,
         make_tx: F,
-    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<SubmitResultExt, EngineError> {
         let nonce = signer.use_nonce();
         let tx = make_tx(nonce.into());
         self.submit_transaction_profiled(&signer.secret_key, tx)
@@ -347,14 +368,14 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
     ) -> Result<SubmitResult, EngineError> {
         self.submit_transaction_profiled(account, transaction)
-            .map(|(result, _)| result)
+            .map(|result| result.inner)
     }
 
     pub fn submit_transaction_profiled(
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<SubmitResultExt, EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
         self.call(SUBMIT, CALLER_ACCOUNT_ID, rlp::encode(&signed_tx).to_vec())
             .map(Self::profile_outcome)
@@ -373,7 +394,7 @@ impl AuroraRunner {
             max_gas_price,
             gas_token_address,
         )
-        .map(|(result, _)| result)
+        .map(|result| result.inner)
     }
 
     pub fn submit_transaction_with_args_profiled(
@@ -382,7 +403,7 @@ impl AuroraRunner {
         transaction: TransactionLegacy,
         max_gas_price: u128,
         gas_token_address: Option<Address>,
-    ) -> Result<(SubmitResult, ExecutionProfile), EngineError> {
+    ) -> Result<SubmitResultExt, EngineError> {
         let signed_tx = sign_transaction(transaction, Some(self.chain_id), account);
         let args = SubmitArgs {
             tx_data: rlp::encode(&signed_tx).to_vec(),
@@ -398,12 +419,17 @@ impl AuroraRunner {
         .map(Self::profile_outcome)
     }
 
-    fn profile_outcome(outcome: VMOutcome) -> (SubmitResult, ExecutionProfile) {
+    fn profile_outcome(outcome: VMOutcome) -> SubmitResultExt {
         let profile = ExecutionProfile::new(&outcome);
         let submit_result =
             SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
-        (submit_result, profile)
+        SubmitResultExt {
+            inner: submit_result,
+            execution_profile: Some(profile),
+            call_tracer: None,
+            trace_log: None,
+        }
     }
 
     pub fn deploy_contract<F: FnOnce(&T) -> TransactionLegacy, T: Into<ContractConstructor>>(
@@ -987,4 +1013,12 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
     };
 
     EngineError { kind, gas_used }
+}
+
+#[derive(Debug)]
+pub struct SubmitResultExt {
+    pub inner: SubmitResult,
+    pub execution_profile: Option<ExecutionProfile>,
+    pub call_tracer: Option<CallTracer>,
+    pub trace_log: Option<Vec<TraceLog>>,
 }

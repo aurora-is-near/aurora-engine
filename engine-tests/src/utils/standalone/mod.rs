@@ -14,12 +14,11 @@ use engine_standalone_storage::{
     },
     BlockMetadata, Diff, Storage,
 };
-use engine_standalone_tracing::types::call_tracer::CallTracer;
 use engine_standalone_tracing::TraceLog;
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 
-use crate::utils;
+use crate::utils::{self, SubmitResultExt};
 
 pub mod mocks;
 pub mod storage;
@@ -123,22 +122,20 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::ExecutionError> {
-        let mut outcome =
+    ) -> Result<SubmitResultExt, sync::ExecutionError> {
+        let outcome =
             self.submit_transaction_inner(account, transaction, Some(TraceKind::Transaction));
-        let trace_log = outcome.trace_log.take();
-        unwrap_result(outcome).map(|res| (res, trace_log))
+        unwrap_result_ext(outcome)
     }
 
     pub fn submit_transaction_with_call_stack_tracing(
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<(SubmitResult, Option<CallTracer>), sync::ExecutionError> {
-        let mut outcome =
+    ) -> Result<SubmitResultExt, sync::ExecutionError> {
+        let outcome =
             self.submit_transaction_inner(account, transaction, Some(TraceKind::CallFrame));
-        let trace_log = outcome.call_tracer.take();
-        unwrap_result(outcome).map(|res| (res, trace_log))
+        unwrap_result_ext(outcome)
     }
 
     pub fn submit_transaction(
@@ -429,6 +426,23 @@ fn unwrap_result(
         sync::TransactionExecutionResult::Submit(result) => {
             result.map_err(sync::ExecutionError::Engine)
         }
+        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
+        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+    }
+}
+
+fn unwrap_result_ext(
+    mut outcome: sync::TransactionIncludedOutcome,
+) -> Result<SubmitResultExt, sync::ExecutionError> {
+    match outcome.maybe_result?.unwrap() {
+        sync::TransactionExecutionResult::Submit(result) => result
+            .map_err(sync::ExecutionError::Engine)
+            .map(|inner| SubmitResultExt {
+                inner,
+                execution_profile: None,
+                call_tracer: outcome.call_tracer.take(),
+                trace_log: outcome.trace_log.take(),
+            }),
         sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
         sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }

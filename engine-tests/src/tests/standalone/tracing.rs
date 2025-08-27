@@ -164,11 +164,11 @@ fn test_evm_tracing() {
         value: Wei::zero(),
         data: hex::decode(CONTRACT_INPUT).unwrap(),
     };
-    let (result, tracing_log) = runner
+    let result = runner
         .submit_transaction_with_tracing(&signer.secret_key, tx)
         .unwrap();
-    let tracing_log = tracing_log.unwrap();
-    assert!(result.status.is_ok());
+    let tracing_log = result.trace_log.unwrap();
+    assert!(result.inner.status.is_ok());
 
     // Check trace
     let positions: Vec<u8> = tracing_log

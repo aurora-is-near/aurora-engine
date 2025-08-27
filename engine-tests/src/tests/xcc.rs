@@ -62,7 +62,7 @@ fn test_xcc_eth_gas_cost() {
     // Baseline transaction is an ERC-20 transferFrom call since such a call is included as part
     // of the precompile execution, but we want to isolate just the precompile logic itself
     // (the EVM subcall is charged separately).
-    let (baseline_result, baseline) = runner
+    let baseline_result = runner
         .submit_with_signer_profiled(&mut baseline_signer, |nonce| {
             wnear_erc20.transfer_from(
                 utils::address_from_secret_key(&signer.secret_key),
@@ -72,15 +72,17 @@ fn test_xcc_eth_gas_cost() {
             )
         })
         .unwrap();
+    let baseline = baseline_result.execution_profile.unwrap();
     assert!(
-        baseline_result.status.is_ok(),
-        "Unexpected baseline status: {baseline_result:?}",
+        baseline_result.inner.status.is_ok(),
+        "Unexpected baseline status: {:?}",
+        baseline_result.inner
     );
 
     let mut profile_for_promise = |p: PromiseArgs| -> (u64, u64, u64) {
         let data = borsh::to_vec(&CrossContractCallArgs::Eager(p)).unwrap();
         let input_length = data.len();
-        let (submit_result, profile) = runner
+        let submit_result = runner
             .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
                 nonce,
                 gas_price: U256::zero(),
@@ -90,12 +92,13 @@ fn test_xcc_eth_gas_cost() {
                 data,
             })
             .unwrap();
-        assert!(submit_result.status.is_ok());
+        let profile = submit_result.execution_profile.unwrap();
+        assert!(submit_result.inner.status.is_ok());
         // Subtract off baseline transaction to isolate just precompile things
         (
             u64::try_from(input_length).unwrap(),
             profile.all_gas() - baseline.all_gas(),
-            submit_result.gas_used,
+            submit_result.inner.gas_used,
         )
     };
 
