@@ -240,7 +240,8 @@ impl StandaloneRunner {
         ctx: &near_vm_runner::logic::VMContext,
         promise_results: &[PromiseResult],
         block_random_value: Option<H256>,
-    ) -> Result<SubmitResult, engine::EngineError> {
+        trace_kind: Option<TraceKind>,
+    ) -> Result<SubmitResultExt, engine::EngineError> {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit;
@@ -286,29 +287,32 @@ impl StandaloneRunner {
             );
         }
 
-        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
+        let mut outcome = sync::execute_transaction_message::<AuroraModExp, _>(
             storage,
             &self.wasm_runner,
             tx_msg,
-            None,
+            trace_kind,
         )
         .unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
-        match outcome.maybe_result.unwrap() {
-            Some(sync::TransactionExecutionResult::Submit(result)) => result,
-            Some(sync::TransactionExecutionResult::DeployErc20(address)) => Ok(SubmitResult::new(
+        let inner = match outcome.maybe_result.unwrap() {
+            Some(sync::TransactionExecutionResult::Submit(result)) => result?,
+            Some(sync::TransactionExecutionResult::DeployErc20(address)) => SubmitResult::new(
                 TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
-            )),
-            _ => Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            )),
-        }
+            ),
+            _ => SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 0, Vec::new()),
+        };
+
+        Ok(SubmitResultExt {
+            inner,
+            execution_profile: None,
+            call_tracer: outcome.call_tracer.take(),
+            trace_log: outcome.trace_log.take(),
+        })
     }
 
     pub const fn get_current_state(&self) -> &Diff {

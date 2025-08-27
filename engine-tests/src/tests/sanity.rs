@@ -196,18 +196,18 @@ fn test_transaction_to_zero_address() {
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
     let result = runner
-        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .submit_raw(utils::SUBMIT, &context, &[], None, None)
         .unwrap();
-    assert_eq!(result.gas_used, 53_000);
+    assert_eq!(result.inner.gas_used, 53_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     let result = runner
-        .submit_raw(utils::SUBMIT, &context, &[], None)
+        .submit_raw(utils::SUBMIT, &context, &[], None, None)
         .unwrap();
-    assert_eq!(result.gas_used, 21_000);
+    assert_eq!(result.inner.gas_used, 21_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
 }

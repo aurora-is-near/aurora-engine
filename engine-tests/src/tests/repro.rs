@@ -171,11 +171,11 @@ fn repro_common(context: &ReproContext) {
     let mut standalone = standalone::StandaloneRunner::default();
     json_snapshot::initialize_engine_state(&standalone.storage, snapshot).unwrap();
     let standalone_result = standalone
-        .submit_raw("submit", &runner.context, &[], None)
+        .submit_raw("submit", &runner.context, &[], None, None)
         .unwrap();
     assert_eq!(
         borsh::to_vec(&submit_result).unwrap(),
-        borsh::to_vec(&standalone_result).unwrap()
+        borsh::to_vec(&standalone_result.inner).unwrap()
     );
     standalone.close();
 }

@@ -60,7 +60,14 @@ impl AuroraRunner {
         signer_account_id: &str,
         input: Vec<u8>,
     ) -> Result<VMOutcome, EngineError> {
-        self.call_with_signer(method_name, caller_account_id, signer_account_id, input)
+        self.call_with_signer(
+            method_name,
+            caller_account_id,
+            signer_account_id,
+            input,
+            None,
+        )
+        .map(|(outcome, _, _)| outcome)
     }
 
     pub fn evm_call(

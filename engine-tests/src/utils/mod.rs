@@ -9,6 +9,7 @@ use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use aurora_evm::ExitFatal;
+use engine_standalone_storage::sync::TraceKind;
 use engine_standalone_tracing::types::call_tracer::CallTracer;
 use engine_standalone_tracing::TraceLog;
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
@@ -188,7 +189,14 @@ impl AuroraRunner {
         caller_account_id: &str,
         input: Vec<u8>,
     ) -> Result<VMOutcome, EngineError> {
-        self.call_with_signer(method_name, caller_account_id, caller_account_id, input)
+        self.call_with_signer(
+            method_name,
+            caller_account_id,
+            caller_account_id,
+            input,
+            None,
+        )
+        .map(|(outcome, _, _)| outcome)
     }
 
     pub fn call_with_signer(
@@ -197,7 +205,8 @@ impl AuroraRunner {
         caller_account_id: &str,
         signer_account_id: &str,
         input: Vec<u8>,
-    ) -> Result<VMOutcome, EngineError> {
+        trace_kind: Option<TraceKind>,
+    ) -> Result<(VMOutcome, Option<CallTracer>, Option<Vec<TraceLog>>), EngineError> {
         Self::update_context(
             &mut self.context,
             caller_account_id,
@@ -242,17 +251,21 @@ impl AuroraRunner {
         self.context.storage_usage = outcome.storage_usage;
         self.previous_logs.clone_from(&outcome.logs);
 
-        if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.submit_raw(
+        let (call_trace, trace_log) = if let Some(standalone_runner) = &mut self.standalone_runner {
+            let result = standalone_runner.submit_raw(
                 method_name,
                 &self.context,
                 &self.promise_results,
                 self.block_random_value,
+                trace_kind,
             )?;
             self.validate_standalone();
-        }
+            (result.call_tracer, result.trace_log)
+        } else {
+            (None, None)
+        };
 
-        Ok(outcome)
+        Ok((outcome, call_trace, trace_log))
     }
 
     pub fn consume_json_snapshot(
@@ -342,13 +355,16 @@ impl AuroraRunner {
         let tx = make_tx(nonce.into());
         let signed_tx = sign_transaction(tx, Some(self.chain_id), &signer.secret_key);
         // TODO: enable call trace
-        let outcome = self.call_with_signer(
+        let (outcome, call_tracer, trace_log) = self.call_with_signer(
             SUBMIT,
             CALLER_ACCOUNT_ID,
             CALLER_ACCOUNT_ID,
             rlp::encode(&signed_tx).to_vec(),
+            Some(TraceKind::CallFrame),
         )?;
-        let ext = Self::profile_outcome(outcome);
+        let mut ext = Self::profile_outcome(outcome);
+        ext.call_tracer = call_tracer;
+        ext.trace_log = trace_log;
         Ok(ext)
     }
 
