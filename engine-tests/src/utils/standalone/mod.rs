@@ -392,6 +392,7 @@ impl StandaloneRunner {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn internal_submit_transaction(
         transaction_bytes: &[u8],
         transaction_position: u16,

@@ -67,7 +67,7 @@ impl AuroraRunner {
             input,
             None,
         )
-        .map(|(outcome, _, _)| outcome)
+        .map(|outcome| outcome.inner)
     }
 
     pub fn evm_call(

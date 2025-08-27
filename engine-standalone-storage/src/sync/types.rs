@@ -102,7 +102,7 @@ impl TransactionKind {
             }
         })?;
 
-        Ok(TransactionKind {
+        Ok(Self {
             method_name,
             args: bytes,
             promise_result: match method_name {
@@ -119,74 +119,84 @@ impl TransactionKind {
         })
     }
 
+    #[must_use]
     pub fn clone_raw_input(&self) -> Vec<u8> {
         self.args.clone()
     }
 
+    #[must_use]
     pub fn submit(tx: &EthTransactionKind) -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::Submit,
             args: tx.into(),
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub fn deploy_erc20(args: &DeployErc20TokenArgs) -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::DeployErc20,
             args: borsh::to_vec(args).unwrap(),
             promise_result: None,
         }
     }
 
-    pub fn new_deploy(args: Vec<u8>) -> Self {
-        TransactionKind {
+    #[must_use]
+    pub const fn new_deploy(args: Vec<u8>) -> Self {
+        Self {
             method_name: TransactionKindTag::Deploy,
             args,
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub fn new_ft_on_transfer(args: &FtOnTransferArgs) -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::FtOnTransfer,
             args: serde_json::to_vec(args).unwrap(),
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub fn new_call(args: &CallArgs) -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::Call,
             args: borsh::to_vec(&args).unwrap(),
             promise_result: None,
         }
     }
 
-    pub fn new_factory_update(args: Vec<u8>) -> Self {
-        TransactionKind {
+    #[must_use]
+    pub const fn new_factory_update(args: Vec<u8>) -> Self {
+        Self {
             method_name: TransactionKindTag::FactoryUpdate,
             args,
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub fn new_factory_set_wnear_address(args: Address) -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::FactorySetWNearAddress,
             args: args.as_bytes().to_vec(),
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub const fn unknown() -> Self {
-        TransactionKind {
+        Self {
             method_name: TransactionKindTag::Unknown,
             args: vec![],
             promise_result: None,
         }
     }
 
+    #[must_use]
     pub fn get_submit_args(&self) -> Option<engine::SubmitArgs> {
         if matches!(self.method_name, TransactionKindTag::SubmitWithArgs) {
             engine::SubmitArgs::try_from_slice(&self.args).ok()
@@ -485,6 +495,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
 struct BorshableTransactionKind<'a> {
     method_name: TransactionKindTag,
     args: Cow<'a, [u8]>,
+    #[allow(clippy::option_option)]
     promise_result: Option<Option<Cow<'a, [u8]>>>,
 }
 
@@ -494,7 +505,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             method_name: t.method_name,
             args: Cow::Borrowed(&t.args),
             promise_result: match &t.promise_result {
-                Some(PromiseResult::Successful(v)) => Some(Some(Cow::Borrowed(&*v))),
+                Some(PromiseResult::Successful(v)) => Some(Some(Cow::Borrowed(v))),
                 Some(PromiseResult::Failed) => Some(None),
                 Some(PromiseResult::NotReady) => {
                     debug_assert!(false, "should never happen");
@@ -508,12 +519,13 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
 
 impl<'a> From<BorshableTransactionKind<'a>> for TransactionKind {
     fn from(t: BorshableTransactionKind<'a>) -> Self {
-        TransactionKind {
+        Self {
             method_name: t.method_name,
             args: t.args.into_owned(),
-            promise_result: t.promise_result.map(|res| match res {
-                Some(result) => PromiseResult::Successful(result.into_owned()),
-                None => PromiseResult::Failed,
+            promise_result: t.promise_result.map(|res| {
+                res.map_or(PromiseResult::Failed, |result| {
+                    PromiseResult::Successful(result.into_owned())
+                })
             }),
         }
     }

@@ -242,7 +242,7 @@ fn test_trace_contract_with_precompile_sub_call() {
     // So the trace is one top-level call with multiple sub-calls (and the sub-calls contain no further sub-calls).
     let tx = contract.call_method("test_all", signer.use_nonce().into());
     let standalone_result = runner
-        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx.clone())
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
         .unwrap();
     let mut call_tracer = standalone_result.call_tracer.unwrap();
     assert!(standalone_result.inner.status.is_ok());

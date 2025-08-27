@@ -196,7 +196,7 @@ impl AuroraRunner {
             input,
             None,
         )
-        .map(|(outcome, _, _)| outcome)
+        .map(|outcome| outcome.inner)
     }
 
     pub fn call_with_signer(
@@ -206,7 +206,7 @@ impl AuroraRunner {
         signer_account_id: &str,
         input: Vec<u8>,
         trace_kind: Option<TraceKind>,
-    ) -> Result<(VMOutcome, Option<CallTracer>, Option<Vec<TraceLog>>), EngineError> {
+    ) -> Result<OutcomeExt, EngineError> {
         Self::update_context(
             &mut self.context,
             caller_account_id,
@@ -251,7 +251,8 @@ impl AuroraRunner {
         self.context.storage_usage = outcome.storage_usage;
         self.previous_logs.clone_from(&outcome.logs);
 
-        let (call_trace, trace_log) = if let Some(standalone_runner) = &mut self.standalone_runner {
+        let (call_tracer, trace_log) = if let Some(standalone_runner) = &mut self.standalone_runner
+        {
             let result = standalone_runner.submit_raw(
                 method_name,
                 &self.context,
@@ -265,7 +266,11 @@ impl AuroraRunner {
             (None, None)
         };
 
-        Ok((outcome, call_trace, trace_log))
+        Ok(OutcomeExt {
+            inner: outcome,
+            call_tracer,
+            trace_log,
+        })
     }
 
     pub fn consume_json_snapshot(
@@ -355,16 +360,16 @@ impl AuroraRunner {
         let tx = make_tx(nonce.into());
         let signed_tx = sign_transaction(tx, Some(self.chain_id), &signer.secret_key);
         // TODO: enable call trace
-        let (outcome, call_tracer, trace_log) = self.call_with_signer(
+        let outcome = self.call_with_signer(
             SUBMIT,
             CALLER_ACCOUNT_ID,
             CALLER_ACCOUNT_ID,
             rlp::encode(&signed_tx).to_vec(),
             Some(TraceKind::CallFrame),
         )?;
-        let mut ext = Self::profile_outcome(outcome);
-        ext.call_tracer = call_tracer;
-        ext.trace_log = trace_log;
+        let mut ext = Self::profile_outcome(outcome.inner);
+        ext.call_tracer = outcome.call_tracer;
+        ext.trace_log = outcome.trace_log;
         Ok(ext)
     }
 
@@ -1035,6 +1040,12 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
 pub struct SubmitResultExt {
     pub inner: SubmitResult,
     pub execution_profile: Option<ExecutionProfile>,
+    pub call_tracer: Option<CallTracer>,
+    pub trace_log: Option<Vec<TraceLog>>,
+}
+
+pub struct OutcomeExt {
+    pub inner: VMOutcome,
     pub call_tracer: Option<CallTracer>,
     pub trace_log: Option<Vec<TraceLog>>,
 }
