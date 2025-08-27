@@ -19,7 +19,7 @@ panic = "abort"
 [dependencies]
 aurora-engine = { workspace = true, default-features = false, features = ["tracing"] }
 aurora-engine-sdk = { workspace = true, default-features = false }
-engine-standalone-tracing.workspace = true
+engine-standalone-tracing = { workspace = true, optional = true }
 aurora-evm = { workspace = true, features = ["tracing"] }
 borsh.workspace = true
 primitive-types.workspace = true
@@ -32,4 +32,4 @@ workspace = true
 
 [features]
 integration-test = ["aurora-engine/integration-test"]
-contract = ["aurora-engine/contract", "aurora-engine-sdk/contract"]
+contract = ["aurora-engine/contract", "aurora-engine-sdk/contract", "engine-standalone-tracing"]

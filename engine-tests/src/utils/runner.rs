@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fs, sync::Arc};
 
 use aurora_engine_sdk::{env::Env, io::IO};
 use engine_standalone_storage::AbstractContractRunner;
@@ -302,11 +302,10 @@ impl Contract for CodeWrapper {
     }
 }
 
-const BUNDLED_CONTRACT: &[u8] = include_bytes!("../../../bin/aurora-engine-traced.wasm");
-
 impl ContractRunner {
     pub fn bundled() -> Self {
-        Self::new(BUNDLED_CONTRACT.to_vec(), None)
+        let code = fs::read("../bin/aurora-engine-traced.wasm").unwrap();
+        Self::new(code, None)
     }
 
     pub fn new(code: Vec<u8>, hash: Option<CryptoHash>) -> Self {

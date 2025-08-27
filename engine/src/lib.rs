@@ -23,6 +23,27 @@ pub mod xcc;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+/// The contract must either compile for `wasm32` or use `std`
+#[cfg(all(not(target_arch = "wasm32"), not(feature = "std")))]
+pub mod noop_allocator {
+    use core::alloc::{GlobalAlloc, Layout};
+
+    pub struct Allocator;
+
+    unsafe impl GlobalAlloc for Allocator {
+        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+            core::ptr::null_mut()
+        }
+
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+            unreachable!("should never be called, since alloc never returns non-null");
+        }
+    }
+
+    #[global_allocator]
+    static ALLOC: Allocator = Allocator;
+}
+
 #[cfg(not(feature = "std"))]
 #[panic_handler]
 pub fn on_panic(info: &core::panic::PanicInfo) -> ! {
@@ -39,7 +60,14 @@ pub fn on_panic(info: &core::panic::PanicInfo) -> ! {
     #[cfg(not(feature = "log"))]
     {
         let _ = info;
-        core::arch::wasm32::unreachable();
+        #[cfg(target_arch = "wasm32")]
+        {
+            core::arch::wasm32::unreachable();
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            core::hint::unreachable_unchecked();
+        } // unsafe semantic; consider a more conservative fallback if preferred
     }
 }
 

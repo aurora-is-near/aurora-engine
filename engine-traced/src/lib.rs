@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+pub use aurora_engine;
+
 #[cfg(feature = "contract")]
 mod contract {
     use aurora_engine::{
