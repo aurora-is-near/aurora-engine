@@ -333,7 +333,13 @@ where
         }
         TransactionKindTag::FtOnTransfer => {
             let data = runner
-                .call_contract("ft_on_transfer_with_return", promise_results, env, io, None)
+                .call_contract(
+                    "borealis_wrapper_ft_on_transfer",
+                    promise_results,
+                    env,
+                    io,
+                    None,
+                )
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let submit_result = Option::<SubmitResult>::try_from_slice(&data)
@@ -358,21 +364,20 @@ where
 
             None
         }
-        TransactionKindTag::ExitToNear => {
-            runner
-                .call_contract(
-                    "exit_to_near_precompile_callback",
-                    promise_results,
-                    env,
-                    io,
-                    None,
-                )
-                .map_err(ExecutionError::from_vm_err)?;
-
-            // TODO: add a wrapper over the call that returns the submit result for refund tx
-            // maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
-            None
-        }
+        TransactionKindTag::ExitToNear => runner
+            .call_contract(
+                "borealis_wrapper_exit_to_near_precompile_callback",
+                promise_results,
+                env,
+                io,
+                None,
+            )
+            .map_err(ExecutionError::from_vm_err)?
+            .map(|data| Option::try_from_slice(&data).map_err(ExecutionError::Deserialize))
+            .transpose()?
+            .flatten()
+            .map(Ok)
+            .map(TransactionExecutionResult::Submit),
         TransactionKindTag::SetConnectorData => None,
         TransactionKindTag::NewConnector => None,
         TransactionKindTag::NewEngine => {

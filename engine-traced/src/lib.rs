@@ -51,7 +51,7 @@ mod contract {
     }
 
     #[no_mangle]
-    pub extern "C" fn ft_on_transfer_with_return() {
+    pub extern "C" fn borealis_wrapper_ft_on_transfer() {
         let mut io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
@@ -59,6 +59,21 @@ mod contract {
             .map_err(ContractError::msg)
             .sdk_unwrap();
         let result_bytes = borsh::to_vec(&result)
+            .map_err(|_| errors::ERR_SERIALIZE)
+            .sdk_unwrap();
+        io.return_output(&result_bytes);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn borealis_wrapper_exit_to_near_precompile_callback() {
+        let mut io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        let maybe_result =
+            contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
+                .map_err(ContractError::msg)
+                .sdk_unwrap();
+        let result_bytes = borsh::to_vec(&maybe_result)
             .map_err(|_| errors::ERR_SERIALIZE)
             .sdk_unwrap();
         io.return_output(&result_bytes);

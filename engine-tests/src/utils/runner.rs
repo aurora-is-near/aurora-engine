@@ -304,7 +304,12 @@ impl Contract for CodeWrapper {
 
 impl ContractRunner {
     pub fn bundled() -> Self {
-        let code = fs::read("../bin/aurora-engine-traced.wasm").unwrap();
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../bin/aurora-engine-traced.wasm"
+        );
+        // use runtime read to silence `cargo check` error in case the wasm file is not ready yet
+        let code = fs::read(path).unwrap();
         Self::new(code, None)
     }
 
