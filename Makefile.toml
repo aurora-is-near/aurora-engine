@@ -9,7 +9,7 @@ CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
 WASM_FILE = "aurora-engine.wasm"
-WASM_FILE_TRACED = "aurora-engine-traced.wasm"
+WASM_FILE_TRACED = "aurora-engine-compat.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
@@ -86,7 +86,7 @@ args = [
     "clippy",
     "--workspace",
     "--all-targets",
-    "--exclude=aurora-engine-traced",
+    "--exclude=aurora-engine-compat",
     "--",
     "-D",
     "warnings",
@@ -100,8 +100,21 @@ args = [
     "clippy",
     "--workspace",
     "--all-targets",
-    "--features",
-    "contract",
+    "--exclude=aurora-engine-compat",
+    "--features=contract",
+    "--",
+    "-D",
+    "warnings",
+    "-D",
+    "clippy::as_conversions",
+]
+
+[tasks.clippy-contract-compat]
+extend = "clippy-base"
+args = [
+    "clippy",
+    "--target=${ENGINE_CARGO_TARGET}",
+    "--features=contract_3_9_2",
     "--",
     "-D",
     "warnings",
@@ -115,6 +128,7 @@ args = [
     "clippy",
     "--workspace",
     "--all-targets",
+    "--exclude=aurora-engine-compat",
     "--features",
     "contract,error_refund",
     "--",
@@ -195,7 +209,7 @@ args = [
 category = "Post"
 command = "cp"
 args = [
-    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine_traced.wasm",
+    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine_compat.wasm",
     "bin/${WASM_FILE_TRACED}",
 ]
 
@@ -245,8 +259,8 @@ args = [
     "--target",
     "${ENGINE_CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
-    "--features=contract",
-    "--package=aurora-engine-traced",
+    "--features=contract_3_9_2",
+    "--package=aurora-engine-compat",
 ]
 
 [tasks.build-engine-flow]

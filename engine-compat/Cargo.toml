@@ -1,0 +1,36 @@
+[package]
+name = "aurora-engine-compat"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+readme.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
+aurora-engine-3-9-2 = { git = "https://github.com/aurora-is-near/aurora-engine", branch="feat/wasm-tracing", package = "aurora-engine", default-features = false, features = ["tracing", "contract"], optional = true }
+aurora-engine-sdk-3-9-2 = { git = "https://github.com/aurora-is-near/aurora-engine", branch="feat/wasm-tracing", package = "aurora-engine-sdk", default-features = false, features = ["contract"], optional = true }
+
+engine-standalone-tracing = { workspace = true }
+aurora-evm = { workspace = true, features = ["tracing"] }
+borsh = { workspace = true, default-features = false }
+primitive-types.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wee_alloc.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+integration-test = ["aurora-engine-3-9-2/integration-test"]
+contract_3_9_2 = ["dep:aurora-engine-3-9-2", "dep:aurora-engine-sdk-3-9-2"]

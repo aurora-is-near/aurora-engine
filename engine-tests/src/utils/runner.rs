@@ -306,7 +306,7 @@ impl ContractRunner {
     pub fn bundled() -> Self {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../bin/aurora-engine-traced.wasm"
+            "/../bin/aurora-engine-compat.wasm"
         );
         // use runtime read to silence `cargo check` error in case the wasm file is not ready yet
         let code = fs::read(path).unwrap();

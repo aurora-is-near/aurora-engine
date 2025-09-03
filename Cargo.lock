@@ -273,13 +273,13 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "aurora-engine"
 version = "3.9.2"
 dependencies = [
- "aurora-engine-hashchain",
- "aurora-engine-modexp",
- "aurora-engine-precompiles",
- "aurora-engine-sdk",
+ "aurora-engine-hashchain 1.0.0",
+ "aurora-engine-modexp 1.2.0",
+ "aurora-engine-precompiles 1.2.0",
+ "aurora-engine-sdk 1.2.0",
  "aurora-engine-test-doubles",
- "aurora-engine-transactions",
- "aurora-engine-types",
+ "aurora-engine-transactions 1.2.0",
+ "aurora-engine-types 2.0.0",
  "aurora-evm",
  "bitflags 1.3.2",
  "ethabi",
@@ -293,11 +293,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine"
+version = "3.9.2"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "aurora-engine-hashchain 1.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-precompiles 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-transactions 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-evm",
+ "bitflags 1.3.2",
+ "ethabi",
+ "function_name",
+ "hex",
+ "rlp",
+ "serde",
+ "serde_json",
+ "wee_alloc",
+]
+
+[[package]]
+name = "aurora-engine-compat"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine 3.9.2 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-evm",
+ "borsh 1.5.7",
+ "engine-standalone-tracing",
+ "primitive-types 0.13.1",
+ "wee_alloc",
+]
+
+[[package]]
 name = "aurora-engine-hashchain"
 version = "1.0.0"
 dependencies = [
- "aurora-engine-sdk",
- "aurora-engine-types",
+ "aurora-engine-sdk 1.2.0",
+ "aurora-engine-types 2.0.0",
+ "fixed-hash 0.8.0",
+ "impl-serde 0.5.0",
+]
+
+[[package]]
+name = "aurora-engine-hashchain"
+version = "1.0.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
  "fixed-hash 0.8.0",
  "impl-serde 0.5.0",
 ]
@@ -312,13 +358,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-modexp"
+version = "1.2.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "hex",
+ "num",
+]
+
+[[package]]
 name = "aurora-engine-precompiles"
 version = "1.2.0"
 dependencies = [
- "aurora-engine-modexp",
- "aurora-engine-sdk",
+ "aurora-engine-modexp 1.2.0",
+ "aurora-engine-sdk 1.2.0",
  "aurora-engine-test-doubles",
- "aurora-engine-types",
+ "aurora-engine-types 2.0.0",
  "aurora-evm",
  "ethabi",
  "hex",
@@ -330,12 +385,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-precompiles"
+version = "1.2.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-evm",
+ "ethabi",
+ "hex",
+ "num",
+ "serde",
+ "serde_json",
+ "zeropool-bn",
+]
+
+[[package]]
 name = "aurora-engine-sdk"
 version = "1.2.0"
 dependencies = [
- "aurora-engine-types",
+ "aurora-engine-types 2.0.0",
  "base64 0.22.1",
  "hex",
+ "libsecp256k1",
+ "ripemd",
+ "sha2 0.10.9",
+ "sha3",
+]
+
+[[package]]
+name = "aurora-engine-sdk"
+version = "1.2.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "base64 0.22.1",
  "libsecp256k1",
  "ripemd",
  "sha2 0.10.9",
@@ -346,8 +431,8 @@ dependencies = [
 name = "aurora-engine-test-doubles"
 version = "1.0.0"
 dependencies = [
- "aurora-engine-sdk",
- "aurora-engine-types",
+ "aurora-engine-sdk 1.2.0",
+ "aurora-engine-types 2.0.0",
  "aurora-evm",
 ]
 
@@ -356,14 +441,14 @@ name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aurora-engine",
- "aurora-engine-hashchain",
- "aurora-engine-modexp",
- "aurora-engine-precompiles",
- "aurora-engine-sdk",
+ "aurora-engine 3.9.2",
+ "aurora-engine-hashchain 1.0.0",
+ "aurora-engine-modexp 1.2.0",
+ "aurora-engine-precompiles 1.2.0",
+ "aurora-engine-sdk 1.2.0",
  "aurora-engine-test-doubles",
- "aurora-engine-transactions",
- "aurora-engine-types",
+ "aurora-engine-transactions 1.2.0",
+ "aurora-engine-types 2.0.0",
  "aurora-engine-workspace",
  "aurora-evm",
  "borsh 1.5.7",
@@ -397,7 +482,7 @@ name = "aurora-engine-tests-connector"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aurora-engine-types",
+ "aurora-engine-types 2.0.0",
  "cargo-near-build",
  "near-sdk",
  "near-workspaces",
@@ -406,28 +491,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine-traced"
-version = "0.1.0"
+name = "aurora-engine-transactions"
+version = "1.2.0"
 dependencies = [
- "aurora-engine",
- "aurora-engine-sdk",
+ "aurora-engine-sdk 1.2.0",
+ "aurora-engine-types 2.0.0",
  "aurora-evm",
- "borsh 1.5.7",
- "engine-standalone-tracing",
- "primitive-types 0.13.1",
- "wee_alloc",
+ "hex",
+ "rlp",
+ "serde",
 ]
 
 [[package]]
 name = "aurora-engine-transactions"
 version = "1.2.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
 dependencies = [
- "aurora-engine-sdk",
- "aurora-engine-types",
+ "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
+ "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
  "aurora-evm",
- "hex",
  "rlp",
- "serde",
 ]
 
 [[package]]
@@ -445,11 +528,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-types"
+version = "2.0.0"
+source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
+dependencies = [
+ "borsh 1.5.7",
+ "bs58 0.5.1",
+ "hex",
+ "primitive-types 0.13.1",
+ "rlp",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aurora-engine-workspace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aurora-engine-types",
+ "aurora-engine-types 2.0.0",
  "near-gas",
  "near-sdk",
  "near-workspaces",
@@ -1789,12 +1886,12 @@ dependencies = [
 name = "engine-standalone-storage"
 version = "0.1.0"
 dependencies = [
- "aurora-engine",
- "aurora-engine-modexp",
- "aurora-engine-precompiles",
- "aurora-engine-sdk",
- "aurora-engine-transactions",
- "aurora-engine-types",
+ "aurora-engine 3.9.2",
+ "aurora-engine-modexp 1.2.0",
+ "aurora-engine-precompiles 1.2.0",
+ "aurora-engine-sdk 1.2.0",
+ "aurora-engine-transactions 1.2.0",
+ "aurora-engine-types 2.0.0",
  "engine-standalone-tracing",
  "hex",
  "postgres",
@@ -1809,7 +1906,7 @@ dependencies = [
 name = "engine-standalone-tracing"
 version = "0.1.0"
 dependencies = [
- "aurora-engine-types",
+ "aurora-engine-types 2.0.0",
  "aurora-evm",
  "borsh 1.5.7",
  "hex",

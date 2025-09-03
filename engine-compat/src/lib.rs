@@ -2,15 +2,21 @@
 
 extern crate alloc;
 
-pub use aurora_engine;
+#[cfg(feature = "contract_3_9_2")]
+pub use aurora_engine_3_9_2 as aurora_engine;
 
-#[cfg(feature = "contract")]
+#[cfg(feature = "contract_3_9_2")]
+pub use aurora_engine_sdk_3_9_2 as aurora_engine_sdk;
+
+// #[cfg(any(feature = "contract_3_9_2", feature = "contract_x_y_z"))]
+#[cfg(feature = "contract_3_9_2")]
 mod contract {
-    use aurora_engine::{
+    use super::aurora_engine::{
         contract_methods::{self, ContractError},
         errors,
     };
-    use aurora_engine_sdk::{io::IO, near_runtime::Runtime, types::SdkUnwrap};
+    use super::aurora_engine_sdk::{io::IO, near_runtime::Runtime, types::SdkUnwrap};
+
     use engine_standalone_tracing::{sputnik, types::call_tracer::CallTracer};
 
     #[no_mangle]
