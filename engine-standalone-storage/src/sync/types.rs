@@ -9,7 +9,7 @@ use aurora_engine_types::{
     H256,
 };
 use std::{borrow::Cow, str::FromStr};
-use strum::EnumString;
+use strum::{Display, EnumString};
 
 use crate::error::ParseTransactionKindError;
 
@@ -206,7 +206,9 @@ impl TransactionKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumString, BorshDeserialize, BorshSerialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, EnumString, Display, BorshDeserialize, BorshSerialize,
+)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 pub enum TransactionKindTag {
     #[strum(serialize = "submit")]
