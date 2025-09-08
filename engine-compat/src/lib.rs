@@ -2,14 +2,59 @@
 
 extern crate alloc;
 
+#[cfg(all(
+    not(feature = "contract_3_9_2"),
+    not(feature = "contract_3_7_0"),
+    not(feature = "contract_3_9_0")
+))]
+mod allocator {
+    use core::alloc::{GlobalAlloc, Layout};
+
+    #[panic_handler]
+    #[cfg(not(test))]
+    pub const fn on_panic(_info: &core::panic::PanicInfo) -> ! {
+        loop {}
+    }
+
+    pub struct Allocator;
+
+    unsafe impl GlobalAlloc for Allocator {
+        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+            core::ptr::null_mut()
+        }
+
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+            unreachable!("should never be called, since alloc never returns non-null");
+        }
+    }
+
+    #[global_allocator]
+    static ALLOC: Allocator = Allocator;
+}
+
+#[cfg(feature = "contract_3_7_0")]
+pub use aurora_engine_3_7_0 as aurora_engine;
+
+#[cfg(feature = "contract_3_7_0")]
+pub use aurora_engine_sdk_3_7_0 as aurora_engine_sdk;
+
+#[cfg(feature = "contract_3_9_0")]
+pub use aurora_engine_3_9_0 as aurora_engine;
+
+#[cfg(feature = "contract_3_9_0")]
+pub use aurora_engine_sdk_3_9_0 as aurora_engine_sdk;
+
 #[cfg(feature = "contract_3_9_2")]
 pub use aurora_engine_3_9_2 as aurora_engine;
 
 #[cfg(feature = "contract_3_9_2")]
 pub use aurora_engine_sdk_3_9_2 as aurora_engine_sdk;
 
-// #[cfg(any(feature = "contract_3_9_2", feature = "contract_x_y_z"))]
-#[cfg(feature = "contract_3_9_2")]
+#[cfg(any(
+    feature = "contract_3_9_2",
+    feature = "contract_3_7_0",
+    feature = "contract_3_9_0"
+))]
 mod contract {
     use super::aurora_engine::{
         contract_methods::{self, ContractError},
