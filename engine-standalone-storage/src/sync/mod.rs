@@ -4,6 +4,7 @@ use std::io;
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_modexp::ModExpAlgorithm;
+use aurora_engine_sdk::io::StorageIntermediate;
 use aurora_engine_sdk::{env, io::IO};
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
@@ -11,7 +12,7 @@ use aurora_engine_types::{
     types::Address, H256,
 };
 use engine_standalone_tracing::types::call_tracer::CallTracer;
-use engine_standalone_tracing::{Logs, TraceLog};
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use thiserror::Error;
 
 pub mod types;
@@ -78,12 +79,6 @@ where
             )))
         }
     }
-}
-
-#[derive(Clone, Copy)]
-pub enum TraceKind {
-    Transaction,
-    CallFrame,
 }
 
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static, R>(
@@ -157,79 +152,78 @@ where
 
     let promise_data = transaction_message.promise_data.clone();
 
-    let (tx_hash, result, trace_log, call_tracer) =
-        match &transaction_message.transaction.method_name {
-            TransactionKindTag::Submit => {
-                // We can ignore promises in the standalone engine because it processes each receipt separately
-                // and it is fed a stream of receipts (it does not schedule them)
+    if let Some(v) = &trace_kind {
+        io.write_borsh(b"borealis/argument", v);
+    }
 
-                let tx_hash = aurora_engine_sdk::keccak(&transaction_message.transaction.args);
-                let method = match trace_kind {
-                    None => "submit",
-                    Some(TraceKind::Transaction) => "submit_trace_tx",
-                    Some(TraceKind::CallFrame) => "submit_trace_call",
-                };
-                let mut trace_log = None;
-                let mut trace_call_stack = None;
-                let result = runner
-                    .call_contract(method, promise_data, &env, io, None)
-                    .map_err(ExecutionError::from_vm_err)
-                    .and_then(|data| {
-                        data.map(|data| {
-                            let mut slice = data.as_slice();
-                            io.return_output(&data);
-                            let res = SubmitResult::deserialize_reader(&mut slice)
-                                .map_err(ExecutionError::Deserialize)?;
-                            if !slice.is_empty() {
-                                match trace_kind {
-                                    Some(TraceKind::Transaction) => {
-                                        trace_log = Logs::deserialize_reader(&mut slice)
-                                            .ok()
-                                            .map(|Logs(l)| l);
-                                    }
-                                    Some(TraceKind::CallFrame) => {
-                                        trace_call_stack =
-                                            CallTracer::deserialize_reader(&mut slice).ok();
-                                    }
-                                    None => {}
-                                }
-                            }
-                            Ok(TransactionExecutionResult::Submit(Ok(res)))
-                        })
-                        .transpose()
-                    });
-                (tx_hash, result, trace_log, trace_call_stack)
-            }
-            TransactionKindTag::SubmitWithArgs => {
-                let args = transaction_message.transaction.get_submit_args().unwrap();
+    let (tx_hash, result) = match &transaction_message.transaction.method_name {
+        TransactionKindTag::Submit => {
+            // We can ignore promises in the standalone engine because it processes each receipt separately
+            // and it is fed a stream of receipts (it does not schedule them)
 
-                let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
-                let result = runner
-                    .call_contract("submit_with_args", promise_data, &env, io, None)
-                    .map_err(ExecutionError::from_vm_err)
-                    .and_then(|data| {
-                        data.map(|data| {
-                            io.return_output(&data);
-                            let res = SubmitResult::try_from_slice(&data)
-                                .map_err(ExecutionError::Deserialize)?;
-                            Ok(TransactionExecutionResult::Submit(Ok(res)))
-                        })
-                        .transpose()
-                    });
+            let tx_hash = aurora_engine_sdk::keccak(&transaction_message.transaction.args);
+            let result = runner
+                .call_contract("borealis_wrapper_submit", promise_data, &env, io, None)
+                .map_err(ExecutionError::from_vm_err)
+                .and_then(|data| {
+                    data.map(|data| {
+                        let mut slice = data.as_slice();
+                        io.return_output(&data);
+                        let res = SubmitResult::deserialize(&mut slice)
+                            .map_err(ExecutionError::Deserialize)?;
 
-                (tx_hash, result, None, None)
-            }
-            _ => {
-                let result = non_submit_execute(
-                    &transaction_message.transaction,
-                    runner,
-                    io,
-                    &env,
-                    promise_data,
-                );
-                (near_receipt_id, result, None, None)
-            }
-        };
+                        Ok(TransactionExecutionResult::Submit(Ok(res)))
+                    })
+                    .transpose()
+                });
+            (tx_hash, result)
+        }
+        TransactionKindTag::SubmitWithArgs => {
+            let args = transaction_message.transaction.get_submit_args().unwrap();
+
+            let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
+            let result = runner
+                .call_contract("submit_with_args", promise_data, &env, io, None)
+                .map_err(ExecutionError::from_vm_err)
+                .and_then(|data| {
+                    data.map(|data| {
+                        io.return_output(&data);
+                        let res = SubmitResult::try_from_slice(&data)
+                            .map_err(ExecutionError::Deserialize)?;
+                        Ok(TransactionExecutionResult::Submit(Ok(res)))
+                    })
+                    .transpose()
+                });
+
+            (tx_hash, result)
+        }
+        _ => {
+            let result = non_submit_execute(
+                &transaction_message.transaction,
+                runner,
+                io,
+                &env,
+                promise_data,
+            );
+            (near_receipt_id, result)
+        }
+    };
+
+    let mut trace_log = None;
+    let mut call_tracer = None;
+
+    // TODO: log error
+    match trace_kind {
+        Some(TraceKind::Transaction) => {
+            let value = io.read_storage(b"borealis/transaction_tracing");
+            trace_log = value.and_then(|v| v.to_value().ok());
+        }
+        Some(TraceKind::CallFrame) => {
+            let value = io.read_storage(b"borealis/call_frame_tracing");
+            call_tracer = value.and_then(|v| v.to_value().ok());
+        }
+        None => {}
+    }
 
     let diff = get_diff(&io);
 
@@ -277,7 +271,7 @@ where
         TransactionKindTag::Call => {
             // We can ignore promises in the standalone engine (see above)
             let data = runner
-                .call_contract("call", promise_results, env, io, None)
+                .call_contract("borealis_wrapper_call", promise_results, env, io, None)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -328,7 +322,7 @@ where
             Some(TransactionExecutionResult::DeployErc20(address))
         }
         TransactionKindTag::FtOnTransfer => {
-            let data = runner
+            runner
                 .call_contract(
                     "borealis_wrapper_ft_on_transfer",
                     promise_results,
@@ -338,8 +332,19 @@ where
                 )
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
-            let submit_result = Option::<SubmitResult>::try_from_slice(&data)
-                .map_err(ExecutionError::Deserialize)?;
+
+            let value = io.read_storage(b"borealis/submit_result");
+            let submit_result = value
+                .map(|v| {
+                    let v = v.to_vec();
+                    let mut slice = v.as_slice();
+                    <Option<SubmitResult> as BorshDeserialize>::deserialize(&mut slice)
+                })
+                .transpose()
+                .map_err(|err| {
+                    ExecutionError::Deserialize(io::Error::new(io::ErrorKind::Other, err))
+                })?
+                .flatten();
 
             submit_result.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
@@ -360,20 +365,31 @@ where
 
             None
         }
-        TransactionKindTag::ExitToNear => runner
-            .call_contract(
-                "borealis_wrapper_exit_to_near_precompile_callback",
-                promise_results,
-                env,
-                io,
-                None,
-            )
-            .map_err(ExecutionError::from_vm_err)?
-            .map(|data| Option::try_from_slice(&data).map_err(ExecutionError::Deserialize))
-            .transpose()?
-            .flatten()
-            .map(Ok)
-            .map(TransactionExecutionResult::Submit),
+        TransactionKindTag::ExitToNear => {
+            runner
+                .call_contract(
+                    "borealis_wrapper_exit_to_near_precompile_callback",
+                    promise_results,
+                    env,
+                    io,
+                    None,
+                )
+                .map_err(ExecutionError::from_vm_err)?;
+            let value = io.read_storage(b"borealis/submit_result");
+            value
+                .map(|v| {
+                    let v = v.to_vec();
+                    let mut slice = v.as_slice();
+                    <Option<SubmitResult> as BorshDeserialize>::deserialize(&mut slice)
+                })
+                .transpose()
+                .map_err(|err| {
+                    ExecutionError::Deserialize(io::Error::new(io::ErrorKind::Other, err))
+                })?
+                .flatten()
+                .map(Ok)
+                .map(TransactionExecutionResult::Submit)
+        }
         // TODO: call legacy methods
         TransactionKindTag::SetConnectorData => None,
         // TODO: call legacy methods

@@ -394,7 +394,9 @@ impl Storage {
         );
 
         let result = f(engine_state);
-        let diff = engine_state.get_transaction_diff();
+        let mut diff = engine_state.get_transaction_diff();
+        // do not commit debugging info
+        diff.retain(|key, _| !key.starts_with(b"borealis/"));
         let engine_output = engine_output.into_inner().unwrap_or_default();
 
         EngineAccessResult {

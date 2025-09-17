@@ -5,7 +5,6 @@ use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
-use engine_standalone_storage::sync::TraceKind;
 use engine_standalone_storage::{
     sync::{
         self,
@@ -14,7 +13,7 @@ use engine_standalone_storage::{
     },
     BlockMetadata, Diff, Storage,
 };
-use engine_standalone_tracing::TraceLog;
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 

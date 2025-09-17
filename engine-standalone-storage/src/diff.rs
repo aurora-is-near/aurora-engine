@@ -84,6 +84,13 @@ impl Diff {
     pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, std::io::Error> {
         Self::try_from_slice(bytes)
     }
+
+    pub fn retain<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&[u8], &mut DiffValue) -> bool,
+    {
+        self.0.retain(|k, v| f(k, v));
+    }
 }
 
 impl<'diff> IntoIterator for &'diff Diff {

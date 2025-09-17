@@ -17,16 +17,10 @@ crate-type = ["cdylib"]
 panic = "abort"
 
 [dependencies]
-aurora-engine-3-7-0 = { git = "https://github.com/aurora-is-near/aurora-engine", tag="3.7.0", package = "aurora-engine", default-features = false, features = ["tracing", "contract", "ext-connector", "mainnet"], optional = true }
-aurora-engine-sdk-3-7-0 = { git = "https://github.com/aurora-is-near/aurora-engine", tag="3.7.0", package = "aurora-engine-sdk", default-features = false, features = ["contract", "mainnet"], optional = true }
-aurora-engine-3-9-0 = { git = "https://github.com/aurora-is-near/aurora-engine", tag="3.9.0", package = "aurora-engine", default-features = false, features = ["tracing", "contract"], optional = true }
-aurora-engine-sdk-3-9-0 = { git = "https://github.com/aurora-is-near/aurora-engine", tag="3.9.0", package = "aurora-engine-sdk", default-features = false, features = ["contract"], optional = true }
-aurora-engine-3-9-2 = { git = "https://github.com/aurora-is-near/aurora-engine", branch="feat/wasm-tracing", package = "aurora-engine", default-features = false, features = ["tracing", "contract"], optional = true }
-aurora-engine-sdk-3-9-2 = { git = "https://github.com/aurora-is-near/aurora-engine", branch="feat/wasm-tracing", package = "aurora-engine-sdk", default-features = false, features = ["contract"], optional = true }
-
-aurora-evm = { workspace = true, features = ["tracing"], optional = true }
-borsh = { workspace = true, default-features = false, optional = true }
-engine-standalone-tracing = { workspace = true, optional = true }
+aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract"] }
+aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract"] }
+engine-standalone-tracing = { workspace = true, optional = true, default-features = false }
+borsh = { workspace = true, optional = true }
 primitive-types = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -36,7 +30,4 @@ wee_alloc.workspace = true
 workspace = true
 
 [features]
-integration-test = ["aurora-engine-3-9-2/integration-test"]
-contract_3_7_0 = ["dep:aurora-engine-3-7-0", "dep:aurora-engine-sdk-3-7-0", "aurora-evm", "borsh", "engine-standalone-tracing", "primitive-types"]
-contract_3_9_0 = ["dep:aurora-engine-3-9-0", "dep:aurora-engine-sdk-3-9-0", "aurora-evm", "borsh", "engine-standalone-tracing", "primitive-types"]
-contract_3_9_2 = ["dep:aurora-engine-3-9-2", "dep:aurora-engine-sdk-3-9-2", "aurora-evm", "borsh", "engine-standalone-tracing", "primitive-types"]
+contract = ["aurora-engine", "aurora-engine-sdk", "engine-standalone-tracing", "borsh", "primitive-types"]

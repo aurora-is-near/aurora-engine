@@ -2,8 +2,7 @@
 use aurora_engine_sdk::env::{Env, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use engine_standalone_storage::sync::TraceKind;
-use engine_standalone_tracing::TraceLog;
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use serde::Deserialize;
 use std::path::Path;
 

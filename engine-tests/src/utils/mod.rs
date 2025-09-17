@@ -9,9 +9,8 @@ use aurora_engine_types::parameters::engine::{NewCallArgs, NewCallArgsV4};
 use aurora_engine_types::parameters::silo::FixedGasArgs;
 use aurora_engine_types::types::{EthGas, PromiseResult};
 use aurora_evm::ExitFatal;
-use engine_standalone_storage::sync::TraceKind;
 use engine_standalone_tracing::types::call_tracer::CallTracer;
-use engine_standalone_tracing::TraceLog;
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
@@ -585,6 +584,9 @@ impl AuroraRunner {
             }
 
             for (key, value) in standalone_state {
+                if key.starts_with(b"borealis/") {
+                    continue;
+                }
                 let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
                 assert_eq!(

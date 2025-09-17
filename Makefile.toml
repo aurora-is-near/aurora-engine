@@ -9,7 +9,7 @@ CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
 WASM_FILE = "aurora-engine.wasm"
-WASM_FILE_TRACED = "aurora-engine-compat.wasm"
+WASM_FILE_COMPAT = "aurora-engine-compat.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
@@ -175,12 +175,12 @@ args = [
     "bin/${WASM_FILE}",
 ]
 
-[tasks.copy-traced-engine-build]
+[tasks.copy-engine-compat-build]
 category = "Post"
 command = "cp"
 args = [
     "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine_compat.wasm",
-    "bin/${WASM_FILE_TRACED}",
+    "bin/${WASM_FILE_COMPAT}",
 ]
 
 [tasks.copy-xcc-router-build]
@@ -221,7 +221,7 @@ args = [
     "aurora-engine"
 ]
 
-[tasks.build-traced-engine]
+[tasks.build-engine-compat]
 category = "Build"
 command = "${CARGO}"
 args = [
@@ -229,7 +229,7 @@ args = [
     "--target",
     "${ENGINE_CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
-    "--features=contract_3_9_2",
+    "--features=contract",
     "--package=aurora-engine-compat",
 ]
 
@@ -238,12 +238,12 @@ category = "Build"
 dependencies = [
     "build-contracts",
     "build-engine",
-    "build-traced-engine",
+    "build-engine-compat",
     "make-bin-directory",
     "copy-engine-build",
-    "copy-traced-engine-build",
+    "copy-engine-compat-build",
     "wasm-opt",
-    "wasm-opt-traced",
+    "wasm-opt-compat",
     "post-engine-build-env",
 ]
 
@@ -299,8 +299,8 @@ env = { "CONTRACT_FILE" = "${WASM_FILE}" }
 category = "Build"
 run_task = "wasm-opt-common"
 
-[tasks.wasm-opt-traced]
-env = { "CONTRACT_FILE" = "${WASM_FILE_TRACED}" }
+[tasks.wasm-opt-compat]
+env = { "CONTRACT_FILE" = "${WASM_FILE_COMPAT}" }
 category = "Build"
 run_task = "wasm-opt-common"
 

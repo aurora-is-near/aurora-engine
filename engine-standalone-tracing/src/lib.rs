@@ -9,3 +9,9 @@ pub use types::{
     Depth, LogMemory, LogStack, LogStorage, LogStorageKey, LogStorageValue, Logs, ProgramCounter,
     StepTransactionTrace, TraceLog, TransactionTrace,
 };
+
+#[derive(Clone, Copy, borsh::BorshSerialize, borsh::BorshDeserialize)]
+pub enum TraceKind {
+    Transaction,
+    CallFrame,
+}

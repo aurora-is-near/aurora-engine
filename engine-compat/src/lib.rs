@@ -2,19 +2,10 @@
 
 extern crate alloc;
 
-#[cfg(all(
-    not(feature = "contract_3_9_2"),
-    not(feature = "contract_3_7_0"),
-    not(feature = "contract_3_9_0")
-))]
-mod allocator {
+/// The contract must compile with feature `contract`. This code is only for clippy and udeps.
+#[cfg(not(feature = "contract"))]
+pub mod noop_allocator {
     use core::alloc::{GlobalAlloc, Layout};
-
-    #[panic_handler]
-    #[cfg(not(test))]
-    pub const fn on_panic(_info: &core::panic::PanicInfo) -> ! {
-        loop {}
-    }
 
     pub struct Allocator;
 
@@ -30,103 +21,141 @@ mod allocator {
 
     #[global_allocator]
     static ALLOC: Allocator = Allocator;
+
+    #[cfg(not(test))]
+    #[panic_handler]
+    const fn on_panic(info: &core::panic::PanicInfo) -> ! {
+        let _ = info;
+        loop {}
+    }
 }
 
-#[cfg(feature = "contract_3_7_0")]
-pub use aurora_engine_3_7_0 as aurora_engine;
-
-#[cfg(feature = "contract_3_7_0")]
-pub use aurora_engine_sdk_3_7_0 as aurora_engine_sdk;
-
-#[cfg(feature = "contract_3_9_0")]
-pub use aurora_engine_3_9_0 as aurora_engine;
-
-#[cfg(feature = "contract_3_9_0")]
-pub use aurora_engine_sdk_3_9_0 as aurora_engine_sdk;
-
-#[cfg(feature = "contract_3_9_2")]
-pub use aurora_engine_3_9_2 as aurora_engine;
-
-#[cfg(feature = "contract_3_9_2")]
-pub use aurora_engine_sdk_3_9_2 as aurora_engine_sdk;
-
-#[cfg(any(
-    feature = "contract_3_9_2",
-    feature = "contract_3_7_0",
-    feature = "contract_3_9_0"
-))]
-mod contract {
-    use super::aurora_engine::{
-        contract_methods::{self, ContractError},
-        errors,
+#[cfg(feature = "contract")]
+mod dbg {
+    use alloc::format;
+    use aurora_engine_sdk::{
+        io::{StorageIntermediate, IO},
+        near_runtime::Runtime as Rt,
     };
-    use super::aurora_engine_sdk::{io::IO, near_runtime::Runtime, types::SdkUnwrap};
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use engine_standalone_tracing::{
+        sputnik::{self, TransactionTraceBuilder},
+        types::call_tracer::CallTracer,
+        TraceKind,
+    };
 
-    use engine_standalone_tracing::{sputnik, types::call_tracer::CallTracer};
+    pub struct Runtime;
+
+    impl Runtime {
+        pub fn read<A>() -> Option<A>
+        where
+            A: BorshDeserialize,
+        {
+            match Rt
+                .read_storage(b"borealis/argument")
+                .map(|v| v.to_value())
+                .transpose()
+            {
+                Ok(v) => v,
+                Err(err) => aurora_engine_sdk::panic_utf8(err.as_ref()),
+            }
+        }
+
+        pub fn write<R>(key: &[u8], response: R)
+        where
+            R: BorshSerialize,
+        {
+            match borsh::to_vec(&response) {
+                Ok(bytes) => drop(Rt.write_storage(key, &bytes)),
+                Err(err) => {
+                    let msg = format!("write response: {err}").into_bytes();
+                    aurora_engine_sdk::panic_utf8(&msg);
+                }
+            }
+        }
+
+        pub fn trace<F, R>(f: F) -> R
+        where
+            F: FnOnce() -> R,
+        {
+            match Self::read::<TraceKind>() {
+                None => f(),
+                Some(TraceKind::CallFrame) => {
+                    let mut listener = CallTracer::default();
+                    let r = sputnik::traced_call(&mut listener, f);
+                    Self::write(b"borealis/call_frame_tracing", listener);
+                    r
+                }
+                Some(TraceKind::Transaction) => {
+                    let mut listener = TransactionTraceBuilder::default();
+                    let r = sputnik::traced_call(&mut listener, f);
+                    let trace_log = listener.finish().logs().clone();
+                    Self::write(b"borealis/transaction_tracing", trace_log);
+                    r
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+mod contract {
+    use aurora_engine::contract_methods::{self, ContractError};
+    use aurora_engine_sdk::{near_runtime::Runtime, types::SdkUnwrap};
+
+    use super::dbg;
 
     #[no_mangle]
-    extern "C" fn submit_trace_tx() {
-        let mut io = Runtime;
+    extern "C" fn borealis_wrapper_submit() {
+        let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
 
-        let mut listener = sputnik::TransactionTraceBuilder::default();
-        let submit_result = sputnik::traced_call(&mut listener, || {
+        dbg::Runtime::trace(|| {
             contract_methods::evm_transactions::submit(io, &env, &mut handler)
                 .map_err(ContractError::msg)
                 .sdk_unwrap()
         });
-        let trace_log = listener.finish().logs().clone();
-        let result_bytes = borsh::to_vec(&(submit_result, trace_log))
-            .map_err(|_| errors::ERR_SERIALIZE)
-            .sdk_unwrap();
-        io.return_output(&result_bytes);
     }
 
     #[no_mangle]
-    extern "C" fn submit_trace_call() {
-        let mut io = Runtime;
+    pub extern "C" fn borealis_wrapper_call() {
+        let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
 
-        let mut listener = CallTracer::default();
-        let submit_result = sputnik::traced_call(&mut listener, || {
-            contract_methods::evm_transactions::submit(io, &env, &mut handler)
+        dbg::Runtime::trace(|| {
+            contract_methods::evm_transactions::call(io, &env, &mut handler)
                 .map_err(ContractError::msg)
-                .sdk_unwrap()
+                .sdk_unwrap();
         });
-        let result_bytes = borsh::to_vec(&(submit_result, listener))
-            .map_err(|_| errors::ERR_SERIALIZE)
-            .sdk_unwrap();
-        io.return_output(&result_bytes);
     }
 
     #[no_mangle]
     pub extern "C" fn borealis_wrapper_ft_on_transfer() {
-        let mut io = Runtime;
+        let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        let result = contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
-            .map_err(ContractError::msg)
-            .sdk_unwrap();
-        let result_bytes = borsh::to_vec(&result)
-            .map_err(|_| errors::ERR_SERIALIZE)
-            .sdk_unwrap();
-        io.return_output(&result_bytes);
+
+        let result = dbg::Runtime::trace(|| {
+            contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
+                .map_err(ContractError::msg)
+                .sdk_unwrap()
+        });
+        dbg::Runtime::write(b"borealis/submit_result", result);
     }
 
     #[no_mangle]
     pub extern "C" fn borealis_wrapper_exit_to_near_precompile_callback() {
-        let mut io = Runtime;
+        let io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
-        let maybe_result =
+
+        let maybe_result = dbg::Runtime::trace(|| {
             contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
                 .map_err(ContractError::msg)
                 .sdk_unwrap();
-        let result_bytes = borsh::to_vec(&maybe_result)
-            .map_err(|_| errors::ERR_SERIALIZE)
-            .sdk_unwrap();
-        io.return_output(&result_bytes);
+        });
+        dbg::Runtime::write(b"borealis/submit_result", maybe_result);
     }
 }

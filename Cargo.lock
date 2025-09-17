@@ -271,65 +271,21 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aurora-engine"
-version = "3.7.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "aurora-engine-hashchain 1.0.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0)",
- "aurora-engine-modexp 1.0.0",
- "aurora-engine-precompiles 1.0.0",
- "aurora-engine-sdk 1.0.0",
- "aurora-engine-transactions 1.0.0",
- "aurora-engine-types 1.0.0",
- "bitflags 1.3.2",
- "ethabi",
- "evm",
- "function_name",
- "hex",
- "rlp 0.5.2",
- "serde",
- "serde_json",
- "wee_alloc",
-]
-
-[[package]]
-name = "aurora-engine"
-version = "3.9.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "aurora-engine-hashchain 1.0.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-precompiles 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-transactions 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-types 1.2.0",
- "aurora-evm",
- "bitflags 1.3.2",
- "ethabi",
- "function_name",
- "hex",
- "rlp 0.6.1",
- "serde",
- "serde_json",
- "wee_alloc",
-]
-
-[[package]]
-name = "aurora-engine"
 version = "3.9.2"
 dependencies = [
- "aurora-engine-hashchain 1.0.0",
- "aurora-engine-modexp 1.2.0",
- "aurora-engine-precompiles 1.2.0",
- "aurora-engine-sdk 1.2.0",
+ "aurora-engine-hashchain",
+ "aurora-engine-modexp",
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
  "aurora-engine-test-doubles",
- "aurora-engine-transactions 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-transactions",
+ "aurora-engine-types",
  "aurora-evm",
  "bitflags 1.3.2",
  "ethabi",
  "function_name",
  "hex",
- "rlp 0.6.1",
+ "rlp",
  "serde",
  "serde_json",
  "test-case",
@@ -337,38 +293,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine"
-version = "3.9.2"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "aurora-engine-hashchain 1.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-precompiles 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-transactions 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-evm",
- "bitflags 1.3.2",
- "ethabi",
- "function_name",
- "hex",
- "rlp 0.6.1",
- "serde",
- "serde_json",
- "wee_alloc",
-]
-
-[[package]]
 name = "aurora-engine-compat"
 version = "0.1.0"
 dependencies = [
- "aurora-engine 3.7.0",
- "aurora-engine 3.9.0",
- "aurora-engine 3.9.2 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-sdk 1.0.0",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-evm",
+ "aurora-engine",
+ "aurora-engine-sdk",
  "borsh 1.5.7",
  "engine-standalone-tracing",
  "primitive-types 0.13.1",
@@ -379,52 +308,10 @@ dependencies = [
 name = "aurora-engine-hashchain"
 version = "1.0.0"
 dependencies = [
- "aurora-engine-sdk 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "fixed-hash 0.8.0",
  "impl-serde 0.5.0",
-]
-
-[[package]]
-name = "aurora-engine-hashchain"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "aurora-engine-sdk 1.0.0",
- "aurora-engine-types 1.0.0",
- "fixed-hash 0.8.0",
- "impl-serde 0.5.0",
-]
-
-[[package]]
-name = "aurora-engine-hashchain"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-types 1.2.0",
- "fixed-hash 0.8.0",
- "impl-serde 0.5.0",
-]
-
-[[package]]
-name = "aurora-engine-hashchain"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "fixed-hash 0.8.0",
- "impl-serde 0.5.0",
-]
-
-[[package]]
-name = "aurora-engine-modexp"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "hex",
- "num",
 ]
 
 [[package]]
@@ -437,50 +324,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine-modexp"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "hex",
- "num",
-]
-
-[[package]]
-name = "aurora-engine-modexp"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "hex",
- "num",
-]
-
-[[package]]
-name = "aurora-engine-precompiles"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "aurora-engine-modexp 1.0.0",
- "aurora-engine-sdk 1.0.0",
- "aurora-engine-types 1.0.0",
- "ethabi",
- "evm",
- "hex",
- "libsecp256k1",
- "num",
- "ripemd",
- "sha2 0.10.9",
- "sha3",
- "zeropool-bn",
-]
-
-[[package]]
 name = "aurora-engine-precompiles"
 version = "1.2.0"
 dependencies = [
- "aurora-engine-modexp 1.2.0",
- "aurora-engine-sdk 1.2.0",
+ "aurora-engine-modexp",
+ "aurora-engine-sdk",
  "aurora-engine-test-doubles",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-types",
  "aurora-evm",
  "ethabi",
  "hex",
@@ -492,83 +342,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine-precompiles"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-types 1.2.0",
- "aurora-evm",
- "ethabi",
- "hex",
- "num",
- "ripemd",
- "sha2 0.10.9",
- "sha3",
- "zeropool-bn",
-]
-
-[[package]]
-name = "aurora-engine-precompiles"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "aurora-engine-modexp 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-evm",
- "ethabi",
- "hex",
- "num",
- "serde",
- "serde_json",
- "zeropool-bn",
-]
-
-[[package]]
-name = "aurora-engine-sdk"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "aurora-engine-types 1.0.0",
- "base64 0.22.1",
- "sha2 0.10.9",
- "sha3",
-]
-
-[[package]]
 name = "aurora-engine-sdk"
 version = "1.2.0"
 dependencies = [
- "aurora-engine-types 2.0.0",
+ "aurora-engine-types",
  "base64 0.22.1",
  "hex",
- "libsecp256k1",
- "ripemd",
- "sha2 0.10.9",
- "sha3",
-]
-
-[[package]]
-name = "aurora-engine-sdk"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "aurora-engine-types 1.2.0",
- "base64 0.22.1",
- "libsecp256k1",
- "sha2 0.10.9",
- "sha3",
-]
-
-[[package]]
-name = "aurora-engine-sdk"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "base64 0.22.1",
  "libsecp256k1",
  "ripemd",
  "sha2 0.10.9",
@@ -579,8 +358,8 @@ dependencies = [
 name = "aurora-engine-test-doubles"
 version = "1.0.0"
 dependencies = [
- "aurora-engine-sdk 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "aurora-evm",
 ]
 
@@ -589,14 +368,14 @@ name = "aurora-engine-tests"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aurora-engine 3.9.2",
- "aurora-engine-hashchain 1.0.0",
- "aurora-engine-modexp 1.2.0",
- "aurora-engine-precompiles 1.2.0",
- "aurora-engine-sdk 1.2.0",
+ "aurora-engine",
+ "aurora-engine-hashchain",
+ "aurora-engine-modexp",
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
  "aurora-engine-test-doubles",
- "aurora-engine-transactions 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-transactions",
+ "aurora-engine-types",
  "aurora-engine-workspace",
  "aurora-evm",
  "borsh 1.5.7",
@@ -616,7 +395,7 @@ dependencies = [
  "near-sdk",
  "near-vm-runner",
  "rand 0.8.5",
- "rlp 0.6.1",
+ "rlp",
  "serde",
  "serde_json",
  "sha3",
@@ -630,7 +409,7 @@ name = "aurora-engine-tests-connector"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-types",
  "cargo-near-build",
  "near-sdk",
  "near-workspaces",
@@ -640,78 +419,14 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-transactions"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "aurora-engine-precompiles 1.0.0",
- "aurora-engine-sdk 1.0.0",
- "aurora-engine-types 1.0.0",
- "evm",
- "rlp 0.5.2",
-]
-
-[[package]]
-name = "aurora-engine-transactions"
 version = "1.2.0"
 dependencies = [
- "aurora-engine-sdk 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
  "aurora-evm",
  "hex",
- "rlp 0.6.1",
+ "rlp",
  "serde",
-]
-
-[[package]]
-name = "aurora-engine-transactions"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0)",
- "aurora-engine-types 1.2.0",
- "aurora-evm",
- "rlp 0.6.1",
-]
-
-[[package]]
-name = "aurora-engine-transactions"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "aurora-engine-sdk 1.2.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-engine-types 2.0.0 (git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing)",
- "aurora-evm",
- "rlp 0.6.1",
-]
-
-[[package]]
-name = "aurora-engine-types"
-version = "1.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.7.0#338dd61b2ccf60cf2438bac1979d19dd4f0dca59"
-dependencies = [
- "base64 0.22.1",
- "borsh 1.5.7",
- "bs58 0.5.1",
- "hex",
- "primitive-types 0.12.2",
- "rlp 0.5.2",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "aurora-engine-types"
-version = "1.2.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?tag=3.9.0#69a864f790f7dfd750c1e7f6eec8d65b16c118f4"
-dependencies = [
- "base64 0.22.1",
- "borsh 1.5.7",
- "bs58 0.5.1",
- "hex",
- "primitive-types 0.13.1",
- "rlp 0.6.1",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -723,21 +438,7 @@ dependencies = [
  "hex",
  "primitive-types 0.13.1",
  "rand 0.8.5",
- "rlp 0.6.1",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "aurora-engine-types"
-version = "2.0.0"
-source = "git+https://github.com/aurora-is-near/aurora-engine?branch=feat%2Fwasm-tracing#c7ba7235ebb512cc9924c6dc07056b8dc6c0db92"
-dependencies = [
- "borsh 1.5.7",
- "bs58 0.5.1",
- "hex",
- "primitive-types 0.13.1",
- "rlp 0.6.1",
+ "rlp",
  "serde",
  "serde_json",
 ]
@@ -747,7 +448,7 @@ name = "aurora-engine-workspace"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aurora-engine-types 2.0.0",
+ "aurora-engine-types",
  "near-gas",
  "near-sdk",
  "near-workspaces",
@@ -767,7 +468,7 @@ dependencies = [
  "log",
  "parity-scale-codec",
  "primitive-types 0.13.1",
- "rlp 0.6.1",
+ "rlp",
  "scale-info",
  "serde",
  "sha3",
@@ -2087,12 +1788,12 @@ dependencies = [
 name = "engine-standalone-storage"
 version = "0.1.0"
 dependencies = [
- "aurora-engine 3.9.2",
- "aurora-engine-modexp 1.2.0",
- "aurora-engine-precompiles 1.2.0",
- "aurora-engine-sdk 1.2.0",
- "aurora-engine-transactions 1.2.0",
- "aurora-engine-types 2.0.0",
+ "aurora-engine",
+ "aurora-engine-modexp",
+ "aurora-engine-precompiles",
+ "aurora-engine-sdk",
+ "aurora-engine-transactions",
+ "aurora-engine-types",
  "engine-standalone-tracing",
  "hex",
  "postgres",
@@ -2107,7 +1808,7 @@ dependencies = [
 name = "engine-standalone-tracing"
 version = "0.1.0"
 dependencies = [
- "aurora-engine-types 2.0.0",
+ "aurora-engine-types",
  "aurora-evm",
  "borsh 1.5.7",
  "hex",
@@ -2202,26 +1903,8 @@ checksum = "c22d4b5885b6aa2fe5e8b9329fb8d232bf739e434e6b87347c63bdd00c120f60"
 dependencies = [
  "crunchy",
  "fixed-hash 0.8.0",
- "impl-codec 0.6.0",
- "impl-rlp 0.3.0",
  "impl-serde 0.4.0",
- "scale-info",
  "tiny-keccak",
-]
-
-[[package]]
-name = "ethereum"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e04d24d20b8ff2235cffbf242d5092de3aa45f77c5270ddbfadd2778ca13fea"
-dependencies = [
- "bytes",
- "ethereum-types",
- "hash-db",
- "hash256-std-hasher",
- "rlp 0.5.2",
- "sha3",
- "trie-root",
 ]
 
 [[package]]
@@ -2232,60 +1915,9 @@ checksum = "02d215cbf040552efcbe99a38372fe80ab9d00268e20012b79fcd0f073edd8ee"
 dependencies = [
  "ethbloom",
  "fixed-hash 0.8.0",
- "impl-codec 0.6.0",
- "impl-rlp 0.3.0",
  "impl-serde 0.4.0",
  "primitive-types 0.12.2",
- "scale-info",
  "uint 0.9.5",
-]
-
-[[package]]
-name = "evm"
-version = "0.45.2"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.45.4-aurora#1d9d1dc299fe379913347a71ca00f06344a07262"
-dependencies = [
- "auto_impl",
- "environmental",
- "ethereum",
- "evm-core",
- "evm-gasometer",
- "evm-runtime",
- "log",
- "primitive-types 0.12.2",
- "rlp 0.5.2",
- "sha3",
-]
-
-[[package]]
-name = "evm-core"
-version = "0.45.2"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.45.4-aurora#1d9d1dc299fe379913347a71ca00f06344a07262"
-dependencies = [
- "primitive-types 0.12.2",
-]
-
-[[package]]
-name = "evm-gasometer"
-version = "0.45.2"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.45.4-aurora#1d9d1dc299fe379913347a71ca00f06344a07262"
-dependencies = [
- "environmental",
- "evm-core",
- "evm-runtime",
- "primitive-types 0.12.2",
-]
-
-[[package]]
-name = "evm-runtime"
-version = "0.45.2"
-source = "git+https://github.com/aurora-is-near/sputnikvm.git?tag=v0.45.4-aurora#1d9d1dc299fe379913347a71ca00f06344a07262"
-dependencies = [
- "auto_impl",
- "environmental",
- "evm-core",
- "primitive-types 0.12.2",
- "sha3",
 ]
 
 [[package]]
@@ -2654,21 +2286,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "459196ed295495a68f7d7fe1d84f6c4b7ff0e21fe3017b2f283c6fac3ad803c9"
 dependencies = [
  "cfg-if 1.0.0",
- "crunchy",
-]
-
-[[package]]
-name = "hash-db"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e7d7786361d7425ae2fe4f9e407eb0efaa0840f5212d109cc018c40c35c6ab4"
-
-[[package]]
-name = "hash256-std-hasher"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92c171d55b98633f4ed3860808f004099b36c1cc29c42cfc53aa8591b21efcf2"
-dependencies = [
  "crunchy",
 ]
 
@@ -3132,20 +2749,11 @@ dependencies = [
 
 [[package]]
 name = "impl-rlp"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f28220f89297a075ddc7245cd538076ee98b01f2a9c23a53a4f1105d5a322808"
-dependencies = [
- "rlp 0.5.2",
-]
-
-[[package]]
-name = "impl-rlp"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54ed8ad1f3877f7e775b8cbf30ed1bd3209a95401817f19a0eb4402d13f8cf90"
 dependencies = [
- "rlp 0.6.1",
+ "rlp",
 ]
 
 [[package]]
@@ -4941,9 +4549,7 @@ checksum = "0b34d9fd68ae0b74a41b21c03c2f62847aa0ffea044eee893b4c140b37e244e2"
 dependencies = [
  "fixed-hash 0.8.0",
  "impl-codec 0.6.0",
- "impl-rlp 0.3.0",
  "impl-serde 0.4.0",
- "scale-info",
  "uint 0.9.5",
 ]
 
@@ -4955,7 +4561,7 @@ checksum = "d15600a7d856470b7d278b3fe0e311fe28c2526348549f8ef2ff7db3299c87f5"
 dependencies = [
  "fixed-hash 0.8.0",
  "impl-codec 0.7.1",
- "impl-rlp 0.4.0",
+ "impl-rlp",
  "impl-serde 0.5.0",
  "uint 0.10.0",
 ]
@@ -5397,35 +5003,13 @@ dependencies = [
 
 [[package]]
 name = "rlp"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
-dependencies = [
- "bytes",
- "rlp-derive 0.1.0",
- "rustc-hex",
-]
-
-[[package]]
-name = "rlp"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa24e92bb2a83198bb76d661a71df9f7076b8c420b8696e4d3d97d50d94479e3"
 dependencies = [
  "bytes",
- "rlp-derive 0.2.0",
+ "rlp-derive",
  "rustc-hex",
-]
-
-[[package]]
-name = "rlp-derive"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e33d7b2abe0c340d8797fe2907d3f20d3b5ea5908683618bfe80df7f621f672a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -6722,15 +6306,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "trie-root"
-version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4ed310ef5ab98f5fa467900ed906cb9232dd5376597e00fd4cba2a449d06c0b"
-dependencies = [
- "hash-db",
 ]
 
 [[package]]
