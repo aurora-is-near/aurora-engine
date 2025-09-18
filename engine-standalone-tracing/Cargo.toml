@@ -14,13 +14,14 @@ autobenches = false
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine-types = { workspace = true, features = ["std"] }
+aurora-engine-types = { workspace = true }
 evm-core.workspace = true
-evm = { workspace = true, features = ["std", "tracing"] }
+evm = { workspace = true, features = ["tracing"] }
 evm-runtime.workspace = true
 evm-gasometer.workspace = true
-hex = { workspace = true, features = ["std"] }
-serde = { workspace = true, features = ["std"], optional = true }
+hex = { workspace = true }
+serde = { workspace = true, optional = true }
+borsh.workspace = true
 
 [features]
 default = []
