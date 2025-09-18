@@ -302,6 +302,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurora-engine-compat"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "borsh 1.5.7",
+ "engine-standalone-tracing",
+ "primitive-types 0.13.1",
+ "wee_alloc",
+]
+
+[[package]]
 name = "aurora-engine-hashchain"
 version = "1.0.0"
 dependencies = [
@@ -1823,6 +1836,7 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine-types",
  "aurora-evm",
+ "borsh 1.5.7",
  "hex",
  "serde",
 ]

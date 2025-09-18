@@ -1,14 +1,17 @@
+use alloc::{string::String, vec::Vec};
+use borsh::{io, BorshDeserialize, BorshSerialize};
+use core::ops::Index;
+
 use aurora_engine_types::types::EthGas;
 use aurora_engine_types::BTreeMap;
 use aurora_evm::core::Opcode;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::ops::Index;
 
 pub mod call_tracer;
 
 /// Depth of a log.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Depth(u32);
 
@@ -34,7 +37,7 @@ impl Depth {
 }
 
 /// A trace log memory.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogMemory(Vec<[u8; 32]>);
 
@@ -76,7 +79,7 @@ impl From<&[u8]> for LogMemory {
 }
 
 /// The stack of the log.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStack(Vec<[u8; 32]>);
 
@@ -110,7 +113,9 @@ impl FromIterator<[u8; 32]> for LogStack {
 }
 
 /// A trace log program counter.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Default)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Default, BorshSerialize, BorshDeserialize,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ProgramCounter(pub u32);
 
@@ -123,7 +128,9 @@ impl ProgramCounter {
 }
 
 /// A storage key for the `LogStorage`.
-#[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, BorshSerialize, BorshDeserialize,
+)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorageKey(pub [u8; 32]);
 
@@ -136,7 +143,7 @@ impl LogStorageKey {
 }
 
 /// A storage value for the `LogStorage`.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorageValue(pub [u8; 32]);
 
@@ -149,7 +156,7 @@ impl LogStorageValue {
 }
 
 /// A map for `LogStorageKeys` to `LogStorageValue`s.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LogStorage(BTreeMap<LogStorageKey, LogStorageValue>);
 
@@ -161,7 +168,7 @@ impl LogStorage {
 
 impl IntoIterator for LogStorage {
     type Item = (LogStorageKey, LogStorageValue);
-    type IntoIter = std::collections::btree_map::IntoIter<LogStorageKey, LogStorageValue>;
+    type IntoIter = alloc::collections::btree_map::IntoIter<LogStorageKey, LogStorageValue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -169,7 +176,7 @@ impl IntoIterator for LogStorage {
 }
 
 /// The trace log of an execution on the EVM.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TraceLog {
     /// The depth of the log.
@@ -183,14 +190,41 @@ pub struct TraceLog {
     /// The bounded memory.
     pub memory: LogMemory,
     /// The opcode as a byte.
-    #[cfg_attr(feature = "serde", serde(with = "opcode_serde"))]
-    pub opcode: Opcode,
+    pub opcode: BorshOpcode,
     /// The current program counter of the transaction.
     pub program_counter: ProgramCounter,
     /// The local stack.
     pub stack: LogStack,
     /// The storage of the execution.
     pub storage: LogStorage,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BorshOpcode(#[cfg_attr(feature = "serde", serde(with = "opcode_serde"))] pub Opcode);
+
+impl BorshSerialize for BorshOpcode {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        borsh::ser::BorshSerialize::serialize(&self.0 .0, writer)
+    }
+}
+
+impl BorshDeserialize for BorshOpcode {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        u8::deserialize_reader(reader).map(Opcode).map(Self)
+    }
+}
+
+impl From<Opcode> for BorshOpcode {
+    fn from(opcode: Opcode) -> Self {
+        Self(opcode)
+    }
+}
+
+impl From<BorshOpcode> for Opcode {
+    fn from(borsh_opcode: BorshOpcode) -> Self {
+        borsh_opcode.0
+    }
 }
 
 impl Default for TraceLog {
@@ -201,7 +235,7 @@ impl Default for TraceLog {
             gas: EthGas::default(),
             gas_cost: EthGas::default(),
             memory: LogMemory::default(),
-            opcode: Opcode::STOP,
+            opcode: Opcode::STOP.into(),
             program_counter: ProgramCounter::default(),
             stack: LogStack::default(),
             storage: LogStorage::default(),
@@ -209,7 +243,7 @@ impl Default for TraceLog {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Logs(pub Vec<TraceLog>);
 
@@ -239,7 +273,7 @@ impl Index<usize> for Logs {
 
 impl IntoIterator for Logs {
     type Item = TraceLog;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = alloc::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -334,6 +368,8 @@ impl StepTransactionTrace {
 // See here for custom serde serialization: https://serde.rs/custom-serialization.html
 #[cfg(feature = "serde")]
 mod opcode_serde {
+    use core::fmt;
+
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S>(opcode: &aurora_evm::core::Opcode, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -347,7 +383,7 @@ mod opcode_serde {
     impl serde::de::Visitor<'_> for U8Visitor {
         type Value = u8;
 
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("an integer between 0 and 2^8 - 1")
         }
 

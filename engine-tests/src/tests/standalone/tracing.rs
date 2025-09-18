@@ -187,7 +187,7 @@ fn test_evm_tracing() {
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
-    let op_codes: Vec<u8> = trace.logs().0.iter().map(|l| l.opcode.0).collect();
+    let op_codes: Vec<u8> = trace.logs().0.iter().map(|l| l.opcode.0 .0).collect();
     assert_eq!(op_codes.as_slice(), &EXPECTED_OP_CODES);
 }
 
@@ -221,7 +221,7 @@ fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_tr
             "Program counters should match"
         );
         assert_eq!(log.depth.into_u32(), step.depth, "Depths should match");
-        assert_eq!(log.opcode.as_u8(), step.op, "opcodes should match");
+        assert_eq!(log.opcode.0.as_u8(), step.op, "opcodes should match");
         assert_eq!(
             log.gas_cost.as_u64(),
             step.gas_cost,

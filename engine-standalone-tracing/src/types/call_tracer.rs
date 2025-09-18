@@ -1,14 +1,17 @@
 //! This module defines data structure to produce traces compatible with geths "callTracer":
 //! `https://github.com/ethereum/go-ethereum/blob/ad15050c7fbedd0f05a49e81400de18c2cc2c284/eth/tracers/native/call.go`
 
-use aurora_engine_types::{types::Address, U256};
+use alloc::{format, string::String, vec::Vec};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use aurora_engine_types::{types::Address, U256};
+use borsh::{io, BorshDeserialize, BorshSerialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct CallFrame {
     pub call_type: CallType,
     pub from: Address,
     pub to: Option<Address>,
-    pub value: U256,
+    pub value: BorshU256,
     pub gas: u64,
     pub gas_used: u64,
     pub input: Vec<u8>,
@@ -17,7 +20,34 @@ pub struct CallFrame {
     pub calls: Vec<CallFrame>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BorshU256(U256);
+
+impl From<U256> for BorshU256 {
+    fn from(value: U256) -> Self {
+        Self(value)
+    }
+}
+
+impl From<BorshU256> for U256 {
+    fn from(value: BorshU256) -> Self {
+        value.0
+    }
+}
+
+impl BorshSerialize for BorshU256 {
+    fn serialize<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+        self.0 .0.serialize(writer)
+    }
+}
+
+impl BorshDeserialize for BorshU256 {
+    fn deserialize_reader<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+        <[u64; 4]>::deserialize_reader(reader).map(U256).map(Self)
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct CallTracer {
     pub call_stack: Vec<CallFrame>,
     pub top_level_transact: Option<CallFrame>,
@@ -38,7 +68,7 @@ impl CallTracer {
                 call_type: CallType::Call,
                 from: Address::default(),
                 to: None,
-                value: U256::zero(),
+                value: U256::zero().into(),
                 gas: 0,
                 gas_used: 0,
                 input: Vec::new(),
@@ -83,7 +113,7 @@ impl CallTracer {
             call_type,
             from,
             to: Some(to),
-            value,
+            value: value.into(),
             gas,
             gas_used: 0,
             input,
@@ -140,7 +170,7 @@ impl CallTracer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum CallType {
     Call,
     StaticCall,
@@ -293,7 +323,7 @@ impl aurora_evm::tracing::EventListener for CallTracer {
                     call_type: CallType::Call,
                     from: Address::new(caller),
                     to: Some(Address::new(address)),
-                    value,
+                    value: value.into(),
                     gas: gas_limit,
                     gas_used: 0,
                     input: data.to_vec(),
@@ -315,7 +345,7 @@ impl aurora_evm::tracing::EventListener for CallTracer {
                     call_type: CallType::Create,
                     from: Address::new(caller),
                     to: Some(Address::new(address)),
-                    value,
+                    value: value.into(),
                     gas: gas_limit,
                     gas_used: 0,
                     input: init_code.to_vec(),
@@ -338,7 +368,7 @@ impl aurora_evm::tracing::EventListener for CallTracer {
                     call_type: CallType::Create2,
                     from: Address::new(caller),
                     to: Some(Address::new(address)),
-                    value,
+                    value: value.into(),
                     gas: gas_limit,
                     gas_used: 0,
                     input: init_code.to_vec(),
@@ -379,10 +409,10 @@ pub struct SerializableCallFrame {
 #[cfg(feature = "serde")]
 impl From<CallFrame> for SerializableCallFrame {
     fn from(frame: CallFrame) -> Self {
-        let value = if frame.value.is_zero() {
+        let value = if frame.value.0.is_zero() {
             None
         } else {
-            let value = frame.value;
+            let value = frame.value.0;
             Some(format!("0x{value:x}"))
         };
 
