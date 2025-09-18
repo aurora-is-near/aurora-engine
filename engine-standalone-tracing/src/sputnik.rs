@@ -1,8 +1,8 @@
+use alloc::{rc::Rc, vec::Vec};
+use core::{cell::RefCell, ptr::NonNull};
+
 use aurora_engine_types::types::EthGas;
 use evm::{Capture, Opcode};
-use std::cell::RefCell;
-use std::ptr::NonNull;
-use std::rc::Rc;
 
 use crate::types::{
     LogStorageKey, LogStorageValue, Logs, ProgramCounter, TraceLog, TransactionTrace,
@@ -110,7 +110,7 @@ impl evm_runtime::tracing::EventListener for TransactionTraceBuilder {
                 stack,
                 memory,
             } => {
-                self.current.opcode = opcode;
+                self.current.opcode = opcode.into();
                 if let Ok(pc) = position {
                     self.current.program_counter =
                         ProgramCounter(u32::try_from(*pc).unwrap_or_default());
