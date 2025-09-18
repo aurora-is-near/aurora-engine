@@ -92,6 +92,7 @@ members = [
     "engine-transactions",
     "engine-types",
     "engine-workspace",
+    "engine-compat",
 ]
 
 exclude = [

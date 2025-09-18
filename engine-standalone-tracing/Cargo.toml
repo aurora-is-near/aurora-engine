@@ -14,10 +14,11 @@ autobenches = false
 crate-type = ["lib"]
 
 [dependencies]
-aurora-engine-types = { workspace = true, features = ["std"] }
-aurora-evm = { workspace = true, features = ["std", "tracing"] }
-hex = { workspace = true, features = ["std"] }
-serde = { workspace = true, features = ["std"], optional = true }
+aurora-engine-types = { workspace = true }
+aurora-evm = { workspace = true, features = ["tracing"] }
+hex = { workspace = true }
+serde = { workspace = true, optional = true }
+borsh.workspace = true
 
 [lints]
 workspace = true
