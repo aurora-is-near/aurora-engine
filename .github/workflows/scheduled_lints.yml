@@ -14,9 +14,6 @@ jobs:
       matrix:
         version: [ mainnet, testnet ]
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install Rust toolchain
@@ -39,12 +36,10 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
@@ -60,23 +55,12 @@ jobs:
     runs-on: selfhosted
     container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/native.sh
-      - name: Install Rust toolchain and components
-        run: |
-          rustup component add rustfmt clippy
-          rustup toolchain add nightly
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:

@@ -17,9 +17,6 @@ jobs:
       matrix:
         command: [ check-fmt, clippy, udeps ]
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Setup Rust cache
@@ -29,13 +26,10 @@ jobs:
           cache-on-failure: "true"
           cache-all-crates: "true"
       - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+        run: sudo scripts/ci-deps/install-wasm-opt.sh
       - name: Install Rust toolchain and components
         run: |
-          rustup component add rustfmt clippy
           rustup toolchain add nightly
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run ${{ matrix.command }}
         run: cargo make ${{ matrix.command }}
 
@@ -44,13 +38,8 @@ jobs:
     runs-on: selfhosted
     container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/native.sh
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -59,8 +48,6 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock
             etc/tests/uniswap/yarn.lock
-      - name: Install cargo-make
-        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin
