@@ -59,6 +59,8 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -69,8 +71,8 @@ jobs:
           node-version: 18
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+      - name: Install nightly rust toolchain
+        run: rustup toolchain add nightly
       - name: Run checks
         run: cargo make check
       - name: Run build XCC router
