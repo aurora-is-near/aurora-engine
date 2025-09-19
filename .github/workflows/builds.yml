@@ -20,6 +20,8 @@ jobs:
         run: cargo install --no-default-features --force cargo-make
       - name: Install dependencies
         run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Compile smart contracts
         run: |
           cargo make build-docker

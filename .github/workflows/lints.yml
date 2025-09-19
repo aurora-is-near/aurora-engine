@@ -28,8 +28,9 @@ jobs:
       - name: Install dependencies
         run: scripts/ci-deps/install-wasm-opt.sh
       - name: Install Rust toolchain and components
-        run: |
-          rustup toolchain add nightly
+        run: rustup toolchain add nightly
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run ${{ matrix.command }}
         run: cargo make ${{ matrix.command }}
 
@@ -48,6 +49,8 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock
             etc/tests/uniswap/yarn.lock
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin

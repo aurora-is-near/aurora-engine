@@ -29,7 +29,7 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install dependencies
+      - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
@@ -55,6 +55,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run bench-modexp tests
         run: cargo make bench-modexp
 
@@ -73,6 +75,8 @@ jobs:
           key: cargo-build-xcc-router
           cache-on-failure: "true"
           cache-all-crates: "true"
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build XCC router
         run: cargo make build-xcc-router
 

@@ -40,6 +40,8 @@ jobs:
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
@@ -65,6 +67,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run checks
         run: cargo make check
       - name: Run build XCC router
