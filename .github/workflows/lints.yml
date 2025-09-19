@@ -26,14 +26,7 @@ jobs:
           cache-on-failure: "true"
           cache-all-crates: "true"
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
-      - name: Update Node and Yarn
-        run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm alias default 18
-          npm install -g yarn
-          echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
+        run: scripts/ci-deps/native.sh
       - name: Install Rust toolchain and components
         run: rustup toolchain add nightly
       - name: Install cargo-make
@@ -48,6 +41,8 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -56,13 +51,6 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock
             etc/tests/uniswap/yarn.lock
-      - name: Update Node and Yarn
-        run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm alias default 18
-          npm install -g yarn
-          echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run yarn lint
