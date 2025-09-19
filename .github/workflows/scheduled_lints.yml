@@ -2,12 +2,13 @@
 on:
   schedule:
     - cron: '0 8 * * 1-5'
+  pull_request:
 
 name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: k8s-infrastructure-dind
+    runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
       matrix:
@@ -18,8 +19,6 @@ jobs:
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install ci deps
-        run: sudo scripts/ci-deps/native.sh
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -58,7 +57,7 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted
     container: rust:latest
     steps:
       - name: Potential broken submodules fix

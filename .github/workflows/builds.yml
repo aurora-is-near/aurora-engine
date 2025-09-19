@@ -7,16 +7,13 @@ name: Build
 jobs:
   build:
     name: Build contracts
-    runs-on: k8s-infrastructure-dind
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Potential broken submodules fix
         run: |
           git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install ci deps
-        run: |
-          sudo scripts/ci-deps/native.sh
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -36,7 +33,7 @@ jobs:
 
   publish:
     name: Publish contracts
-    runs-on: k8s-infrastructure-generic
+    runs-on: github-hosted-heavy-runner
     needs: build
     steps:
       - name: Download artifacts

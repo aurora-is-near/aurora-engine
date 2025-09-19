@@ -10,12 +10,10 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: k8s-infrastructure-dind  # strong main container and weak docker container
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install CI deps
-        run: sudo scripts/ci-deps/native.sh
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -31,16 +29,17 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install cargo-make
-        run: sudo cargo +stable install cargo-make
-      - name: Run tests
-        run: sudo cargo make test-flow
+      - name: Install dependencies
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Tests
+        run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: k8s-infrastructure-native
-    container:
-      image: rust:latest
+    runs-on: selfhosted-heavy
+    container: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |
@@ -66,9 +65,8 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: k8s-infrastructure-native
-    container:
-      image: rust:latest
+    runs-on: selfhosted
+    container: rust:latest
     steps:
       - name: Potential broken submodules fix
         run: |

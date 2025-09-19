@@ -10,7 +10,7 @@ name: Lints
 jobs:
   rust:
     name: Run ${{ matrix.command }}
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted
     container: rust:latest
     strategy:
       fail-fast: false
@@ -41,7 +41,7 @@ jobs:
 
   contracts:
     name: Contracts
-    runs-on: k8s-infrastructure-native
+    runs-on: selfhosted
     container: rust:latest
     steps:
       - name: Potential broken submodules fix
