@@ -10,12 +10,11 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: k8s-worker-8  # strong main container and weak docker container
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: sudo scripts/ci-deps/install-wasm-opt.sh
+      - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -30,17 +29,22 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: k8s-worker-8
+    runs-on: selfhosted-heavy
+    container: rust:latest
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo scripts/ci-deps/install-wasm-opt.sh
+        run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -51,23 +55,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run bench-modexp tests
         run: cargo make bench-modexp
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: k8s-worker-4
+    runs-on: selfhosted
+    container: rust:latest
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
-        run: sudo scripts/ci-deps/install-wasm-opt.sh
+        run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           key: cargo-build-xcc-router
           cache-on-failure: "true"
           cache-all-crates: "true"
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Build XCC router
         run: cargo make build-xcc-router
 
