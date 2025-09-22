@@ -167,11 +167,9 @@ where
                 .map_err(ExecutionError::from_vm_err)
                 .and_then(|data| {
                     data.map(|data| {
-                        let mut slice = data.as_slice();
                         io.return_output(&data);
-                        let res = SubmitResult::deserialize(&mut slice)
+                        let res = SubmitResult::try_from_slice(&data)
                             .map_err(ExecutionError::Deserialize)?;
-
                         Ok(TransactionExecutionResult::Submit(Ok(res)))
                     })
                     .transpose()

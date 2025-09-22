@@ -23,52 +23,25 @@ pub mod xcc;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-/// The contract must either compile for `wasm32` or use `std`
-#[cfg(all(not(target_arch = "wasm32"), not(feature = "std")))]
-pub mod noop_allocator {
-    use core::alloc::{GlobalAlloc, Layout};
-
-    pub struct Allocator;
-
-    unsafe impl GlobalAlloc for Allocator {
-        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-            core::ptr::null_mut()
-        }
-
-        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-            unreachable!("should never be called, since alloc never returns non-null");
-        }
-    }
-
-    #[global_allocator]
-    static ALLOC: Allocator = Allocator;
-}
-
-#[cfg(not(feature = "std"))]
+#[cfg(target_arch = "wasm32")]
 #[panic_handler]
-pub fn on_panic(info: &core::panic::PanicInfo) -> ! {
+#[cfg_attr(not(feature = "log"), allow(unused_variables))]
+#[no_mangle]
+pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
         use prelude::ToString;
 
         let msg = info.message();
-        let msg = info
-            .location()
-            .map_or_else(|| msg.to_string(), |loc| prelude::format!("{msg} [{loc}]"));
+        let msg = if let Some(log) = info.location() {
+            prelude::format!("{msg} [{log}]")
+        } else {
+            msg.to_string()
+        };
         prelude::sdk::panic_utf8(msg.as_bytes());
     }
     #[cfg(not(feature = "log"))]
-    {
-        let _ = info;
-        #[cfg(target_arch = "wasm32")]
-        {
-            core::arch::wasm32::unreachable();
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            core::hint::unreachable_unchecked();
-        } // unsafe semantic; consider a more conservative fallback if preferred
-    }
+    ::core::arch::wasm32::unreachable();
 }
 
 #[cfg(feature = "contract")]
