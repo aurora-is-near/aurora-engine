@@ -7,12 +7,21 @@ name: Build
 jobs:
   build:
     name: Build contracts
-    runs-on: k8s-worker-8
+    runs-on: github-hosted-heavy-runner
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install cargo-make
+        run: cargo install --no-default-features --force cargo-make
       - name: Install dependencies
-        run: sudo scripts/ci-deps/install-wasm-opt.sh
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Compile smart contracts
         run: |
           cargo make build-docker
@@ -25,7 +34,7 @@ jobs:
 
   publish:
     name: Publish contracts
-    runs-on: k8s-worker-2
+    runs-on: github-hosted-heavy-runner
     needs: build
     steps:
       - name: Download artifacts

@@ -7,7 +7,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: k8s-worker-6
+    runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
       matrix:
@@ -15,6 +15,12 @@ jobs:
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          toolchain: stable
+          override: false
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -32,7 +38,9 @@ jobs:
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
-        run: sudo scripts/ci-deps/install-wasm-opt.sh
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
         run: cargo make test
       - uses: 8398a7/action-slack@v3
@@ -45,10 +53,13 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: k8s-worker-6
+    runs-on: selfhosted
+    container: rust:latest
     steps:
       - name: Clone the repository
         uses: actions/checkout@v4
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -57,6 +68,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install nightly rust toolchain
+        run: rustup toolchain add nightly
       - name: Run checks
         run: cargo make check
       - name: Run build XCC router
