@@ -163,7 +163,7 @@ where
 
             let tx_hash = aurora_engine_sdk::keccak(&transaction_message.transaction.args);
             let result = runner
-                .call_contract("borealis_wrapper_submit", promise_data, &env, io, None)
+                .call_contract("borealis_wrapper_submit", promise_data, &env, io)
                 .map_err(ExecutionError::from_vm_err)
                 .and_then(|data| {
                     data.map(|data| {
@@ -181,7 +181,7 @@ where
 
             let tx_hash = aurora_engine_sdk::keccak(&args.tx_data);
             let result = runner
-                .call_contract("submit_with_args", promise_data, &env, io, None)
+                .call_contract("submit_with_args", promise_data, &env, io)
                 .map_err(ExecutionError::from_vm_err)
                 .and_then(|data| {
                     data.map(|data| {
@@ -207,21 +207,10 @@ where
         }
     };
 
-    let mut trace_log = None;
-    let mut call_tracer = None;
-
-    // TODO: log error
-    match trace_kind {
-        Some(TraceKind::Transaction) => {
-            let value = io.read_storage(b"borealis/transaction_tracing");
-            trace_log = value.and_then(|v| v.to_value().ok());
-        }
-        Some(TraceKind::CallFrame) => {
-            let value = io.read_storage(b"borealis/call_frame_tracing");
-            call_tracer = value.and_then(|v| v.to_value().ok());
-        }
-        None => {}
-    }
+    let value = io.read_storage(b"borealis/transaction_tracing");
+    let trace_log = value.and_then(|v| v.to_value().ok());
+    let value = io.read_storage(b"borealis/call_frame_tracing");
+    let call_tracer = value.and_then(|v| v.to_value().ok());
 
     let diff = get_diff(&io);
 
@@ -269,7 +258,7 @@ where
         TransactionKindTag::Call => {
             // We can ignore promises in the standalone engine (see above)
             let data = runner
-                .call_contract("borealis_wrapper_call", promise_results, env, io, None)
+                .call_contract("borealis_wrapper_call", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -280,7 +269,7 @@ where
 
         TransactionKindTag::Deploy => {
             let data = runner
-                .call_contract("deploy_code", promise_results, env, io, None)
+                .call_contract("deploy_code", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =
@@ -290,7 +279,7 @@ where
         }
         TransactionKindTag::DeployErc20 => {
             let data = runner
-                .call_contract("deploy_erc20_token", promise_results, env, io, None)
+                .call_contract("deploy_erc20_token", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?;
 
             match data {
@@ -305,13 +294,7 @@ where
         }
         TransactionKindTag::DeployErc20Callback => {
             let data = runner
-                .call_contract(
-                    "deploy_erc20_token_callback",
-                    promise_results,
-                    env,
-                    io,
-                    None,
-                )
+                .call_contract("deploy_erc20_token_callback", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let mut slice = data.as_slice();
@@ -321,13 +304,7 @@ where
         }
         TransactionKindTag::FtOnTransfer => {
             runner
-                .call_contract(
-                    "borealis_wrapper_ft_on_transfer",
-                    promise_results,
-                    env,
-                    io,
-                    None,
-                )
+                .call_contract("borealis_wrapper_ft_on_transfer", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
 
@@ -339,9 +316,7 @@ where
                     <Option<SubmitResult> as BorshDeserialize>::deserialize(&mut slice)
                 })
                 .transpose()
-                .map_err(|err| {
-                    ExecutionError::Deserialize(io::Error::new(io::ErrorKind::Other, err))
-                })?
+                .map_err(ExecutionError::Deserialize)?
                 .flatten();
 
             submit_result.map(|result| TransactionExecutionResult::Submit(Ok(result)))
@@ -358,7 +333,7 @@ where
         TransactionKindTag::SetPausedFlags => None,
         TransactionKindTag::RegisterRelayer => {
             runner
-                .call_contract("register_relayer", promise_results, env, io, None)
+                .call_contract("register_relayer", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
@@ -370,7 +345,6 @@ where
                     promise_results,
                     env,
                     io,
-                    None,
                 )
                 .map_err(ExecutionError::from_vm_err)?;
             let value = io.read_storage(b"borealis/submit_result");
@@ -381,9 +355,7 @@ where
                     <Option<SubmitResult> as BorshDeserialize>::deserialize(&mut slice)
                 })
                 .transpose()
-                .map_err(|err| {
-                    ExecutionError::Deserialize(io::Error::new(io::ErrorKind::Other, err))
-                })?
+                .map_err(ExecutionError::Deserialize)?
                 .flatten()
                 .map(Ok)
                 .map(TransactionExecutionResult::Submit)
@@ -410,15 +382,8 @@ where
         | TransactionKindTag::RemoveRelayerKey
         | TransactionKindTag::StartHashchain
         | TransactionKindTag::SetErc20Metadata
-        | TransactionKindTag::MirrorErc20TokenCallback => {
-            let method = transaction.method_name.to_string();
-            runner
-                .call_contract(&method, promise_results, env, io, None)
-                .map_err(ExecutionError::from_vm_err)?;
-
-            None
-        }
-        TransactionKindTag::SetFixedGas
+        | TransactionKindTag::MirrorErc20TokenCallback
+        | TransactionKindTag::SetFixedGas
         | TransactionKindTag::SetErc20FallbackAddress
         | TransactionKindTag::SetSiloParams
         | TransactionKindTag::AddEntryToWhitelist
@@ -426,17 +391,16 @@ where
         | TransactionKindTag::RemoveEntryFromWhitelist
         | TransactionKindTag::SetWhitelistStatus
         | TransactionKindTag::SetWhitelistsStatuses => {
-            let input = transaction.args.clone();
             let method = transaction.method_name.to_string();
             runner
-                .call_contract(&method, promise_results, env, io, Some(input))
+                .call_contract(&method, promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?;
 
             None
         }
         TransactionKindTag::WithdrawWnearToRouter => {
             let data = runner
-                .call_contract("withdraw_wnear_to_router", promise_results, env, io, None)
+                .call_contract("withdraw_wnear_to_router", promise_results, env, io)
                 .map_err(ExecutionError::from_vm_err)?
                 .ok_or(ExecutionError::DeserializeUnexpectedEnd)?;
             let result =

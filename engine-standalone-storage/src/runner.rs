@@ -9,7 +9,6 @@ pub trait AbstractContractRunner {
         promise_data: Vec<Option<Vec<u8>>>,
         env: &E,
         io: I,
-        override_input: Option<Vec<u8>>,
     ) -> Result<Option<Vec<u8>>, Self::Error>
     where
         E: Env,
