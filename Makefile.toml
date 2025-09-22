@@ -93,6 +93,21 @@ args = [
     "clippy::as_conversions",
 ]
 
+[tasks.clippy-contract]
+extend = "clippy-base"
+args = [
+    "clippy",
+    "--workspace",
+    "--all-targets",
+    "--features",
+    "contract",
+    "--",
+    "-D",
+    "warnings",
+    "-D",
+    "clippy::as_conversions",
+]
+
 [tasks.clippy-contract-refund]
 extend = "clippy-base"
 args = [
@@ -112,6 +127,7 @@ args = [
 [tasks.clippy]
 dependencies = [
     "clippy-base",
+    "clippy-contract",
     "clippy-contract-refund",
 ]
 

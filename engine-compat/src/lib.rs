@@ -1,9 +1,9 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
 
 /// The contract must compile with feature `contract`. This code is only for clippy and udeps.
-#[cfg(not(feature = "contract"))]
+#[cfg(not(any(feature = "contract", test)))]
 pub mod noop_allocator {
     use core::alloc::{GlobalAlloc, Layout};
 
@@ -154,7 +154,7 @@ mod contract {
         let maybe_result = dbg::Runtime::trace(|| {
             contract_methods::connector::exit_to_near_precompile_callback(io, &env, &mut handler)
                 .map_err(ContractError::msg)
-                .sdk_unwrap();
+                .sdk_unwrap()
         });
         dbg::Runtime::write(b"borealis/submit_result", maybe_result);
     }
