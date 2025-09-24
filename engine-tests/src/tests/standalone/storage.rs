@@ -85,13 +85,11 @@ fn test_replay_transaction() {
                 .iter()
                 .enumerate()
                 .map(|(position, tx)| {
-                    let diff = runner
-                        .execute_transaction_at_position(
-                            tx,
-                            block_height,
-                            u16::try_from(position).unwrap(),
-                        )
-                        .unwrap();
+                    let diff = runner.execute_transaction_at_position(
+                        tx,
+                        block_height,
+                        u16::try_from(position).unwrap(),
+                    );
 
                     utils::standalone::storage::commit(&mut runner.storage, &diff);
 
@@ -123,7 +121,6 @@ fn test_replay_transaction() {
         for ((position, tx), diff) in txs {
             let replay_diff = runner
                 .execute_transaction_at_position(tx, block_height, u16::try_from(position).unwrap())
-                .unwrap()
                 .diff;
             assert_eq!(replay_diff, diff);
         }

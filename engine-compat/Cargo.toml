@@ -19,6 +19,7 @@ panic = "abort"
 [dependencies]
 aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract"] }
 aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract"] }
+aurora-engine-types = { workspace = true, optional = true, default-features = false }
 engine-standalone-tracing = { workspace = true, optional = true, default-features = false }
 borsh = { workspace = true, optional = true }
 primitive-types = { workspace = true, optional = true }
@@ -30,4 +31,4 @@ wee_alloc.workspace = true
 workspace = true
 
 [features]
-contract = ["aurora-engine", "aurora-engine-sdk", "engine-standalone-tracing", "borsh", "primitive-types"]
+contract = ["aurora-engine", "aurora-engine-sdk", "aurora-engine-types", "engine-standalone-tracing", "borsh", "primitive-types"]

@@ -258,7 +258,7 @@ impl AuroraRunner {
                 &self.promise_results,
                 self.block_random_value,
                 trace_kind,
-            )?;
+            );
             self.validate_standalone();
             (result.call_tracer, result.trace_log)
         } else {

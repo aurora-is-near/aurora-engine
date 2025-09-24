@@ -1,5 +1,5 @@
 use aurora_engine::engine;
-use aurora_engine::parameters::{SubmitResult, TransactionStatus};
+use aurora_engine::parameters::{SubmitResult, TransactionExecutionResult, TransactionStatus};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
@@ -200,7 +200,7 @@ impl StandaloneRunner {
         signed_tx: &LegacyEthSignedTransaction,
         block_height: u64,
         transaction_position: u16,
-    ) -> Result<sync::TransactionIncludedOutcome, engine::EngineError> {
+    ) -> sync::TransactionIncludedOutcome {
         let storage = &mut self.storage;
         let env = &mut self.env;
 
@@ -220,16 +220,9 @@ impl StandaloneRunner {
         )
         .unwrap();
 
-        match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
-            sync::TransactionExecutionResult::Submit(result) => {
-                if let Err(e) = result.as_ref() {
-                    return Err(e.clone());
-                }
-            }
-            _ => unreachable!(),
-        }
+        let _ = outcome.maybe_result.as_ref().unwrap().as_ref().unwrap();
 
-        Ok(outcome)
+        outcome
     }
 
     #[allow(clippy::too_many_lines)]
@@ -240,7 +233,7 @@ impl StandaloneRunner {
         promise_results: &[PromiseResult],
         block_random_value: Option<H256>,
         trace_kind: Option<TraceKind>,
-    ) -> Result<SubmitResultExt, engine::EngineError> {
+    ) -> SubmitResultExt {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit;
@@ -297,8 +290,8 @@ impl StandaloneRunner {
         storage::commit(storage, &outcome);
 
         let inner = match outcome.maybe_result.unwrap() {
-            Some(sync::TransactionExecutionResult::Submit(result)) => result?,
-            Some(sync::TransactionExecutionResult::DeployErc20(address)) => SubmitResult::new(
+            Some(TransactionExecutionResult::Submit(result)) => result,
+            Some(TransactionExecutionResult::DeployErc20(address)) => SubmitResult::new(
                 TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
@@ -306,12 +299,12 @@ impl StandaloneRunner {
             _ => SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 0, Vec::new()),
         };
 
-        Ok(SubmitResultExt {
+        SubmitResultExt {
             inner,
             execution_profile: None,
             call_tracer: outcome.call_tracer.take(),
             trace_log: outcome.trace_log.take(),
-        })
+        }
     }
 
     pub const fn get_current_state(&self) -> &Diff {
@@ -430,11 +423,9 @@ fn unwrap_result(
         .maybe_result?
         .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
     {
-        sync::TransactionExecutionResult::Submit(result) => {
-            result.map_err(sync::ExecutionError::Engine)
-        }
-        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
-        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+        TransactionExecutionResult::Submit(result) => Ok(result),
+        TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
+        TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }
 }
 
@@ -445,16 +436,14 @@ fn unwrap_result_ext(
         .maybe_result?
         .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
     {
-        sync::TransactionExecutionResult::Submit(result) => result
-            .map_err(sync::ExecutionError::Engine)
-            .map(|inner| SubmitResultExt {
-                inner,
-                execution_profile: None,
-                call_tracer: outcome.call_tracer.take(),
-                trace_log: outcome.trace_log.take(),
-            }),
-        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
-        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+        TransactionExecutionResult::Submit(result) => Ok(SubmitResultExt {
+            inner: result,
+            execution_profile: None,
+            call_tracer: outcome.call_tracer.take(),
+            trace_log: outcome.trace_log.take(),
+        }),
+        TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
+        TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }
 }
 

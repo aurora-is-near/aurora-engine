@@ -298,6 +298,7 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine",
  "aurora-engine-sdk",
+ "aurora-engine-types",
  "borsh 1.5.7",
  "engine-standalone-tracing",
  "primitive-types 0.13.1",
