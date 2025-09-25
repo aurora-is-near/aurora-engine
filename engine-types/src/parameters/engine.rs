@@ -1,5 +1,6 @@
 use crate::{
     account_id::AccountId,
+    parameters::PromiseWithCallbackArgs,
     public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
     Vec,
@@ -394,6 +395,14 @@ pub struct UpgradeParams {
     pub code: Vec<u8>,
     /// Amount of gas for the state migration.
     pub state_migration_gas: Option<u64>,
+}
+
+/// Result of executing a transaction.
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub enum TransactionExecutionResult {
+    Submit(SubmitResult),
+    DeployErc20(Address),
+    Promise(PromiseWithCallbackArgs),
 }
 
 mod chain_id_deserialize {
