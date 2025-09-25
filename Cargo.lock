@@ -298,9 +298,9 @@ version = "0.1.0"
 dependencies = [
  "aurora-engine",
  "aurora-engine-sdk",
+ "aurora-engine-types",
  "borsh 1.3.1",
  "engine-standalone-tracing",
- "getrandom 0.2.16",
  "primitive-types 0.12.2",
  "wee_alloc",
 ]
@@ -2117,10 +2117,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
 dependencies = [
  "cfg-if 1.0.0",
- "js-sys",
  "libc",
  "wasi 0.11.0+wasi-snapshot-preview1",
- "wasm-bindgen",
 ]
 
 [[package]]
