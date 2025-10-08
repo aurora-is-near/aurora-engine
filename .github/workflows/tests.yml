@@ -12,7 +12,7 @@ jobs:
     name: Test suite
     runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
     steps:
-      - name: Bootstrap RunsOn additional features
+      - name: Setup RunsOn
         uses: runs-on/action@v2
         with:
           metrics: cpu,network,memory,disk,io
@@ -45,7 +45,7 @@ jobs:
     runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     steps:
-      - name: Bootstrap RunsOn additional features
+      - name: Setup RunsOn
         uses: runs-on/action@v2
         with:
           metrics: cpu,network,memory,disk,io
@@ -73,7 +73,7 @@ jobs:
     runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     steps:
-      - name: Bootstrap RunsOn additional features
+      - name: Setup RunsOn
         uses: runs-on/action@v2
         with:
           metrics: cpu,network,memory,disk,io
