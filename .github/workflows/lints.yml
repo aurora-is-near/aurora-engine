@@ -10,13 +10,17 @@ name: Lints
 jobs:
   rust:
     name: Run ${{ matrix.command }}
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     strategy:
       fail-fast: false
       matrix:
         command: [ check-fmt, clippy, udeps ]
     steps:
+      - name: Bootstrap RunsOn additional features
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
@@ -36,9 +40,13 @@ jobs:
 
   contracts:
     name: Contracts
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     steps:
+      - name: Bootstrap RunsOn additional features
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
