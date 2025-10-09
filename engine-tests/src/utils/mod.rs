@@ -358,7 +358,6 @@ impl AuroraRunner {
         let nonce = signer.use_nonce();
         let tx = make_tx(nonce.into());
         let signed_tx = sign_transaction(tx, Some(self.chain_id), &signer.secret_key);
-        // TODO: enable call trace
         let outcome = self.call_with_signer(
             SUBMIT,
             CALLER_ACCOUNT_ID,

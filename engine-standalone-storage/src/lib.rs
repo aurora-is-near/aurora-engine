@@ -413,10 +413,36 @@ impl Storage {
         self.db.get(key)
     }
 
+    /// Retrieve data for a key with `CustomData` prefix at (after) the block
+    /// and position in the block or any further, but bellow next such record.
+    pub fn get_custom_data_at(
+        &self,
+        key: &[u8],
+        block_height: u64,
+        transaction_position: u16,
+    ) -> Result<Option<Vec<u8>>, rocksdb::Error> {
+        let prefix = construct_custom_key_at(key, block_height, transaction_position);
+        let mut it = self.db.prefix_iterator(prefix);
+        Ok(it.next().transpose()?.map(|(_k, v)| v.to_vec()))
+    }
+
     /// Save data for a key with `CustomData` prefix. A helper method which allows saving
     /// arbitrary data from outside the crate.
     pub fn set_custom_data(&self, key: &[u8], value: &[u8]) -> Result<(), rocksdb::Error> {
         let key = construct_storage_key(StoragePrefix::CustomData, key);
+        self.db.put(key, value)
+    }
+
+    /// Save data for a key with `CustomData` prefix at the block
+    /// and position in the block.
+    pub fn set_custom_data_at(
+        &self,
+        key: &[u8],
+        block_height: u64,
+        transaction_position: u16,
+        value: &[u8],
+    ) -> Result<(), rocksdb::Error> {
+        let key = construct_custom_key_at(key, block_height, transaction_position);
         self.db.put(key, value)
     }
 }
@@ -503,6 +529,19 @@ fn construct_storage_key(prefix: StoragePrefix, key: &[u8]) -> Vec<u8> {
 fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {
     construct_storage_key(
         StoragePrefix::Engine,
+        [
+            key,
+            &block_height.to_be_bytes(),
+            &transaction_position.to_be_bytes(),
+        ]
+        .concat()
+        .as_slice(),
+    )
+}
+
+fn construct_custom_key_at(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {
+    construct_storage_key(
+        StoragePrefix::CustomData,
         [
             key,
             &block_height.to_be_bytes(),
