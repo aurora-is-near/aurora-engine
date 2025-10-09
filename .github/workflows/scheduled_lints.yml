@@ -7,12 +7,16 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: github-hosted-heavy-runner
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
     strategy:
       fail-fast: false
       matrix:
         version: [ mainnet, testnet ]
     steps:
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install Rust toolchain
@@ -53,9 +57,13 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.8xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     steps:
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
