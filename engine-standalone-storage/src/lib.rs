@@ -422,7 +422,11 @@ impl Storage {
         transaction_position: u16,
     ) -> Result<Option<Vec<u8>>, rocksdb::Error> {
         let prefix = construct_custom_key_at(key, block_height, transaction_position);
-        let mut it = self.db.prefix_iterator(prefix);
+        let mut it = self.db.prefix_iterator(&prefix);
+        it.set_mode(rocksdb::IteratorMode::From(
+            prefix.as_ref(),
+            rocksdb::Direction::Reverse,
+        ));
         Ok(it.next().transpose()?.map(|(_k, v)| v.to_vec()))
     }
 
