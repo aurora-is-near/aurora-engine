@@ -427,6 +427,8 @@ impl Storage {
             prefix.as_ref(),
             rocksdb::Direction::Reverse,
         ));
+        let minimal = construct_custom_key_at(key, 0, 0).into_boxed_slice();
+        let mut it = it.take_while(|r| r.as_ref().map_or(false, |(k, _v)| k >= &minimal));
         Ok(it.next().transpose()?.map(|(_k, v)| v.to_vec()))
     }
 
