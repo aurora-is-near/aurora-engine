@@ -110,7 +110,7 @@ mod contract {
 
     #[no_mangle]
     #[allow(clippy::too_many_lines)]
-    pub extern "C" fn execute_transaction() {
+    pub extern "C" fn execute() {
         let mut io = Runtime;
         let env = Runtime;
         let mut handler = Runtime;
@@ -269,6 +269,7 @@ mod contract {
                 contract_methods::connector::mirror_erc20_token_callback(io, &env, &mut handler)
                     .map(|()| None)
             }
+            "get_version" => contract_methods::admin::get_version(io).map(|()| None),
             _ => Err(ContractError {
                 message: Box::new(format!("Unknown method: {method}")),
             }),

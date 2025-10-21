@@ -172,7 +172,7 @@ where
         &transaction_message.transaction.method_name.to_string(),
     );
     let maybe_result = runner
-        .call_contract("execute_transaction", promise_data, &env, io)
+        .call_contract(promise_data, &env, io)
         .map_err(ExecutionError::from_vm_err)
         .and_then(|_| {
             type R = Result<Option<TransactionExecutionResult>, String>;

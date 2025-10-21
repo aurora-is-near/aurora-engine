@@ -400,7 +400,6 @@ impl AbstractContractRunner for ContractRunner {
 
     fn call_contract<E, I>(
         &self,
-        method: &str,
         promise_data: Vec<Option<Vec<u8>>>,
         env: &E,
         io: I,
@@ -423,7 +422,7 @@ impl AbstractContractRunner for ContractRunner {
             action_log: vec![],
         };
 
-        let vm_outcome = self.call(method, input, promise_results, env, &mut ext)?;
+        let vm_outcome = self.call("execute", input, promise_results, env, &mut ext)?;
         let output = vm_outcome.return_data.as_value();
         if let Some(data) = &output {
             ext.io.return_output(data);

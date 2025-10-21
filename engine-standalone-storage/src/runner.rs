@@ -5,7 +5,6 @@ pub trait AbstractContractRunner {
 
     fn call_contract<E, I>(
         &self,
-        method: &str,
         promise_data: Vec<Option<Vec<u8>>>,
         env: &E,
         io: I,

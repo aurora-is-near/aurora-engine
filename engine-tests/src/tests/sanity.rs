@@ -57,7 +57,7 @@ fn bench_memory_get_standalone() {
     let result = standalone_runner
         .submit_transaction(&signer.secret_key, tx)
         .unwrap();
-    let duration = dbg!(start.elapsed());
+    let duration = start.elapsed();
     let limit = Duration::from_secs(6);
     assert!(
         matches!(result.status, TransactionStatus::OutOfGas),
