@@ -95,6 +95,9 @@ mod dbg {
 }
 
 #[cfg(feature = "contract")]
+mod simulate;
+
+#[cfg(feature = "contract")]
 mod contract {
     use alloc::{boxed::Box, format, string::String, vec::Vec};
 
@@ -270,6 +273,9 @@ mod contract {
                     .map(|()| None)
             }
             "get_version" => contract_methods::admin::get_version(io).map(|()| None),
+            "simulate_eth_call" => super::simulate::eth_call(io, env)
+                .map(TransactionExecutionResult::Submit)
+                .map(Some),
             _ => Err(ContractError {
                 message: Box::new(format!("Unknown method: {method}")),
             }),

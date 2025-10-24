@@ -297,7 +297,9 @@ name = "aurora-engine-compat"
 version = "0.1.0"
 dependencies = [
  "aurora-engine",
+ "aurora-engine-modexp",
  "aurora-engine-sdk",
+ "aurora-engine-transactions",
  "aurora-engine-types",
  "borsh 1.5.7",
  "engine-standalone-tracing",
