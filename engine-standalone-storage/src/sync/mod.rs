@@ -190,6 +190,8 @@ where
     let trace_log = value.and_then(|v| v.to_value().ok());
     let value = io.read_storage(b"borealis/call_frame_tracing");
     let call_tracer = value.and_then(|v| v.to_value().ok());
+    let value = io.read_storage(b"borealis/custom_debug_info");
+    let custom_debug_info = value.map(|x| x.as_ref().to_vec());
 
     let diff = get_diff(&io);
 
@@ -200,6 +202,7 @@ where
         maybe_result,
         trace_log,
         call_tracer,
+        custom_debug_info,
     }
 }
 
@@ -237,6 +240,7 @@ pub struct TransactionIncludedOutcome {
     pub maybe_result: Result<Option<TransactionExecutionResult>, ExecutionError>,
     pub trace_log: Option<Vec<TraceLog>>,
     pub call_tracer: Option<CallTracer>,
+    pub custom_debug_info: Option<Vec<u8>>,
 }
 
 impl TransactionIncludedOutcome {

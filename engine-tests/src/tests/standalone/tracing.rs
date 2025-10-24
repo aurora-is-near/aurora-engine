@@ -81,6 +81,7 @@ fn test_evm_tracing_with_storage() {
         maybe_result: Ok(None),
         trace_log: None,
         call_tracer: None,
+        custom_debug_info: None,
     };
     standalone::storage::commit(&mut runner.storage, &tx);
 

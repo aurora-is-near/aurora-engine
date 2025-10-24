@@ -58,6 +58,7 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
             trace_log: None,
             call_tracer: None,
+            custom_debug_info: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
@@ -95,6 +96,7 @@ impl StandaloneRunner {
             maybe_result: Ok(None),
             trace_log: None,
             call_tracer: None,
+            custom_debug_info: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);

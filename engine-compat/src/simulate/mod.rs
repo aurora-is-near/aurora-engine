@@ -40,6 +40,7 @@ where
         .to_value()
         .expect("Failed to deserialize EthCallInput");
 
+    let current_nonce = engine::get_nonce(&io, &from).low_u64();
     let mut local_io = io;
     let mut full_override = BTreeMap::new();
     for (address, state_override) in state_override {
@@ -62,6 +63,13 @@ where
             }
         }
     }
+
+    // debug info nonce status: 1 -> not provided, 2 -> too low, 3 -> greater or equal
+    let nonce_status = nonce.map_or(1u64, |nonce| if nonce < current_nonce { 2 } else { 3 });
+    local_io.write_borsh(
+        b"borealis/custom_debug_info",
+        &(nonce_status, current_nonce),
+    );
 
     if full_override.is_empty() {
         compute_call_result(
