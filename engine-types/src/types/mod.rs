@@ -5,12 +5,14 @@ pub mod address;
 pub mod balance;
 pub mod fee;
 pub mod gas;
+pub mod gas_limit;
 pub mod wei;
 
 pub use address::{make_address, Address};
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
+pub use gas_limit::*;
 pub use wei::*;
 
 pub type RawU256 = [u8; 32];

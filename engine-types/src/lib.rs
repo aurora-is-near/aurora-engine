@@ -6,6 +6,9 @@
     clippy::module_name_repetitions
 )]
 
+#[cfg(not(any(feature = "std", feature = "contracts-std")))]
+extern crate alloc;
+
 pub mod account_id;
 pub mod parameters;
 pub mod public_key;

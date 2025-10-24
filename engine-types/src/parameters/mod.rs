@@ -4,4 +4,5 @@ pub mod connector;
 pub mod engine;
 pub mod promise;
 pub mod silo;
+pub mod simulate;
 pub mod xcc;
