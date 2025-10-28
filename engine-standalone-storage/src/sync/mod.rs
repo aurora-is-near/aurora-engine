@@ -18,7 +18,7 @@ pub mod types;
 use crate::engine_state::EngineStateAccess;
 use crate::runner::AbstractContractRunner;
 use crate::{BlockMetadata, Diff, Storage};
-use types::{Message, TransactionKindTag, TransactionMessage};
+use types::{Message, TransactionMessage};
 
 /// Note: this function does not automatically commit transaction messages to the storage.
 /// If you want the transaction diff committed then you must call the `commit` method on
@@ -156,11 +156,9 @@ where
         io.write_borsh(b"borealis/trace_kind", v);
     }
 
-    let tx_hash = match &transaction_message.transaction.method_name {
-        TransactionKindTag::Submit => {
-            aurora_engine_sdk::keccak(&transaction_message.transaction.args)
-        }
-        TransactionKindTag::SubmitWithArgs => {
+    let tx_hash = match transaction_message.transaction.method_name.as_str() {
+        "submit" => aurora_engine_sdk::keccak(&transaction_message.transaction.args),
+        "submit_with_args" => {
             let args = transaction_message.transaction.get_submit_args().unwrap();
             aurora_engine_sdk::keccak(&args.tx_data)
         }

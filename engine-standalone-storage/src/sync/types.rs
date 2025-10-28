@@ -8,10 +8,7 @@ use aurora_engine_types::{
     types::{Address, NearGas, PromiseResult},
     H256,
 };
-use std::{borrow::Cow, str::FromStr};
-use strum::{Display, EnumString};
-
-use crate::error::ParseTransactionKindError;
+use std::borrow::Cow;
 
 /// Type describing the format of messages sent to the storage layer for keeping
 /// it in sync with the blockchain.
@@ -83,7 +80,7 @@ impl TransactionMessage {
 #[allow(clippy::large_enum_variant)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 pub struct TransactionKind {
-    pub(super) method_name: TransactionKindTag,
+    pub(super) method_name: String,
     pub(super) args: Vec<u8>,
     promise_result: Option<PromiseResult>,
 }
@@ -91,22 +88,12 @@ pub struct TransactionKind {
 impl TransactionKind {
     /// Try to parse an Aurora transaction from raw information available in a Near action
     /// (method name, input bytes, data returned from promises).
-    pub fn new(
-        method_name: &str,
-        bytes: Vec<u8>,
-        promise_data: &[Option<Vec<u8>>],
-    ) -> Result<Self, ParseTransactionKindError> {
-        let method_name = TransactionKindTag::from_str(method_name).map_err(|_| {
-            ParseTransactionKindError::UnknownMethodName {
-                name: method_name.into(),
-            }
-        })?;
-
-        Ok(Self {
-            method_name,
+    pub fn new(method_name: &str, bytes: Vec<u8>, promise_data: &[Option<Vec<u8>>]) -> Self {
+        Self {
+            method_name: method_name.to_owned(),
             args: bytes,
             promise_result: match method_name {
-                TransactionKindTag::ResolveTransfer => {
+                "ft_resolve_transfer" => {
                     Some(promise_data.first().and_then(Option::as_ref).map_or(
                         aurora_engine_types::types::PromiseResult::Failed,
                         |bytes| {
@@ -116,7 +103,7 @@ impl TransactionKind {
                 }
                 _ => None,
             },
-        })
+        }
     }
 
     #[must_use]
@@ -127,7 +114,7 @@ impl TransactionKind {
     #[must_use]
     pub fn submit(tx: &EthTransactionKind) -> Self {
         Self {
-            method_name: TransactionKindTag::Submit,
+            method_name: "submit".to_owned(),
             args: tx.into(),
             promise_result: None,
         }
@@ -136,16 +123,16 @@ impl TransactionKind {
     #[must_use]
     pub fn deploy_erc20(args: &DeployErc20TokenArgs) -> Self {
         Self {
-            method_name: TransactionKindTag::DeployErc20,
+            method_name: "deploy_erc20_token".to_owned(),
             args: borsh::to_vec(args).unwrap(),
             promise_result: None,
         }
     }
 
     #[must_use]
-    pub const fn new_deploy(args: Vec<u8>) -> Self {
+    pub fn new_deploy(args: Vec<u8>) -> Self {
         Self {
-            method_name: TransactionKindTag::Deploy,
+            method_name: "deploy_code".to_owned(),
             args,
             promise_result: None,
         }
@@ -154,7 +141,7 @@ impl TransactionKind {
     #[must_use]
     pub fn new_ft_on_transfer(args: &FtOnTransferArgs) -> Self {
         Self {
-            method_name: TransactionKindTag::FtOnTransfer,
+            method_name: "ft_on_transfer".to_owned(),
             args: serde_json::to_vec(args).unwrap(),
             promise_result: None,
         }
@@ -163,16 +150,16 @@ impl TransactionKind {
     #[must_use]
     pub fn new_call(args: &CallArgs) -> Self {
         Self {
-            method_name: TransactionKindTag::Call,
+            method_name: "call".to_owned(),
             args: borsh::to_vec(&args).unwrap(),
             promise_result: None,
         }
     }
 
     #[must_use]
-    pub const fn new_factory_update(args: Vec<u8>) -> Self {
+    pub fn new_factory_update(args: Vec<u8>) -> Self {
         Self {
-            method_name: TransactionKindTag::FactoryUpdate,
+            method_name: "factory_update".to_owned(),
             args,
             promise_result: None,
         }
@@ -181,16 +168,16 @@ impl TransactionKind {
     #[must_use]
     pub fn new_factory_set_wnear_address(args: Address) -> Self {
         Self {
-            method_name: TransactionKindTag::FactorySetWNearAddress,
+            method_name: "factory_set_wnear_address".to_owned(),
             args: args.as_bytes().to_vec(),
             promise_result: None,
         }
     }
 
     #[must_use]
-    pub const fn unknown() -> Self {
+    pub fn unknown() -> Self {
         Self {
-            method_name: TransactionKindTag::Unknown,
+            method_name: "unknown".to_owned(),
             args: vec![],
             promise_result: None,
         }
@@ -198,7 +185,7 @@ impl TransactionKind {
 
     #[must_use]
     pub fn get_submit_args(&self) -> Option<engine::SubmitArgs> {
-        if matches!(self.method_name, TransactionKindTag::SubmitWithArgs) {
+        if self.method_name == "submit_with_args" {
             engine::SubmitArgs::try_from_slice(&self.args).ok()
         } else {
             None
@@ -206,123 +193,10 @@ impl TransactionKind {
     }
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, EnumString, Display, BorshDeserialize, BorshSerialize,
-)]
-#[borsh(crate = "aurora_engine_types::borsh")]
-pub enum TransactionKindTag {
-    #[strum(serialize = "submit")]
-    Submit,
-    #[strum(serialize = "call")]
-    Call,
-    #[strum(serialize = "pause_precompiles")]
-    PausePrecompiles,
-    #[strum(serialize = "resume_precompiles")]
-    ResumePrecompiles,
-    #[strum(serialize = "deploy_code")]
-    Deploy,
-    #[strum(serialize = "deploy_erc20_token")]
-    DeployErc20,
-    #[strum(serialize = "deploy_erc20_token_callback")]
-    DeployErc20Callback,
-    #[strum(serialize = "ft_on_transfer")]
-    FtOnTransfer,
-    #[strum(serialize = "deposit")]
-    Deposit,
-    #[strum(serialize = "ft_transfer_call")]
-    FtTransferCall,
-    #[strum(serialize = "finish_deposit")]
-    FinishDeposit,
-    #[strum(serialize = "ft_resolve_transfer")]
-    ResolveTransfer,
-    #[strum(serialize = "ft_transfer")]
-    FtTransfer,
-    #[strum(serialize = "withdraw")]
-    Withdraw,
-    #[strum(serialize = "storage_deposit")]
-    StorageDeposit,
-    #[strum(serialize = "storage_unregister")]
-    StorageUnregister,
-    #[strum(serialize = "storage_withdraw")]
-    StorageWithdraw,
-    #[strum(serialize = "set_paused_flags")]
-    SetPausedFlags,
-    #[strum(serialize = "register_relayer")]
-    RegisterRelayer,
-    #[strum(serialize = "exit_to_near_precompile_callback")]
-    ExitToNear,
-    #[strum(serialize = "set_eth_connector_contract_data")]
-    SetConnectorData,
-    #[strum(serialize = "new_eth_connector")]
-    NewConnector,
-    #[strum(serialize = "new")]
-    NewEngine,
-    #[strum(serialize = "factory_update")]
-    FactoryUpdate,
-    #[strum(serialize = "factory_update_address_version")]
-    FactoryUpdateAddressVersion,
-    #[strum(serialize = "factory_set_wnear_address")]
-    FactorySetWNearAddress,
-    #[strum(serialize = "set_owner")]
-    SetOwner,
-    #[strum(serialize = "submit_with_args")]
-    SubmitWithArgs,
-    #[strum(serialize = "set_upgrade_delay_blocks")]
-    SetUpgradeDelayBlocks,
-    #[strum(serialize = "fund_xcc_sub_account")]
-    FundXccSubAccount,
-    #[strum(serialize = "pause_contract")]
-    PauseContract,
-    #[strum(serialize = "resume_contract")]
-    ResumeContract,
-    #[strum(serialize = "set_key_manager")]
-    SetKeyManager,
-    #[strum(serialize = "add_relayer_key")]
-    AddRelayerKey,
-    #[strum(serialize = "store_relayer_key_callback")]
-    StoreRelayerKeyCallback,
-    #[strum(serialize = "remove_relayer_key")]
-    RemoveRelayerKey,
-    #[strum(serialize = "start_hashchain")]
-    StartHashchain,
-    #[strum(serialize = "set_erc20_metadata")]
-    SetErc20Metadata,
-    #[strum(serialize = "set_eth_connector_contract_account")]
-    SetEthConnectorContractAccount,
-    #[strum(serialize = "set_fixed_gas")]
-    SetFixedGas,
-    #[strum(serialize = "set_erc20_fallback_address")]
-    SetErc20FallbackAddress,
-    #[strum(serialize = "set_silo_params")]
-    SetSiloParams,
-    #[strum(serialize = "set_whitelist_status")]
-    SetWhitelistStatus,
-    #[strum(serialize = "set_whitelists_statuses")]
-    SetWhitelistsStatuses,
-    #[strum(serialize = "add_entry_to_whitelist")]
-    AddEntryToWhitelist,
-    #[strum(serialize = "add_entry_to_whitelist_batch")]
-    AddEntryToWhitelistBatch,
-    #[strum(serialize = "remove_entry_from_whitelist")]
-    RemoveEntryFromWhitelist,
-    #[strum(serialize = "mirror_erc20_token_callback")]
-    MirrorErc20TokenCallback,
-    #[strum(serialize = "withdraw_wnear_to_router")]
-    WithdrawWnearToRouter,
-    Unknown,
-}
-
 impl TransactionKind {
     #[must_use]
     pub fn raw_bytes(&self) -> Vec<u8> {
         self.args.clone()
-    }
-}
-
-/// Used to make sure `TransactionKindTag` is kept in sync with `TransactionKind`
-impl From<&TransactionKind> for TransactionKindTag {
-    fn from(tx: &TransactionKind) -> Self {
-        tx.method_name
     }
 }
 
@@ -495,7 +369,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 struct BorshableTransactionKind<'a> {
-    method_name: TransactionKindTag,
+    method_name: String,
     args: Cow<'a, [u8]>,
     #[allow(clippy::option_option)]
     promise_result: Option<Option<Cow<'a, [u8]>>>,
@@ -504,7 +378,7 @@ struct BorshableTransactionKind<'a> {
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
     fn from(t: &'a TransactionKind) -> Self {
         BorshableTransactionKind {
-            method_name: t.method_name,
+            method_name: t.method_name.clone(),
             args: Cow::Borrowed(&t.args),
             promise_result: match &t.promise_result {
                 Some(PromiseResult::Successful(v)) => Some(Some(Cow::Borrowed(v))),

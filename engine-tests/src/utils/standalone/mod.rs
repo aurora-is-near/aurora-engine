@@ -255,8 +255,7 @@ impl StandaloneRunner {
                 PromiseResult::Failed | PromiseResult::NotReady => None,
             })
             .collect();
-        let transaction_kind = TransactionKind::new(method_name, ctx.input.clone(), &promise_data)
-            .expect("All method names must be known by standalone");
+        let transaction_kind = TransactionKind::new(method_name, ctx.input.clone(), &promise_data);
 
         let transaction_hash = if let Some(args) = transaction_kind.get_submit_args() {
             aurora_engine_sdk::keccak(&args.tx_data)
