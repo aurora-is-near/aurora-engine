@@ -1,10 +1,27 @@
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-use std::collections::{btree_map, BTreeMap};
+use std::{
+    collections::{btree_map, BTreeMap},
+    fmt,
+};
 
-#[derive(Debug, Default, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[derive(Default, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 /// Collection of Engine state keys which changed by executing a transaction.
 pub struct Diff(BTreeMap<Vec<u8>, DiffValue>);
+
+impl fmt::Debug for Diff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut f = f.debug_struct("Diff");
+        for (k, v) in &self.0 {
+            let v = match v {
+                DiffValue::Deleted => "delete".to_owned(),
+                DiffValue::Modified(v) => format!("modify: {}", hex::encode(v)),
+            };
+            f.field(&hex::encode(k), &v);
+        }
+        f.finish()
+    }
+}
 
 #[derive(Debug, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 #[borsh(crate = "aurora_engine_types::borsh")]

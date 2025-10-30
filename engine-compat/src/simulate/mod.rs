@@ -38,7 +38,7 @@ where
     } = io
         .read_input()
         .to_value()
-        .expect("Failed to deserialize EthCallInput");
+        .expect("Failed to deserialize SimulateEthCallArgs");
 
     let current_nonce = engine::get_nonce(&io, &from).low_u64();
     let mut local_io = io;

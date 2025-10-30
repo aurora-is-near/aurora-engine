@@ -17,8 +17,8 @@ crate-type = ["cdylib"]
 panic = "abort"
 
 [dependencies]
-aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract"] }
-aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract"] }
+aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract", "log"] }
+aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract", "log"] }
 aurora-engine-modexp = { workspace = true, optional = true }
 aurora-engine-transactions = { workspace = true, optional = true }
 aurora-engine-types = { workspace = true, optional = true, default-features = false }
