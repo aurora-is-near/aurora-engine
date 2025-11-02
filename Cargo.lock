@@ -304,6 +304,8 @@ dependencies = [
  "borsh 1.3.1",
  "engine-standalone-tracing",
  "primitive-types 0.12.2",
+ "serde",
+ "serde_json",
  "wee_alloc",
 ]
 

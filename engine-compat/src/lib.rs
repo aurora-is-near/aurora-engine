@@ -99,9 +99,9 @@ mod simulate;
 
 #[cfg(feature = "contract")]
 mod contract {
-    use alloc::{boxed::Box, format, string::String, vec::Vec};
+    use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
 
-    use aurora_engine::contract_methods::{self, ContractError};
+    use aurora_engine::{contract_methods, errors::ERR_SERIALIZE};
     use aurora_engine_sdk::{io::IO, near_runtime::Runtime, types::SdkUnwrap};
     use aurora_engine_types::parameters::{engine::TransactionExecutionResult, silo::FixedGasArgs};
 
@@ -118,111 +118,134 @@ mod contract {
             return;
         };
 
-        let out = dbg::Runtime::trace(|| match method.as_str() {
+        let result = dbg::Runtime::trace(|| match method.as_str() {
             "submit" => contract_methods::evm_transactions::submit(io, &env, &mut handler)
                 .map(TransactionExecutionResult::Submit)
-                .map(Some),
+                .map(Some)
+                .map_err(|err| format!("{err:?}")),
             "submit_with_args" => {
                 contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
                     .map(TransactionExecutionResult::Submit)
                     .map(Some)
+                    .map_err(|err| format!("{err:?}"))
             }
             "call" => contract_methods::evm_transactions::call(io, &env, &mut handler)
                 .map(TransactionExecutionResult::Submit)
-                .map(Some),
+                .map(Some)
+                .map_err(|err| format!("{err:?}")),
             "deploy_code" => {
                 contract_methods::evm_transactions::deploy_code(io, &env, &mut handler)
                     .map(TransactionExecutionResult::Submit)
                     .map(Some)
+                    .map_err(|err| format!("{err:?}"))
             }
             "deploy_erc20_token" => {
                 contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
                     .map(TransactionExecutionResult::DeployErc20)
                     .map(Some)
+                    .map_err(|err| format!("{err:?}"))
             }
             "ft_on_transfer" => contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
-                .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Submit)),
+                .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Submit))
+                .map_err(|err| format!("{err:?}")),
             "ft_transfer_call" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::ft_transfer_call(io, &env, &mut handler)
-                    .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Promise)),
+                    .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Promise))
+                    .map_err(|err| format!("{err:?}")),
             },
             "ft_resolve_transfer" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::ft_resolve_transfer(io, &env, &mut handler)
-                    .map(|()| None),
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "ft_transfer" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
-                () => contract_methods::connector::ft_transfer(io, &env).map(|()| None),
+                () => contract_methods::connector::ft_transfer(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "withdraw" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
-                () => contract_methods::connector::withdraw(io, &env).map(|()| None),
+                () => contract_methods::connector::withdraw(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "deposit" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::deposit(io, &env, &mut handler)
-                    .map(|x| x.map(TransactionExecutionResult::Promise)),
+                    .map(|x| x.map(TransactionExecutionResult::Promise))
+                    .map_err(|err| format!("{err:?}")),
             },
             "finish_deposit" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::finish_deposit(io, &env, &mut handler)
-                    .map(|x| x.map(TransactionExecutionResult::Promise)),
+                    .map(|x| x.map(TransactionExecutionResult::Promise))
+                    .map_err(|err| format!("{err:?}")),
             },
             "storage_deposit" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::storage_deposit(io, &env, &mut handler)
-                    .map(|()| None),
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "storage_unregister" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::storage_unregister(io, &env, &mut handler)
-                    .map(|()| None),
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "storage_withdraw" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
-                () => contract_methods::connector::storage_withdraw(io, &env).map(|()| None),
+                () => contract_methods::connector::storage_withdraw(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "set_paused_flags" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
-                () => contract_methods::connector::set_paused_flags(io, &env).map(|()| None),
+                () => contract_methods::connector::set_paused_flags(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
-            "register_relayer" => {
-                contract_methods::admin::register_relayer(io, &env).map(|()| None)
-            }
+            "register_relayer" => contract_methods::admin::register_relayer(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "set_eth_connector_contract_data" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
                 () => contract_methods::connector::set_eth_connector_contract_data(io, &env)
-                    .map(|()| None),
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "new_eth_connector" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => Ok(None),
                 #[cfg(not(feature = "ext-connector"))]
-                () => contract_methods::connector::new_eth_connector(io, &env).map(|()| None),
+                () => contract_methods::connector::new_eth_connector(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
             },
             "unknown" => Ok(None),
             "exit_to_near_precompile_callback" => {
@@ -232,54 +255,81 @@ mod contract {
                     &mut handler,
                 )
                 .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Submit))
+                .map_err(|err| format!("{err:?}"))
             }
-            "new" => contract_methods::admin::new(io, &env).map(|()| None),
+            "new" => contract_methods::admin::new(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "set_eth_connector_contract_account" => match () {
                 #[cfg(feature = "ext-connector")]
                 () => contract_methods::connector::set_eth_connector_contract_account(io, &env)
-                    .map(|()| None),
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}")),
                 #[cfg(not(feature = "ext-connector"))]
                 () => Ok(None),
             },
-            "factory_update" => contract_methods::xcc::factory_update(io, &env).map(|()| None),
+            "factory_update" => contract_methods::xcc::factory_update(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "factory_update_address_version" => {
                 contract_methods::xcc::factory_update_address_version(io, &env, &handler)
                     .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
             "factory_set_wnear_address" => {
-                contract_methods::xcc::factory_set_wnear_address(io, &env).map(|()| None)
+                contract_methods::xcc::factory_set_wnear_address(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
             "fund_xcc_sub_account" => {
-                contract_methods::xcc::fund_xcc_sub_account(io, &env, &mut handler).map(|()| None)
+                contract_methods::xcc::fund_xcc_sub_account(io, &env, &mut handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
             "withdraw_wnear_to_router" => {
                 contract_methods::xcc::withdraw_wnear_to_router(io, &env, &mut handler)
                     .map(TransactionExecutionResult::Submit)
                     .map(Some)
+                    .map_err(|err| format!("{err:?}"))
             }
-            "pause_precompiles" => {
-                contract_methods::admin::pause_precompiles(io, &env).map(|()| None)
-            }
-            "resume_precompiles" => {
-                contract_methods::admin::resume_precompiles(io, &env).map(|()| None)
-            }
-            "set_owner" => contract_methods::admin::set_owner(io, &env).map(|()| None),
+            "pause_precompiles" => contract_methods::admin::pause_precompiles(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "resume_precompiles" => contract_methods::admin::resume_precompiles(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_owner" => contract_methods::admin::set_owner(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "set_upgrade_delay_blocks" => {
-                contract_methods::admin::set_upgrade_delay_blocks(io, &env).map(|()| None)
+                contract_methods::admin::set_upgrade_delay_blocks(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
-            "pause_contract" => contract_methods::admin::pause_contract(io, &env).map(|()| None),
-            "resume_contract" => contract_methods::admin::resume_contract(io, &env).map(|()| None),
-            "set_key_manager" => contract_methods::admin::set_key_manager(io, &env).map(|()| None),
-            "add_relayer_key" => {
-                contract_methods::admin::add_relayer_key(io, &env, &mut handler).map(|()| None)
-            }
+            "pause_contract" => contract_methods::admin::pause_contract(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "resume_contract" => contract_methods::admin::resume_contract(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_key_manager" => contract_methods::admin::set_key_manager(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "add_relayer_key" => contract_methods::admin::add_relayer_key(io, &env, &mut handler)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "remove_relayer_key" => {
-                contract_methods::admin::remove_relayer_key(io, &env, &mut handler).map(|()| None)
+                contract_methods::admin::remove_relayer_key(io, &env, &mut handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
-            "start_hashchain" => contract_methods::admin::start_hashchain(io, &env).map(|()| None),
+            "start_hashchain" => contract_methods::admin::start_hashchain(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "set_erc20_metadata" => {
                 contract_methods::connector::set_erc20_metadata(io, &env, &mut handler)
                     .map(|_| None)
+                    .map_err(|err| format!("{err:?}"))
             }
             "set_fixed_gas" => {
                 let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
@@ -314,16 +364,19 @@ mod contract {
             "mirror_erc20_token_callback" => {
                 contract_methods::connector::mirror_erc20_token_callback(io, &env, &mut handler)
                     .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
             }
-            "get_version" => contract_methods::admin::get_version(io).map(|()| None),
+            "get_version" => contract_methods::admin::get_version(io)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
             "simulate_eth_call" => super::simulate::eth_call(io, env)
                 .map(TransactionExecutionResult::Submit)
-                .map(Some),
-            _ => Err(ContractError {
-                message: Box::new(format!("Unknown method: {method}")),
-            }),
+                .map(Some)
+                .map_err(|err| {
+                    serde_json::to_string(&err).unwrap_or_else(|_| ERR_SERIALIZE.to_owned())
+                }),
+            _ => Err(format!("Unknown method: {method}")),
         });
-        let result = out.map_err(|err| format!("{err:?}"));
         // the type of the response must be: `Result<Option<TransactionExecutionResult>, String>`
         dbg::Runtime::write(b"borealis/result", result);
     }

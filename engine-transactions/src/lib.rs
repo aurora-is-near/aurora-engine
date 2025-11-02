@@ -200,7 +200,7 @@ fn init_code_cost(config: &evm::Config, data: &[u8]) -> Result<u64, Error> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Error {
     UnknownTransactionType,
     EmptyInput,
@@ -210,13 +210,49 @@ pub enum Error {
     EcRecover,
     GasOverflow,
     IntegerConversion,
-    #[cfg_attr(feature = "serde", serde(serialize_with = "decoder_err_to_str"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(serialize_with = "decoder_err_to_str"),
+        serde(deserialize_with = "decoder_str_to_err")
+    )]
     RlpDecodeError(DecoderError),
 }
 
 #[cfg(feature = "serde")]
 fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
-    ser.serialize_str(&format!("{err:?}"))
+    #[cfg(not(feature = "std"))]
+    use aurora_engine_types::ToString;
+
+    ser.serialize_str(&err.to_string())
+}
+
+#[cfg(feature = "serde")]
+fn decoder_str_to_err<'de, D: serde::Deserializer<'de>>(de: D) -> Result<DecoderError, D::Error> {
+    use aurora_engine_types::String;
+
+    use serde::Deserialize;
+
+    String::deserialize(de).and_then(|str| {
+        if str.starts_with("Custom") {
+            Ok(DecoderError::Custom(
+                "-- ommited, cannot marshal from wasm module --",
+            ))
+        } else {
+            match str.as_str() {
+                "RlpIsTooBig" => Ok(DecoderError::RlpIsTooBig),
+                "RlpIsTooShort" => Ok(DecoderError::RlpIsTooShort),
+                "RlpExpectedToBeList" => Ok(DecoderError::RlpExpectedToBeList),
+                "RlpExpectedToBeData" => Ok(DecoderError::RlpExpectedToBeData),
+                "RlpIncorrectListLen" => Ok(DecoderError::RlpIncorrectListLen),
+                "RlpDataLenWithZeroPrefix" => Ok(DecoderError::RlpDataLenWithZeroPrefix),
+                "RlpListLenWithZeroPrefix" => Ok(DecoderError::RlpListLenWithZeroPrefix),
+                "RlpInvalidIndirection" => Ok(DecoderError::RlpInvalidIndirection),
+                "RlpInconsistentLengthAndData" => Ok(DecoderError::RlpInconsistentLengthAndData),
+                "RlpInvalidLength" => Ok(DecoderError::RlpInvalidLength),
+                unexpected => Err(<D::Error as serde::de::Error>::custom(unexpected)),
+            }
+        }
+    })
 }
 
 impl Error {
