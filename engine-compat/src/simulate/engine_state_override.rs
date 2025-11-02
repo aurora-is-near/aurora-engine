@@ -39,7 +39,7 @@ where
     fn copy_to_slice(&self, buffer: &mut [u8]) {
         match self {
             StorageValueOverride::Cow(cow) => {
-                buffer.copy_from_slice(&cow);
+                buffer.copy_from_slice(cow);
             }
             StorageValueOverride::Original(original) => {
                 original.copy_to_slice(buffer);
@@ -59,19 +59,17 @@ where
     }
 
     fn return_output(&mut self, value: &[u8]) {
-        self.inner.return_output(value)
+        self.inner.return_output(value);
     }
 
     fn read_storage(&self, key: &[u8]) -> Option<Self::StorageValue> {
         fn deconstruct_storage_key(key: &[u8]) -> Option<(H160, H256)> {
-            const STORAGE_VERSION: u8 = storage::VersionPrefix::V1 as u8;
-            const STORAGE_PREFIX: u8 = storage::KeyPrefix::Storage as u8;
-
             let version = *key.first()?;
-            if version != STORAGE_VERSION {
-                panic!("Unexpected version");
-            }
-            if key.get(1)? == &STORAGE_PREFIX {
+            assert!(
+                version == u8::from(storage::VersionPrefix::V1),
+                "Unexpected version"
+            );
+            if *key.get(1)? == u8::from(storage::KeyPrefix::Storage) {
                 let key_len = key.len();
                 // Lengths are 54 or 58 bytes, depending on if the generation is present or not
                 if key_len == 54 {

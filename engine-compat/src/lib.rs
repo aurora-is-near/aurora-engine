@@ -314,7 +314,7 @@ mod contract {
             "get_version" => contract_methods::admin::get_version(io)
                 .map(|()| None)
                 .map_err(|err| format!("{err:?}")),
-            "simulate_eth_call" => super::simulate::eth_call(io, env)
+            "simulate_eth_call" => super::simulate::eth_call(io, &env)
                 .map(TransactionExecutionResult::Submit)
                 .map(Some)
                 .map_err(|err| {

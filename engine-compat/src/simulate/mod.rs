@@ -33,7 +33,7 @@ impl From<EngineError> for StateOrEngineError {
     }
 }
 
-pub fn eth_call<I, E>(io: I, env: E) -> Result<SubmitResult, StateOrEngineError>
+pub fn eth_call<I, E>(io: I, env: &E) -> Result<SubmitResult, StateOrEngineError>
 where
     I: IO + Send + Copy,
     E: Env,
@@ -103,7 +103,7 @@ where
         compute_call_result(
             override_io,
             env,
-            from.into(),
+            from,
             to,
             gas_limit,
             gas_price.into(),
@@ -117,7 +117,7 @@ where
 #[allow(clippy::too_many_arguments)]
 fn compute_call_result<I: IO + Copy, E: Env>(
     io: I,
-    env: E,
+    env: &E,
     from: Address,
     to: Option<Address>,
     gas_limit: GasLimit,
@@ -130,13 +130,8 @@ fn compute_call_result<I: IO + Copy, E: Env>(
     aurora_engine::state::get_state(&io)
         .map_err(|_err| StateOrEngineError::StateMissing)
         .and_then(|engine_state| {
-            let mut engine: Engine<_, _, AuroraModExp> = Engine::new_with_state(
-                engine_state,
-                from,
-                env.current_account_id().clone(),
-                io,
-                &env,
-            );
+            let mut engine: Engine<_, _, AuroraModExp> =
+                Engine::new_with_state(engine_state, from, env.current_account_id(), io, env);
             let fixed_gas_cost = aurora_engine::contract_methods::silo::get_fixed_gas(&io);
             let user_gas_limit = gas_limit.unlimited_user_defined_value();
             // If the user provided a gas limit in their request then we can charge gas
@@ -152,7 +147,7 @@ fn compute_call_result<I: IO + Copy, E: Env>(
                         value,
                         nonce,
                         fixed_gas_cost,
-                    )?
+                    )?;
                 }
             }
             let result = match to {
@@ -189,7 +184,7 @@ fn compute_call_result<I: IO + Copy, E: Env>(
                     value,
                     nonce,
                     fixed_gas_cost,
-                )?
+                )?;
             }
             result.map_err(From::from)
         })

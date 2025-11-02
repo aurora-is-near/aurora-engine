@@ -16,13 +16,13 @@ pub struct U256BorshWrapper(pub [u64; 4]);
 
 impl From<U256> for U256BorshWrapper {
     fn from(U256(v): U256) -> Self {
-        U256BorshWrapper(v)
+        Self(v)
     }
 }
 
 impl From<U256BorshWrapper> for U256 {
     fn from(U256BorshWrapper(v): U256BorshWrapper) -> Self {
-        U256(v)
+        Self(v)
     }
 }
 
@@ -31,13 +31,13 @@ pub struct H256BorshWrapper(pub [u8; 32]);
 
 impl From<H256> for H256BorshWrapper {
     fn from(H256(v): H256) -> Self {
-        H256BorshWrapper(v)
+        Self(v)
     }
 }
 
 impl From<H256BorshWrapper> for H256 {
     fn from(H256BorshWrapper(v): H256BorshWrapper) -> Self {
-        H256(v)
+        Self(v)
     }
 }
 

@@ -17,25 +17,26 @@ pub enum GasLimit {
 
 impl GasLimit {
     #[inline]
+    #[must_use]
     pub const fn value(self) -> u64 {
         match self {
-            Self::UserDefined(value) => value,
-            Self::Default(value) => value,
+            Self::UserDefined(value) | Self::Default(value) => value,
             Self::Limited { limit, .. } => limit,
         }
     }
 
     /// Get the user defined value (if any). This function
     /// ignores if an upper bound was imposed.
+    #[must_use]
     pub const fn unlimited_user_defined_value(self) -> Option<u64> {
         match self {
             Self::Default(_) => None,
-            Self::UserDefined(value) => Some(value),
-            Self::Limited { user_value, .. } => Some(user_value),
+            Self::UserDefined(user_value) | Self::Limited { user_value, .. } => Some(user_value),
         }
     }
 
     /// Impose an upper bound on the value of the gas limit.
+    #[must_use]
     pub const fn limited(self, limit: u64) -> Self {
         match self {
             Self::UserDefined(user_value) if user_value > limit => {

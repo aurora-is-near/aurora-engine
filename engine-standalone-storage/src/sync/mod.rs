@@ -167,7 +167,7 @@ where
 
     io.write_borsh(
         b"borealis/method",
-        &transaction_message.transaction.method_name.to_string(),
+        &transaction_message.transaction.method_name,
     );
     let maybe_result = runner
         .call_contract(promise_data, &env, io)

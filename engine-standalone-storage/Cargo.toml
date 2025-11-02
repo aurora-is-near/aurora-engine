@@ -26,7 +26,6 @@ rocksdb.workspace = true
 postgres.workspace = true
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
-strum.workspace = true
 thiserror.workspace = true
 
 [lints]
