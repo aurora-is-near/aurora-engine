@@ -62,7 +62,7 @@ pub fn current_address(current_account_id: &AccountId) -> Address {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EngineError {
     pub kind: EngineErrorKind,
     pub gas_used: u64,
@@ -82,7 +82,7 @@ impl AsRef<[u8]> for EngineError {
 
 /// Errors with the EVM engine.
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[cfg_attr(feature = "impl-serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "impl-serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum EngineErrorKind {
     /// Normal EVM errors.
     EvmError(ExitError),

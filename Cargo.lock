@@ -313,6 +313,8 @@ dependencies = [
  "borsh 1.5.7",
  "engine-standalone-tracing",
  "primitive-types 0.13.1",
+ "serde",
+ "serde_json",
  "wee_alloc",
 ]
 
@@ -476,9 +478,8 @@ dependencies = [
 
 [[package]]
 name = "aurora-evm"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c137cde01ce10801a70dc5352117a77fdab62281032b4536b646cf1044c38564"
+version = "2.0.0-rc.1"
+source = "git+https://github.com/aurora-is-near/aurora-evm.git?branch=v2.0.0-rc.1-serde-no-std#e7c79bc25650e0976ec8d549fcc3adf107e6fd43"
 dependencies = [
  "auto_impl",
  "environmental",
