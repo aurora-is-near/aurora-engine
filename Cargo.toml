@@ -31,7 +31,7 @@ bstr = "1"
 cargo-near-build = "0.4"
 criterion = "0.5"
 ethabi = { version = "18", default-features = false }
-aurora-evm = { version = "2.0.0-rc.1", default-features = false }
+aurora-evm = { git = "https://github.com/aurora-is-near/aurora-evm.git", branch = "v2.0.0-rc.1-serde-no-std", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.20"

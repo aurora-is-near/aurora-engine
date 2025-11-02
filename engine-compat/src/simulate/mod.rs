@@ -3,7 +3,6 @@ mod engine_state_override;
 use alloc::{collections::BTreeMap, vec::Vec};
 
 use aurora_engine::{
-    contract_methods::ContractError,
     engine::{self, Engine, EngineError, EngineErrorKind},
     parameters::SubmitResult,
 };
@@ -21,7 +20,21 @@ use primitive_types::U256;
 
 use self::engine_state_override::StorageOverride;
 
-pub fn eth_call<I, E>(io: I, env: E) -> Result<SubmitResult, ContractError>
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+
+pub enum StateOrEngineError {
+    StateMissing,
+
+    Engine(EngineError),
+}
+
+impl From<EngineError> for StateOrEngineError {
+    fn from(value: EngineError) -> Self {
+        Self::Engine(value)
+    }
+}
+
+pub fn eth_call<I, E>(io: I, env: E) -> Result<SubmitResult, StateOrEngineError>
 where
     I: IO + Send + Copy,
     E: Env,
@@ -113,10 +126,10 @@ fn compute_call_result<I: IO + Copy, E: Env>(
     value: Wei,
     data: Vec<u8>,
     nonce: Option<u64>,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<SubmitResult, StateOrEngineError> {
     let mut handler = aurora_engine_sdk::promise::Noop;
     aurora_engine::state::get_state(&io)
-        .map_err(|err| ContractError::from(err))
+        .map_err(|_err| StateOrEngineError::StateMissing)
         .and_then(|engine_state| {
             let mut engine: Engine<_, _, AuroraModExp> = Engine::new_with_state(
                 engine_state,
