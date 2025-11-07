@@ -11,6 +11,7 @@ use engine_standalone_storage::{
         types::{TransactionKind, TransactionMessage},
         TransactionIncludedOutcome,
     },
+    wasmer_runner::WasmerRunner,
     BlockMetadata, Diff, Storage,
 };
 use engine_standalone_tracing::{TraceKind, TraceLog};
@@ -30,6 +31,7 @@ pub struct StandaloneRunner {
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
     pub wasm_runner: utils::runner::ContractRunner,
+    pub wasmer_runner: WasmerRunner,
 }
 
 impl StandaloneRunner {
@@ -165,7 +167,7 @@ impl StandaloneRunner {
             0,
             trace_kind,
             storage,
-            &self.wasm_runner,
+            &mut self.wasmer_runner,
             env,
             &mut self.cumulative_diff,
             &[],
@@ -187,7 +189,7 @@ impl StandaloneRunner {
             0,
             trace_kind,
             storage,
-            &self.wasm_runner,
+            &mut self.wasmer_runner,
             env,
             &mut self.cumulative_diff,
             &[],
@@ -391,7 +393,7 @@ impl StandaloneRunner {
         transaction_position: u16,
         trace_kind: Option<TraceKind>,
         storage: &mut Storage,
-        runner: &utils::runner::ContractRunner,
+        runner: &mut WasmerRunner,
         env: &env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
@@ -406,10 +408,8 @@ impl StandaloneRunner {
         );
         tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
 
-        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-            storage, runner, tx_msg, trace_kind,
-        )
-        .unwrap();
+        let outcome =
+            sync::execute_transaction_message_wasmer(storage, runner, tx_msg, trace_kind).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -455,6 +455,16 @@ impl Default for StandaloneRunner {
         storage
             .set_engine_account_id(&env.current_account_id)
             .unwrap();
+
+        let mut wasmer_runner = WasmerRunner::new(storage.clone());
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../bin/aurora-engine-compat.wasm"
+        );
+        wasmer_runner
+            .set_code(std::fs::read(path).unwrap())
+            .unwrap();
+
         Self {
             storage_dir,
             storage,
@@ -462,6 +472,7 @@ impl Default for StandaloneRunner {
             chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
             wasm_runner: utils::runner::ContractRunner::bundled(),
+            wasmer_runner,
         }
     }
 }

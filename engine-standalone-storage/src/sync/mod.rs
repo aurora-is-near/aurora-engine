@@ -17,7 +17,7 @@ pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::runner::AbstractContractRunner;
-use crate::{BlockMetadata, Diff, Storage};
+use crate::{wasmer_runner::WasmerRunner, BlockMetadata, Diff, DiffValue, Storage};
 use types::{Message, TransactionMessage};
 
 /// Note: this function does not automatically commit transaction messages to the storage.
@@ -77,6 +77,90 @@ where
             )))
         }
     }
+}
+
+pub fn execute_transaction_message_wasmer(
+    storage: &Storage,
+    runner: &mut WasmerRunner,
+    transaction_message: TransactionMessage,
+    trace_kind: Option<TraceKind>,
+) -> Result<TransactionIncludedOutcome, crate::Error> {
+    let transaction_position = transaction_message.position;
+    let block_hash = transaction_message.block_hash;
+    let block_height = storage.get_block_height_by_hash(block_hash)?;
+    let block_metadata = storage.get_block_metadata(block_hash)?;
+    let engine_account_id = storage.get_engine_account_id()?;
+    let raw_input = transaction_message.transaction.args.clone();
+    let signer_account_id = transaction_message.signer.clone();
+    let predecessor_account_id = transaction_message.caller.clone();
+    let near_receipt_id = transaction_message.near_receipt_id;
+    let current_account_id = engine_account_id;
+    let random_seed = compute_random_seed(
+        &transaction_message.action_hash,
+        &block_metadata.random_seed,
+    );
+    let env = env::Fixed {
+        signer_account_id,
+        current_account_id,
+        predecessor_account_id,
+        block_height,
+        block_timestamp: block_metadata.timestamp,
+        attached_deposit: transaction_message.attached_near,
+        random_seed,
+        prepaid_gas: transaction_message.prepaid_gas,
+        used_gas: NearGas::new(0),
+    };
+
+    let tx_hash = match transaction_message.transaction.method_name.as_str() {
+        "submit" => aurora_engine_sdk::keccak(&transaction_message.transaction.args),
+        "submit_with_args" => {
+            let args = transaction_message.transaction.get_submit_args().unwrap();
+            aurora_engine_sdk::keccak(&args.tx_data)
+        }
+        _ => near_receipt_id,
+    };
+
+    let (mut diff, _output) = runner
+        .call_contract(
+            &transaction_message.transaction.method_name,
+            trace_kind,
+            &transaction_message.promise_data,
+            env,
+            block_height,
+            transaction_position,
+            raw_input,
+        )
+        .expect("todo: workout error");
+
+    type R = Result<Option<TransactionExecutionResult>, String>;
+
+    let value = diff
+        .get(b"borealis/result")
+        .and_then(DiffValue::value)
+        .unwrap();
+    let value = value.to_vec();
+    let mut value_slice = value.as_slice();
+    let maybe_result = <R as BorshDeserialize>::deserialize(&mut value_slice)
+        .unwrap()
+        .map_err(ExecutionError::Inner);
+
+    // let value = io.read_storage(b"borealis/transaction_tracing");
+    // let trace_log = value.and_then(|v| v.to_value().ok());
+    // let value = io.read_storage(b"borealis/call_frame_tracing");
+    // let call_tracer = value.and_then(|v| v.to_value().ok());
+    // let value = io.read_storage(b"borealis/custom_debug_info");
+    // let custom_debug_info = value.map(|x| x.as_ref().to_vec());
+    diff.retain(|key, _| !key.starts_with(b"borealis/"));
+
+    Ok(TransactionIncludedOutcome {
+        hash: tx_hash,
+        info: transaction_message,
+        diff,
+        maybe_result,
+        trace_log: None,
+        call_tracer: None,
+        custom_debug_info: None,
+    })
 }
 
 pub fn execute_transaction_message<M: ModExpAlgorithm + 'static, R>(

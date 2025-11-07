@@ -22,11 +22,17 @@ aurora-engine-transactions = { workspace = true, features = ["std"] }
 aurora-engine-types = { workspace = true, features = ["std"] }
 engine-standalone-tracing.workspace = true
 hex = { workspace = true, features = ["std"] }
+libsecp256k1.workspace = true
+ripemd.workspace = true
 rocksdb.workspace = true
+parking_lot.workspace = true
 postgres.workspace = true
 serde = { workspace = true, features = ["std"] }
 serde_json = { workspace = true, features = ["std"] }
+sha2.workspace = true
+sha3.workspace = true
 thiserror.workspace = true
+wasmer.workspace = true
 
 [lints]
 workspace = true
