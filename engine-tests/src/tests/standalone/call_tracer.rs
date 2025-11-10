@@ -249,7 +249,7 @@ fn test_trace_contract_with_precompile_sub_call() {
     assert_eq!(call_tracer.call_stack.len(), 1);
 
     let trace = call_tracer.call_stack.pop().unwrap();
-    assert_eq!(trace.calls.len(), 8);
+    assert_eq!(trace.calls.len(), 9);
     for call in trace.calls {
         assert!(call.calls.is_empty());
     }

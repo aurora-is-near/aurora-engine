@@ -48,7 +48,6 @@ near-sdk = "5"
 near-vm-runner = { version = "0.31", features = ["wasmtime_vm", "near_vm"] }
 near-workspaces = "0.21"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
-parking_lot = "0.12.5"
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 rand = "0.8"

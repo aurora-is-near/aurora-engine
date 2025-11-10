@@ -138,6 +138,39 @@ impl WasmerRunner {
             .unwrap_or_default()
         }
 
+        fn alt_bn128_g1_sum(
+            env: FunctionEnvMut<WasmEnv>,
+            value_len: u64,
+            value_ptr: u64,
+            register_id: u64,
+        ) {
+            with_env(env, |state, memory, _storage| {
+                state.alt_bn128_g1_sum(memory, value_len, value_ptr, register_id);
+            });
+        }
+
+        fn alt_bn128_g1_multiexp(
+            env: FunctionEnvMut<WasmEnv>,
+            value_len: u64,
+            value_ptr: u64,
+            register_id: u64,
+        ) {
+            with_env(env, |state, memory, _storage| {
+                state.alt_bn128_g1_multiexp(memory, value_len, value_ptr, register_id);
+            });
+        }
+
+        fn alt_bn128_pairing_check(
+            env: FunctionEnvMut<WasmEnv>,
+            value_len: u64,
+            value_ptr: u64,
+        ) -> u64 {
+            with_env(env, |state, memory, _storage| {
+                state.alt_bn128_pairing_check(memory, value_len, value_ptr)
+            })
+            .unwrap_or_default()
+        }
+
         fn value_return(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) {
             with_env(env, |state, memory, _storage| {
                 state.value_return(memory, value_len, value_ptr);
@@ -153,23 +186,23 @@ impl WasmerRunner {
                 "current_account_id" => Function::new_typed_with_env(&mut store, &env, current_account_id),
                 "signer_account_id" => Function::new_typed_with_env(&mut store, &env, signer_account_id),
                 "signer_account_pk" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _register_id: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `signer_account_pk` is not implemented");
                 }),
                 "predecessor_account_id" => Function::new_typed_with_env(&mut store, &env, predecessor_account_id),
                 "input" => Function::new_typed_with_env(&mut store, &env, |mut env: FunctionEnvMut<WasmEnv>, register_id: u64| env.data_mut().state.input(register_id)),
                 "block_index" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>| env.data().state.block_index()),
                 "block_timestamp" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>| env.data().state.block_timestamp()),
                 "epoch_height" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `epoch_height` is not implemented");
                     0u64
                 }),
                 "storage_usage" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `storage_usage` is not implemented");
                     0u64
                 }),
                 // Economics API
                 "account_balance" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _balance_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `account_balance` is not implemented");
                 }),
                 "attached_deposit" => Function::new_typed_with_env(&mut store, &env, attached_deposit),
                 "prepaid_gas" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>| env.data().state.prepaid_gas()),
@@ -180,16 +213,9 @@ impl WasmerRunner {
                 "keccak256" => Function::new_typed_with_env(&mut store, &env, digest::<sha3::Keccak256>),
                 "ripemd160" => Function::new_typed_with_env(&mut store, &env, digest::<ripemd::Ripemd160>),
                 "ecrecover" => Function::new_typed_with_env(&mut store, &env, ecrecover),
-                "alt_bn128_g1_sum" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _value_len: u64, _value_ptr: u64, _register_id: u64| {
-                    // Not implemented
-                }),
-                "alt_bn128_g1_multiexp" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _value_len: u64, _value_ptr: u64, _register_id: u64| {
-                    // Not implemented
-                }),
-                "alt_bn128_pairing_check" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _value_len: u64, _value_ptr: u64| {
-                    // Not implemented
-                    0u64
-                }),
+                "alt_bn128_g1_sum" => Function::new_typed_with_env(&mut store, &env, alt_bn128_g1_sum),
+                "alt_bn128_g1_multiexp" => Function::new_typed_with_env(&mut store, &env, alt_bn128_g1_multiexp),
+                "alt_bn128_pairing_check" => Function::new_typed_with_env(&mut store, &env, alt_bn128_pairing_check),
                 // Miscellaneous API
                 "value_return" => Function::new_typed_with_env(&mut store, &env, value_return),
                 "panic" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>| {
@@ -198,7 +224,7 @@ impl WasmerRunner {
                 "panic_utf8" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>, len: u64, ptr: u64| with_env(env, |st, memory, _| st.panic_utf8(memory, len, ptr)).unwrap_or_default()),
                 "log_utf8" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>, len: u64, ptr: u64| with_env(env, |st, memory, _| st.log_utf8(memory, len, ptr)).unwrap_or_default()),
                 "log_utf16" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _len: u64, _ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `log_utf16` is not implemented");
                 }),
                 "abort" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, msg_ptr: u32, filename_ptr: u32, line: u32, col: u32| {
                     let _ = (msg_ptr, filename_ptr, line, col);
@@ -206,52 +232,52 @@ impl WasmerRunner {
                 }),
                 // Promises API
                 "promise_create" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _account_id_len: u64, _account_id_ptr: u64, _method_name_len: u64, _method_name_ptr: u64, _arguments_len: u64, _arguments_ptr: u64, _amount_ptr: u64, _gas: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_create` is not implemented");
                     0u64
                 }),
                 "promise_then" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _account_id_len: u64, _account_id_ptr: u64, _method_name_len: u64, _method_name_ptr: u64, _arguments_len: u64, _arguments_ptr: u64, _amount_ptr: u64, _gas: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_then` is not implemented");
                     0u64
                 }),
                 "promise_and" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_idx_ptr: u64, _promise_idx_count: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_and` is not implemented");
                     0u64
                 }),
                 "promise_batch_create" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _account_id_len: u64, _account_id_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_create` is not implemented");
                     0u64
                 }),
                 "promise_batch_then" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _account_id_len: u64, _account_id_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_then` is not implemented");
                     0u64
                 }),
                 // Promise API actions
                 "promise_batch_action_create_account" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_create_account` is not implemented");
                 }),
                 "promise_batch_action_deploy_contract" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _code_len: u64, _code_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_deploy_contract` is not implemented");
                 }),
                 "promise_batch_action_function_call" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _method_name_len: u64, _method_name_ptr: u64, _arguments_len: u64, _arguments_ptr: u64, _amount_ptr: u64, _gas: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_function_call` is not implemented");
                 }),
                 "promise_batch_action_transfer" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _amount_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_transfer` is not implemented");
                 }),
                 "promise_batch_action_stake" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _amount_ptr: u64, _public_key_len: u64, _public_key_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_stake` is not implemented");
                 }),
                 "promise_batch_action_add_key_with_full_access" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _public_key_len: u64, _public_key_ptr: u64, _nonce: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_add_key_with_full_access` is not implemented");
                 }),
                 "promise_batch_action_add_key_with_function_call" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _public_key_len: u64, _public_key_ptr: u64, _nonce: u64, _allowance_ptr: u64, _receiver_id_len: u64, _receiver_id_ptr: u64, _method_names_len: u64, _method_names_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_add_key_with_function_call` is not implemented");
                 }),
                 "promise_batch_action_delete_key" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _public_key_len: u64, _public_key_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_delete_key` is not implemented");
                 }),
                 "promise_batch_action_delete_account" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _promise_index: u64, _beneficiary_id_len: u64, _beneficiary_id_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `promise_batch_action_delete_account` is not implemented");
                 }),
                 // Promise API results
                 "promise_results_count" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>| env.data().state.promise_results_count()),
@@ -266,23 +292,23 @@ impl WasmerRunner {
                 "storage_remove" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>, key_len: u64, key_ptr: u64, register_id: u64| with_env(env, |st, memory, storage| st.storage_remove(memory, storage, key_len, key_ptr, register_id)).unwrap_or_default()),
                 "storage_has_key" => Function::new_typed_with_env(&mut store, &env, |env: FunctionEnvMut<WasmEnv>, key_len: u64, key_ptr: u64| with_env(env, |st, memory, storage| st.storage_has_key(memory, storage, key_len, key_ptr)).unwrap_or_default()),
                 "storage_iter_prefix" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _prefix_len: u64, _prefix_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `storage_iter_prefix` is not implemented");
                     0u64
                 }),
                 "storage_iter_range" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _from_len: u64, _from_ptr: u64, _to_len: u64, _to_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `storage_iter_range` is not implemented");
                     0u64
                 }),
                 "storage_iter_next" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _iterator_id: u64, _key_register_id: u64, _value_register_id: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `storage_iter_next` is not implemented");
                     0u64
                 }),
                 // Validator API
                 "validator_stake" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _account_id_len: u64, _account_id_ptr: u64, _stake_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `validator_stake` is not implemented");
                 }),
                 "validator_total_stake" => Function::new_typed_with_env(&mut store, &env, |_env: FunctionEnvMut<WasmEnv>, _stake_ptr: u64| {
-                    // Not implemented
+                    eprintln!("LOG: the host function `validator_total_stake` is not implemented");
                 }),
             }
         };
@@ -400,8 +426,13 @@ pub mod state {
 
     use std::{borrow::Cow, iter};
 
+    use aurora_engine_precompiles::{
+        alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair},
+        Byzantium, Precompile,
+    };
     use aurora_engine_sdk::env::Fixed;
-    use aurora_engine_types::borsh;
+    use aurora_engine_types::{borsh, H160, U256};
+    use aurora_evm::Context;
     use engine_standalone_tracing::TraceKind;
     use sha2::digest::{FixedOutput, Update};
     use wasmer::MemoryView;
@@ -690,6 +721,110 @@ pub mod state {
             );
 
             Ok(())
+        }
+
+        pub fn alt_bn128_g1_sum(
+            &mut self,
+            memory: &MemoryView<'_>,
+            value_len: u64,
+            value_ptr: u64,
+            register_id: u64,
+        ) {
+            let mut input = self.get_data(memory, value_ptr, value_len);
+            input.remove(0);
+            input.remove(64);
+            // endianness
+            input[0x00..0x20].reverse();
+            input[0x20..0x40].reverse();
+            input[0x40..0x60].reverse();
+            input[0x60..0x80].reverse();
+            let precompile = Bn256Add::<Byzantium>::new();
+            let context = Context {
+                address: H160::default(),
+                caller: H160::default(),
+                apparent_value: U256::default(),
+            };
+            let mut output = precompile
+                .run(&input, None, &context, false)
+                .inspect_err(|err| eprintln!("{err:?}"))
+                .map_or(vec![0; 0x40], |x| x.output);
+            // swap endianness
+            output[0x00..0x20].reverse();
+            output[0x20..0x40].reverse();
+            Self::set_reg(&mut self.registers, register_id, output.into());
+        }
+
+        pub fn alt_bn128_g1_multiexp(
+            &mut self,
+            memory: &MemoryView<'_>,
+            value_len: u64,
+            value_ptr: u64,
+            register_id: u64,
+        ) {
+            let mut input = self.get_data(memory, value_ptr, value_len);
+            input[0x00..0x20].reverse();
+            input[0x20..0x40].reverse();
+            input[0x40..0x60].reverse();
+
+            let precompile = Bn256Mul::<Byzantium>::new();
+            let context = Context {
+                address: H160::default(),
+                caller: H160::default(),
+                apparent_value: U256::default(),
+            };
+            let mut output = precompile
+                .run(&input, None, &context, false)
+                .inspect_err(|err| eprintln!("{err:?}"))
+                .map_or(vec![0; 0x40], |x| x.output);
+            // swap endianness
+            output[0x00..0x20].reverse();
+            output[0x20..0x40].reverse();
+            Self::set_reg(&mut self.registers, register_id, output.into());
+        }
+
+        pub fn alt_bn128_pairing_check(
+            &mut self,
+            memory: &MemoryView<'_>,
+            value_len: u64,
+            value_ptr: u64,
+        ) -> u64 {
+            let mut input = self.get_data(memory, value_ptr, value_len);
+            dbg!(hex::encode(&input));
+            input.chunks_mut(0x20).for_each(<[u8]>::reverse);
+            for pair in input.chunks_mut(0xc0) {
+                let mut b = [0; 0x20];
+                b.clone_from_slice(&pair[0x40..][..0x20]);
+                let mut c = [0; 0x20];
+                c.clone_from_slice(&pair[0x60..][..0x20]);
+                pair[0x40..][..0x20].clone_from_slice(&c);
+                pair[0x60..][..0x20].clone_from_slice(&b);
+
+                // is there more ergonomic swap of subslices?
+                let mut b = [0; 0x20];
+                b.clone_from_slice(&pair[0x80..][..0x20]);
+                let mut c = [0; 0x20];
+                c.clone_from_slice(&pair[0xa0..][..0x20]);
+                pair[0x80..][..0x20].clone_from_slice(&c);
+                pair[0xa0..][..0x20].clone_from_slice(&b);
+            }
+
+            let precompile = Bn256Pair::<Byzantium>::new();
+            let context = Context {
+                address: H160::default(),
+                caller: H160::default(),
+                apparent_value: U256::default(),
+            };
+            let output = precompile
+                .run(&input, None, &context, false)
+                .inspect_err(|err| eprintln!("{err:?}"))
+                .map_or(vec![0; 0x20], |x| x.output);
+
+            dbg!(hex::encode(&output));
+            if output == [0; 0x20] {
+                0
+            } else {
+                1
+            }
         }
 
         pub fn value_return(&mut self, memory: &MemoryView<'_>, value_len: u64, value_ptr: u64) {
