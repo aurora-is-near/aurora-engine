@@ -128,7 +128,7 @@ fn bench_modexp_standalone() {
             .submit_transaction(&signer.secret_key, bench_tx)
             .unwrap();
         let duration = start.elapsed();
-        let limit = Duration::from_secs(12);
+        let limit = Duration::from_secs(1);
 
         assert!(
             duration < limit,

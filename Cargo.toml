@@ -65,7 +65,7 @@ thiserror = "2"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.23"
-wasmer = { version = "6.1", features = ["llvm"] }
+wasmer = "6.1"
 wee_alloc = { version = "0.4", default-features = false }
 
 [workspace.lints.clippy]

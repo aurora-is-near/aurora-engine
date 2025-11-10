@@ -17,7 +17,8 @@ pub mod types;
 
 use crate::engine_state::EngineStateAccess;
 use crate::runner::AbstractContractRunner;
-use crate::{wasmer_runner::WasmerRunner, BlockMetadata, Diff, DiffValue, Storage};
+use crate::wasmer_runner::WasmerRuntimeOutcome;
+use crate::{wasmer_runner::WasmerRunner, BlockMetadata, Diff, Storage};
 use types::{Message, TransactionMessage};
 
 /// Note: this function does not automatically commit transaction messages to the storage.
@@ -120,7 +121,14 @@ pub fn execute_transaction_message_wasmer(
         _ => near_receipt_id,
     };
 
-    let (mut diff, _output) = runner
+    let WasmerRuntimeOutcome {
+        diff,
+        maybe_result,
+        trace_log,
+        call_tracer,
+        custom_debug_info,
+        ..
+    } = runner
         .call_contract(
             &transaction_message.transaction.method_name,
             trace_kind,
@@ -132,34 +140,14 @@ pub fn execute_transaction_message_wasmer(
         )
         .expect("todo: workout error");
 
-    type R = Result<Option<TransactionExecutionResult>, String>;
-
-    let value = diff
-        .get(b"borealis/result")
-        .and_then(DiffValue::value)
-        .unwrap();
-    let value = value.to_vec();
-    let mut value_slice = value.as_slice();
-    let maybe_result = <R as BorshDeserialize>::deserialize(&mut value_slice)
-        .unwrap()
-        .map_err(ExecutionError::Inner);
-
-    // let value = io.read_storage(b"borealis/transaction_tracing");
-    // let trace_log = value.and_then(|v| v.to_value().ok());
-    // let value = io.read_storage(b"borealis/call_frame_tracing");
-    // let call_tracer = value.and_then(|v| v.to_value().ok());
-    // let value = io.read_storage(b"borealis/custom_debug_info");
-    // let custom_debug_info = value.map(|x| x.as_ref().to_vec());
-    diff.retain(|key, _| !key.starts_with(b"borealis/"));
-
     Ok(TransactionIncludedOutcome {
         hash: tx_hash,
         info: transaction_message,
         diff,
-        maybe_result,
-        trace_log: None,
-        call_tracer: None,
-        custom_debug_info: None,
+        maybe_result: maybe_result.map_err(ExecutionError::Inner),
+        trace_log,
+        call_tracer,
+        custom_debug_info,
     })
 }
 
