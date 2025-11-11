@@ -59,7 +59,7 @@ fn test_consume_deploy_message() {
         trace_kind: None,
     };
 
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -115,7 +115,7 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -158,7 +158,7 @@ fn test_consume_deploy_erc20_message() {
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -215,7 +215,7 @@ fn test_consume_ft_on_transfer_message() {
         trace_kind: None,
     };
 
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -262,7 +262,7 @@ fn test_consume_call_message() {
         trace_kind: None,
     };
 
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -317,7 +317,7 @@ fn test_consume_submit_message() {
         trace_kind: None,
     };
 
-    let outcome = sync::consume_message_wasmer::<false>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -362,7 +362,7 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     runner.init_evm();
 
     let block_message = sample_block();
-    sync::consume_message_wasmer::<false>(
+    sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Block(block_message.clone()),
     )

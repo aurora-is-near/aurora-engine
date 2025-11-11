@@ -45,7 +45,6 @@ const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 pub mod mocked_external;
 pub mod one_inch;
-pub mod runner;
 pub mod rust;
 pub mod solidity;
 pub mod standalone;

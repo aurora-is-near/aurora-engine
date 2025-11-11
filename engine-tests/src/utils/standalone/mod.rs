@@ -28,7 +28,6 @@ pub struct StandaloneRunner {
     pub chain_id: u64,
     // Cumulative diff from all transactions (ie full state representation)
     pub cumulative_diff: Diff,
-    pub wasm_runner: utils::runner::ContractRunner,
 }
 
 impl StandaloneRunner {
@@ -106,7 +105,7 @@ impl StandaloneRunner {
         signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
-    ) -> Result<SubmitResult, sync::ExecutionError> {
+    ) -> Result<SubmitResult, String> {
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: U256::zero(),
@@ -122,7 +121,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResultExt, sync::ExecutionError> {
+    ) -> Result<SubmitResultExt, String> {
         let outcome =
             self.submit_transaction_inner(account, transaction, Some(TraceKind::Transaction));
         unwrap_result_ext(outcome)
@@ -132,7 +131,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResultExt, sync::ExecutionError> {
+    ) -> Result<SubmitResultExt, String> {
         let outcome =
             self.submit_transaction_inner(account, transaction, Some(TraceKind::CallFrame));
         unwrap_result_ext(outcome)
@@ -142,7 +141,7 @@ impl StandaloneRunner {
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, sync::ExecutionError> {
+    ) -> Result<SubmitResult, String> {
         let outcome = self.submit_transaction_inner(account, transaction, None);
         unwrap_result(outcome)
     }
@@ -174,7 +173,7 @@ impl StandaloneRunner {
         &mut self,
         transaction_bytes: &[u8],
         trace_kind: Option<TraceKind>,
-    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), sync::ExecutionError> {
+    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), String> {
         self.env.predecessor_account_id = "some-account.near".parse().unwrap();
         let storage = &mut self.storage;
         let env = &mut self.env;
@@ -211,7 +210,7 @@ impl StandaloneRunner {
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::submit(&transaction_bytes.as_slice().try_into().unwrap());
-        let outcome = sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
+        let outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
 
         let _ = outcome.maybe_result.as_ref().unwrap().as_ref().unwrap();
 
@@ -272,8 +271,7 @@ impl StandaloneRunner {
             );
         }
 
-        let mut outcome =
-            sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
+        let mut outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -394,7 +392,7 @@ impl StandaloneRunner {
         tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
         tx_msg.trace_kind = trace_kind;
 
-        let outcome = sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
+        let outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -402,12 +400,10 @@ impl StandaloneRunner {
     }
 }
 
-fn unwrap_result(
-    outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResult, sync::ExecutionError> {
+fn unwrap_result(outcome: sync::TransactionIncludedOutcome) -> Result<SubmitResult, String> {
     match outcome
         .maybe_result?
-        .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
+        .ok_or_else(|| "no result".to_string())?
     {
         TransactionExecutionResult::Submit(result) => Ok(result),
         TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
@@ -417,10 +413,10 @@ fn unwrap_result(
 
 fn unwrap_result_ext(
     mut outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResultExt, sync::ExecutionError> {
+) -> Result<SubmitResultExt, String> {
     match outcome
         .maybe_result?
-        .ok_or_else(|| sync::ExecutionError::VMRunnerError(Box::new("no result")))?
+        .ok_or_else(|| "no result".to_string())?
     {
         TransactionExecutionResult::Submit(result) => Ok(SubmitResultExt {
             inner: result,
@@ -456,7 +452,6 @@ impl Default for StandaloneRunner {
             env,
             chain_id: utils::DEFAULT_CHAIN_ID,
             cumulative_diff: Diff::default(),
-            wasm_runner: utils::runner::ContractRunner::bundled(),
         }
     }
 }

@@ -50,8 +50,6 @@ fn bench_memory_get_standalone() {
     };
 
     let mut standalone_runner = runner.standalone_runner.unwrap();
-    let limit_config = &mut standalone_runner.wasm_runner.wasm_config_mut().limit_config;
-    limit_config.max_memory_pages = 1 << 16;
 
     let start = std::time::Instant::now();
     let result = standalone_runner

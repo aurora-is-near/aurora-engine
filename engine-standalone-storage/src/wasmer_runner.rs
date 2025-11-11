@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 use std::ops::Deref;
 
 use aurora_engine::parameters::TransactionExecutionResult;
@@ -52,7 +54,7 @@ pub enum WasmInitError {
     #[error("Wasmer compile error: {0}")]
     CompileError(#[from] wasmer::CompileError),
     #[error("Wasmer instantiation error: {0}")]
-    InstantiationError(#[from] wasmer::InstantiationError),
+    InstantiationError(#[from] Box<wasmer::InstantiationError>),
     #[error("Wasmer export memory error: {0}")]
     ExportError(#[from] wasmer::ExportError),
 }
@@ -81,7 +83,100 @@ pub struct WasmerRuntimeOutcome {
     pub output: Vec<u8>,
 }
 
+fn read_register(env: FunctionEnvMut<WasmEnv>, register_id: u64, ptr: u64) {
+    with_env(env, |state, memory, _db| {
+        state.read_register(memory, register_id, ptr);
+    });
+}
+
+fn register_len(env: FunctionEnvMut<WasmEnv>, register_id: u64) -> u64 {
+    env.data().state.register_len(register_id)
+}
+
+fn current_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
+    env.data_mut().state.current_account_id(register_id);
+}
+
+fn signer_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
+    env.data_mut().state.signer_account_id(register_id);
+}
+
+fn predecessor_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
+    env.data_mut().state.predecessor_account_id(register_id);
+}
+
+fn attached_deposit(env: FunctionEnvMut<WasmEnv>, balance_ptr: u64) {
+    with_env(env, |state, memory, _db| {
+        state.attached_deposit(memory, balance_ptr);
+    });
+}
+
+fn digest<D: Default + Update + FixedOutput>(
+    env: FunctionEnvMut<WasmEnv>,
+    value_len: u64,
+    value_ptr: u64,
+    register_id: u64,
+) {
+    with_env(env, |state, memory, _db| {
+        state.digest::<D>(memory, value_len, value_ptr, register_id);
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ecrecover(
+    env: FunctionEnvMut<WasmEnv>,
+    hash_len: u64,
+    hash_ptr: u64,
+    sig_len: u64,
+    sig_ptr: u64,
+    v: u64,
+    _flag: u64,
+    register_id: u64,
+) -> u64 {
+    with_env(env, |state, memory, _db| {
+        let res = state.ecrecover(memory, hash_len, hash_ptr, sig_len, sig_ptr, v, register_id);
+        u64::from(res.is_ok())
+    })
+    .unwrap_or_default()
+}
+
+fn alt_bn128_g1_sum(
+    env: FunctionEnvMut<WasmEnv>,
+    value_len: u64,
+    value_ptr: u64,
+    register_id: u64,
+) {
+    with_env(env, |state, memory, _db| {
+        state.alt_bn128_g1_sum(memory, value_len, value_ptr, register_id);
+    });
+}
+
+fn alt_bn128_g1_multiexp(
+    env: FunctionEnvMut<WasmEnv>,
+    value_len: u64,
+    value_ptr: u64,
+    register_id: u64,
+) {
+    with_env(env, |state, memory, _db| {
+        state.alt_bn128_g1_multiexp(memory, value_len, value_ptr, register_id);
+    });
+}
+
+fn alt_bn128_pairing_check(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) -> u64 {
+    with_env(env, |state, memory, _db| {
+        state.alt_bn128_pairing_check(memory, value_len, value_ptr)
+    })
+    .unwrap_or_default()
+}
+
+fn value_return(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) {
+    with_env(env, |state, memory, _db| {
+        state.value_return(memory, value_len, value_ptr);
+    });
+}
+
 impl WasmerRunner {
+    #[allow(clippy::too_many_lines)]
     pub fn new(db: DB) -> Self {
         let mut store = Store::default();
 
@@ -91,102 +186,6 @@ impl WasmerRunner {
             memory: None,
         };
         let env = FunctionEnv::new(&mut store, state);
-
-        fn read_register(env: FunctionEnvMut<WasmEnv>, register_id: u64, ptr: u64) {
-            with_env(env, |state, memory, _db| {
-                state.read_register(memory, register_id, ptr)
-            });
-        }
-
-        fn register_len(env: FunctionEnvMut<WasmEnv>, register_id: u64) -> u64 {
-            env.data().state.register_len(register_id)
-        }
-
-        fn current_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
-            env.data_mut().state.current_account_id(register_id);
-        }
-
-        fn signer_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
-            env.data_mut().state.signer_account_id(register_id);
-        }
-
-        fn predecessor_account_id(mut env: FunctionEnvMut<WasmEnv>, register_id: u64) {
-            env.data_mut().state.predecessor_account_id(register_id);
-        }
-
-        fn attached_deposit(env: FunctionEnvMut<WasmEnv>, balance_ptr: u64) {
-            with_env(env, |state, memory, _db| {
-                state.attached_deposit(memory, balance_ptr);
-            });
-        }
-
-        fn digest<D: Default + Update + FixedOutput>(
-            env: FunctionEnvMut<WasmEnv>,
-            value_len: u64,
-            value_ptr: u64,
-            register_id: u64,
-        ) {
-            with_env(env, |state, memory, _db| {
-                state.digest::<D>(memory, value_len, value_ptr, register_id);
-            });
-        }
-
-        fn ecrecover(
-            env: FunctionEnvMut<WasmEnv>,
-            hash_len: u64,
-            hash_ptr: u64,
-            sig_len: u64,
-            sig_ptr: u64,
-            v: u64,
-            _flag: u64,
-            register_id: u64,
-        ) -> u64 {
-            with_env(env, |state, memory, _db| {
-                let res =
-                    state.ecrecover(memory, hash_len, hash_ptr, sig_len, sig_ptr, v, register_id);
-                u64::from(res.is_ok())
-            })
-            .unwrap_or_default()
-        }
-
-        fn alt_bn128_g1_sum(
-            env: FunctionEnvMut<WasmEnv>,
-            value_len: u64,
-            value_ptr: u64,
-            register_id: u64,
-        ) {
-            with_env(env, |state, memory, _db| {
-                state.alt_bn128_g1_sum(memory, value_len, value_ptr, register_id);
-            });
-        }
-
-        fn alt_bn128_g1_multiexp(
-            env: FunctionEnvMut<WasmEnv>,
-            value_len: u64,
-            value_ptr: u64,
-            register_id: u64,
-        ) {
-            with_env(env, |state, memory, _db| {
-                state.alt_bn128_g1_multiexp(memory, value_len, value_ptr, register_id);
-            });
-        }
-
-        fn alt_bn128_pairing_check(
-            env: FunctionEnvMut<WasmEnv>,
-            value_len: u64,
-            value_ptr: u64,
-        ) -> u64 {
-            with_env(env, |state, memory, _db| {
-                state.alt_bn128_pairing_check(memory, value_len, value_ptr)
-            })
-            .unwrap_or_default()
-        }
-
-        fn value_return(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) {
-            with_env(env, |state, memory, _db| {
-                state.value_return(memory, value_len, value_ptr);
-            });
-        }
 
         let imports = imports! {
             "env" => {
@@ -334,7 +333,7 @@ impl WasmerRunner {
 
     pub fn set_code(&mut self, code: Vec<u8>) -> Result<(), WasmInitError> {
         let module = Module::new(&self.store, code)?;
-        let instance = Instance::new(&mut self.store, &module, &self.imports)?;
+        let instance = Instance::new(&mut self.store, &module, &self.imports).map_err(Box::new)?;
         let memory = instance.exports.get_memory("memory")?.clone();
         self.env.as_mut(&mut self.store).memory = Some(memory);
 
@@ -356,10 +355,11 @@ impl WasmerRunner {
             .get_typed_function::<(), ()>(&self.store, "get_version")?
             .call(&mut self.store)
             .map_err(WasmRuntimeError::from)
-            .map(|_| self.env.as_mut(&mut self.store).state.take_output())
+            .map(|()| self.env.as_mut(&mut self.store).state.take_output())
             .and_then(|v| String::from_utf8(v).map_err(|_| WasmRuntimeError::DeserializeResult))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn call_contract(
         &mut self,
         method_name: &str,
@@ -389,6 +389,8 @@ impl WasmerRunner {
             .call(&mut self.store)
             .map_err(WasmRuntimeError::from)
             .and_then(|()| {
+                type R = Result<Option<TransactionExecutionResult>, String>;
+
                 let state = &mut self.env.as_mut(&mut self.store).state;
                 let mut diff = state.get_transaction_diff();
 
@@ -397,7 +399,6 @@ impl WasmerRunner {
                     .get(b"borealis/result")
                     .and_then(DiffValue::value)
                     .ok_or(WasmRuntimeError::DeserializeResult)?;
-                type R = Result<Option<TransactionExecutionResult>, String>;
                 let maybe_result = <R as BorshDeserialize>::deserialize(&mut value)
                     .map_err(|_| WasmRuntimeError::DeserializeResult)?;
 
@@ -514,7 +515,7 @@ mod state {
         #[must_use]
         pub fn get_transaction_diff(&mut self) -> Diff {
             let current_diff = mem::take(&mut self.inner.current_diff);
-            for (k, v) in current_diff.iter() {
+            for (k, v) in &current_diff {
                 match v {
                     DiffValue::Deleted => self.inner.cached_diff.delete(k.clone()),
                     DiffValue::Modified(v) => self.inner.cached_diff.modify(k.clone(), v.clone()),
@@ -528,6 +529,7 @@ mod state {
             mem::take(&mut self.inner.cached_diff)
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn init(
             &mut self,
             method_name: &str,
@@ -599,12 +601,12 @@ mod state {
             }
         }
 
-        /// Near API
+        // Near API
 
         pub fn read_register(&self, memory: &MemoryView<'_>, register_id: u64, ptr: u64) {
             self.read_reg(register_id, |reg| {
                 if let Some(reg) = &reg.0 {
-                    if let Err(err) = memory.write(ptr, &*reg) {
+                    if let Err(err) = memory.write(ptr, reg) {
                         eprintln!(
                             "LOG: panic called from wasm: `read_register` {register_id} failed with: {err}"
                         );
@@ -722,6 +724,7 @@ mod state {
             Self::set_reg(&mut self.registers, register_id, hash.as_slice().into());
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn ecrecover(
             &mut self,
             memory: &MemoryView<'_>,
@@ -812,7 +815,7 @@ mod state {
         }
 
         pub fn alt_bn128_pairing_check(
-            &mut self,
+            &self,
             memory: &MemoryView<'_>,
             value_len: u64,
             value_ptr: u64,
@@ -847,11 +850,7 @@ mod state {
                 .inspect_err(|err| eprintln!("{err:?}"))
                 .map_or(vec![0; 0x20], |x| x.output);
 
-            if output == [0; 0x20] {
-                0
-            } else {
-                1
-            }
+            u64::from(output != [0; 0x20])
         }
 
         pub fn value_return(&mut self, memory: &MemoryView<'_>, value_len: u64, value_ptr: u64) {
@@ -890,6 +889,7 @@ mod state {
             1
         }
 
+        #[allow(clippy::too_many_arguments)]
         pub fn storage_write(
             &mut self,
             memory: &MemoryView<'_>,

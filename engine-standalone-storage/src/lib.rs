@@ -13,14 +13,12 @@ pub mod error;
 pub mod json_snapshot;
 pub mod promise;
 pub mod relayer_db;
-mod runner;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
 mod wasmer_runner;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
-pub use runner::AbstractContractRunner;
 
 pub use self::wasmer_runner::{WasmInitError, WasmRuntimeError, WasmerRunner};
 
@@ -72,7 +70,7 @@ impl Storage {
         Ok(Self { db })
     }
 
-    pub fn runner_mut(&mut self) -> &mut WasmerRunner {
+    pub const fn runner_mut(&mut self) -> &mut WasmerRunner {
         &mut self.db
     }
 
