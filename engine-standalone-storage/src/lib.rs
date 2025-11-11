@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, path::Path, sync::Mutex};
 
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
@@ -20,11 +16,13 @@ pub mod relayer_db;
 mod runner;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
-pub mod wasmer_runner;
+mod wasmer_runner;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
 pub use runner::AbstractContractRunner;
+
+pub use self::wasmer_runner::{WasmInitError, WasmRuntimeError, WasmerRunner};
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
@@ -63,15 +61,19 @@ impl From<StoragePrefix> for u8 {
 
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
-#[derive(Clone)]
 pub struct Storage {
-    db: Arc<DB>,
+    db: WasmerRunner,
 }
 
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
-        let db = Arc::new(DB::open_default(path)?);
+        let db = DB::open_default(path)?;
+        let db = WasmerRunner::new(db);
         Ok(Self { db })
+    }
+
+    pub fn runner_mut(&mut self) -> &mut WasmerRunner {
+        &mut self.db
     }
 
     pub fn set_engine_account_id(&mut self, id: &AccountId) -> Result<(), rocksdb::Error> {
@@ -96,24 +98,6 @@ impl Storage {
 
     pub fn get_earliest_block(&self) -> Result<(H256, u64), Error> {
         self.block_read(rocksdb::IteratorMode::Start)
-    }
-
-    pub fn read_by_key(
-        &self,
-        key: &[u8],
-        bound_block_height: u64,
-        transaction_position: u16,
-    ) -> Result<DiffValue, Error> {
-        let upper_bound = construct_engine_key(key, bound_block_height, transaction_position);
-        let lower_bound = construct_storage_key(StoragePrefix::Engine, key);
-        let mut opt = rocksdb::ReadOptions::default();
-        opt.set_iterate_upper_bound(upper_bound);
-        opt.set_iterate_lower_bound(lower_bound);
-
-        let mut iter = self.db.iterator_opt(rocksdb::IteratorMode::End, opt);
-        // TODO: error kind
-        let (_, value) = iter.next().ok_or(Error::NoBlockAtHeight(0))??;
-        Ok(DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
     }
 
     fn block_read(&self, mode: rocksdb::IteratorMode) -> Result<(H256, u64), Error> {

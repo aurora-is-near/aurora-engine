@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use aurora_engine::parameters::TransactionExecutionResult;
 use aurora_engine_types::borsh::BorshDeserialize;
 
@@ -6,12 +8,13 @@ use engine_standalone_tracing::{types::call_tracer::CallTracer, TraceKind, Trace
 use sha3::digest::{FixedOutput, Update};
 use thiserror::Error;
 
+use rocksdb::DB;
 use wasmer::{
     imports, Function, FunctionEnv, FunctionEnvMut, Imports, Instance, Memory, MemoryView, Module,
     Store,
 };
 
-use crate::{Diff, DiffValue, Storage};
+use crate::{Diff, DiffValue};
 
 pub struct WasmerRunner {
     store: Store,
@@ -20,20 +23,28 @@ pub struct WasmerRunner {
     instance: Option<Instance>,
 }
 
+impl Deref for WasmerRunner {
+    type Target = DB;
+
+    fn deref(&self) -> &Self::Target {
+        &self.env.as_ref(&self.store).db
+    }
+}
+
 pub struct WasmEnv {
-    state: state::State,
-    storage: Storage,
+    state: NearState,
+    db: DB,
     memory: Option<Memory>,
 }
 
 fn with_env<T>(
     mut env: FunctionEnvMut<WasmEnv>,
-    f: impl FnOnce(&mut state::State, &MemoryView<'_>, &Storage) -> T,
+    f: impl FnOnce(&mut NearState, &MemoryView<'_>, &DB) -> T,
 ) -> Option<T> {
     let (data, store) = env.data_and_store_mut();
     data.memory
         .as_ref()
-        .map(|memory| f(&mut data.state, &memory.view(&store), &data.storage))
+        .map(|memory| f(&mut data.state, &memory.view(&store), &data.db))
 }
 
 #[derive(Debug, Error)]
@@ -71,18 +82,18 @@ pub struct WasmerRuntimeOutcome {
 }
 
 impl WasmerRunner {
-    pub fn new(storage: Storage) -> Self {
+    pub fn new(db: DB) -> Self {
         let mut store = Store::default();
 
         let state = WasmEnv {
-            state: state::State::default(),
-            storage,
+            state: NearState::default(),
+            db,
             memory: None,
         };
         let env = FunctionEnv::new(&mut store, state);
 
         fn read_register(env: FunctionEnvMut<WasmEnv>, register_id: u64, ptr: u64) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.read_register(memory, register_id, ptr)
             });
         }
@@ -104,7 +115,7 @@ impl WasmerRunner {
         }
 
         fn attached_deposit(env: FunctionEnvMut<WasmEnv>, balance_ptr: u64) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.attached_deposit(memory, balance_ptr);
             });
         }
@@ -115,7 +126,7 @@ impl WasmerRunner {
             value_ptr: u64,
             register_id: u64,
         ) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.digest::<D>(memory, value_len, value_ptr, register_id);
             });
         }
@@ -130,7 +141,7 @@ impl WasmerRunner {
             _flag: u64,
             register_id: u64,
         ) -> u64 {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 let res =
                     state.ecrecover(memory, hash_len, hash_ptr, sig_len, sig_ptr, v, register_id);
                 u64::from(res.is_ok())
@@ -144,7 +155,7 @@ impl WasmerRunner {
             value_ptr: u64,
             register_id: u64,
         ) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.alt_bn128_g1_sum(memory, value_len, value_ptr, register_id);
             });
         }
@@ -155,7 +166,7 @@ impl WasmerRunner {
             value_ptr: u64,
             register_id: u64,
         ) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.alt_bn128_g1_multiexp(memory, value_len, value_ptr, register_id);
             });
         }
@@ -165,14 +176,14 @@ impl WasmerRunner {
             value_len: u64,
             value_ptr: u64,
         ) -> u64 {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.alt_bn128_pairing_check(memory, value_len, value_ptr)
             })
             .unwrap_or_default()
         }
 
         fn value_return(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) {
-            with_env(env, |state, memory, _storage| {
+            with_env(env, |state, memory, _db| {
                 state.value_return(memory, value_len, value_ptr);
             });
         }
@@ -421,7 +432,8 @@ impl WasmerRunner {
     }
 }
 
-pub mod state {
+pub use self::state::NearState;
+mod state {
     #![allow(clippy::as_conversions)]
 
     use std::{borrow::Cow, iter};
@@ -434,12 +446,13 @@ pub mod state {
     use aurora_engine_types::{borsh, H160, U256};
     use aurora_evm::Context;
     use engine_standalone_tracing::TraceKind;
+    use rocksdb::DB;
     use sha2::digest::{FixedOutput, Update};
     use wasmer::MemoryView;
 
-    use crate::{Diff, DiffValue, Storage};
+    use crate::{Diff, DiffValue};
 
-    pub struct State {
+    pub struct NearState {
         inner: StateInner,
         registers: Vec<Register>,
     }
@@ -474,7 +487,7 @@ pub mod state {
         }
     }
 
-    impl Default for State {
+    impl Default for NearState {
         fn default() -> Self {
             Self {
                 inner: StateInner::default(),
@@ -485,7 +498,7 @@ pub mod state {
         }
     }
 
-    impl State {
+    impl NearState {
         #[must_use]
         pub fn take_output(&self) -> Vec<u8> {
             self.inner.output.clone()
@@ -866,7 +879,7 @@ pub mod state {
         pub fn storage_write(
             &mut self,
             memory: &MemoryView<'_>,
-            db: &Storage,
+            db: &DB,
             key_len: u64,
             key_ptr: u64,
             value_len: u64,
@@ -890,7 +903,7 @@ pub mod state {
         pub fn storage_read(
             &mut self,
             memory: &MemoryView<'_>,
-            db: &Storage,
+            db: &DB,
             key_len: u64,
             key_ptr: u64,
             register_id: u64,
@@ -905,7 +918,8 @@ pub mod state {
                 });
             }
 
-            if let Ok(value) = db.read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
+            if let Ok(value) =
+                read_by_key(db, &key, lock.bound_block_height, lock.bound_tx_position)
             {
                 return value.value().map_or(0, |bytes| {
                     Self::set_reg(&mut self.registers, register_id, bytes.into());
@@ -919,7 +933,7 @@ pub mod state {
         pub fn storage_remove(
             &mut self,
             memory: &MemoryView<'_>,
-            db: &Storage,
+            db: &DB,
             key_len: u64,
             key_ptr: u64,
             register_id: u64,
@@ -935,7 +949,7 @@ pub mod state {
         pub fn storage_has_key(
             &self,
             memory: &MemoryView<'_>,
-            db: &Storage,
+            db: &DB,
             key_len: u64,
             key_ptr: u64,
         ) -> u64 {
@@ -945,8 +959,27 @@ pub mod state {
                 return matches!(value, DiffValue::Modified(..)).into();
             }
 
-            db.read_by_key(&key, lock.bound_block_height, lock.bound_tx_position)
+            read_by_key(db, &key, lock.bound_block_height, lock.bound_tx_position)
                 .map_or(0, |diff| u64::from(diff.value().is_some()))
         }
+    }
+
+    pub fn read_by_key(
+        db: &DB,
+        key: &[u8],
+        bound_block_height: u64,
+        transaction_position: u16,
+    ) -> Result<DiffValue, crate::Error> {
+        let upper_bound =
+            crate::construct_engine_key(key, bound_block_height, transaction_position);
+        let lower_bound = crate::construct_storage_key(crate::StoragePrefix::Engine, key);
+        let mut opt = rocksdb::ReadOptions::default();
+        opt.set_iterate_upper_bound(upper_bound);
+        opt.set_iterate_lower_bound(lower_bound);
+
+        let mut iter = db.iterator_opt(rocksdb::IteratorMode::End, opt);
+        // TODO: error kind
+        let (_, value) = iter.next().ok_or(crate::Error::NoBlockAtHeight(0))??;
+        Ok(DiffValue::try_from_bytes(&value).expect("diff value is invalid"))
     }
 }

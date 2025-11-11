@@ -18,7 +18,7 @@ pub mod types;
 use crate::engine_state::EngineStateAccess;
 use crate::runner::AbstractContractRunner;
 use crate::wasmer_runner::WasmerRuntimeOutcome;
-use crate::{wasmer_runner::WasmerRunner, BlockMetadata, Diff, Storage};
+use crate::{BlockMetadata, Diff, Storage};
 use types::{Message, TransactionMessage};
 
 /// Note: this function does not automatically commit transaction messages to the storage.
@@ -81,8 +81,7 @@ where
 }
 
 pub fn execute_transaction_message_wasmer(
-    storage: &Storage,
-    runner: &mut WasmerRunner,
+    storage: &mut Storage,
     transaction_message: TransactionMessage,
     trace_kind: Option<TraceKind>,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
@@ -128,7 +127,8 @@ pub fn execute_transaction_message_wasmer(
         call_tracer,
         custom_debug_info,
         ..
-    } = runner
+    } = storage
+        .runner_mut()
         .call_contract(
             &transaction_message.transaction.method_name,
             trace_kind,
@@ -182,8 +182,9 @@ where
     Ok(result.result)
 }
 
+/// deprecated
 #[allow(clippy::too_many_arguments)]
-pub fn execute_transaction<I, F, R>(
+fn execute_transaction<I, F, R>(
     runner: &R,
     transaction_message: TransactionMessage,
     block_height: u64,
