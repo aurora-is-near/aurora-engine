@@ -1,4 +1,3 @@
-use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp, DEFAULT_PREPAID_GAS};
 use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
@@ -57,11 +56,11 @@ fn test_consume_deploy_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -112,12 +111,12 @@ fn test_consume_deploy_erc20_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -155,12 +154,12 @@ fn test_consume_deploy_erc20_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -213,11 +212,11 @@ fn test_consume_ft_on_transfer_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -260,11 +259,11 @@ fn test_consume_call_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -315,11 +314,11 @@ fn test_consume_submit_message() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp, _>(
+    let outcome = sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
     .unwrap();
@@ -363,9 +362,8 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     runner.init_evm();
 
     let block_message = sample_block();
-    sync::consume_message::<AuroraModExp, _>(
+    sync::consume_message_wasmer::<false>(
         &mut runner.storage,
-        &runner.wasm_runner,
         sync::types::Message::Block(block_message.clone()),
     )
     .unwrap();

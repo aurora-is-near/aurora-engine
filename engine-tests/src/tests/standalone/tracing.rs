@@ -76,6 +76,7 @@ fn test_evm_tracing_with_storage() {
             promise_data: Vec::new(),
             action_hash: H256::default(),
             prepaid_gas: DEFAULT_PREPAID_GAS,
+            trace_kind: None,
         },
         diff,
         maybe_result: Ok(None),

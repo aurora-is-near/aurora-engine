@@ -158,6 +158,7 @@ where
             promise_data: Vec::new(),
             action_hash: H256::default(),
             prepaid_gas: DEFAULT_PREPAID_GAS,
+            trace_kind: None,
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -261,6 +262,7 @@ mod test {
                         promise_data: Vec::new(),
                         action_hash: H256::default(),
                         prepaid_gas: DEFAULT_PREPAID_GAS,
+                        trace_kind: None,
                     },
                     &diff,
                 )

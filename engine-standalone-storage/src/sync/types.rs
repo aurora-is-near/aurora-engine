@@ -8,6 +8,7 @@ use aurora_engine_types::{
     types::{Address, NearGas, PromiseResult},
     H256,
 };
+use engine_standalone_tracing::TraceKind;
 use std::borrow::Cow;
 
 /// Type describing the format of messages sent to the storage layer for keeping
@@ -16,6 +17,12 @@ use std::borrow::Cow;
 pub enum Message {
     Block(BlockMessage),
     Transaction(Box<TransactionMessage>),
+}
+
+impl From<TransactionMessage> for Message {
+    fn from(value: TransactionMessage) -> Self {
+        Self::Transaction(Box::new(value))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +63,7 @@ pub struct TransactionMessage {
     /// - <https://github.com/near/nearcore/blob/00ca2f3f73e2a547ba881f76ecc59450dbbef6e2/core/primitives/src/utils.rs#L295>
     pub action_hash: H256,
     pub prepaid_gas: NearGas,
+    pub trace_kind: Option<TraceKind>,
 }
 
 impl TransactionMessage {
@@ -314,6 +322,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                     promise_data: Vec::new(),
                     action_hash: H256::default(),
                     prepaid_gas: DEFAULT_PREPAID_GAS,
+                    trace_kind: None,
                 }
             }
             BorshableTransactionMessage::V2(t) => {
@@ -330,6 +339,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                     promise_data: t.promise_data.into_owned(),
                     action_hash: H256::default(),
                     prepaid_gas: DEFAULT_PREPAID_GAS,
+                    trace_kind: None,
                 }
             }
             BorshableTransactionMessage::V3(t) => Self {
@@ -344,6 +354,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                 promise_data: t.promise_data.into_owned(),
                 action_hash: H256::default(),
                 prepaid_gas: DEFAULT_PREPAID_GAS,
+                trace_kind: None,
             },
             BorshableTransactionMessage::V4(t) => Self {
                 block_hash: H256(t.block_hash),
@@ -357,6 +368,7 @@ impl<'a> From<BorshableTransactionMessage<'a>> for TransactionMessage {
                 promise_data: t.promise_data.into_owned(),
                 action_hash: H256(t.action_hash),
                 prepaid_gas: DEFAULT_PREPAID_GAS,
+                trace_kind: None,
             },
         }
     }

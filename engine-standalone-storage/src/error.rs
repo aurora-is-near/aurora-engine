@@ -1,7 +1,7 @@
-use crate::TransactionIncluded;
+use crate::{TransactionIncluded, WasmRuntimeError};
 use aurora_engine_types::H256;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, Clone)]
 pub enum Error {
     BlockNotFound(H256),
     Borsh(String),
@@ -11,6 +11,7 @@ pub enum Error {
     Rocksdb(rocksdb::Error),
     EngineAccountIdNotSet,
     EngineAccountIdCorrupted,
+    Wasmer(WasmRuntimeError),
 }
 
 impl From<rocksdb::Error> for Error {

@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 use std::io;
 
-use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::io::StorageIntermediate;
 use aurora_engine_sdk::{env, io::IO};
 use aurora_engine_types::types::NearGas;
@@ -10,7 +9,7 @@ use aurora_engine_types::{
     H256,
 };
 use engine_standalone_tracing::types::call_tracer::CallTracer;
-use engine_standalone_tracing::{TraceKind, TraceLog};
+use engine_standalone_tracing::TraceLog;
 use thiserror::Error;
 
 pub mod types;
@@ -19,12 +18,24 @@ use crate::engine_state::EngineStateAccess;
 use crate::runner::AbstractContractRunner;
 use crate::wasmer_runner::WasmerRuntimeOutcome;
 use crate::{BlockMetadata, Diff, Storage};
-use types::{Message, TransactionMessage};
+use types::{BlockMessage, Message, TransactionMessage};
 
-/// Note: this function does not automatically commit transaction messages to the storage.
-/// If you want the transaction diff committed then you must call the `commit` method on
-/// the outcome of this function.
-pub fn consume_message<M: ModExpAlgorithm + 'static, R>(
+pub fn consume_message_wasmer<const KEEP_DIFF: bool>(
+    storage: &mut Storage,
+    message: Message,
+) -> Result<ConsumeMessageOutcome, crate::Error> {
+    match message {
+        Message::Block(msg) => {
+            consume_block_message(storage, msg).map(|()| ConsumeMessageOutcome::BlockAdded)
+        }
+        Message::Transaction(msg) => execute_transaction_message_wasmer::<KEEP_DIFF>(storage, *msg)
+            .map(Box::new)
+            .map(ConsumeMessageOutcome::TransactionIncluded),
+    }
+}
+
+#[deprecated = "use `consume_message_wasmer`"]
+pub fn consume_message<R>(
     storage: &mut Storage,
     runner: &R,
     message: Message,
@@ -34,63 +45,44 @@ where
     R::Error: Debug + Send + Sync + 'static,
 {
     match message {
-        Message::Block(block_message) => {
-            let block_hash = block_message.hash;
-            let block_height = block_message.height;
-            let block_metadata = block_message.metadata;
-            storage
-                .set_block_data(block_hash, block_height, &block_metadata)
-                .map_err(crate::Error::Rocksdb)?;
-            Ok(ConsumeMessageOutcome::BlockAdded)
+        Message::Block(msg) => {
+            consume_block_message(storage, msg).map(|()| ConsumeMessageOutcome::BlockAdded)
         }
-
-        Message::Transaction(transaction_message) => {
-            // Failed transactions have no impact on the state of our database.
-            if !transaction_message.succeeded {
-                return Ok(ConsumeMessageOutcome::FailedTransactionIgnored);
-            }
-
-            let transaction_position = transaction_message.position;
-            let block_hash = transaction_message.block_hash;
-            let block_height = storage.get_block_height_by_hash(block_hash)?;
-            let block_metadata = storage.get_block_metadata(block_hash)?;
-            let engine_account_id = storage.get_engine_account_id()?;
-
-            let transaction_message = *transaction_message;
-            let raw_input = transaction_message.transaction.args.clone();
-            let outcome = storage
-                .with_engine_access(block_height, transaction_position, &raw_input, |io| {
-                    execute_transaction(
-                        runner,
-                        transaction_message,
-                        block_height,
-                        &block_metadata,
-                        engine_account_id,
-                        None,
-                        io,
-                        EngineStateAccess::get_transaction_diff,
-                    )
-                })
-                .result;
-
-            Ok(ConsumeMessageOutcome::TransactionIncluded(Box::new(
-                outcome,
-            )))
+        Message::Transaction(msg) =>
+        {
+            #[allow(deprecated)]
+            execute_transaction_message(storage, runner, *msg)
+                .map(Box::new)
+                .map(ConsumeMessageOutcome::TransactionIncluded)
         }
     }
 }
 
-pub fn execute_transaction_message_wasmer(
+fn consume_block_message(
+    storage: &mut Storage,
+    block_message: BlockMessage,
+) -> Result<(), crate::Error> {
+    let block_hash = block_message.hash;
+    let block_height = block_message.height;
+    let block_metadata = block_message.metadata;
+    storage
+        .set_block_data(block_hash, block_height, &block_metadata)
+        .map_err(crate::Error::Rocksdb)
+}
+
+/// Note: this function does not automatically commit transaction messages to the storage.
+/// If you want the transaction diff committed then you must call the `commit` method on
+/// the outcome of this function.
+pub fn execute_transaction_message_wasmer<const KEEP_DIFF: bool>(
     storage: &mut Storage,
     transaction_message: TransactionMessage,
-    trace_kind: Option<TraceKind>,
 ) -> Result<TransactionIncludedOutcome, crate::Error> {
     let transaction_position = transaction_message.position;
     let block_hash = transaction_message.block_hash;
     let block_height = storage.get_block_height_by_hash(block_hash)?;
     let block_metadata = storage.get_block_metadata(block_hash)?;
     let engine_account_id = storage.get_engine_account_id()?;
-    let raw_input = transaction_message.transaction.args.clone();
+    let raw_input = transaction_message.transaction.clone_raw_input();
     let signer_account_id = transaction_message.signer.clone();
     let predecessor_account_id = transaction_message.caller.clone();
     let near_receipt_id = transaction_message.near_receipt_id;
@@ -131,14 +123,17 @@ pub fn execute_transaction_message_wasmer(
         .runner_mut()
         .call_contract(
             &transaction_message.transaction.method_name,
-            trace_kind,
+            transaction_message.trace_kind,
             &transaction_message.promise_data,
             env,
             block_height,
             transaction_position,
             raw_input,
         )
-        .expect("todo: workout error");
+        .map_err(crate::Error::Wasmer)?;
+    if !KEEP_DIFF {
+        drop(storage.runner_mut().take_cached_diff());
+    }
 
     Ok(TransactionIncludedOutcome {
         hash: tx_hash,
@@ -151,11 +146,14 @@ pub fn execute_transaction_message_wasmer(
     })
 }
 
-pub fn execute_transaction_message<M: ModExpAlgorithm + 'static, R>(
+/// Note: this function does not automatically commit transaction messages to the storage.
+/// If you want the transaction diff committed then you must call the `commit` method on
+/// the outcome of this function.
+#[deprecated = "use `execute_transaction_message_wasmer`"]
+pub fn execute_transaction_message<R>(
     storage: &Storage,
     runner: &R,
     transaction_message: TransactionMessage,
-    trace_kind: Option<TraceKind>,
 ) -> Result<TransactionIncludedOutcome, crate::Error>
 where
     R: AbstractContractRunner,
@@ -168,13 +166,13 @@ where
     let engine_account_id = storage.get_engine_account_id()?;
     let raw_input = transaction_message.transaction.args.clone();
     let result = storage.with_engine_access(block_height, transaction_position, &raw_input, |io| {
+        #[allow(deprecated)]
         execute_transaction(
             runner,
             transaction_message,
             block_height,
             &block_metadata,
             engine_account_id,
-            trace_kind,
             io,
             EngineStateAccess::get_transaction_diff,
         )
@@ -182,15 +180,14 @@ where
     Ok(result.result)
 }
 
-/// deprecated
+#[deprecated]
 #[allow(clippy::too_many_arguments)]
-fn execute_transaction<I, F, R>(
+pub fn execute_transaction<I, F, R>(
     runner: &R,
     transaction_message: TransactionMessage,
     block_height: u64,
     block_metadata: &BlockMetadata,
     engine_account_id: AccountId,
-    trace_kind: Option<TraceKind>,
     mut io: I,
     get_diff: F,
 ) -> TransactionIncludedOutcome
@@ -225,7 +222,7 @@ where
     // and it is fed a stream of receipts (it does not schedule them)
     let promise_data = transaction_message.promise_data.clone();
 
-    if let Some(v) = &trace_kind {
+    if let Some(v) = &transaction_message.trace_kind {
         io.write_borsh(b"borealis/trace_kind", v);
     }
 
@@ -300,6 +297,13 @@ impl ConsumeMessageOutcome {
             x.commit(storage)?;
         }
         Ok(())
+    }
+
+    pub fn take_call_tracer(&mut self) -> Option<CallTracer> {
+        match self {
+            Self::TransactionIncluded(v) => v.call_tracer.take(),
+            _ => None,
+        }
     }
 }
 

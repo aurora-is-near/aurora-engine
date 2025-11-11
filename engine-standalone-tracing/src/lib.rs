@@ -10,7 +10,7 @@ pub use types::{
     StepTransactionTrace, TraceLog, TransactionTrace,
 };
 
-#[derive(Clone, Copy, borsh::BorshSerialize, borsh::BorshDeserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, borsh::BorshSerialize, borsh::BorshDeserialize)]
 pub enum TraceKind {
     Transaction,
     CallFrame,

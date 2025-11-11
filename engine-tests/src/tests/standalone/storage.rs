@@ -271,6 +271,7 @@ fn test_transaction_index() {
         promise_data: Vec::new(),
         action_hash: H256::default(),
         prepaid_gas: DEFAULT_PREPAID_GAS,
+        trace_kind: None,
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,

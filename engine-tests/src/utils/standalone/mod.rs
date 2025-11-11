@@ -1,6 +1,5 @@
 use aurora_engine::engine;
 use aurora_engine::parameters::{SubmitResult, TransactionExecutionResult, TransactionStatus};
-use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
@@ -212,13 +211,7 @@ impl StandaloneRunner {
         tx_msg.position = transaction_position;
         tx_msg.transaction =
             TransactionKind::submit(&transaction_bytes.as_slice().try_into().unwrap());
-        let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-            storage,
-            &self.wasm_runner,
-            tx_msg,
-            None,
-        )
-        .unwrap();
+        let outcome = sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
 
         let _ = outcome.maybe_result.as_ref().unwrap().as_ref().unwrap();
 
@@ -264,6 +257,7 @@ impl StandaloneRunner {
         let storage = &mut self.storage;
         let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
         tx_msg.transaction = transaction_kind;
+        tx_msg.trace_kind = trace_kind;
 
         if ctx.random_seed.len() == 32 {
             let runtime_random_value = {
@@ -278,13 +272,8 @@ impl StandaloneRunner {
             );
         }
 
-        let mut outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-            storage,
-            &self.wasm_runner,
-            tx_msg,
-            trace_kind,
-        )
-        .unwrap();
+        let mut outcome =
+            sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
@@ -380,6 +369,7 @@ impl StandaloneRunner {
             promise_data,
             action_hash,
             prepaid_gas: env.prepaid_gas,
+            trace_kind: None,
         }
     }
 
@@ -402,9 +392,9 @@ impl StandaloneRunner {
             promise_results,
         );
         tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
+        tx_msg.trace_kind = trace_kind;
 
-        let outcome =
-            sync::execute_transaction_message_wasmer(storage, tx_msg, trace_kind).unwrap();
+        let outcome = sync::execute_transaction_message_wasmer::<false>(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 

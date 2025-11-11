@@ -57,7 +57,7 @@ pub enum WasmInitError {
     ExportError(#[from] wasmer::ExportError),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum WasmRuntimeError {
     #[error("Wasmer runtime error: {0}")]
     Inner(#[from] wasmer::RuntimeError),
@@ -342,6 +342,11 @@ impl WasmerRunner {
         Ok(())
     }
 
+    #[must_use]
+    pub fn take_cached_diff(&mut self) -> Diff {
+        self.env.as_mut(&mut self.store).state.take_cached_diff()
+    }
+
     /// must call on on-chain variant of the contract
     pub fn get_version(&mut self) -> Result<String, WasmRuntimeError> {
         self.instance
@@ -384,7 +389,7 @@ impl WasmerRunner {
             .call(&mut self.store)
             .map_err(WasmRuntimeError::from)
             .and_then(|()| {
-                let state = &self.env.as_mut(&mut self.store).state;
+                let state = &mut self.env.as_mut(&mut self.store).state;
                 let mut diff = state.get_transaction_diff();
 
                 // Deserialize the execution result
@@ -436,7 +441,7 @@ pub use self::state::NearState;
 mod state {
     #![allow(clippy::as_conversions)]
 
-    use std::{borrow::Cow, iter};
+    use std::{borrow::Cow, iter, mem};
 
     use aurora_engine_precompiles::{
         alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair},
@@ -468,7 +473,8 @@ mod state {
 
         bound_block_height: u64,
         bound_tx_position: u16,
-        transaction_diff: Diff,
+        cached_diff: Diff,
+        current_diff: Diff,
     }
 
     const REGISTERS_NUMBER: usize = 6;
@@ -482,7 +488,8 @@ mod state {
                 promise_data: Box::new([]),
                 bound_block_height: 0,
                 bound_tx_position: 0,
-                transaction_diff: Diff::default(),
+                cached_diff: Diff::default(),
+                current_diff: Diff::default(),
             }
         }
     }
@@ -500,13 +507,25 @@ mod state {
 
     impl NearState {
         #[must_use]
-        pub fn take_output(&self) -> Vec<u8> {
-            self.inner.output.clone()
+        pub fn take_output(&mut self) -> Vec<u8> {
+            mem::take(&mut self.inner.output)
         }
 
         #[must_use]
-        pub fn get_transaction_diff(&self) -> Diff {
-            self.inner.transaction_diff.clone()
+        pub fn get_transaction_diff(&mut self) -> Diff {
+            let current_diff = mem::take(&mut self.inner.current_diff);
+            for (k, v) in current_diff.iter() {
+                match v {
+                    DiffValue::Deleted => self.inner.cached_diff.delete(k.clone()),
+                    DiffValue::Modified(v) => self.inner.cached_diff.modify(k.clone(), v.clone()),
+                }
+            }
+            current_diff
+        }
+
+        #[must_use]
+        pub fn take_cached_diff(&mut self) -> Diff {
+            mem::take(&mut self.inner.cached_diff)
         }
 
         pub fn init(
@@ -522,22 +541,19 @@ mod state {
             self.registers
                 .iter_mut()
                 .for_each(|reg| *reg = Register::default());
-            self.inner = StateInner {
-                env: Some(env),
-                input,
-                output: vec![],
-                promise_data,
-                bound_block_height: block_height,
-                bound_tx_position: transaction_position,
-                transaction_diff: Diff::default(),
-            };
+            self.inner.env = Some(env);
+            self.inner.input = input;
+            self.inner.output.clear();
+            self.inner.promise_data = promise_data;
+            self.inner.bound_block_height = block_height;
+            self.inner.bound_tx_position = transaction_position;
 
-            self.inner.transaction_diff.modify(
+            self.inner.current_diff.modify(
                 b"borealis/method".to_vec(),
                 borsh::to_vec(method_name).expect("must serialize string"),
             );
             if let Some(v) = &trace_kind {
-                self.inner.transaction_diff.modify(
+                self.inner.current_diff.modify(
                     b"borealis/trace_kind".to_vec(),
                     borsh::to_vec(&v).expect("must serialize trivial enum"),
                 );
@@ -802,7 +818,6 @@ mod state {
             value_ptr: u64,
         ) -> u64 {
             let mut input = self.get_data(memory, value_ptr, value_len);
-            dbg!(hex::encode(&input));
             input.chunks_mut(0x20).for_each(<[u8]>::reverse);
             for pair in input.chunks_mut(0xc0) {
                 let mut b = [0; 0x20];
@@ -832,7 +847,6 @@ mod state {
                 .inspect_err(|err| eprintln!("{err:?}"))
                 .map_or(vec![0; 0x20], |x| x.output);
 
-            dbg!(hex::encode(&output));
             if output == [0; 0x20] {
                 0
             } else {
@@ -893,10 +907,7 @@ mod state {
             let res = self.storage_read(memory, db, key_len, key_ptr, register_id);
 
             let key = self.get_data(memory, key_ptr, key_len);
-
-            self.inner
-                .transaction_diff
-                .modify(key.to_vec(), value.to_vec());
+            self.inner.current_diff.modify(key, value);
             res
         }
 
@@ -911,16 +922,17 @@ mod state {
             let key = self.get_data(memory, key_ptr, key_len);
 
             let lock = &self.inner;
-            if let Some(diff) = lock.transaction_diff.get(&key) {
+            if let Some(diff) = None
+                .or_else(|| lock.current_diff.get(&key))
+                .or_else(|| lock.cached_diff.get(&key))
+            {
                 return diff.value().map_or(0, |bytes| {
                     Self::set_reg(&mut self.registers, register_id, bytes.into());
                     1
                 });
             }
 
-            if let Ok(value) =
-                read_by_key(db, &key, lock.bound_block_height, lock.bound_tx_position)
-            {
+            if let Ok(value) = read_db(db, &key, lock.bound_block_height, lock.bound_tx_position) {
                 return value.value().map_or(0, |bytes| {
                     Self::set_reg(&mut self.registers, register_id, bytes.into());
                     1
@@ -940,9 +952,8 @@ mod state {
         ) -> u64 {
             // fetch original value into register
             let res = self.storage_read(memory, db, key_len, key_ptr, register_id);
-
             let key = self.get_data(memory, key_ptr, key_len);
-            self.inner.transaction_diff.delete(key);
+            self.inner.current_diff.delete(key);
             res
         }
 
@@ -955,16 +966,19 @@ mod state {
         ) -> u64 {
             let key = self.get_data(memory, key_ptr, key_len);
             let lock = &self.inner;
-            if let Some(value) = lock.transaction_diff.get(&key) {
+            if let Some(value) = None
+                .or_else(|| lock.current_diff.get(&key))
+                .or_else(|| lock.cached_diff.get(&key))
+            {
                 return matches!(value, DiffValue::Modified(..)).into();
             }
 
-            read_by_key(db, &key, lock.bound_block_height, lock.bound_tx_position)
+            read_db(db, &key, lock.bound_block_height, lock.bound_tx_position)
                 .map_or(0, |diff| u64::from(diff.value().is_some()))
         }
     }
 
-    pub fn read_by_key(
+    fn read_db(
         db: &DB,
         key: &[u8],
         bound_block_height: u64,

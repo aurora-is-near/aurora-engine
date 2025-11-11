@@ -1,7 +1,6 @@
 use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
-use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
@@ -338,13 +337,7 @@ fn test_trace_precompiles_with_subcalls() {
         let mut tx =
             standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
         tx.transaction = tx_kind;
-        let mut outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-            storage,
-            &runner.wasm_runner,
-            tx,
-            None,
-        )
-        .unwrap();
+        let mut outcome = sync::execute_transaction_message_wasmer::<false>(storage, tx).unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
         let key =
@@ -368,13 +361,9 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = tx_kind;
         tx
     };
-    let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-        &runner.storage,
-        &runner.wasm_runner,
-        factory_update,
-        None,
-    )
-    .unwrap();
+    let outcome =
+        sync::execute_transaction_message_wasmer::<false>(&mut runner.storage, factory_update)
+            .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
     let set_wnear_address = {
         runner.env.block_height += 1;
@@ -387,13 +376,9 @@ fn test_trace_precompiles_with_subcalls() {
         tx.transaction = tx_kind;
         tx
     };
-    let outcome = sync::execute_transaction_message::<AuroraModExp, _>(
-        &runner.storage,
-        &runner.wasm_runner,
-        set_wnear_address,
-        None,
-    )
-    .unwrap();
+    let outcome =
+        sync::execute_transaction_message_wasmer::<false>(&mut runner.storage, set_wnear_address)
+            .unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
 
     // User calls XCC precompile
