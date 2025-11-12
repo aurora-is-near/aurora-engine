@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::Path, sync::Mutex};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::{account_id::AccountId, H256};
@@ -66,8 +70,16 @@ pub struct Storage {
 impl Storage {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = DB::open_default(path)?;
-        let db = WasmerRunner::new(db);
+        let db = WasmerRunner::new(Arc::new(db));
         Ok(Self { db })
+    }
+
+    /// Create a new `Storage` instance which shares the same underlying database.
+    /// This handy for handling RPC requests that requires different runners and the same db.
+    pub fn share(&self) -> Self {
+        Self {
+            db: WasmerRunner::new(self.db.clone()),
+        }
     }
 
     pub const fn runner_mut(&mut self) -> &mut WasmerRunner {

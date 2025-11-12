@@ -1,6 +1,6 @@
 #![allow(clippy::needless_pass_by_value)]
 
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
 use aurora_engine::parameters::TransactionExecutionResult;
 use aurora_engine_types::borsh::BorshDeserialize;
@@ -26,7 +26,7 @@ pub struct WasmerRunner {
 }
 
 impl Deref for WasmerRunner {
-    type Target = DB;
+    type Target = Arc<DB>;
 
     fn deref(&self) -> &Self::Target {
         &self.env.as_ref(&self.store).db
@@ -35,7 +35,7 @@ impl Deref for WasmerRunner {
 
 pub struct WasmEnv {
     state: NearState,
-    db: DB,
+    db: Arc<DB>,
     memory: Option<Memory>,
 }
 
@@ -177,7 +177,7 @@ fn value_return(env: FunctionEnvMut<WasmEnv>, value_len: u64, value_ptr: u64) {
 
 impl WasmerRunner {
     #[allow(clippy::too_many_lines)]
-    pub fn new(db: DB) -> Self {
+    pub fn new(db: Arc<DB>) -> Self {
         let mut store = Store::default();
 
         let state = WasmEnv {
