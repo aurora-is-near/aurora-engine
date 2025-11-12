@@ -10,7 +10,7 @@ name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     steps:
       - name: Setup RunsOn
         uses: runs-on/action@v2
@@ -42,7 +42,7 @@ jobs:
 
   test_modexp:
     name: Test modexp suite
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     container: rust:latest
     steps:
       - name: Setup RunsOn
@@ -70,7 +70,7 @@ jobs:
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     container: rust:latest
     steps:
       - name: Setup RunsOn

@@ -7,7 +7,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.12xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     strategy:
       fail-fast: false
       matrix:
@@ -57,7 +57,7 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.8xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-32cpu-64gb
     container: rust:latest
     steps:
       - name: Setup RunsOn
