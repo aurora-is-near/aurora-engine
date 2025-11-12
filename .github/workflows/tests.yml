@@ -5,12 +5,13 @@ on:
       - master
       - develop
   pull_request:
+  workflow_dispatch:
 
 name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
     steps:
       - name: Setup RunsOn
         uses: runs-on/action@v2
