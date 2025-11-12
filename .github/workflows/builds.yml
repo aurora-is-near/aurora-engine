@@ -7,11 +7,12 @@ name: Build
 jobs:
   build:
     name: Build contracts
-    runs-on: github-hosted-heavy-runner
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install Rust
@@ -21,6 +22,10 @@ jobs:
           override: true
       - name: Install cargo-make
         run: cargo install --no-default-features --force cargo-make
+      - name: Install dependencies
+        run: scripts/ci-deps/install-wasm-opt.sh
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Compile smart contracts
         run: |
           cargo make build-docker
@@ -33,9 +38,13 @@ jobs:
 
   publish:
     name: Publish contracts
-    runs-on: github-hosted-heavy-runner
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     needs: build
     steps:
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Download artifacts
         uses: actions/download-artifact@v4
       - run: ls -lH artifact

@@ -5,28 +5,27 @@ on:
       - master
       - develop
   pull_request:
+  workflow_dispatch:
 
 name: Tests
 jobs:
   test:
     name: Test suite
-    runs-on: github-hosted-heavy-runner
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: aurora-cargo-test
+          key: aurora-cargo-tests
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -35,69 +34,63 @@ jobs:
           cache-dependency-path: |
             etc/eth-contracts
             etc/tests/uniswap
-      - name: Install dependencies
+      - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
         run: scripts/ci-deps/install-wasm-opt.sh
-      - name: Tests
+      - name: Run tests
         run: cargo make test-flow
 
   test_modexp:
     name: Test modexp suite
-    runs-on: selfhosted-heavy
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: aurora-modexp-test
-      - name: Install dependencies
-        run: cargo +stable make -V || cargo +stable install cargo-make
+          key: aurora-modexp-tests
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
           node-version: 18
-      - name: Test bench-modexp
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Run bench-modexp tests
         run: cargo make bench-modexp
 
   build_xcc_router:
     name: Build XCC router
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-48cpu-96gb
     container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
-      - name: Cargo Cache
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            etc/xcc-router/target/
           key: cargo-build-xcc-router
-      - name: Install dependencies
+          cache-on-failure: "true"
+          cache-all-crates: "true"
+      - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Build
+      - name: Build XCC router
         run: cargo make build-xcc-router
 
 env:

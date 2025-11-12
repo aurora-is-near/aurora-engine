@@ -7,11 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Additions
+## [3.9.2] 2025-08-08
 
-- Added a possibility to deploy ERC-20 token with metadata by [@aleksuss]. ([#1008])
+### Fixes
 
-[#1008]: https://github.com/aurora-is-near/aurora-engine/pull/1008
+- Access to the silo-related transactions to the owner only by [@aleksuss]. ([#1030])
+
+[#1030]: https://github.com/aurora-is-near/aurora-engine/pull/1030
+
+## [3.9.1] 2025-07-09
+
+### Fixes
+
+- Improve security of the `exit_to_near` precompile by [@aleksuss]. ([#1024])
+
+[#1024]: https://github.com/aurora-is-near/aurora-engine/pull/1024
 
 ## [3.9.0] 2025-04-07
 
@@ -762,7 +772,10 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.2...develop
+[3.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...3.9.2
+[3.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...3.9.1
+[3.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...3.9.0
 [3.8.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.7.0...3.8.0
 [3.7.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.4...3.7.0
 [3.6.4]: https://github.com/aurora-is-near/aurora-engine/compare/3.6.3...3.6.4

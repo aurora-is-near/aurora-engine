@@ -10,24 +10,29 @@ name: Lints
 jobs:
   rust:
     name: Run ${{ matrix.command }}
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     strategy:
       fail-fast: false
       matrix:
         command: [ check-fmt, clippy, udeps ]
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aurora-${{ matrix.command }}-check
+          cache-on-failure: "true"
+          cache-all-crates: "true"
       - name: Install Rust toolchain and components
-        run: |
-          rustup component add rustfmt clippy
-          rustup toolchain add nightly
+        run: rustup toolchain add nightly
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run ${{ matrix.command }}
@@ -35,12 +40,13 @@ jobs:
 
   contracts:
     name: Contracts
-    runs-on: selfhosted
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
     container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
       - name: Install dependencies
