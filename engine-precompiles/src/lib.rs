@@ -62,7 +62,7 @@ impl PrecompileOutput {
     }
 }
 
-type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
+pub type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
