@@ -5,6 +5,7 @@ on:
       - master
       - develop
   pull_request:
+  workflow_dispatch:
 
 name: Tests
 jobs:
