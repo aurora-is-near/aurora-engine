@@ -161,7 +161,7 @@ fn test_consume_transaction() {
 
 #[test]
 fn test_block_index() {
-    let (temp_dir, mut storage) = create_db();
+    let (temp_dir, mut storage) = create_db(&"aurora".parse().unwrap());
 
     let block_hash = H256([3u8; 32]);
     let block_height = 17u64;
@@ -252,7 +252,7 @@ fn test_block_index() {
 
 #[test]
 fn test_transaction_index() {
-    let (temp_dir, mut storage) = create_db();
+    let (temp_dir, mut storage) = create_db(&"aurora".parse().unwrap());
 
     let block_height = 37u64;
     mocks::insert_block(&mut storage, block_height);

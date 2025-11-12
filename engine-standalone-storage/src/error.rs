@@ -1,5 +1,5 @@
 use crate::{TransactionIncluded, WasmRuntimeError};
-use aurora_engine_types::H256;
+use aurora_engine_types::{account_id::AccountId, H256};
 
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -12,6 +12,10 @@ pub enum Error {
     EngineAccountIdNotSet,
     EngineAccountIdCorrupted,
     Wasmer(WasmRuntimeError),
+    AccountIdMismatch {
+        expected: AccountId,
+        found: AccountId,
+    },
 }
 
 impl From<rocksdb::Error> for Error {

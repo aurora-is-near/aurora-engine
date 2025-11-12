@@ -24,6 +24,7 @@ mod wasmer_runner;
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
 
+use self::wasmer_runner::DerefDB;
 pub use self::wasmer_runner::{WasmInitError, WasmRuntimeError, WasmerRunner};
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
@@ -64,31 +65,50 @@ impl From<StoragePrefix> for u8 {
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
-    db: WasmerRunner,
+    db: DerefDB,
 }
 
 impl Storage {
+    pub fn open_ensure_account_id<P: AsRef<Path>>(path: P, id: &AccountId) -> Result<Self, Error> {
+        let db = DB::open_default(path)?;
+        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
+        let Some(slice) = db.get_pinned(&key)? else {
+            db.put(key, id.as_bytes())?;
+            let db = DerefDB::new(Arc::new(db));
+            return Ok(Self { db });
+        };
+
+        if id.as_bytes() != slice.as_ref() {
+            return Err(Error::AccountIdMismatch {
+                expected: AccountId::try_from(slice.as_ref())
+                    .map_err(|_| Error::EngineAccountIdCorrupted)?,
+                found: id.clone(),
+            });
+        }
+        drop(slice);
+
+        let db = DerefDB::new(Arc::new(db));
+        Ok(Self { db })
+    }
+
+    #[deprecated(note = "use open_ensure_account_id instead")]
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
         let db = DB::open_default(path)?;
-        let db = WasmerRunner::new(Arc::new(db));
+        let db = DerefDB::new(Arc::new(db));
         Ok(Self { db })
     }
 
     /// Create a new `Storage` instance which shares the same underlying database.
     /// This handy for handling RPC requests that requires different runners and the same db.
+    #[must_use]
     pub fn share(&self) -> Self {
         Self {
-            db: WasmerRunner::new(self.db.clone()),
+            db: DerefDB::new(self.db.clone()),
         }
     }
 
     pub const fn runner_mut(&mut self) -> &mut WasmerRunner {
-        &mut self.db
-    }
-
-    pub fn set_engine_account_id(&mut self, id: &AccountId) -> Result<(), rocksdb::Error> {
-        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
-        self.db.put(key, id.as_bytes())
+        &mut self.db.0
     }
 
     pub fn get_engine_account_id(&self) -> Result<AccountId, Error> {
@@ -238,9 +258,8 @@ impl Storage {
         })
     }
 
-    #[allow(clippy::needless_pass_by_ref_mut)]
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
-        &mut self,
+        &self,
         tx_hash: H256,
         tx_msg: &TransactionMessage,
         diff: &Diff,

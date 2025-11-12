@@ -25,11 +25,19 @@ pub struct WasmerRunner {
     instance: Option<Instance>,
 }
 
-impl Deref for WasmerRunner {
+pub struct DerefDB(pub WasmerRunner);
+
+impl DerefDB {
+    pub fn new(db: Arc<DB>) -> Self {
+        Self(WasmerRunner::new(db))
+    }
+}
+
+impl Deref for DerefDB {
     type Target = Arc<DB>;
 
     fn deref(&self) -> &Self::Target {
-        &self.env.as_ref(&self.store).db
+        &self.0.env.as_ref(&self.0.store).db
     }
 }
 

@@ -49,10 +49,6 @@ fn test_produce_snapshot() {
         chain_id: 1_313_161_554,
         ..Default::default()
     };
-    runner
-        .storage
-        .set_engine_account_id(&"aurora".parse().unwrap())
-        .unwrap();
     json_snapshot::initialize_engine_state(&runner.storage, snapshot.clone()).unwrap();
 
     // add a couple more transactions that write some extra keys

@@ -218,7 +218,9 @@ mod test {
     #[test]
     #[ignore]
     fn test_fill_db() {
-        let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
+        let mut storage =
+            crate::Storage::open_ensure_account_id("rocks_tmp/", &"aurora".parse().unwrap())
+                .unwrap();
         let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();
         let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),

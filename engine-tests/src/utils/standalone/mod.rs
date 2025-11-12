@@ -39,9 +39,6 @@ impl StandaloneRunner {
         self.chain_id = chain_id;
         let storage = &mut self.storage;
         let env = &mut self.env;
-        storage
-            .set_engine_account_id(&env.current_account_id)
-            .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
@@ -431,11 +428,8 @@ fn unwrap_result_ext(
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
-        let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
-        storage
-            .set_engine_account_id(&env.current_account_id)
-            .unwrap();
+        let (storage_dir, mut storage) = storage::create_db(&env.current_account_id);
 
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
