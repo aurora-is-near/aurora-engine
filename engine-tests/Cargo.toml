@@ -56,3 +56,6 @@ workspace = true
 
 [features]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
+# This feature skips heavy BLS tests.
+# E.g. of usage the feature: `cargo make test --features skip-bls-tests`
+skip-bls-tests = []

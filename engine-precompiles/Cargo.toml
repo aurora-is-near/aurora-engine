@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-precompiles"
-version = "1.2.0"
+version = "1.3.0"
 description = "Set of precompiles that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
@@ -33,7 +33,7 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-evm/std", "bn/std", "ethabi/std", "serde/std", "serde_json/std"]
-contract = ["aurora-engine-sdk/contract"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/bls", "aurora-engine-sdk/std", "aurora-evm/std", "bn/std", "ethabi/std", "serde/std", "serde_json/std"]
+contract = ["aurora-engine-sdk/contract", "aurora-engine-sdk/bls"]
 log = []
 error_refund = []

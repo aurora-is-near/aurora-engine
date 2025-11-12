@@ -313,7 +313,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-precompiles"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-sdk",
@@ -331,10 +331,11 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-sdk"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-types",
  "base64 0.22.1",
+ "blst",
  "hex",
  "libsecp256k1",
  "ripemd",
@@ -407,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-transactions"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
