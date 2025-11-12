@@ -84,7 +84,7 @@ fn test_1inch_liquidity_protocol() {
 }
 
 #[test]
-fn test_1_inch_limit_order_deploy() {
+fn test_1inch_limit_order_deploy() {
     // set up Aurora runner and accounts
     let (mut runner, mut source_account) = initialize();
 
