@@ -20,7 +20,7 @@ impl Helper<'_> {
         let data = deployer_constructor.code;
         let abi = deployer_constructor.abi;
 
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
                 crate::prelude::transactions::legacy::TransactionLegacy {
@@ -33,15 +33,16 @@ impl Helper<'_> {
                 }
             })
             .unwrap();
+        let profile = result.execution_profile.unwrap();
 
         let deployer_address =
-            Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
+            Address::try_from_slice(utils::unwrap_success_slice(&result.inner)).unwrap();
         let deployer = PoolDeployer(solidity::DeployedContract {
             abi,
             address: deployer_address,
         });
 
-        (result, profile, deployer)
+        (result.inner, profile, deployer)
     }
 
     pub(crate) fn create_pool_factory(
@@ -53,7 +54,7 @@ impl Helper<'_> {
         );
 
         let signer_address = utils::address_from_secret_key(&self.signer.secret_key);
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
                 constructor.deploy_with_args(
@@ -66,11 +67,12 @@ impl Helper<'_> {
                 )
             })
             .unwrap();
+        let profile = result.execution_profile.unwrap();
 
-        let address = Address::try_from_slice(utils::unwrap_success_slice(&result)).unwrap();
+        let address = Address::try_from_slice(utils::unwrap_success_slice(&result.inner)).unwrap();
         let pool_factory = PoolFactory(constructor.deployed_at(address));
 
-        (result, profile, pool_factory)
+        (result.inner, profile, pool_factory)
     }
 
     pub(crate) fn create_pool(
@@ -83,7 +85,7 @@ impl Helper<'_> {
             LIQUIDITY_PROTOCOL_PATH.join("Mooniswap.sol/Mooniswap.json"),
         );
 
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
                 pool_factory.0.call_method_with_args(
@@ -96,12 +98,13 @@ impl Helper<'_> {
                 )
             })
             .unwrap();
+        let profile = result.execution_profile.unwrap();
 
         let address =
-            Address::try_from_slice(&utils::unwrap_success_slice(&result)[12..32]).unwrap();
+            Address::try_from_slice(&utils::unwrap_success_slice(&result.inner)[12..32]).unwrap();
         let pool = Pool(constructor.deployed_at(address));
 
-        (result, profile, pool)
+        (result.inner, profile, pool)
     }
 
     pub(crate) fn create_erc20(&mut self, name: &str, symbol: &str) -> ERC20 {
@@ -199,14 +202,15 @@ impl Helper<'_> {
         method_name: &str,
         args: &[ethabi::Token],
     ) -> (SubmitResult, ExecutionProfile) {
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(self.signer, |nonce| {
                 pool.0.call_method_with_args(method_name, args, nonce)
             })
             .unwrap();
-        assert!(result.status.is_ok());
-        (result, profile)
+        let profile = result.execution_profile.unwrap();
+        assert!(result.inner.status.is_ok());
+        (result.inner, profile)
     }
 }
 

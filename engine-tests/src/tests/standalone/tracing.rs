@@ -2,7 +2,7 @@
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
-use engine_standalone_tracing::{sputnik, types::TransactionTrace};
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use serde::Deserialize;
 use std::path::Path;
 
@@ -72,13 +72,16 @@ fn test_evm_tracing_with_storage() {
             signer: "system".parse().unwrap(),
             caller: "system".parse().unwrap(),
             attached_near: 0,
-            transaction: engine_standalone_storage::sync::types::TransactionKind::Unknown,
+            transaction: engine_standalone_storage::sync::types::TransactionKind::unknown(),
             promise_data: Vec::new(),
-            raw_input: Vec::new(),
             action_hash: H256::default(),
+            trace_kind: None,
         },
         diff,
         maybe_result: Ok(None),
+        trace_log: None,
+        call_tracer: None,
+        custom_debug_info: None,
     };
     standalone::storage::commit(&mut runner.storage, &tx);
 
@@ -92,16 +95,15 @@ fn test_evm_tracing_with_storage() {
         tx_nonce,
         None,
     );
-    let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
-        runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
-    });
+    let (result, trace_log) = runner
+        .submit_raw_transaction_bytes(&tx_bytes, Some(TraceKind::Transaction))
+        .unwrap();
     assert!(result.status.is_ok());
     assert_eq!(result.gas_used, 45_038);
 
     // Check trace
     check_transaction_trace(
-        &listener.finish(),
+        trace_log,
         "src/tests/res/79f7f8f9b3ad98f29a3df5cbed1556397089701c3ce007c2844605849dfb0ad4_trace.json",
     );
 
@@ -115,16 +117,15 @@ fn test_evm_tracing_with_storage() {
         tx_nonce,
         None,
     );
-    let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
-        runner.submit_raw_transaction_bytes(&tx_bytes).unwrap()
-    });
+    let (result, trace_log) = runner
+        .submit_raw_transaction_bytes(&tx_bytes, Some(TraceKind::Transaction))
+        .unwrap();
     assert!(result.status.is_ok());
     assert_eq!(result.gas_used, 27_938);
 
     // Check trace
     check_transaction_trace(
-        &listener.finish(),
+        trace_log,
         "src/tests/res/33db52b0e7fa03cd84e8c99fea90a1962b4f8d0e63c8bbe4c11373a233dc4f0e_trace.json",
     );
 }
@@ -163,31 +164,26 @@ fn test_evm_tracing() {
         value: Wei::zero(),
         data: hex::decode(CONTRACT_INPUT).unwrap(),
     };
-    let mut listener = sputnik::TransactionTraceBuilder::default();
-    let result = sputnik::traced_call(&mut listener, || {
-        runner.submit_transaction(&signer.secret_key, tx).unwrap()
-    });
-    assert!(result.status.is_ok());
+    let result = runner
+        .submit_transaction_with_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let tracing_log = result.trace_log.unwrap();
+    assert!(result.inner.status.is_ok());
 
     // Check trace
-    let trace = listener.finish();
-    let positions: Vec<u8> = trace
-        .logs()
-        .0
+    let positions: Vec<u8> = tracing_log
         .iter()
         .filter_map(|l| u8::try_from(l.program_counter.into_u32()).ok())
         .collect();
     assert_eq!(positions.as_slice(), &EXPECTED_POSITIONS);
 
-    let costs: Vec<u32> = trace
-        .logs()
-        .0
+    let costs: Vec<u32> = tracing_log
         .iter()
         .filter_map(|l| u32::try_from(l.gas_cost.as_u64()).ok())
         .collect();
     assert_eq!(costs.as_slice(), &EXPECTED_COSTS);
 
-    let op_codes: Vec<u8> = trace.logs().0.iter().map(|l| l.opcode.0).collect();
+    let op_codes: Vec<u8> = tracing_log.iter().map(|l| l.opcode.0).collect();
     assert_eq!(op_codes.as_slice(), &EXPECTED_OP_CODES);
 }
 
@@ -207,15 +203,19 @@ const EXPECTED_OP_CODES: [u8; 27] = [
     91, 91, 91, 0,
 ];
 
-fn check_transaction_trace<P: AsRef<Path>>(trace: &TransactionTrace, expected_trace_path: P) {
+fn check_transaction_trace<P: AsRef<Path>>(
+    trace_log: Option<Vec<TraceLog>>,
+    expected_trace_path: P,
+) {
     let expected_trace: Vec<EtherscanTraceStep> = {
         let file = std::fs::File::open(expected_trace_path).unwrap();
         let reader = std::io::BufReader::new(file);
         serde_json::from_reader(reader).unwrap()
     };
 
-    assert_eq!(trace.logs().0.len(), expected_trace.len());
-    for (log, step) in trace.logs().0.iter().zip(expected_trace) {
+    let trace = trace_log.unwrap();
+    assert_eq!(trace.len(), expected_trace.len());
+    for (log, step) in trace.iter().zip(expected_trace) {
         assert_eq!(
             log.program_counter.0, step.pc,
             "Program counters should match"

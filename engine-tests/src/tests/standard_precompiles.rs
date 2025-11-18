@@ -10,10 +10,10 @@ const INITIAL_NONCE: u64 = 0;
 
 fn precompile_execution_profile(method: &str) -> ExecutionProfile {
     let (mut runner, mut signer, contract) = initialize();
-    let (_result, profile) = runner
+    let result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| contract.call_method(method, nonce))
         .unwrap();
-    profile
+    result.execution_profile.unwrap()
 }
 
 #[test]

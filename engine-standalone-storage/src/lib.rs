@@ -4,6 +4,7 @@ use rocksdb::DB;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use sync::types::TransactionMessage;
 
 const VERSION: u8 = 0;
@@ -16,9 +17,13 @@ pub mod promise;
 pub mod relayer_db;
 /// Functions for receiving new blocks and transactions to keep the storage up to date.
 pub mod sync;
+mod wasmer_runner;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
+
+use self::wasmer_runner::DerefDB;
+pub use self::wasmer_runner::{WasmInitError, WasmRuntimeError, WasmerRunner};
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,
@@ -58,18 +63,43 @@ impl From<StoragePrefix> for u8 {
 const ACCOUNT_ID_KEY: &[u8] = b"engine_account_id";
 
 pub struct Storage {
-    db: DB,
+    db: DerefDB,
 }
 
 impl Storage {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, rocksdb::Error> {
+    pub fn open_ensure_account_id<P: AsRef<Path>>(path: P, id: &AccountId) -> Result<Self, Error> {
         let db = DB::open_default(path)?;
+        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
+        let Some(slice) = db.get_pinned(&key)? else {
+            db.put(key, id.as_bytes())?;
+            let db = DerefDB::new(Arc::new(db));
+            return Ok(Self { db });
+        };
+
+        if id.as_bytes() != slice.as_ref() {
+            return Err(Error::AccountIdMismatch {
+                expected: AccountId::try_from(slice.as_ref())
+                    .map_err(|_| Error::EngineAccountIdCorrupted)?,
+                found: id.clone(),
+            });
+        }
+        drop(slice);
+
+        let db = DerefDB::new(Arc::new(db));
         Ok(Self { db })
     }
 
-    pub fn set_engine_account_id(&mut self, id: &AccountId) -> Result<(), rocksdb::Error> {
-        let key = construct_storage_key(StoragePrefix::EngineAccountId, ACCOUNT_ID_KEY);
-        self.db.put(key, id.as_bytes())
+    /// Create a new `Storage` instance which shares the same underlying database.
+    /// This handy for handling RPC requests that requires different runners and the same db.
+    #[must_use]
+    pub fn share(&self) -> Self {
+        Self {
+            db: DerefDB::new(self.db.clone()),
+        }
+    }
+
+    pub const fn runner_mut(&mut self) -> &mut WasmerRunner {
+        &mut self.db.0
     }
 
     pub fn get_engine_account_id(&self) -> Result<AccountId, Error> {
@@ -221,7 +251,7 @@ impl Storage {
 
     #[allow(clippy::needless_pass_by_ref_mut)]
     fn process_transaction<F: Fn(&mut rocksdb::WriteBatch, &[u8], &[u8])>(
-        &mut self,
+        &self,
         tx_hash: H256,
         tx_msg: &TransactionMessage,
         diff: &Diff,
@@ -309,7 +339,7 @@ impl Storage {
         while iter.valid() {
             // unwrap is safe because the iterator is valid
             let db_key = iter.key().expect("iterator should is invalid").to_vec();
-            if db_key.get(0..engine_prefix_len) != Some(&engine_prefix) {
+            if !db_key.starts_with(&engine_prefix) {
                 break;
             }
             // raw engine key skips the 2-byte prefix and the block+position suffix
@@ -415,6 +445,41 @@ impl Storage {
         let key = construct_storage_key(StoragePrefix::CustomData, key);
         self.db.put(key, value)
     }
+
+    /// Retrieve data for a key with `CustomData` prefix at (after) the block
+    /// and position in the block or any further, but bellow next such record.
+    pub fn get_custom_data_at(
+        &self,
+        key: &[u8],
+        block_height: u64,
+        transaction_position: u16,
+    ) -> Result<Option<Vec<u8>>, rocksdb::Error> {
+        let prefix = construct_custom_key_prefix(key);
+        let mut it = self.db.prefix_iterator(&prefix);
+
+        let prefix_from =
+            construct_custom_key_at(key, block_height, transaction_position).into_boxed_slice();
+        it.set_mode(rocksdb::IteratorMode::From(
+            prefix_from.as_ref(),
+            rocksdb::Direction::Reverse,
+        ));
+        let minimal = construct_custom_key_at(key, 0, 0).into_boxed_slice();
+        let mut it = it.take_while(|r| r.as_ref().is_ok_and(|(k, _v)| k >= &minimal));
+        Ok(it.next().transpose()?.map(|(_k, v)| v.to_vec()))
+    }
+
+    /// Save data for a key with `CustomData` prefix at the block
+    /// and position in the block.
+    pub fn set_custom_data_at(
+        &self,
+        key: &[u8],
+        block_height: u64,
+        transaction_position: u16,
+        value: &[u8],
+    ) -> Result<(), rocksdb::Error> {
+        let key = construct_custom_key_at(key, block_height, transaction_position);
+        self.db.put(key, value)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -499,6 +564,23 @@ fn construct_storage_key(prefix: StoragePrefix, key: &[u8]) -> Vec<u8> {
 fn construct_engine_key(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {
     construct_storage_key(
         StoragePrefix::Engine,
+        [
+            key,
+            &block_height.to_be_bytes(),
+            &transaction_position.to_be_bytes(),
+        ]
+        .concat()
+        .as_slice(),
+    )
+}
+
+fn construct_custom_key_prefix(key: &[u8]) -> Vec<u8> {
+    construct_storage_key(StoragePrefix::CustomData, key)
+}
+
+fn construct_custom_key_at(key: &[u8], block_height: u64, transaction_position: u16) -> Vec<u8> {
+    construct_storage_key(
+        StoragePrefix::CustomData,
         [
             key,
             &block_height.to_be_bytes(),

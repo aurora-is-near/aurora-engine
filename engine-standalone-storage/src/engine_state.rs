@@ -65,7 +65,10 @@ impl<'db, 'input, 'output> EngineStateAccess<'db, 'input, 'output> {
 
     #[must_use]
     pub fn get_transaction_diff(&self) -> Diff {
-        self.transaction_diff.borrow().clone()
+        let mut diff = self.transaction_diff.borrow().clone();
+        // do not commit debugging info
+        diff.retain(|key, _| !key.starts_with(b"borealis/"));
+        diff
     }
 
     fn construct_engine_read(&self, key: &[u8]) -> rocksdb::ReadOptions {

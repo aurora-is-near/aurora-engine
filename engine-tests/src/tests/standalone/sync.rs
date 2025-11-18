@@ -1,4 +1,3 @@
-use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
@@ -43,8 +42,7 @@ fn test_consume_deploy_message() {
 
     let code = b"hello_world!".to_vec();
     let input = utils::create_deploy_transaction(code.clone(), U256::zero()).data;
-    let tx_kind = sync::types::TransactionKind::Deploy(input);
-    let raw_input = tx_kind.raw_bytes();
+    let tx_kind = sync::types::TransactionKind::new_deploy(input);
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -56,11 +54,11 @@ fn test_consume_deploy_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -99,8 +97,7 @@ fn test_consume_deploy_erc20_message() {
     let dest_address = Address::new(H160([170u8; 20]));
 
     let args = aurora_engine::parameters::DeployErc20TokenArgs::Legacy(token.clone());
-    let tx_kind = sync::types::TransactionKind::DeployErc20(args);
-    let raw_input = tx_kind.raw_bytes();
+    let tx_kind = sync::types::TransactionKind::deploy_erc20(&args);
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
         near_receipt_id: H256([8u8; 32]),
@@ -111,12 +108,12 @@ fn test_consume_deploy_erc20_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
     // Deploy ERC-20 (this would be the flow for bridging a new NEP-141 to Aurora)
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -142,8 +139,7 @@ fn test_consume_deploy_erc20_message() {
         amount: Balance::new(mint_amount),
         msg: hex::encode(dest_address.as_bytes()),
     };
-    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
-    let raw_input = tx_kind.raw_bytes();
+    let tx_kind = sync::types::TransactionKind::new_ft_on_transfer(&args);
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
         near_receipt_id: H256([8u8; 32]),
@@ -154,12 +150,12 @@ fn test_consume_deploy_erc20_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
     // Mint new tokens (via ft_on_transfer flow, same as the bridge)
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -199,8 +195,7 @@ fn test_consume_ft_on_transfer_message() {
         ]
         .concat(),
     };
-    let tx_kind = sync::types::TransactionKind::FtOnTransfer(args);
-    let raw_input = tx_kind.raw_bytes();
+    let tx_kind = sync::types::TransactionKind::new_ft_on_transfer(&args);
     let caller = utils::standalone::mocks::EXT_ETH_CONNECTOR.parse().unwrap();
     let transaction_message = sync::types::TransactionMessage {
         block_hash: block_message.hash,
@@ -212,11 +207,11 @@ fn test_consume_ft_on_transfer_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -246,11 +241,8 @@ fn test_consume_call_message() {
     utils::standalone::mocks::insert_block(&mut runner.storage, runner.env.block_height);
     let block_hash = utils::standalone::mocks::compute_block_hash(runner.env.block_height);
 
-    let tx_kind = sync::types::TransactionKind::Call(simple_transfer_args(
-        recipient_address,
-        transfer_amount,
-    ));
-    let raw_input = tx_kind.raw_bytes();
+    let args = simple_transfer_args(recipient_address, transfer_amount);
+    let tx_kind = sync::types::TransactionKind::new_call(&args);
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
         near_receipt_id: H256([8u8; 32]),
@@ -261,11 +253,11 @@ fn test_consume_call_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -303,8 +295,7 @@ fn test_consume_submit_message() {
         utils::sign_transaction(transaction, Some(runner.chain_id), &signer.secret_key);
     let eth_transaction =
         crate::prelude::transactions::EthTransactionKind::Legacy(signed_transaction);
-    let tx_kind = sync::types::TransactionKind::Submit(eth_transaction);
-    let raw_input = tx_kind.raw_bytes();
+    let tx_kind = sync::types::TransactionKind::submit(&eth_transaction);
 
     let transaction_message = sync::types::TransactionMessage {
         block_hash,
@@ -316,11 +307,11 @@ fn test_consume_submit_message() {
         attached_near: 0,
         transaction: tx_kind,
         promise_data: Vec::new(),
-        raw_input,
         action_hash: H256::default(),
+        trace_kind: None,
     };
 
-    let outcome = sync::consume_message::<AuroraModExp>(
+    let outcome = sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Transaction(Box::new(transaction_message)),
     )
@@ -365,7 +356,7 @@ fn initialize() -> (StandaloneRunner, sync::types::BlockMessage) {
     runner.init_evm();
 
     let block_message = sample_block();
-    sync::consume_message::<AuroraModExp>(
+    sync::consume_message::<false>(
         &mut runner.storage,
         sync::types::Message::Block(block_message.clone()),
     )

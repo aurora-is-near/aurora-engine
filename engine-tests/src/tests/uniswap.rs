@@ -29,7 +29,7 @@ fn test_uniswap_input_multihop() {
     let mut context = UniswapTestContext::new("uniswap");
 
     // evm_gas = 970k
-    // near total gas = 82 Tgas
+    // near total gas = 85 Tgas
 
     let tokens = context.create_tokens(10, MINT_AMOUNT.into());
     for (token_a, token_b) in tokens.iter().zip(tokens.iter().skip(1)) {
@@ -39,7 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(82, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(85, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -235,15 +235,16 @@ impl UniswapTestContext {
         let params = self.mint_params(amount, token_a, token_b);
 
         let manager = &self.manager;
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(&mut self.signer, |nonce| manager.mint(&params, nonce))
             .unwrap();
-        assert!(result.status.is_ok());
+        let profile = result.execution_profile.unwrap();
+        assert!(result.inner.status.is_ok());
 
         let result = {
             let mut values = [U256::zero(); 4];
-            let result_bytes = utils::unwrap_success(result);
+            let result_bytes = utils::unwrap_success(result.inner);
             for (i, item) in values.iter_mut().enumerate() {
                 let lower = i * 32;
                 let upper = (i + 1) * 32;
@@ -290,16 +291,17 @@ impl UniswapTestContext {
         }
         let params = Self::exact_input_params(amount_in, token_path);
         let swap_router = &self.swap_router;
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(&mut self.signer, |nonce| {
                 swap_router.exact_input(&params, nonce)
             })
             .unwrap();
-        assert!(result.status.is_ok(), "Swap failed");
+        let profile = result.execution_profile.unwrap();
+        assert!(result.inner.status.is_ok(), "Swap failed");
 
-        let evm_gas = result.gas_used;
-        let amount_out = U256::from_big_endian(&utils::unwrap_success(result));
+        let evm_gas = result.inner.gas_used;
+        let amount_out = U256::from_big_endian(&utils::unwrap_success(result.inner));
         (amount_out, evm_gas, profile)
     }
 
@@ -332,15 +334,16 @@ impl UniswapTestContext {
 
         let params = Self::exact_output_single_params(amount_out, token_in, token_out);
         let swap_router = &self.swap_router;
-        let (result, profile) = self
+        let result = self
             .runner
             .submit_with_signer_profiled(&mut self.signer, |nonce| {
                 swap_router.exact_output_single(&params, nonce)
             })
             .unwrap();
-        assert!(result.status.is_ok(), "Swap failed");
+        let profile = result.execution_profile.unwrap();
+        assert!(result.inner.status.is_ok(), "Swap failed");
 
-        let amount_in = U256::from_big_endian(&utils::unwrap_success(result));
+        let amount_in = U256::from_big_endian(&utils::unwrap_success(result.inner));
         assert!(amount_in >= amount_out);
 
         (amount_in, profile)
