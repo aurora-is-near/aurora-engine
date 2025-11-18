@@ -119,7 +119,7 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
 #[cfg(not(feature = "contract"))]
 #[must_use]
 pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
-    bn128::g1_sum(left, right).unwrap_or_else(|_| [0u8; 64])
+    bn128::g1_sum(left, right).unwrap_or([0u8; 64])
 }
 
 #[cfg(feature = "contract")]
@@ -148,7 +148,7 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
 #[cfg(not(feature = "contract"))]
 #[must_use]
 pub fn alt_bn128_g1_scalar_multiple(point: [u8; 64], scalar: [u8; 32]) -> [u8; 64] {
-    bn128::g1_scalar_multiple(point, scalar).unwrap_or_else(|_| [0u8; 64])
+    bn128::g1_scalar_multiple(point, scalar).unwrap_or([0u8; 64])
 }
 
 #[cfg(feature = "contract")]

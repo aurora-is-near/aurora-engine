@@ -47,7 +47,6 @@ fn read_bn_g2(mut x: [u8; 0x80]) -> Result<bn::G2, BnError> {
 }
 
 /// Big-endian inputs and outputs
-#[must_use]
 pub fn g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
     let p1 = read_bn_point(left)?;
     let p2 = read_bn_point(right)?;
@@ -62,7 +61,6 @@ pub fn g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
 }
 
 /// Big-endian inputs and outputs
-#[must_use]
 pub fn g1_scalar_multiple(point: [u8; 64], mut scalar: [u8; 32]) -> Result<[u8; 64], BnError> {
     let p = read_bn_point(point)?;
     scalar.reverse(); // To little-endian
@@ -77,7 +75,6 @@ pub fn g1_scalar_multiple(point: [u8; 64], mut scalar: [u8; 32]) -> Result<[u8; 
 }
 
 /// Big-endian inputs
-#[must_use]
 pub fn pairing<I>(pairs: I) -> Result<bool, BnError>
 where
     I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
