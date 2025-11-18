@@ -8,6 +8,8 @@ use crate::prelude::{Vec, U256};
 pub use types::keccak;
 
 pub mod base64;
+#[cfg(not(feature = "contract"))]
+mod bn128;
 pub mod caching;
 pub mod env;
 pub mod error;
@@ -114,6 +116,12 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
     }
 }
 
+#[cfg(not(feature = "contract"))]
+#[must_use]
+pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
+    bn128::g1_sum(left, right).unwrap_or_else(|_| [0u8; 64])
+}
+
 #[cfg(feature = "contract")]
 #[must_use]
 pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
@@ -137,6 +145,12 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
     }
 }
 
+#[cfg(not(feature = "contract"))]
+#[must_use]
+pub fn alt_bn128_g1_scalar_multiple(point: [u8; 64], scalar: [u8; 32]) -> [u8; 64] {
+    bn128::g1_scalar_multiple(point, scalar).unwrap_or_else(|_| [0u8; 64])
+}
+
 #[cfg(feature = "contract")]
 pub fn alt_bn128_pairing<I>(pairs: I) -> bool
 where
@@ -144,11 +158,9 @@ where
 {
     let n = pairs.len();
     let mut bytes = Vec::with_capacity(n * 6 * 32);
-    let mut buf = [0u8; 64 + 128];
     for (g1, g2) in pairs {
-        buf[0..64].copy_from_slice(&g1);
-        buf[64..192].copy_from_slice(&g2);
-        bytes.extend_from_slice(&buf);
+        bytes.extend_from_slice(&g1);
+        bytes.extend_from_slice(&g2);
     }
 
     let value_ptr = bytes.as_ptr() as u64;
@@ -157,6 +169,16 @@ where
     let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
 
     result == 1
+}
+
+#[cfg(not(feature = "contract"))]
+pub fn alt_bn128_pairing<I>(pairs: I) -> bool
+where
+    I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
+{
+    let res = bn128::pairing(pairs);
+    debug_assert!(res.is_ok());
+    res.unwrap_or_default()
 }
 
 /// Recover address from message hash and signature.

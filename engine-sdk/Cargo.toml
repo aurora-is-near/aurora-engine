@@ -15,6 +15,7 @@ publish = true
 [dependencies]
 aurora-engine-types.workspace = true
 base64.workspace = true
+bn = { workspace = true }
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 ripemd.workspace = true
 sha2.workspace = true
