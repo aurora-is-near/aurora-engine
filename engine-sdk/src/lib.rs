@@ -29,6 +29,12 @@ const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
 #[cfg(feature = "contract")]
 const ECRECOVER_MALLEABILITY_FLAG: u64 = 0;
 
+#[derive(Debug)]
+pub enum BnError {
+    Field(bn::FieldError),
+    Group(bn::GroupError),
+}
+
 #[cfg(feature = "contract")]
 pub fn panic_utf8(bytes: &[u8]) -> ! {
     unsafe {
@@ -91,8 +97,7 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
 }
 
 #[cfg(feature = "contract")]
-#[must_use]
-pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
+pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
     let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
 
     bytes.push(0); // positive sign
@@ -112,19 +117,17 @@ pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
         let y = U256::from_little_endian(&output[32..64]);
         output[0..32].copy_from_slice(&x.to_big_endian());
         output[32..64].copy_from_slice(&y.to_big_endian());
-        output
+        Ok(output)
     }
 }
 
 #[cfg(not(feature = "contract"))]
-#[must_use]
-pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
-    bn128::g1_sum(left, right).unwrap_or([0u8; 64])
+pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
+    bn128::g1_sum(left, right)
 }
 
 #[cfg(feature = "contract")]
-#[must_use]
-pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
+pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> Result<[u8; 64], BnError> {
     let mut bytes = [0u8; 96];
     bytes[0..64].copy_from_slice(&g1);
     bytes[64..96].copy_from_slice(&fr);
@@ -141,18 +144,20 @@ pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
         let y = U256::from_little_endian(&output[32..64]);
         output[0..32].copy_from_slice(&x.to_big_endian());
         output[32..64].copy_from_slice(&y.to_big_endian());
-        output
+        Ok(output)
     }
 }
 
 #[cfg(not(feature = "contract"))]
-#[must_use]
-pub fn alt_bn128_g1_scalar_multiple(point: [u8; 64], scalar: [u8; 32]) -> [u8; 64] {
-    bn128::g1_scalar_multiple(point, scalar).unwrap_or([0u8; 64])
+pub fn alt_bn128_g1_scalar_multiple(
+    point: [u8; 64],
+    scalar: [u8; 32],
+) -> Result<[u8; 64], BnError> {
+    bn128::g1_scalar_multiple(point, scalar)
 }
 
 #[cfg(feature = "contract")]
-pub fn alt_bn128_pairing<I>(pairs: I) -> bool
+pub fn alt_bn128_pairing<I>(pairs: I) -> Result<bool, BnError>
 where
     I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
 {
@@ -168,17 +173,15 @@ where
 
     let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
 
-    result == 1
+    Ok(result == 1)
 }
 
 #[cfg(not(feature = "contract"))]
-pub fn alt_bn128_pairing<I>(pairs: I) -> bool
+pub fn alt_bn128_pairing<I>(pairs: I) -> Result<bool, BnError>
 where
     I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
 {
-    let res = bn128::pairing(pairs);
-    debug_assert!(res.is_ok());
-    res.unwrap_or_default()
+    bn128::pairing(pairs)
 }
 
 /// Recover address from message hash and signature.

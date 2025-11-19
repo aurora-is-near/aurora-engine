@@ -2,6 +2,7 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
+use aurora_engine_sdk::BnError;
 use aurora_evm::{Context, ExitError};
 use bn::Group;
 use core::num::{NonZeroU64, NonZeroUsize};
@@ -56,7 +57,6 @@ mod consts {
     pub(super) const POINT_LEN: usize = 64;
 
     /// Size of BN pairs.
-    #[cfg(feature = "contract")]
     pub(super) const POINT_PAIR_LEN: usize = 128;
 
     /// Output length.
@@ -67,7 +67,6 @@ mod consts {
     pub(super) const ERR_BIG_ENDIAN: ExitError = ExitError::Other(Borrowed("ERR_BIG_ENDIAN"));
 }
 
-#[cfg(feature = "contract")]
 mod type_arith {
     pub struct Double<const P: usize>;
     pub trait Is<const S: usize> {}
@@ -76,14 +75,12 @@ mod type_arith {
     impl Is<32> for Double<16> {}
 }
 
-#[cfg(feature = "contract")]
 trait HostFnEncode {
     type Encoded;
 
     fn host_fn_encode(self) -> Self::Encoded;
 }
 
-#[cfg(feature = "contract")]
 fn concat_low_high<const P: usize, const S: usize>(low: [u8; P], high: [u8; P]) -> [u8; S]
 where
     type_arith::Double<P>: type_arith::Is<S>,
@@ -94,7 +91,6 @@ where
     bytes
 }
 
-#[cfg(feature = "contract")]
 impl HostFnEncode for bn::Fr {
     type Encoded = [u8; consts::SCALAR_LEN];
 
@@ -104,7 +100,6 @@ impl HostFnEncode for bn::Fr {
     }
 }
 
-#[cfg(feature = "contract")]
 impl HostFnEncode for bn::Fq {
     type Encoded = [u8; consts::SCALAR_LEN];
 
@@ -114,7 +109,6 @@ impl HostFnEncode for bn::Fq {
     }
 }
 
-#[cfg(feature = "contract")]
 impl HostFnEncode for bn::Fq2 {
     type Encoded = [u8; consts::SCALAR_LEN * 2];
 
@@ -130,7 +124,6 @@ impl HostFnEncode for bn::Fq2 {
     }
 }
 
-#[cfg(feature = "contract")]
 impl HostFnEncode for bn::G1 {
     type Encoded = [u8; consts::POINT_LEN];
 
@@ -145,7 +138,6 @@ impl HostFnEncode for bn::G1 {
     }
 }
 
-#[cfg(feature = "contract")]
 impl HostFnEncode for bn::G2 {
     type Encoded = [u8; consts::POINT_PAIR_LEN];
 
@@ -182,6 +174,14 @@ fn read_point(input: &[u8], pos: usize) -> Result<bn::G1, ExitError> {
     })
 }
 
+#[allow(clippy::needless_pass_by_value)]
+const fn bn_error(err: BnError) -> ExitError {
+    match err {
+        BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
+        BnError::Group(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")),
+    }
+}
+
 #[derive(Default)]
 pub struct Bn256Add<HF: HardFork>(PhantomData<HF>);
 
@@ -206,27 +206,9 @@ impl<HF: HardFork> Bn256Add<HF> {
         Ok(output.to_vec())
     }
 
-    #[cfg(not(feature = "contract"))]
     fn execute(p1: bn::G1, p2: bn::G1) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
-        let mut output = [0u8; consts::POINT_LEN];
-        if let Some(sum) = bn::AffineG1::from_jacobian(p1 + p2) {
-            sum.x()
-                .to_big_endian(&mut output[0..consts::SCALAR_LEN])
-                .map_err(|_| consts::ERR_BIG_ENDIAN)?;
-            sum.y()
-                .to_big_endian(&mut output[consts::SCALAR_LEN..consts::SCALAR_LEN * 2])
-                .map_err(|_| consts::ERR_BIG_ENDIAN)?;
-        }
-        Ok(output)
-    }
-
-    #[cfg(feature = "contract")]
-    #[allow(clippy::unnecessary_wraps)]
-    fn execute(p1: bn::G1, p2: bn::G1) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
-        Ok(aurora_engine_sdk::alt_bn128_g1_sum(
-            p1.host_fn_encode(),
-            p2.host_fn_encode(),
-        ))
+        aurora_engine_sdk::alt_bn128_g1_sum(p1.host_fn_encode(), p2.host_fn_encode())
+            .map_err(bn_error)
     }
 }
 
@@ -313,29 +295,9 @@ impl<HF: HardFork> Bn256Mul<HF> {
         Ok(output.to_vec())
     }
 
-    #[cfg(not(feature = "contract"))]
-    fn execute(p: bn::G1, fr: bn::Fr) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
-        let mut output = [0u8; consts::OUTPUT_LEN];
-        if let Some(mul) = bn::AffineG1::from_jacobian(p * fr) {
-            mul.x()
-                .into_u256()
-                .to_big_endian(&mut output[0..consts::SCALAR_LEN])
-                .map_err(|_e| consts::ERR_BIG_ENDIAN)?;
-            mul.y()
-                .into_u256()
-                .to_big_endian(&mut output[consts::SCALAR_LEN..consts::SCALAR_LEN * 2])
-                .map_err(|_e| consts::ERR_BIG_ENDIAN)?;
-        }
-        Ok(output)
-    }
-
-    #[cfg(feature = "contract")]
-    #[allow(clippy::unnecessary_wraps)]
     fn execute(g1: bn::G1, fr: bn::Fr) -> Result<[u8; consts::OUTPUT_LEN], ExitError> {
-        Ok(aurora_engine_sdk::alt_bn128_g1_scalar_multiple(
-            g1.host_fn_encode(),
-            fr.host_fn_encode(),
-        ))
+        aurora_engine_sdk::alt_bn128_g1_scalar_multiple(g1.host_fn_encode(), fr.host_fn_encode())
+            .map_err(bn_error)
     }
 }
 
@@ -474,7 +436,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 vals.push((g1_a, g1_b));
             }
 
-            let result = Self::execute(vals);
+            let result = Self::execute(vals)?;
             if result {
                 bn::arith::U256::one()
             } else {
@@ -489,18 +451,11 @@ impl<HF: HardFork> Bn256Pair<HF> {
         Ok(res)
     }
 
-    #[cfg(not(feature = "contract"))]
-    #[allow(clippy::needless_pass_by_value)]
-    fn execute(vals: Vec<(bn::G1, bn::G2)>) -> bool {
-        bn::pairing_batch(&vals) == bn::Gt::one()
-    }
-
-    #[cfg(feature = "contract")]
-    fn execute(vals: Vec<(bn::G1, bn::G2)>) -> bool {
+    fn execute(vals: Vec<(bn::G1, bn::G2)>) -> Result<bool, ExitError> {
         let points = vals
             .into_iter()
             .map(|(g1, g2)| (g1.host_fn_encode(), g2.host_fn_encode()));
-        aurora_engine_sdk::alt_bn128_pairing(points)
+        aurora_engine_sdk::alt_bn128_pairing(points).map_err(bn_error)
     }
 }
 

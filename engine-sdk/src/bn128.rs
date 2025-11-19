@@ -1,19 +1,18 @@
-#[derive(Debug)]
-pub struct BnError;
+use super::BnError;
 
 impl From<bn::FieldError> for BnError {
-    fn from(_err: bn::FieldError) -> Self {
-        Self
+    fn from(err: bn::FieldError) -> Self {
+        Self::Field(err)
     }
 }
 
 impl From<bn::GroupError> for BnError {
-    fn from(_err: bn::GroupError) -> Self {
-        Self
+    fn from(err: bn::GroupError) -> Self {
+        Self::Group(err)
     }
 }
 
-fn read_bn_point(mut x: [u8; 64]) -> Result<bn::G1, BnError> {
+fn read_bn_g1(mut x: [u8; 64]) -> Result<bn::G1, BnError> {
     // To little-endian
     x.chunks_mut(0x20).for_each(<[u8]>::reverse);
 
@@ -48,8 +47,8 @@ fn read_bn_g2(mut x: [u8; 0x80]) -> Result<bn::G2, BnError> {
 
 /// Big-endian inputs and outputs
 pub fn g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
-    let p1 = read_bn_point(left)?;
-    let p2 = read_bn_point(right)?;
+    let p1 = read_bn_g1(left)?;
+    let p2 = read_bn_g1(right)?;
 
     let mut output = [0u8; 0x40];
     if let Some(sum) = bn::AffineG1::from_jacobian(p1 + p2) {
@@ -62,7 +61,7 @@ pub fn g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
 
 /// Big-endian inputs and outputs
 pub fn g1_scalar_multiple(point: [u8; 64], mut scalar: [u8; 32]) -> Result<[u8; 64], BnError> {
-    let p = read_bn_point(point)?;
+    let p = read_bn_g1(point)?;
     scalar.reverse(); // To little-endian
     let scalar = bn::Fr::from_slice(&scalar)?;
 
@@ -81,7 +80,7 @@ where
 {
     let mut vals = Vec::with_capacity(pairs.len());
     for (g1, g2) in pairs {
-        let g1 = read_bn_point(g1)?;
+        let g1 = read_bn_g1(g1)?;
         let g2 = read_bn_g2(g2)?;
         vals.push((g1, g2));
     }
