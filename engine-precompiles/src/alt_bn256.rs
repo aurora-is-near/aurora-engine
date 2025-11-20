@@ -53,15 +53,6 @@ mod consts {
     pub(super) const SCALAR_2_LEN: usize = 64;
 }
 
-#[allow(clippy::needless_pass_by_value)]
-const fn bn_error(err: BnError) -> ExitError {
-    match err {
-        BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
-        BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
-        BnError::G1(_) | BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")),
-    }
-}
-
 #[derive(Default)]
 pub struct Bn256Add<HF: HardFork>(PhantomData<HF>);
 
@@ -349,6 +340,15 @@ impl Precompile for Bn256Pair<Istanbul> {
 
         let output = Self::run_inner(input, context)?;
         Ok(PrecompileOutput::without_logs(cost, output))
+    }
+}
+
+#[allow(clippy::needless_pass_by_value)]
+const fn bn_error(err: BnError) -> ExitError {
+    match err {
+        BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
+        BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
+        BnError::G1(_) | BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")),
     }
 }
 
