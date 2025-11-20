@@ -6,12 +6,6 @@ impl From<bn::FieldError> for BnError {
     }
 }
 
-impl From<bn::GroupError> for BnError {
-    fn from(err: bn::GroupError) -> Self {
-        Self::Group(err)
-    }
-}
-
 fn read_bn_g1(mut x: [u8; 64]) -> Result<bn::G1, BnError> {
     // To little-endian
     x.chunks_mut(0x20).for_each(<[u8]>::reverse);
@@ -22,7 +16,7 @@ fn read_bn_g1(mut x: [u8; 64]) -> Result<bn::G1, BnError> {
     Ok(if px.is_zero() && py.is_zero() {
         <bn::G1 as bn::Group>::zero()
     } else {
-        bn::AffineG1::new(px, py)?.into()
+        bn::AffineG1::new(px, py).map_err(BnError::G1)?.into()
     })
 }
 
@@ -41,7 +35,7 @@ fn read_bn_g2(mut x: [u8; 0x80]) -> Result<bn::G2, BnError> {
     Ok(if ba.is_zero() && bb.is_zero() {
         <bn::G2 as bn::Group>::zero()
     } else {
-        bn::AffineG2::new(ba, bb)?.into()
+        bn::AffineG2::new(ba, bb).map_err(BnError::G2)?.into()
     })
 }
 
@@ -63,7 +57,7 @@ pub fn g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
 pub fn g1_scalar_multiple(point: [u8; 64], mut scalar: [u8; 32]) -> Result<[u8; 64], BnError> {
     let p = read_bn_g1(point)?;
     scalar.reverse(); // To little-endian
-    let scalar = bn::Fr::from_slice(&scalar)?;
+    let scalar = bn::Fr::from_slice(&scalar).map_err(BnError::Scalar)?;
 
     let mut output = [0u8; 0x40];
     if let Some(result) = bn::AffineG1::from_jacobian(p * scalar) {

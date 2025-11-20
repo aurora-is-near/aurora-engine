@@ -32,7 +32,9 @@ const ECRECOVER_MALLEABILITY_FLAG: u64 = 0;
 #[derive(Debug)]
 pub enum BnError {
     Field(bn::FieldError),
-    Group(bn::GroupError),
+    Scalar(bn::FieldError),
+    G1(bn::GroupError),
+    G2(bn::GroupError),
 }
 
 #[cfg(feature = "contract")]
