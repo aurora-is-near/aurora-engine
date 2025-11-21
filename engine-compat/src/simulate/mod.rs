@@ -21,7 +21,7 @@ use primitive_types::U256;
 use self::engine_state_override::StorageOverride;
 
 // TODO: the code is duplicated in borealis-rs, eliminate
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize)]
 pub enum StateOrEngineError {
     StateMissing,
     Engine(EngineError),

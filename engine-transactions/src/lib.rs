@@ -209,7 +209,7 @@ pub enum Error {
     GasOverflow,
     IntegerConversion,
     #[cfg_attr(
-        feature = "serde",
+        feature = "impl-serde",
         serde(serialize_with = "decoder_err_to_str"),
         serde(deserialize_with = "decoder_str_to_err")
     )]
@@ -217,7 +217,7 @@ pub enum Error {
     UnsupportedTransactionEip4844,
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "impl-serde")]
 fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Result<S::Ok, S::Error> {
     #[cfg(not(feature = "std"))]
     use aurora_engine_types::ToString;
@@ -225,7 +225,7 @@ fn decoder_err_to_str<S: serde::Serializer>(err: &DecoderError, ser: S) -> Resul
     ser.serialize_str(&err.to_string())
 }
 
-#[cfg(feature = "serde")]
+#[cfg(feature = "impl-serde")]
 fn decoder_str_to_err<'de, D: serde::Deserializer<'de>>(de: D) -> Result<DecoderError, D::Error> {
     use aurora_engine_types::String;
     use serde::Deserialize;

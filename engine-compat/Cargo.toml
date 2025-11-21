@@ -20,8 +20,8 @@ panic = "abort"
 aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract", "log", "impl-serde"] }
 aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract", "log"] }
 aurora-engine-modexp = { workspace = true, optional = true }
-aurora-engine-transactions = { workspace = true, optional = true, features = ["impl-serde"] }
-aurora-engine-types = { workspace = true, optional = true, default-features = false, features = ["impl-serde"] }
+aurora-engine-transactions = { workspace = true, optional = true }
+aurora-engine-types = { workspace = true, optional = true, default-features = false }
 engine-standalone-tracing = { workspace = true, optional = true, default-features = false }
 borsh = { workspace = true, optional = true }
 primitive-types = { workspace = true, optional = true }

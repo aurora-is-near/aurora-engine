@@ -17,7 +17,7 @@ aurora-engine-sdk.workspace = true
 aurora-engine-types.workspace = true
 aurora-evm.workspace = true
 rlp.workspace = true
-serde = { workspace = true, default-features = false, optional = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex.workspace = true
@@ -27,5 +27,5 @@ workspace = true
 
 [features]
 std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-evm/std", "rlp/std"]
-impl-serde = ["aurora-engine-types/impl-serde", "serde/alloc"]
+impl-serde = ["aurora-engine-types/impl-serde", "serde"]
 contract = ["aurora-engine-sdk/contract"]
