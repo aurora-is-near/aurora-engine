@@ -12,7 +12,7 @@ publish.workspace = true
 autobenches = false
 
 [dependencies]
-aurora-engine-types = { workspace = true, features = ["impl-serde", "std"] }
+aurora-engine-types = { workspace = true, features = ["std"] }
 anyhow.workspace = true
 near-gas.workspace = true
 near-sdk.workspace = true
