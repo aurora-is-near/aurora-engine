@@ -453,7 +453,7 @@ dependencies = [
 [[package]]
 name = "aurora-evm"
 version = "2.1.3"
-source = "git+https://github.com/aurora-is-near/aurora-evm.git?branch=v2.1.3-serde-no-std#dc240d39d37e8f72448625b91f1bb3ccc7403e58"
+source = "git+https://github.com/aurora-is-near/aurora-evm.git?branch=v2.1.3-serde-no-std#a5e899fd5a4b384604db89cae93efb3f8be48d37"
 dependencies = [
  "auto_impl",
  "environmental",
