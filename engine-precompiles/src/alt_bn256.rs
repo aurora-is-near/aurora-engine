@@ -257,12 +257,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 (g1, g2)
             });
 
-            aurora_engine_sdk::alt_bn128_pairing(pairs).map_err(|err| match err {
-                BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
-                BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
-                BnError::G1(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_A")),
-                BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_B")),
-            })?
+            aurora_engine_sdk::alt_bn128_pairing(pairs).map_err(bn_error)?
         };
 
         let mut v = crate::vec![0u8; 32];
@@ -348,7 +343,8 @@ const fn bn_error(err: BnError) -> ExitError {
     match err {
         BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
         BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
-        BnError::G1(_) | BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")),
+        BnError::G1(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_A")),
+        BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_B")),
     }
 }
 
@@ -445,7 +441,7 @@ mod tests {
             Bn256Add::<Byzantium>::new().run(&input, Some(EthGas::new(500)), &new_context(), false);
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
         ));
     }
 
@@ -540,7 +536,7 @@ mod tests {
         );
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_POINT")))
+            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
         ));
     }
 
