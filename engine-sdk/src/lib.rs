@@ -3,12 +3,11 @@
 #![allow(clippy::as_conversions)]
 
 use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
-#[cfg(feature = "contract")]
-use crate::prelude::{Vec, U256};
+
+pub use bn128::{alt_bn128_g1_scalar_multiple, alt_bn128_g1_sum, alt_bn128_pairing, BnError};
 pub use types::keccak;
 
 pub mod base64;
-#[cfg(not(feature = "contract"))]
 mod bn128;
 pub mod caching;
 pub mod env;
@@ -28,14 +27,6 @@ const ECRECOVER_MESSAGE_SIZE: u64 = 32;
 const ECRECOVER_SIGNATURE_LENGTH: u64 = 64;
 #[cfg(feature = "contract")]
 const ECRECOVER_MALLEABILITY_FLAG: u64 = 0;
-
-#[derive(Debug)]
-pub enum BnError {
-    Field(bn::FieldError),
-    Scalar(bn::FieldError),
-    G1(bn::GroupError),
-    G2(bn::GroupError),
-}
 
 #[cfg(feature = "contract")]
 pub fn panic_utf8(bytes: &[u8]) -> ! {
@@ -96,94 +87,6 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     let mut output = [0u8; 20];
     output.copy_from_slice(&hash);
     output
-}
-
-#[cfg(feature = "contract")]
-pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
-    let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
-
-    bytes.push(0); // positive sign
-    bytes.extend_from_slice(&left);
-    bytes.push(0);
-    bytes.extend_from_slice(&right);
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    unsafe {
-        const REGISTER_ID: u64 = 1;
-        exports::alt_bn128_g1_sum(value_len, value_ptr, REGISTER_ID);
-        let mut output = [0u8; 64];
-        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
-        let x = U256::from_little_endian(&output[0..32]);
-        let y = U256::from_little_endian(&output[32..64]);
-        output[0..32].copy_from_slice(&x.to_big_endian());
-        output[32..64].copy_from_slice(&y.to_big_endian());
-        Ok(output)
-    }
-}
-
-#[cfg(not(feature = "contract"))]
-pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> Result<[u8; 64], BnError> {
-    bn128::g1_sum(left, right)
-}
-
-#[cfg(feature = "contract")]
-pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> Result<[u8; 64], BnError> {
-    let mut bytes = [0u8; 96];
-    bytes[0..64].copy_from_slice(&g1);
-    bytes[64..96].copy_from_slice(&fr);
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    unsafe {
-        const REGISTER_ID: u64 = 1;
-        exports::alt_bn128_g1_multiexp(value_len, value_ptr, REGISTER_ID);
-        let mut output = [0u8; 64];
-        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
-        let x = U256::from_little_endian(&output[0..32]);
-        let y = U256::from_little_endian(&output[32..64]);
-        output[0..32].copy_from_slice(&x.to_big_endian());
-        output[32..64].copy_from_slice(&y.to_big_endian());
-        Ok(output)
-    }
-}
-
-#[cfg(not(feature = "contract"))]
-pub fn alt_bn128_g1_scalar_multiple(
-    point: [u8; 64],
-    scalar: [u8; 32],
-) -> Result<[u8; 64], BnError> {
-    bn128::g1_scalar_multiple(point, scalar)
-}
-
-#[cfg(feature = "contract")]
-pub fn alt_bn128_pairing<I>(pairs: I) -> Result<bool, BnError>
-where
-    I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
-{
-    let n = pairs.len();
-    let mut bytes = Vec::with_capacity(n * 6 * 32);
-    for (g1, g2) in pairs {
-        bytes.extend_from_slice(&g1);
-        bytes.extend_from_slice(&g2);
-    }
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
-
-    Ok(result == 1)
-}
-
-#[cfg(not(feature = "contract"))]
-pub fn alt_bn128_pairing<I>(pairs: I) -> Result<bool, BnError>
-where
-    I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
-{
-    bn128::pairing(pairs)
 }
 
 /// Recover address from message hash and signature.
