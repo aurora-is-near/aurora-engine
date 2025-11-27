@@ -74,10 +74,10 @@ impl<HF: HardFork> Bn256Add<HF> {
             .for_each(<[u8]>::reverse);
         let (left, input) = input
             .split_first_chunk()
-            .expect("the constant `consts::ADD_INPUT_LEN` is correct");
+            .expect("the constant `consts::ADD_INPUT_LEN` is incorrect");
         let (right, _) = input
             .split_first_chunk()
-            .expect("the constant `consts::ADD_INPUT_LEN` is correct");
+            .expect("the constant `consts::ADD_INPUT_LEN` is incorrect");
         let output = aurora_engine_sdk::alt_bn128_g1_sum(*left, *right).map_err(into_exit_error)?;
 
         Ok(output.to_vec())
@@ -162,10 +162,10 @@ impl<HF: HardFork> Bn256Mul<HF> {
             .for_each(<[u8]>::reverse);
         let (point, input) = input
             .split_first_chunk()
-            .expect("the constant `consts::MUL_INPUT_LEN` is correct");
+            .expect("the constant `consts::MUL_INPUT_LEN` is incorrect");
         let (scalar, _) = input
             .split_first_chunk()
-            .expect("the constant `consts::MUL_INPUT_LEN` is correct");
+            .expect("the constant `consts::MUL_INPUT_LEN` is incorrect");
         let output = aurora_engine_sdk::alt_bn128_g1_scalar_multiple(*point, *scalar)
             .map_err(into_exit_error)?;
 
@@ -255,13 +255,13 @@ impl<HF: HardFork> Bn256Pair<HF> {
 
                 let (g1, element) = element
                     .split_first_chunk()
-                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is correct");
+                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is incorrect");
                 let mut g1 = *g1;
                 g1.chunks_mut(consts::SCALAR_LEN).for_each(<[u8]>::reverse);
 
                 let (g2, _) = element
                     .split_first_chunk()
-                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is correct");
+                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is incorrect");
                 let mut g2 = *g2;
                 g2.chunks_mut(consts::SCALAR_2_LEN)
                     .for_each(<[u8]>::reverse);
