@@ -228,7 +228,7 @@ impl StorageIntermediate for RegisterIndex {
     }
 
     fn copy_to_slice(&self, buffer: &mut [u8]) {
-        unsafe { exports::read_register(self.0, buffer.as_ptr() as u64) }
+        unsafe { exports::read_register(self.0, buffer.as_mut_ptr() as u64) }
     }
 }
 
@@ -355,8 +355,8 @@ impl crate::env::Env for Runtime {
 
     fn attached_deposit(&self) -> u128 {
         unsafe {
-            let data = [0u8; size_of::<u128>()];
-            exports::attached_deposit(data.as_ptr() as u64);
+            let mut data = [0u8; size_of::<u128>()];
+            exports::attached_deposit(data.as_mut_ptr() as u64);
             u128::from_le_bytes(data)
         }
     }
@@ -364,8 +364,8 @@ impl crate::env::Env for Runtime {
     fn random_seed(&self) -> H256 {
         unsafe {
             exports::random_seed(0);
-            let bytes = H256::zero();
-            exports::read_register(0, bytes.0.as_ptr() as u64);
+            let mut bytes = H256::zero();
+            exports::read_register(0, bytes.0.as_mut_ptr() as u64);
             bytes
         }
     }
@@ -583,8 +583,8 @@ impl crate::env::Env for ViewEnv {
     fn random_seed(&self) -> H256 {
         unsafe {
             exports::random_seed(0);
-            let bytes = H256::zero();
-            exports::read_register(0, bytes.0.as_ptr() as u64);
+            let mut bytes = H256::zero();
+            exports::read_register(0, bytes.0.as_mut_ptr() as u64);
             bytes
         }
     }
