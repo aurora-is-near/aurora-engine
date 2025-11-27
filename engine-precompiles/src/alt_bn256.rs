@@ -72,9 +72,13 @@ impl<HF: HardFork> Bn256Add<HF> {
         input
             .chunks_mut(consts::SCALAR_LEN)
             .for_each(<[u8]>::reverse);
-        let (left, input) = input.split_first_chunk().expect("valid constant");
-        let (right, _) = input.split_first_chunk().expect("valid constant");
-        let output = aurora_engine_sdk::alt_bn128_g1_sum(*left, *right).map_err(bn_error)?;
+        let (left, input) = input
+            .split_first_chunk()
+            .expect("the constant `consts::ADD_INPUT_LEN` is correct");
+        let (right, _) = input
+            .split_first_chunk()
+            .expect("the constant `consts::ADD_INPUT_LEN` is correct");
+        let output = aurora_engine_sdk::alt_bn128_g1_sum(*left, *right).map_err(into_exit_error)?;
 
         Ok(output.to_vec())
     }
@@ -156,10 +160,14 @@ impl<HF: HardFork> Bn256Mul<HF> {
         input
             .chunks_mut(consts::SCALAR_LEN)
             .for_each(<[u8]>::reverse);
-        let (point, input) = input.split_first_chunk().expect("valid constant");
-        let (scalar, _) = input.split_first_chunk().expect("valid constant");
-        let output =
-            aurora_engine_sdk::alt_bn128_g1_scalar_multiple(*point, *scalar).map_err(bn_error)?;
+        let (point, input) = input
+            .split_first_chunk()
+            .expect("the constant `consts::MUL_INPUT_LEN` is correct");
+        let (scalar, _) = input
+            .split_first_chunk()
+            .expect("the constant `consts::MUL_INPUT_LEN` is correct");
+        let output = aurora_engine_sdk::alt_bn128_g1_scalar_multiple(*point, *scalar)
+            .map_err(into_exit_error)?;
 
         Ok(output.to_vec())
     }
@@ -245,11 +253,15 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 // `element.len() == consts::PAIR_ELEMENT_LEN` this is guaranteed by
                 // `input.len() % consts::PAIR_ELEMENT_LEN == 0` guarded above
 
-                let (g1, element) = element.split_first_chunk().expect("valid constant");
+                let (g1, element) = element
+                    .split_first_chunk()
+                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is correct");
                 let mut g1 = *g1;
                 g1.chunks_mut(consts::SCALAR_LEN).for_each(<[u8]>::reverse);
 
-                let (g2, _) = element.split_first_chunk().expect("valid constant");
+                let (g2, _) = element
+                    .split_first_chunk()
+                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is correct");
                 let mut g2 = *g2;
                 g2.chunks_mut(consts::SCALAR_2_LEN)
                     .for_each(<[u8]>::reverse);
@@ -257,7 +269,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 (g1, g2)
             });
 
-            aurora_engine_sdk::alt_bn128_pairing(pairs).map_err(bn_error)?
+            aurora_engine_sdk::alt_bn128_pairing(pairs).map_err(into_exit_error)?
         };
 
         let mut v = crate::vec![0u8; 32];
@@ -339,7 +351,7 @@ impl Precompile for Bn256Pair<Istanbul> {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-const fn bn_error(err: BnError) -> ExitError {
+const fn into_exit_error(err: BnError) -> ExitError {
     match err {
         BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
         BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
