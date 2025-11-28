@@ -2,8 +2,8 @@ use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::{env, near_bindgen};
 
 #[near_bindgen]
-#[borsh(crate = "near_sdk::borsh")]
 #[derive(BorshDeserialize, BorshSerialize, Default)]
+#[borsh(crate = "near_sdk::borsh")]
 pub struct Modexp;
 
 #[near_bindgen]
