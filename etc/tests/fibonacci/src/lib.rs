@@ -44,7 +44,7 @@ impl Fib {
     pub fn fib(n: u8) -> Promise {
         let account = env::current_account_id();
         let mut p = Promise::new(account.clone()).function_call(
-            "seed".into(),
+            "seed".to_string(),
             Vec::new(),
             near_sdk::NearToken::from_near(0),
             FIVE_TGAS,
@@ -53,7 +53,7 @@ impl Fib {
         while n > 0 {
             n -= 1;
             p = p.then(Promise::new(account.clone()).function_call(
-                "accumulate".into(),
+                "accumulate".to_string(),
                 Vec::new(),
                 near_sdk::NearToken::from_near(0),
                 FIVE_TGAS,
