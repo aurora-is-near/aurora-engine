@@ -367,6 +367,12 @@ impl WasmerRunner {
             .and_then(|v| String::from_utf8(v).map_err(|_| WasmRuntimeError::DeserializeResult))
     }
 
+    /// must call on standalone variant of the contract
+    pub fn get_version_at_wrapper(&mut self) -> Result<String, WasmRuntimeError> {
+        let out = self.call_contract("get_version", None, &[], Fixed::default(), 0, 0, vec![])?;
+        String::from_utf8(out.output).map_err(|_| WasmRuntimeError::DeserializeResult)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn call_contract(
         &mut self,
@@ -766,6 +772,7 @@ mod state {
             register_id: u64,
         ) {
             let mut input = self.get_data(memory, value_ptr, value_len);
+            input.resize(0x82, 0);
             input.remove(0);
             input.remove(64);
             let mut output = aurora_engine_sdk::alt_bn128_g1_sum(
@@ -785,7 +792,8 @@ mod state {
             value_ptr: u64,
             register_id: u64,
         ) {
-            let input = self.get_data(memory, value_ptr, value_len);
+            let mut input = self.get_data(memory, value_ptr, value_len);
+            input.resize(0x60, 0);
             let mut output = aurora_engine_sdk::alt_bn128_g1_scalar_multiple(
                 input[..0x40].try_into().unwrap(),
                 input[0x40..].try_into().unwrap(),
@@ -805,6 +813,13 @@ mod state {
         ) -> u64 {
             let input = self.get_data(memory, value_ptr, value_len);
             let pairs = input.chunks(0xc0).map(|chunk| {
+                let chunk = if chunk.len() < 0xc0 {
+                    let mut v = chunk.to_vec();
+                    v.resize(0xc0, 0);
+                    Cow::Owned(v)
+                } else {
+                    Cow::Borrowed(chunk)
+                };
                 (
                     chunk[..0x40].try_into().unwrap(),
                     chunk[0x40..].try_into().unwrap(),
