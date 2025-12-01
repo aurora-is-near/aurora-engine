@@ -187,7 +187,7 @@ fn test_transaction_to_zero_address() {
     let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
     let mut context = utils::AuroraRunner::default().context;
-    context.input = tx_bytes;
+    context.input = tx_bytes.into();
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
@@ -436,7 +436,7 @@ fn test_solidity_pure_bench() {
     let contract_bytes = std::fs::read(artifact_path).unwrap();
     runner.set_code(ContractCode::new(contract_bytes, None));
     let mut context = runner.context.clone();
-    context.input = loop_limit.to_le_bytes().to_vec();
+    context.input = loop_limit.to_le_bytes().into();
 
     let contract = near_vm_runner::prepare(
         &runner.ext.underlying,

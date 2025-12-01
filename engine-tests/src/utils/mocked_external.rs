@@ -3,7 +3,8 @@ use near_primitives_core::hash::CryptoHash;
 use near_primitives_core::types::GasWeight;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::{
-    AccountId, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier, ReceiptIndex,
+    AccountId, ActionIndex, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier,
+    ReceiptIndex,
 };
 use near_vm_runner::logic::{StorageAccessTracker, VMLogicError};
 use std::cell::Cell;
@@ -165,6 +166,31 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
             .append_action_use_global_contract(receipt_index, contract_id)
     }
 
+    fn append_action_deterministic_state_init(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        contract_id: GlobalContractIdentifier,
+        amount: Balance,
+    ) -> Result<ActionIndex, VMLogicError> {
+        self.underlying
+            .append_action_deterministic_state_init(receipt_index, contract_id, amount)
+    }
+
+    fn set_deterministic_state_init_data_entry(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        action_index: ActionIndex,
+        key: Vec<u8>,
+        value: Vec<u8>,
+    ) -> Result<(), VMLogicError> {
+        self.underlying.set_deterministic_state_init_data_entry(
+            receipt_index,
+            action_index,
+            key,
+            value,
+        )
+    }
+
     fn append_action_function_call_weight(
         &mut self,
         receipt_index: ReceiptIndex,
@@ -248,5 +274,9 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
 
     fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {
         self.underlying.get_receipt_receiver(receipt_index)
+    }
+
+    fn set_refund_to(&mut self, receipt_index: ReceiptIndex, refund_to: AccountId) {
+        self.underlying.set_refund_to(receipt_index, refund_to);
     }
 }

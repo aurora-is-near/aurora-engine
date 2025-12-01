@@ -1,4 +1,5 @@
 use aurora_engine::engine::EngineError;
+use near_primitives_core::types::Gas;
 use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
@@ -285,14 +286,14 @@ impl ModExpBenchContext {
         };
 
         let outcome = self.inner.call("modexp", "aurora", input.clone()).unwrap();
-        let aurora = outcome.burnt_gas;
+        let aurora = outcome.burnt_gas.as_gas();
         let aurora_result = parse_output(&outcome.return_data.as_value().unwrap());
 
         let outcome = self
             .inner
             .call("modexp_ibig", "aurora", input.clone())
             .unwrap();
-        let ibig = outcome.burnt_gas;
+        let ibig = outcome.burnt_gas.as_gas();
         let ibig_result = parse_output(&outcome.return_data.as_value().unwrap());
         assert_eq!(
             aurora_result, ibig_result,
@@ -300,7 +301,9 @@ impl ModExpBenchContext {
         );
 
         let maybe_outcome = self.inner.call("modexp_num", "aurora", input);
-        let num = maybe_outcome.map(|outcome| outcome.burnt_gas);
+        let num = maybe_outcome
+            .map(|outcome| outcome.burnt_gas)
+            .map(Gas::as_gas);
 
         BenchResult { aurora, ibig, num }
     }
