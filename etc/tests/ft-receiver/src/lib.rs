@@ -1,15 +1,13 @@
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::{log, near_bindgen, AccountId, PromiseOrValue};
+use near_sdk::{log, near, AccountId, PromiseOrValue};
 
 /// Will happily take and NEP-141
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, Default)]
-#[borsh(crate = "near_sdk::borsh")]
+#[near(contract_state)]
+#[derive(Default)]
 struct DummyFungibleTokenReceiver;
 
-#[near_bindgen]
+#[near]
 impl FungibleTokenReceiver for DummyFungibleTokenReceiver {
     fn ft_on_transfer(
         &mut self,

@@ -205,7 +205,7 @@ fn test_xcc_schedule_gas() {
         )
         .unwrap();
     assert!(
-        outcome.burnt_gas < costs::ROUTER_SCHEDULE.as_u64(),
+        outcome.burnt_gas.as_gas() < costs::ROUTER_SCHEDULE.as_u64(),
         "{:?} not less than {:?}",
         outcome.burnt_gas,
         costs::ROUTER_SCHEDULE
@@ -252,7 +252,7 @@ fn test_xcc_exec_gas() {
         let router_exec_cost = costs::ROUTER_EXEC_BASE
             + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
         assert!(
-            outcome.burnt_gas < router_exec_cost.as_u64(),
+            outcome.burnt_gas.as_gas() < router_exec_cost.as_u64(),
             "{:?} not less than {:?}",
             outcome.burnt_gas,
             router_exec_cost
@@ -269,8 +269,11 @@ fn test_xcc_exec_gas() {
                 } => {
                     assert_eq!(method_name, promise.method.as_bytes());
                     assert_eq!(args, &promise.args);
-                    assert_eq!(attached_deposit, &promise.attached_balance.as_u128());
-                    assert_eq!(prepaid_gas, &promise.attached_gas.as_u64());
+                    assert_eq!(
+                        attached_deposit.as_yoctonear(),
+                        promise.attached_balance.as_u128()
+                    );
+                    assert_eq!(prepaid_gas.as_gas(), promise.attached_gas.as_u64());
                 }
                 MockAction::CreateReceipt { receiver_id, .. } => {
                     assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes());
@@ -300,7 +303,7 @@ fn deploy_router() -> AuroraRunner {
             init_args.as_bytes().to_vec(),
         )
         .unwrap();
-    assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
+    assert!(outcome.used_gas.as_gas() < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
 
     router
 }
