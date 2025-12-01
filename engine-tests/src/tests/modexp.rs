@@ -1,5 +1,4 @@
 use aurora_engine::engine::EngineError;
-use near_primitives_core::types::Gas;
 use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
