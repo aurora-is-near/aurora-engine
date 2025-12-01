@@ -301,9 +301,7 @@ impl ModExpBenchContext {
         );
 
         let maybe_outcome = self.inner.call("modexp_num", "aurora", input);
-        let num = maybe_outcome
-            .map(|outcome| outcome.burnt_gas)
-            .map(Gas::as_gas);
+        let num = maybe_outcome.map(|outcome| outcome.burnt_gas.as_gas());
 
         BenchResult { aurora, ibig, num }
     }
