@@ -1,7 +1,8 @@
 use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::{Borrowed, PhantomData, Vec};
+use crate::prelude::{PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
+use aurora_engine_sdk::bn128::PAIR_ELEMENT_LEN;
 use aurora_evm::{Context, ExitError};
 use core::num::{NonZeroU64, NonZeroUsize};
 
@@ -32,24 +33,6 @@ mod costs {
 
     /// Cost of the Istanbul `alt_bn128_pair` operation.
     pub(super) const ISTANBUL_PAIR_BASE: EthGas = EthGas::new(45_000);
-}
-
-/// bn128 constants.
-mod consts {
-    /// Input length for the add operation.
-    pub(super) const ADD_INPUT_LEN: usize = 128;
-
-    /// Input length for the multiplication operation.
-    pub(super) const MUL_INPUT_LEN: usize = 96;
-
-    /// Pair element length.
-    pub(super) const PAIR_ELEMENT_LEN: usize = 192;
-
-    /// Size of BN scalars.
-    pub(super) const SCALAR_LEN: usize = 32;
-
-    /// Size of BN scalar for g2.
-    pub(super) const SCALAR_2_LEN: usize = 64;
 }
 
 #[derive(Default)]
@@ -221,47 +204,32 @@ impl<HF: HardFork> Bn256Pair<HF> {
 
 impl<HF: HardFork> Bn256Pair<HF> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
-        let res = if input.is_empty() {
-            true
-        } else {
-            if input.len() % consts::PAIR_ELEMENT_LEN != 0 {
-                return Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN")));
-            }
-            let pairs = input.chunks(consts::PAIR_ELEMENT_LEN).map(|element| {
-                // `element.len() == consts::PAIR_ELEMENT_LEN` this is guaranteed by
-                // `input.len() % consts::PAIR_ELEMENT_LEN == 0` guarded above
+        // Default result is 0 (false)
+        let mut pairing_result = crate::vec![0u8; 32];
 
-                let (g1, element) = element
-                    .split_first_chunk()
-                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is incorrect");
-                let mut g1 = *g1;
-                g1.chunks_mut(consts::SCALAR_LEN).for_each(<[u8]>::reverse);
-
-                let (g2, _) = element
-                    .split_first_chunk()
-                    .expect("the constant `consts::PAIR_ELEMENT_LEN` is incorrect");
-                let mut g2 = *g2;
-                g2.chunks_mut(consts::SCALAR_2_LEN)
-                    .for_each(<[u8]>::reverse);
-
-                (g1, g2)
-            });
-
-            aurora_engine_sdk::bn128::alt_bn128_pairing(pairs).map_err(into_exit_error)?
-        };
-
-        let mut v = crate::vec![0u8; 32];
-        if res {
-            v[31] = 1;
+        // Empty input implies the product of an empty set, which is the multiplicative identity (1).
+        // Therefore, the check passes.
+        if input.is_empty() {
+            pairing_result[31] = 1;
+            return Ok(pairing_result);
         }
-        Ok(v)
+
+        // Perform the pairing check
+        if aurora_engine_sdk::bn128::alt_bn128_pairing(input)
+            .map_err(|err| ExitError::Other(err.into()))?
+        {
+            // If valid, set output to 1 (true)
+            pairing_result[31] = 1;
+        }
+
+        Ok(pairing_result)
     }
 }
 
 impl Precompile for Bn256Pair<Byzantium> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+        let pair_element_len = NonZeroUsize::try_from(PAIR_ELEMENT_LEN)
             .and_then(NonZeroU64::try_from)
             .map_err(utils::err_usize_conv)?;
         Ok(
@@ -296,7 +264,7 @@ impl Precompile for Bn256Pair<Byzantium> {
 impl Precompile for Bn256Pair<Istanbul> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let input_len = u64::try_from(input.len()).map_err(utils::err_usize_conv)?;
-        let pair_element_len = NonZeroUsize::try_from(consts::PAIR_ELEMENT_LEN)
+        let pair_element_len = NonZeroUsize::try_from(PAIR_ELEMENT_LEN)
             .and_then(NonZeroU64::try_from)
             .map_err(utils::err_usize_conv)?;
         Ok(
@@ -331,6 +299,7 @@ impl Precompile for Bn256Pair<Istanbul> {
 #[cfg(test)]
 mod tests {
     use crate::utils::new_context;
+    use std::borrow::Cow::Borrowed;
 
     use super::*;
 
