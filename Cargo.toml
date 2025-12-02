@@ -28,7 +28,7 @@ ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
-bn = { version = "0.5", package = "zeropool-bn", default-features = false }
+# bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
