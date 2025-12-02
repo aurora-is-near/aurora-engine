@@ -3,27 +3,27 @@ use aurora_engine_types::Cow;
 #[cfg(feature = "contract")]
 use super::exports;
 
-/// FQ_LEN specifies the number of bytes needed to represent a  Fq element.
+/// Specifies the number of bytes needed to represent a  Fq element.
 /// This is an element in the base field of `bn254`.
 ///
 /// Note: The base field is used to define G1 and G2 elements.
 const FQ_LEN: usize = 32;
 
-/// SCALAR_LEN specifies the number of bytes needed to represent a Fr element.
+/// Specifies the number of bytes needed to represent a Fr element.
 /// This is an element in the scalar field of BN254.
 pub const SCALAR_LEN: usize = 32;
 
-/// FQ2_LEN specifies the number of bytes needed to represent a  Fq^2 element.
+/// Specifies the number of bytes needed to represent a  Fq^2 element.
 ///
 /// Note: This is the quadratic extension of Fq, and by definition
 /// means we need 2 Fq elements.
 const FQ2_LEN: usize = 2 * FQ_LEN;
 
-/// G1_LEN specifies the number of bytes needed to represent a G1 element.
+/// Specifies the number of bytes needed to represent a G1 element.
 ///
 /// Note: A G1 element contains 2 Fq elements.
 pub const G1_LEN: usize = 2 * FQ_LEN;
-/// G2_LEN specifies the number of bytes needed to represent a G2 element.
+/// Specifies the number of bytes needed to represent a G2 element.
 ///
 /// Note: A G2 element contains 2 Fq^2 elements.
 pub const G2_LEN: usize = 2 * FQ2_LEN;
@@ -241,7 +241,7 @@ mod utils {
         Ok(output)
     }
 
-    /// pairing_check performs a pairing check on a list of G1 and G2 point pairs and
+    /// Performs a pairing check on a list of G1 and G2 point pairs and
     /// returns true if the result is equal to the identity element.
     ///
     /// Note: If the input is empty, this function returns true.
@@ -296,7 +296,7 @@ impl From<Bn254Error> for Cow<'static, str> {
     }
 }
 
-/// Adds two G1 points on the alt_bn128 curve via NEAR host function.
+/// Adds two G1 points on the bn128 curve via NEAR host function.
 #[cfg(feature = "contract")]
 pub fn alt_bn128_g1_sum(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
     // Buffer is: [0, P1(G1_LEN), 0, P2(G1_LEN)]
@@ -307,10 +307,10 @@ pub fn alt_bn128_g1_sum(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
     let mut bytes = [0u8; BUFFER_LEN];
 
     // --- Process P1 (First 64 bytes of input) ---
-    // P1.X
-    write_reversed_chunk(&mut bytes[1..1 + FQ_LEN], input_bytes, 0);
-    // P1.Y
-    write_reversed_chunk(&mut bytes[1 + FQ_LEN..1 + G1_LEN], input_bytes, FQ_LEN);
+    // P1.X: 1..1 + FQ_LEN
+    write_reversed_chunk(&mut bytes[1..=FQ_LEN], input_bytes, 0);
+    // P1.Y: 1 + FQ_LEN..1 + G1_LEN
+    write_reversed_chunk(&mut bytes[1 + FQ_LEN..=G1_LEN], input_bytes, FQ_LEN);
 
     // --- Process P2 (Next 64 bytes of input) ---
     // P2.X
@@ -351,7 +351,7 @@ pub fn alt_bn128_g1_sum(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
     utils::g1_point_add(p1_bytes, p2_bytes)
 }
 
-/// Multiplies a G1 point on the alt_bn128 curve by a scalar via NEAR host function.
+/// Multiplies a G1 point on the bn128 curve by a scalar via NEAR host function.
 #[cfg(feature = "contract")]
 pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
     // Buffer is: [P1(G1_LEN), Scalar(SCALAR_LEN)] -> Total 96 bytes
@@ -399,30 +399,72 @@ pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn25
     utils::g1_point_mul(point_bytes, scalar_bytes)
 }
 
+/// Performs a pairing check on a list of G1 and G2 point pairs via NEAR host function.
+/// Accepts a byte slice containing a sequence of pairs (G1, G2).
 #[cfg(feature = "contract")]
 pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
+    use aurora_engine_types::Vec;
+
+    // Empty input implies the product of an empty set, which is the multiplicative identity (1).
+    // Therefore, the check passes.
+    if input_bytes.is_empty() {
+        return Ok(true);
+    }
+
+    // Validate input length
     if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
         return Err(Bn254Error::InvalidPairLength);
     }
-    todo!()
 
-    // let n = input_bytes.len();
-    // let mut bytes = Vec::with_capacity(n * 6 * 32);
-    // for (g1, g2) in input_bytes {
-    //     bytes.extend_from_slice(&g1);
-    //     bytes.extend_from_slice(&g2);
-    // }
-    //
-    // let value_ptr = bytes.as_ptr() as u64;
-    // let value_len = bytes.len() as u64;
-    //
-    // let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
-    //
-    // Ok(result == 1)
+    let len = input_bytes.len();
+    let mut bytes = Vec::with_capacity(len);
+
+    // Unsafe Direct Write - bypass Vectors safety checks (extend_from_slice) to save gas.
+    unsafe {
+        let mut dst_ptr = bytes.as_mut_ptr();
+
+        // Iterate over pairs (192 bytes each)
+        for pair_chunk in input_bytes.chunks_exact(PAIR_ELEMENT_LEN) {
+            // --- Process G1 (2 * 32 bytes) ---
+            // P1.X (32 bytes)
+            write_reversed_raw(&pair_chunk[0..FQ_LEN], dst_ptr);
+            dst_ptr = dst_ptr.add(FQ_LEN); // +32
+
+            // P1.Y (32 bytes)
+            write_reversed_raw(&pair_chunk[FQ_LEN..FQ_LEN * 2], dst_ptr);
+            dst_ptr = dst_ptr.add(FQ_LEN); // +32
+
+            // --- Process G2 (2 * 64 bytes) ---
+            // P2.X (64 bytes) - Reversing 64 bytes swaps coefficients c0/c1 AND endianness
+            write_reversed_raw(&pair_chunk[FQ_LEN * 2..FQ_LEN * 2 + FQ2_LEN], dst_ptr);
+            dst_ptr = dst_ptr.add(FQ2_LEN); // +64
+
+            // P2.Y (64 bytes)
+            write_reversed_raw(&pair_chunk[FQ_LEN * 2 + FQ2_LEN..PAIR_ELEMENT_LEN], dst_ptr);
+            dst_ptr = dst_ptr.add(FQ2_LEN); // +64
+        }
+
+        // Set Length - manually filled the buffer, now we tell Vec it's full.
+        bytes.set_len(len);
+    }
+
+    let value_ptr = bytes.as_ptr() as u64;
+    let value_len = bytes.len() as u64;
+
+    // Call Host Function.
+    let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
+    Ok(result == 1)
 }
 
 #[cfg(not(feature = "contract"))]
 pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
+    // Empty input implies the product of an empty set, which is the multiplicative identity (1).
+    // Therefore, the check passes.
+    if input_bytes.is_empty() {
+        return Ok(true);
+    }
+
+    // Validate input length
     if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
         return Err(Bn254Error::InvalidPairLength);
     }
@@ -451,10 +493,26 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
 // Helper: copy available bytes from input to dest, then reverse (BE -> LE)
 // Works for both FQ elements (coordinates) and Scalar, since both are 32 bytes.
 #[cfg(feature = "contract")]
+#[inline]
 fn write_reversed_chunk(dest: &mut [u8], input: &[u8], offset: usize) {
     if let Some(src) = input.get(offset..) {
         let len = src.len().min(FQ_LEN); // FQ_LEN == SCALAR_LEN == 32
         dest[..len].copy_from_slice(&src[..len]);
     }
     dest.reverse();
+}
+
+/// Helper for direct reverse writing.
+/// Marked `inline(always)` to dissolve into the loop for minimal gas overhead.
+#[cfg(feature = "contract")]
+#[inline]
+unsafe fn write_reversed_raw(src: &[u8], dst: *mut u8) {
+    let len = src.len();
+    for i in 0..len {
+        // Read from end -> Write to start
+        // SAFETY: Caller guarantees src and dst are valid and non-overlapping.
+        // Loop bounds guarantee checking is valid.
+        let byte = *src.get_unchecked(len - 1 - i);
+        *dst.add(i) = byte;
+    }
 }

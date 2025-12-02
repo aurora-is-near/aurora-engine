@@ -206,15 +206,6 @@ impl<HF: HardFork> Bn256Pair<HF> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
         // Default result is 0 (false)
         let mut pairing_result = crate::vec![0u8; 32];
-
-        // Empty input implies the product of an empty set, which is the multiplicative identity (1).
-        // Therefore, the check passes.
-        if input.is_empty() {
-            pairing_result[31] = 1;
-            return Ok(pairing_result);
-        }
-
-        // Perform the pairing check
         if aurora_engine_sdk::bn128::alt_bn128_pairing(input)
             .map_err(|err| ExitError::Other(err.into()))?
         {
@@ -388,9 +379,12 @@ mod tests {
 
         let res =
             Bn256Add::<Byzantium>::new().run(&input, Some(EthGas::new(500)), &new_context(), false);
+
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
+            Err(ExitError::Other(Borrowed(
+                "ERR_BN_AFFINE_G_FAILED_TO_CREATE"
+            )))
         ));
     }
 
@@ -485,7 +479,9 @@ mod tests {
         );
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
+            Err(ExitError::Other(Borrowed(
+                "ERR_BN_AFFINE_G_FAILED_TO_CREATE"
+            )))
         ));
     }
 
@@ -575,7 +571,9 @@ mod tests {
         );
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_A")))
+            Err(ExitError::Other(Borrowed(
+                "ERR_BN_AFFINE_G_FAILED_TO_CREATE"
+            )))
         ));
 
         // invalid input length
@@ -596,7 +594,7 @@ mod tests {
         );
         assert!(matches!(
             res,
-            Err(ExitError::Other(Borrowed("ERR_BN128_INVALID_LEN",)))
+            Err(ExitError::Other(Borrowed("ERR_BN_INVALID_PAIR_LEN",)))
         ));
 
         // on curve
