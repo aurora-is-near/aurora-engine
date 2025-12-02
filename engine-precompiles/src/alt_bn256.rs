@@ -2,7 +2,6 @@ use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Borrowed, PhantomData, Vec};
 use crate::utils;
 use crate::{Byzantium, EvmPrecompileResult, HardFork, Istanbul, Precompile, PrecompileOutput};
-use aurora_engine_sdk::BnError;
 use aurora_evm::{Context, ExitError};
 use core::num::{NonZeroU64, NonZeroUsize};
 
@@ -67,13 +66,7 @@ impl<HF: HardFork> Bn256Add<HF> {
 
 impl<HF: HardFork> Bn256Add<HF> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
-        use aurora_engine_sdk::bn128::{right_pad, ADD_INPUT_LEN, G1_LEN};
-
-        let input = right_pad::<ADD_INPUT_LEN>(input);
-        let p1_bytes = &input[..G1_LEN];
-        let p2_bytes = &input[G1_LEN..];
-
-        let output = aurora_engine_sdk::bn128::alt_bn128_g1_sum(p1_bytes, p2_bytes)
+        let output = aurora_engine_sdk::bn128::alt_bn128_g1_sum(input)
             .map_err(|err| ExitError::Other(err.into()))?;
 
         Ok(output.to_vec())
@@ -151,19 +144,8 @@ impl<HF: HardFork> Bn256Mul<HF> {
 
 impl<HF: HardFork> Bn256Mul<HF> {
     fn run_inner(input: &[u8], _context: &Context) -> Result<Vec<u8>, ExitError> {
-        let mut input = input.to_vec();
-        input.resize(consts::MUL_INPUT_LEN, 0);
-        input
-            .chunks_mut(consts::SCALAR_LEN)
-            .for_each(<[u8]>::reverse);
-        let (point, input) = input
-            .split_first_chunk()
-            .expect("the constant `consts::MUL_INPUT_LEN` is incorrect");
-        let (scalar, _) = input
-            .split_first_chunk()
-            .expect("the constant `consts::MUL_INPUT_LEN` is incorrect");
-        let output = aurora_engine_sdk::alt_bn128_g1_scalar_multiple(*point, *scalar)
-            .map_err(into_exit_error)?;
+        let output = aurora_engine_sdk::bn128::alt_bn128_g1_scalar_multiple(input)
+            .map_err(|err| ExitError::Other(err.into()))?;
 
         Ok(output.to_vec())
     }
@@ -265,7 +247,7 @@ impl<HF: HardFork> Bn256Pair<HF> {
                 (g1, g2)
             });
 
-            aurora_engine_sdk::alt_bn128_pairing(pairs).map_err(into_exit_error)?
+            aurora_engine_sdk::bn128::alt_bn128_pairing(pairs).map_err(into_exit_error)?
         };
 
         let mut v = crate::vec![0u8; 32];
@@ -343,16 +325,6 @@ impl Precompile for Bn256Pair<Istanbul> {
 
         let output = Self::run_inner(input, context)?;
         Ok(PrecompileOutput::without_logs(cost, output))
-    }
-}
-
-#[allow(clippy::needless_pass_by_value)]
-const fn into_exit_error(err: BnError) -> ExitError {
-    match err {
-        BnError::Field(_) => ExitError::Other(Borrowed("ERR_FQ_INCORRECT")),
-        BnError::Scalar(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_FR")),
-        BnError::G1(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_A")),
-        BnError::G2(_) => ExitError::Other(Borrowed("ERR_BN128_INVALID_B")),
     }
 }
 
