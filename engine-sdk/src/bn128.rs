@@ -136,7 +136,7 @@ mod utils {
         let point = if x.is_zero() && y.is_zero() {
             G2Affine::zero()
         } else {
-            // We cannot use `G1Affine::new` because that triggers an assert if the point is not on the curve.
+            // We cannot use `G2Affine::new` because that triggers an assert if the point is not on the curve.
             let point = G2Affine::new_unchecked(x, y);
             if !point.is_on_curve() || !point.is_in_correct_subgroup_assuming_on_curve() {
                 return Err(Bn254Error::AffineGFailedToCreate);
