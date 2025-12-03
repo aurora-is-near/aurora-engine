@@ -16,7 +16,6 @@ contract StandardPrecompiles {
     require(test_modexp(), "erroneous modexp precompile");
     require(test_ecadd(), "erroneous ecadd precompile");
     require(test_ecmul(), "erroneous ecmul precompile");
-    // TODO(#46): ecpair uses up all the gas (by itself) for some reason, need to look into this.
     require(test_ecpair(), "erroneous ecpair precompile");
     require(test_blake2f(), "erroneous blake2f precompile");
     return true;
