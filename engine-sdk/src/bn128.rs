@@ -503,7 +503,7 @@ fn write_reversed_chunk(dest: &mut [u8], input: &[u8], offset: usize) {
 }
 
 /// Helper for direct reverse writing.
-/// Marked `inline(always)` to dissolve into the loop for minimal gas overhead.
+/// Marked `inline` to dissolve into the loop for minimal gas overhead.
 #[cfg(feature = "contract")]
 #[inline]
 unsafe fn write_reversed_raw(src: &[u8], dst: *mut u8) {
