@@ -39,5 +39,5 @@ rpath = false
 [dependencies]
 borsh = { version = "1", default-features = false }
 aurora-engine = { path = "../../../engine", default-features = false }
-aurora-engine-sdk = { path = "../../../engine-sdk", default-features = false, features = ["contract", "bn254"] }
+aurora-engine-sdk = { path = "../../../engine-sdk", default-features = false, features = ["contract"] }
 aurora-engine-types = { path = "../../../engine-types", default-features = false }

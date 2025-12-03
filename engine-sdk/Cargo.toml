@@ -14,17 +14,15 @@ publish = true
 
 [dependencies]
 aurora-engine-types.workspace = true
+ark-bn254 = { workspace = true, features = ["curve"], optional = true }
+ark-serialize = { workspace = true, optional = true }
+ark-ec = { workspace = true, optional = true }
+ark-ff = { workspace = true, features = ["asm"], optional = true }
 base64.workspace = true
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-ark-bn254 = { workspace = true, features = ["curve"], optional = true }
-ark-serialize = { workspace = true, optional = true }
-ark-ec = { workspace = true, optional = true }
-ark-ff = { workspace = true, features = ["asm"], optional = true }
 
 [dev-dependencies]
 hex.workspace = true
@@ -33,8 +31,18 @@ hex.workspace = true
 workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "base64/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std"]
+std = [
+    "aurora-engine-types/std",
+    "base64/std",
+    "libsecp256k1/std",
+    "ripemd/std",
+    "sha2/std",
+    "sha3/std",
+    "dep:ark-bn254",
+    "dep:ark-serialize",
+    "dep:ark-ec",
+    "dep:ark-ff"
+]
 contract = []
-bn254 = ["dep:ark-bn254", "dep:ark-serialize", "dep:ark-ec", "dep:ark-ff"]
 log = []
 all-promise-actions = []

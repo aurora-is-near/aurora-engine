@@ -32,7 +32,7 @@ workspace = true
 
 [features]
 default = ["std"]
-std = ["aurora-engine-types/std", "aurora-engine-sdk/bn254", "aurora-engine-sdk/std", "aurora-evm/std", "ethabi/std", "serde/std", "serde_json/std"]
-contract = ["aurora-engine-sdk/bn254", "aurora-engine-sdk/contract"]
+std = ["aurora-engine-types/std", "aurora-engine-sdk/std", "aurora-evm/std", "ethabi/std", "serde/std", "serde_json/std"]
+contract = ["aurora-engine-sdk/contract"]
 log = []
 error_refund = []

@@ -7,7 +7,6 @@ use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
 pub use types::keccak;
 
 pub mod base64;
-#[cfg(feature = "bn254")]
 pub mod bn128;
 pub mod caching;
 pub mod env;
