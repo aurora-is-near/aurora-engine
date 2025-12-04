@@ -417,7 +417,7 @@ pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn25
 /// Accepts a byte slice containing a sequence of pairs (G1, G2).
 #[cfg(feature = "contract")]
 pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
-    use aurora_engine_types::vec;
+    use aurora_engine_types::Vec;
 
     // Empty input implies the product of an empty set, which is the multiplicative identity (1).
     // Therefore, the check passes.
@@ -430,40 +430,27 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
         return Err(Bn254Error::InvalidPairLength);
     }
 
-    let len = input_bytes.len();
-    let mut bytes = vec![0u8; len];
+    let mut bytes = {
+        let mut v = Vec::with_capacity(input_bytes.len());
+        v.extend_from_slice(input_bytes);
+        v
+    };
 
-    // Iterating over input and output chunks simultaneously (Zip).
-    // This allows the compiler to elide bounds checks because slice sizes match.
-    for (src, dst) in input_bytes
-        .chunks_exact(PAIR_ELEMENT_LEN)
-        .zip(bytes.chunks_exact_mut(PAIR_ELEMENT_LEN))
-    {
+    for pair_chunk in bytes.chunks_exact_mut(PAIR_ELEMENT_LEN) {
         // --- Process G1 (2 * 32 bytes) ---
-
-        // P1.X (0..32)
-        dst[0..FQ_LEN].copy_from_slice(&src[0..FQ_LEN]);
-        dst[0..FQ_LEN].reverse();
-
-        // P1.Y (32..64)
-        dst[FQ_LEN..FQ_LEN * 2].copy_from_slice(&src[FQ_LEN..FQ_LEN * 2]);
-        dst[FQ_LEN..FQ_LEN * 2].reverse();
+        // P1.X
+        pair_chunk[0..FQ_LEN].reverse();
+        // P1.Y
+        pair_chunk[FQ_LEN..G1_LEN].reverse();
 
         // --- Process G2 (2 * 64 bytes) ---
-        // Note: Reversing the full 64 bytes of Fq2 automatically handles
-        // both Endianness swap AND Coefficient swap (c0 <-> c1) required for NEAR format.
+        // P2.X (64 bytes)
+        pair_chunk[G1_LEN..G2_LEN].reverse();
 
-        // P2.X (64..128)
-        const G2_X_START: usize = FQ_LEN * 2;
-        const G2_X_END: usize = G2_X_START + FQ2_LEN;
-        dst[G2_X_START..G2_X_END].copy_from_slice(&src[G2_X_START..G2_X_END]);
-        dst[G2_X_START..G2_X_END].reverse();
-
-        // P2.Y (128..192)
-        const G2_Y_START: usize = G2_X_END;
-        dst[G2_Y_START..].copy_from_slice(&src[G2_Y_START..]);
-        dst[G2_Y_START..].reverse();
+        // P2.Y (64 bytes)
+        pair_chunk[G2_LEN..PAIR_ELEMENT_LEN].reverse();
     }
+
     let value_ptr = bytes.as_ptr() as u64;
     let value_len = bytes.len() as u64;
 
@@ -516,19 +503,4 @@ fn write_reversed_chunk(dest: &mut [u8], input: &[u8], offset: usize) {
         dest[..len].copy_from_slice(&src[..len]);
     }
     dest.reverse();
-}
-
-/// Helper for direct reverse writing.
-/// Marked `inline` to dissolve into the loop for minimal gas overhead.
-#[cfg(feature = "contract")]
-#[inline]
-unsafe fn write_reversed_raw(src: &[u8], dst: *mut u8) {
-    let len = src.len();
-    for i in 0..len {
-        // Read from end -> Write to start
-        // SAFETY: Caller guarantees src and dst are valid and non-overlapping.
-        // Loop bounds guarantee checking is valid.
-        let byte = *src.get_unchecked(len - 1 - i);
-        *dst.add(i) = byte;
-    }
 }

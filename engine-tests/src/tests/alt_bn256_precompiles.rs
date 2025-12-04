@@ -1,6 +1,6 @@
 //! # alt-bn-256 precompiles tests
 //!
-//! Tests bases on parse data from:
+//! Tests based on parse data from:
 //! <https://github.com/ethereum/execution-spec-tests/releases/tag/pectra-devnet-5%40v1.2.0>
 //! for Prague hard fork.
 //!
@@ -44,10 +44,7 @@ impl PrecompileStandalone {
 }
 
 /// Run precompile with specific input data from the file.
-/// It executes precompile it two ways:
-///   1. Run directly and check result with expected output
-///   2. TODO: Call transaction and validation expected output. To avoid NEAR gas limit errors
-///      we only send input with limited expected size.
+/// It executes precompile it two ways: run directly and check result with expected output
 fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas_limit: u64) {
     for data in PrecompileStandalone::new(data).precompile_data {
         let input = hex::decode(data.input.clone()).unwrap();
@@ -62,8 +59,6 @@ fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas
         let standalone_result = precompile.run(&input, None, &ctx, false).unwrap();
         assert_eq!(standalone_result.output, output);
 
-        // TODO:To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
-        //if input.len() < 300000 {
         check_wasm_submit(address, input, &output, gas_limit);
     }
 }
@@ -73,37 +68,19 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = Gas::MAX;
 
-    let inp_hex = hex::encode(&input);
-    let out_hex = hex::encode(&expected_output);
-    // println!("INPUT: {}", inp_hex);
-    // println!("OUTPUT: {}", out_hex);
-    // if inp_hex == "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001"
-    // || inp_hex == "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" {
-    //      return;
-    // }
+    let (submit_res, wasm_result) = runner
+        .submit_with_signer_profiled(&mut signer, |nonce| {
+            aurora_engine_transactions::legacy::TransactionLegacy {
+                nonce,
+                gas_price: U256::zero(),
+                gas_limit: u64::MAX.into(),
+                to: Some(address),
+                value: Wei::zero(),
+                data: input,
+            }
+        })
+        .unwrap();
 
-    //let (submit_res, wasm_result) = runner
-    let res = runner.submit_with_signer_profiled(&mut signer, |nonce| {
-        aurora_engine_transactions::legacy::TransactionLegacy {
-            nonce,
-            gas_price: U256::zero(),
-            gas_limit: u64::MAX.into(),
-            to: Some(address),
-            value: Wei::zero(),
-            data: input,
-        }
-    });
-    if let Err(err) = res {
-        println!("--> Submit Error: {:?}", err);
-        return;
-    }
-    let (submit_res, wasm_result) = res.unwrap();
-
-    println!(
-        "Gas {:?} [{:?}]",
-        wasm_result.wasm_gas(),
-        wasm_result.all_gas()
-    );
     assert_ggas_bound(wasm_result.all_gas(), gas_limit);
     assert_eq!(expected_output, utils::unwrap_success_slice(&submit_res));
 }
@@ -133,7 +110,7 @@ fn test_alt_bn128_mul() {
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        100_000,
+        9810, // 9.81 Tgas
     );
 }
 
@@ -143,6 +120,6 @@ fn test_alt_bn128_pairing() {
         &Bn256Pair::<Istanbul>::new(),
         Bn256Pair::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_pairing.json"),
-        200000,
+        44040, // 44.040 Tgas
     );
 }
