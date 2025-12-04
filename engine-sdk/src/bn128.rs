@@ -417,7 +417,7 @@ pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn25
 /// Accepts a byte slice containing a sequence of pairs (G1, G2).
 #[cfg(feature = "contract")]
 pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
-    use aurora_engine_types::Vec;
+    use aurora_engine_types::vec;
 
     // Empty input implies the product of an empty set, which is the multiplicative identity (1).
     // Therefore, the check passes.
@@ -431,37 +431,39 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
     }
 
     let len = input_bytes.len();
-    let mut bytes = Vec::with_capacity(len);
+    let mut bytes = vec![0u8; len];
 
-    // Unsafe Direct Write - bypass Vectors safety checks (extend_from_slice) to save gas.
-    unsafe {
-        let mut dst_ptr = bytes.as_mut_ptr();
+    // Iterating over input and output chunks simultaneously (Zip).
+    // This allows the compiler to elide bounds checks because slice sizes match.
+    for (src, dst) in input_bytes
+        .chunks_exact(PAIR_ELEMENT_LEN)
+        .zip(bytes.chunks_exact_mut(PAIR_ELEMENT_LEN))
+    {
+        // --- Process G1 (2 * 32 bytes) ---
 
-        // Iterate over pairs (192 bytes each)
-        for pair_chunk in input_bytes.chunks_exact(PAIR_ELEMENT_LEN) {
-            // --- Process G1 (2 * 32 bytes) ---
-            // P1.X (32 bytes)
-            write_reversed_raw(&pair_chunk[0..FQ_LEN], dst_ptr);
-            dst_ptr = dst_ptr.add(FQ_LEN); // +32
+        // P1.X (0..32)
+        dst[0..FQ_LEN].copy_from_slice(&src[0..FQ_LEN]);
+        dst[0..FQ_LEN].reverse();
 
-            // P1.Y (32 bytes)
-            write_reversed_raw(&pair_chunk[FQ_LEN..FQ_LEN * 2], dst_ptr);
-            dst_ptr = dst_ptr.add(FQ_LEN); // +32
+        // P1.Y (32..64)
+        dst[FQ_LEN..FQ_LEN * 2].copy_from_slice(&src[FQ_LEN..FQ_LEN * 2]);
+        dst[FQ_LEN..FQ_LEN * 2].reverse();
 
-            // --- Process G2 (2 * 64 bytes) ---
-            // P2.X (64 bytes) - Reversing 64 bytes swaps coefficients c0/c1 AND endianness
-            write_reversed_raw(&pair_chunk[FQ_LEN * 2..FQ_LEN * 2 + FQ2_LEN], dst_ptr);
-            dst_ptr = dst_ptr.add(FQ2_LEN); // +64
+        // --- Process G2 (2 * 64 bytes) ---
+        // Note: Reversing the full 64 bytes of Fq2 automatically handles
+        // both Endianness swap AND Coefficient swap (c0 <-> c1) required for NEAR format.
 
-            // P2.Y (64 bytes)
-            write_reversed_raw(&pair_chunk[FQ_LEN * 2 + FQ2_LEN..PAIR_ELEMENT_LEN], dst_ptr);
-            dst_ptr = dst_ptr.add(FQ2_LEN); // +64
-        }
+        // P2.X (64..128)
+        const G2_X_START: usize = FQ_LEN * 2;
+        const G2_X_END: usize = G2_X_START + FQ2_LEN;
+        dst[G2_X_START..G2_X_END].copy_from_slice(&src[G2_X_START..G2_X_END]);
+        dst[G2_X_START..G2_X_END].reverse();
 
-        // Set Length - manually filled the buffer, now we tell Vec it's full.
-        bytes.set_len(len);
+        // P2.Y (128..192)
+        const G2_Y_START: usize = G2_X_END;
+        dst[G2_Y_START..].copy_from_slice(&src[G2_Y_START..]);
+        dst[G2_Y_START..].reverse();
     }
-
     let value_ptr = bytes.as_ptr() as u64;
     let value_len = bytes.len() as u64;
 
