@@ -354,11 +354,18 @@ pub fn alt_bn128_g1_sum(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
 /// Multiplies a G1 point on the bn128 curve by a scalar via NEAR host function.
 #[cfg(feature = "contract")]
 pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn254Error> {
+    use aurora_engine_types::U256;
     // Buffer is: [P1(G1_LEN), Scalar(SCALAR_LEN)] -> Total 96 bytes
     const BUFFER_LEN: usize = G1_LEN + SCALAR_LEN;
     // Register ID to store the result
     const REGISTER_ID: u64 = 1;
 
+    const BN128_SCALAR_ORDER: U256 = U256([
+        0x43e1f593f0000001,
+        0x2833e84879b97091,
+        0xb85045b68181585d,
+        0x30644e72e131a029,
+    ]);
     let mut bytes = [0u8; BUFFER_LEN];
 
     // 1. Process Point G1 (First 64 bytes)
@@ -370,6 +377,13 @@ pub fn alt_bn128_g1_scalar_multiple(input_bytes: &[u8]) -> Result<[u8; 64], Bn25
     // 2. Process Scalar (Next 32 bytes)
     // Scalar (Input 64..96)
     write_reversed_chunk(&mut bytes[G1_LEN..], input_bytes, G1_LEN);
+
+    let scalar_slice = &mut bytes[G1_LEN..];
+    let scalar = U256::from_little_endian(scalar_slice);
+    if scalar >= BN128_SCALAR_ORDER {
+        let normalized = scalar % BN128_SCALAR_ORDER;
+        scalar_slice.copy_from_slice(&normalized.to_little_endian());
+    }
 
     let value_ptr = bytes.as_ptr() as u64;
     let value_len = bytes.len() as u64;
