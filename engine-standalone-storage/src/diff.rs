@@ -23,7 +23,7 @@ impl fmt::Debug for Diff {
     }
 }
 
-#[derive(Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
+#[derive(Debug, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 pub enum DiffValue {
     Modified(Vec<u8>),

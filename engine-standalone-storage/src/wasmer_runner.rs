@@ -354,6 +354,10 @@ impl WasmerRunner {
         self.env.as_mut(&mut self.store).state.take_cached_diff()
     }
 
+    pub fn initialized(&self) -> bool {
+        self.instance.is_some()
+    }
+
     /// must call on on-chain variant of the contract
     pub fn get_version(&mut self) -> Result<String, WasmRuntimeError> {
         self.instance
