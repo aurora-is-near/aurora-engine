@@ -245,22 +245,29 @@ mod utils {
     /// returns true if the result is equal to the identity element.
     ///
     /// Note: If the input is empty, this function returns true.
-    /// This is different to EIP2537 which disallows the empty input.
     #[inline]
-    pub fn pairing_check(pairs: &[(&[u8], &[u8])]) -> Result<bool, Bn254Error> {
-        let mut g1_points = Vec::with_capacity(pairs.len());
-        let mut g2_points = Vec::with_capacity(pairs.len());
+    pub fn pairing_check<'a>(
+        mut pairs: impl ExactSizeIterator<Item = (&'a [u8], &'a [u8])>,
+    ) -> Result<bool, Bn254Error> {
+        let pairs_count = pairs.len();
+        let (g1_points, g2_points) = pairs.try_fold(
+            (
+                Vec::with_capacity(pairs_count),
+                Vec::with_capacity(pairs_count),
+            ),
+            |(mut g1_acc, mut g2_acc), (g1_bytes, g2_bytes)| {
+                let g1 = read_g1_point(g1_bytes)?;
+                let g2 = read_g2_point(g2_bytes)?;
 
-        for (g1_bytes, g2_bytes) in pairs {
-            let g1 = read_g1_point(g1_bytes)?;
-            let g2 = read_g2_point(g2_bytes)?;
+                // Skip pairs where either point is at infinity
+                if !g1.is_zero() && !g2.is_zero() {
+                    g1_acc.push(g1);
+                    g2_acc.push(g2);
+                }
 
-            // Skip pairs where either point is at infinity
-            if !g1.is_zero() && !g2.is_zero() {
-                g1_points.push(g1);
-                g2_points.push(g2);
-            }
-        }
+                Ok((g1_acc, g2_acc))
+            },
+        )?;
 
         if g1_points.is_empty() {
             return Ok(true);
@@ -474,9 +481,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
 
     let elements = input_bytes.len() / PAIR_ELEMENT_LEN;
 
-    let mut points = Vec::with_capacity(elements);
-
-    for idx in 0..elements {
+    let points = (0..elements).map(|idx| {
         // Offset to the start of the pairing element at index `idx` in the byte slice
         let start = idx * PAIR_ELEMENT_LEN;
         let g1_start = start;
@@ -487,10 +492,10 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
         // Get G1 and G2 points from the input
         let encoded_g1_element = &input_bytes[g1_start..g2_start];
         let encoded_g2_element = &input_bytes[g2_start..g2_start + G2_LEN];
-        points.push((encoded_g1_element, encoded_g2_element));
-    }
+        (encoded_g1_element, encoded_g2_element)
+    });
 
-    utils::pairing_check(&points)
+    utils::pairing_check(points)
 }
 
 // Helper: copy available bytes from input to dest, then reverse (BE -> LE)
