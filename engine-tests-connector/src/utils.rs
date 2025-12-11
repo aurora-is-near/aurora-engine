@@ -70,7 +70,7 @@ impl TestContract {
         };
         let worker = near_workspaces::sandbox()
             .await
-            .map_err(|err| anyhow::anyhow!("Failed init sandbox: {:?}", err))?;
+            .map_err(|err| anyhow::anyhow!("Failed init sandbox: {err:?}"))?;
         let registrar: AccountId = "registrar".parse()?;
         let sk = SecretKey::from_seed(KeyType::ED25519, registrar.as_str());
         let registrar = worker

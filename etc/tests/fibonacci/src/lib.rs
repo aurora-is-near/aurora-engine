@@ -1,12 +1,10 @@
-use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::{env, near_bindgen, Gas, Promise, PromiseError};
+use near_sdk::{env, near, Gas, Promise, PromiseError};
 
 const FIVE_TGAS: Gas = Gas::from_tgas(5);
 
-#[near_bindgen]
-#[derive(Default, BorshDeserialize, BorshSerialize)]
-#[borsh(crate = "near_sdk::borsh")]
+#[near(contract_state)]
+#[derive(Default)]
 pub struct Fib;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -15,7 +13,7 @@ pub struct FibAcc {
     b: U128,
 }
 
-#[near_bindgen]
+#[near]
 impl Fib {
     /// Seeds the Fibonacci recursion with the starting values (i.e. F[0] and F[1]).
     pub fn seed() -> FibAcc {
