@@ -15,11 +15,9 @@ crate-type = ["lib"]
 
 [dependencies]
 aurora-engine = { workspace = true, features = ["std"] }
-aurora-engine-modexp = { workspace = true, features = ["std"] }
 aurora-engine-sdk = { workspace = true, features = ["std"] }
 aurora-engine-transactions = { workspace = true, features = ["std"] }
 aurora-engine-types = { workspace = true, features = ["std"] }
-aurora-evm.workspace = true
 engine-standalone-tracing.workspace = true
 hex = { workspace = true, features = ["std"] }
 libsecp256k1.workspace = true

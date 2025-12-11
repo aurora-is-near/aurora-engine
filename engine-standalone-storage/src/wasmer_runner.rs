@@ -354,7 +354,8 @@ impl WasmerRunner {
         self.env.as_mut(&mut self.store).state.take_cached_diff()
     }
 
-    pub fn initialized(&self) -> bool {
+    #[must_use]
+    pub const fn initialized(&self) -> bool {
         self.instance.is_some()
     }
 
@@ -462,14 +463,14 @@ mod state {
 
     use std::{borrow::Cow, iter, mem};
 
+    use crate::{Diff, DiffValue};
+    use aurora_engine_sdk::bn128::{FQ_LEN, G1_LEN, G2_LEN, PAIR_ELEMENT_LEN};
     use aurora_engine_sdk::env::Fixed;
     use aurora_engine_types::borsh;
     use engine_standalone_tracing::TraceKind;
     use rocksdb::DB;
     use sha2::digest::{FixedOutput, Update};
     use wasmer::MemoryView;
-
-    use crate::{Diff, DiffValue};
 
     pub struct NearState {
         inner: StateInner,
@@ -757,8 +758,8 @@ mod state {
                 _ => u8::try_from(v - 27).map_err(drop)?,
             };
             let recovery_id = libsecp256k1::RecoveryId::parse(bit).map_err(|_| ())?;
-
             let public_key = libsecp256k1::recover(&hash, &sig, &recovery_id).map_err(|_| ())?;
+
             Self::set_reg(
                 &mut self.registers,
                 register_id,
@@ -779,11 +780,14 @@ mod state {
             input.resize(0x82, 0);
             input.remove(0);
             input.remove(64);
-            let mut output = aurora_engine_sdk::alt_bn128_g1_sum(
-                input[..0x40].try_into().unwrap(),
-                input[0x40..0x80].try_into().unwrap(),
-            )
-            .unwrap_or([0; 0x40]);
+
+            input[..32].reverse();
+            input[32..64].reverse();
+            input[64..96].reverse();
+            input[96..].reverse();
+
+            let mut output =
+                aurora_engine_sdk::bn128::alt_bn128_g1_sum(&input).unwrap_or([0; 0x40]);
             output[0x00..0x20].reverse();
             output[0x20..0x40].reverse();
             Self::set_reg(&mut self.registers, register_id, Cow::Borrowed(&output));
@@ -797,12 +801,14 @@ mod state {
             register_id: u64,
         ) {
             let mut input = self.get_data(memory, value_ptr, value_len);
+
             input.resize(0x60, 0);
-            let mut output = aurora_engine_sdk::alt_bn128_g1_scalar_multiple(
-                input[..0x40].try_into().unwrap(),
-                input[0x40..].try_into().unwrap(),
-            )
-            .unwrap_or([0; 0x40]);
+            input[..32].reverse();
+            input[32..64].reverse();
+            input[64..].reverse();
+
+            let mut output =
+                aurora_engine_sdk::bn128::alt_bn128_g1_scalar_multiple(&input).unwrap_or([0; 64]);
             // swap endianness
             output[0x00..0x20].reverse();
             output[0x20..0x40].reverse();
@@ -815,21 +821,24 @@ mod state {
             value_len: u64,
             value_ptr: u64,
         ) -> u64 {
-            let input = self.get_data(memory, value_ptr, value_len);
-            let pairs = input.chunks(0xc0).map(|chunk| {
-                let chunk = if chunk.len() < 0xc0 {
-                    let mut v = chunk.to_vec();
-                    v.resize(0xc0, 0);
-                    Cow::Owned(v)
-                } else {
-                    Cow::Borrowed(chunk)
-                };
-                (
-                    chunk[..0x40].try_into().unwrap(),
-                    chunk[0x40..].try_into().unwrap(),
-                )
-            });
-            aurora_engine_sdk::alt_bn128_pairing(pairs)
+            let mut input = self.get_data(memory, value_ptr, value_len);
+
+            for input_chunk in input.chunks_exact_mut(PAIR_ELEMENT_LEN) {
+                // --- Process G1 (2 * 32 bytes) ---
+                // P1.X
+                input_chunk[0..FQ_LEN].reverse();
+                // P1.Y
+                input_chunk[FQ_LEN..G1_LEN].reverse();
+
+                // --- Process G2 (2 * 64 bytes) ---
+                // P2.X (64 bytes)
+                input_chunk[G1_LEN..G2_LEN].reverse();
+
+                // P2.Y (64 bytes)
+                input_chunk[G2_LEN..PAIR_ELEMENT_LEN].reverse();
+            }
+
+            aurora_engine_sdk::bn128::alt_bn128_pairing(&input)
                 .unwrap_or_default()
                 .into()
         }

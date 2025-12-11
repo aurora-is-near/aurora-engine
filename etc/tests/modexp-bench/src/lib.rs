@@ -1,12 +1,10 @@
-use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{env, near_bindgen};
+use near_sdk::{env, near};
 
-#[near_bindgen]
-#[borsh(crate = "near_sdk::borsh")]
-#[derive(BorshDeserialize, BorshSerialize, Default)]
+#[derive(Default)]
+#[near(contract_state)]
 pub struct Modexp;
 
-#[near_bindgen]
+#[near]
 impl Modexp {
     pub fn modexp(
         &self,

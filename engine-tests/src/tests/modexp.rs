@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use aurora_engine::engine::EngineError;
+use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
@@ -244,11 +245,11 @@ impl BenchInput {
 #[derive(Debug)]
 struct BenchResult {
     /// Amount of Near gas used by Aurora's modexp implementation
-    aurora: u64,
+    aurora: Gas,
     /// Amount of Near gas used by ibig crate modexp implementation
-    ibig: u64,
+    ibig: Gas,
     /// Amount of Near gas used by num crate modexp implementation
-    num: Result<u64, EngineError>,
+    num: Result<Gas, EngineError>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -260,7 +261,7 @@ enum Implementation {
 
 impl BenchResult {
     fn least(&self) -> Implementation {
-        let num = self.num.as_ref().copied().unwrap_or(u64::MAX);
+        let num = self.num.as_ref().copied().unwrap_or(Gas::MAX);
 
         if self.aurora <= self.ibig && self.aurora <= num {
             Implementation::Aurora

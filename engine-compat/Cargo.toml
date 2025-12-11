@@ -13,9 +13,6 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
-[profile.release]
-panic = "abort"
-
 [dependencies]
 aurora-engine = { workspace = true, optional = true, default-features = false, features = ["tracing", "contract", "log", "impl-serde"] }
 aurora-engine-sdk = { workspace = true, optional = true, default-features = false, features = ["contract", "log"] }
