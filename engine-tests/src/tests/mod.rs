@@ -1,5 +1,6 @@
 mod access_keys;
 mod account_id_precompiles;
+mod alt_bn256_precompiles;
 #[cfg(not(feature = "skip-bls-tests"))]
 mod bls12_381;
 mod contract_call;

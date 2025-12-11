@@ -2,10 +2,11 @@ use crate::utils;
 use aurora_engine_precompiles::prepaid_gas;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{types::Wei, U256};
+use near_primitives_core::types::Gas;
 
 #[test]
 fn test_prepaid_gas_precompile() {
-    const EXPECTED_VALUE: u64 = 157_277_246_352_223;
+    const EXPECTED_VALUE: Gas = Gas::from_gas(157_277_246_352_223);
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();
     // The standalone runner gets the wrong answer because the prepaid gas is not
@@ -28,7 +29,7 @@ fn test_prepaid_gas_precompile() {
         .unwrap();
 
     assert_eq!(
-        U256::from(EXPECTED_VALUE),
+        U256::from(EXPECTED_VALUE.as_gas()),
         U256::from_big_endian(utils::unwrap_success_slice(&result)),
     );
 

@@ -1,4 +1,4 @@
-//! # BLS12-382 precompiles tests
+//! # BLS12-381 precompiles tests
 //!
 //! Tests bases on parse data from:
 //! <https://github.com/ethereum/execution-spec-tests/releases/tag/pectra-devnet-5%40v1.2.0>
@@ -30,6 +30,7 @@ use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_evm::backend::MemoryAccount;
 use libsecp256k1::SecretKey;
+use near_primitives_core::types::Gas;
 use std::collections::BTreeMap;
 use std::{fs, iter};
 
@@ -203,7 +204,7 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data
 /// Submit transaction to precompile address and check result with expected output.
 fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
     let (mut runner, mut signer, _) = initialize_transfer();
-    runner.context.prepaid_gas = u64::MAX;
+    runner.context.prepaid_gas = Gas::MAX;
 
     let wasm_result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {

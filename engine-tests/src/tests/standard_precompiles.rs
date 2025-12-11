@@ -73,7 +73,7 @@ fn profile_ecmul() {
 #[test]
 fn profile_ecpair() {
     let profile = precompile_execution_profile("test_ecpair");
-    utils::assert_gas_bound(profile.all_gas(), 114);
+    utils::assert_gas_bound(profile.all_gas(), 24);
 }
 
 #[test]

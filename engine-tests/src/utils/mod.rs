@@ -15,6 +15,8 @@ use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::ViewConfig;
+use near_primitives_core::gas::Gas;
+use near_primitives_core::types::Balance;
 use near_vm_runner::logic::errors::FunctionCallError;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::ReturnData;
@@ -22,6 +24,7 @@ use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
 use near_vm_runner::{ContractCode, MockContractRuntimeCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
@@ -152,7 +155,7 @@ impl OneShotAuroraRunner<'_> {
         .unwrap();
 
         if let Some(aborted) = outcome.aborted.as_ref() {
-            Err(into_engine_error(outcome.used_gas, aborted))
+            Err(into_engine_error(outcome.used_gas.as_gas(), aborted))
         } else {
             Ok(outcome)
         }
@@ -176,7 +179,7 @@ impl AuroraRunner {
     ) {
         context.block_height += 1;
         context.block_timestamp += 1_000_000_000;
-        context.input = input;
+        context.input = input.into();
         context.signer_account_id = signer_account_id.parse().unwrap();
         context.predecessor_account_id = caller_account_id.parse().unwrap();
     }
@@ -211,7 +214,7 @@ impl AuroraRunner {
                 PromiseResult::Failed => near_vm_runner::logic::types::PromiseResult::Failed,
                 PromiseResult::NotReady => near_vm_runner::logic::types::PromiseResult::NotReady,
                 PromiseResult::Successful(bytes) => {
-                    near_vm_runner::logic::types::PromiseResult::Successful(bytes.clone())
+                    near_vm_runner::logic::types::PromiseResult::Successful(Rc::from(bytes.clone()))
                 }
             })
             .collect();
@@ -235,7 +238,7 @@ impl AuroraRunner {
         .unwrap();
 
         if let Some(error) = outcome.aborted.as_ref() {
-            return Err(into_engine_error(outcome.used_gas, error));
+            return Err(into_engine_error(outcome.used_gas.as_gas(), error));
         }
 
         self.context.storage_usage = outcome.storage_usage;
@@ -431,7 +434,7 @@ impl AuroraRunner {
         let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
+            max_gas_burnt: Gas::MAX,
         });
 
         runner.call("view", "viewer", input).map(|outcome| {
@@ -447,7 +450,7 @@ impl AuroraRunner {
         let mut runner = self.one_shot();
 
         runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
+            max_gas_burnt: Gas::MAX,
         });
 
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
@@ -566,7 +569,7 @@ impl AuroraRunner {
         Arc::get_mut(&mut self.wasm_config)
             .unwrap()
             .limit_config
-            .max_gas_burnt = max_gas_burnt;
+            .max_gas_burnt = Gas::from_gas(max_gas_burnt);
     }
 
     pub fn set_code(&mut self, code: ContractCode) {
@@ -596,17 +599,19 @@ impl Default for AuroraRunner {
                 current_account_id: origin_account_id.clone(),
                 signer_account_id: origin_account_id.clone(),
                 signer_account_pk: vec![],
-                predecessor_account_id: origin_account_id,
-                input: vec![],
-                promise_results: Arc::new([]),
+                predecessor_account_id: origin_account_id.clone(),
+                refund_to_account_id: origin_account_id,
+                input: Rc::default(),
+                promise_results: Arc::default(),
                 block_height: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
-                account_balance: 10u128.pow(25),
-                account_locked_balance: 0,
+                account_balance: Balance::from_near(10),
+                account_locked_balance: Balance::ZERO,
                 storage_usage: 100,
-                attached_deposit: 0,
-                prepaid_gas: 10u64.pow(18),
+                account_contract: near_primitives_core::account::AccountContract::None,
+                attached_deposit: Balance::ZERO,
+                prepaid_gas: Gas::MAX,
                 random_seed: vec![],
                 output_data_receivers: vec![],
                 view_config: None,
@@ -633,12 +638,12 @@ impl ExecutionProfile {
     pub fn new(outcome: &VMOutcome) -> Self {
         Self {
             host_breakdown: outcome.profile.clone(),
-            total_gas_cost: outcome.burnt_gas,
+            total_gas_cost: outcome.burnt_gas.as_gas(),
         }
     }
 
     pub fn wasm_gas(&self) -> u64 {
-        self.host_breakdown.get_wasm_cost()
+        self.host_breakdown.get_wasm_cost().as_gas()
     }
 
     pub const fn all_gas(&self) -> u64 {
