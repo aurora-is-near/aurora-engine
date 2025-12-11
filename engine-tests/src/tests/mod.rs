@@ -1,5 +1,6 @@
 mod access_keys;
 mod account_id_precompiles;
+mod alt_bn256_precompiles;
 mod contract_call;
 mod ecrecover;
 mod erc20;
