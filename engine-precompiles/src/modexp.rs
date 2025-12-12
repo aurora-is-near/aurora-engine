@@ -1,12 +1,12 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
-    utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Osaka, Precompile, PrecompileOutput,
+    prelude, utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Osaka, Precompile,
+    PrecompileOutput,
 };
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_evm::{Context, ExitError};
 use num::{Integer, Zero};
-use std::borrow::Cow::Borrowed;
 
 #[derive(Default)]
 pub struct ModExp<HF: HardFork, M = AuroraModExp>(PhantomData<HF>, PhantomData<M>);
@@ -290,7 +290,9 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
             || exp_len > Self::INPUT_SIZE_LIMIT
             || mod_len > Self::INPUT_SIZE_LIMIT
         {
-            return Err(ExitError::Other(Borrowed("ERR_MODEXP_SIZE_LIMIT")));
+            return Err(ExitError::Other(prelude::Cow::Borrowed(
+                "ERR_MODEXP_SIZE_LIMIT",
+            )));
         }
 
         let cost = Self::required_gas(input)?;
