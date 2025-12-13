@@ -23,7 +23,8 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     /// Calculate the iteration count for gas cost calculation
     /// EIP-7883 changes `BITS_PER_BYTE` from 8 to 16 for Osaka hard fork
     ///
-    /// NOTE: the output of this function is bounded by 2^67
+    /// NOTE: the output of this function is bounded by approximately `BITS_PER_BYTE * 2^64`
+    /// (For `BITS_PER_BYTE=8: ~2^67`, for `BITS_PER_BYTE=16: ~2^68`)
     fn calc_iter_count<const BITS_PER_BYTE: u64>(
         exp_len: u64,
         base_len: u64,
@@ -200,9 +201,8 @@ impl<M: ModExpAlgorithm> ModExp<Osaka, M> {
     // EIP-7823: 1024 bytes (8192 bits)
     const INPUT_SIZE_LIMIT: u64 = 1024;
 
-    // EIP-7883: New logic for multiplication complexity
-    // Introduces doubles the complexity if the base or modulus
-    // length exceeds 32 bytes.
+    /// EIP-7883: New logic for multiplication complexity.
+    /// Doubles the complexity if the base or modulus length exceeds 32 bytes.
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
 
@@ -230,7 +230,7 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
             // EIP-7883: Changed BITS_PER_BYTE from 8 to 16
             let iter_count = Self::calc_iter_count::<16>(exp_len, base_len, input)?;
 
-            // mul * iter_count bounded by 2^189 (so no overflow)
+            // With INPUT_SIZE_LIMIT=1024, mul * iter_count bounded by ~2^30 (no overflow)
             // Old: floor(mult * iter / 3)
             // New: floor(mult * iter)
             let gas = mul * iter_count.max(U256::one());
@@ -835,6 +835,10 @@ mod tests_osaka {
     use super::*;
     use crate::utils::new_context;
 
+    fn run_modexp(input: &[u8], gas_limit: u64) -> Result<PrecompileOutput, ExitError> {
+        ModExp::<Osaka>::new().run(input, Some(EthGas::new(gas_limit)), &new_context(), false)
+    }
+
     fn make_input(b_len: usize, e_len: usize, m_len: usize, fill_byte: u8) -> Vec<u8> {
         let mut out = Vec::new();
         // Lenths (32 bytes each)
@@ -842,9 +846,9 @@ mod tests_osaka {
         out.extend_from_slice(&U256::from(e_len).to_big_endian());
         out.extend_from_slice(&U256::from(m_len).to_big_endian());
         // Data
-        out.extend(core::iter::repeat(fill_byte).take(b_len));
-        out.extend(core::iter::repeat(fill_byte).take(e_len));
-        out.extend(core::iter::repeat(fill_byte).take(m_len));
+        out.extend(core::iter::repeat_n(fill_byte, b_len));
+        out.extend(core::iter::repeat_n(fill_byte, e_len));
+        out.extend(core::iter::repeat_n(fill_byte, m_len));
         out
     }
 
@@ -924,16 +928,11 @@ mod tests_osaka {
 
         // Testing `run`:
         let input_invalid = make_input(1025, 1, 1, 1);
-        let res = ModExp::<Osaka>::new().run(
-            &input_invalid,
-            Some(EthGas::new(10_000_000)),
-            &new_context(),
-            false,
-        );
+        let res = run_modexp(&input_invalid, 10_000_000);
 
         match res {
             Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
-            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT, got {:?}", res),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT, got {res:?}"),
         }
     }
 
@@ -946,25 +945,17 @@ mod tests_osaka {
         input.extend_from_slice(&[0x00; 32]); // Exp Len = 0
         input.extend_from_slice(&[0x00; 32]); // Mod Len = 0
 
-        let res = ModExp::<Osaka>::new().run(
-            &input,
-            Some(EthGas::new(10_000_000)),
-            &new_context(),
-            false,
-        );
+        let res = run_modexp(&input, 10_000_000);
         match res {
             Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
-            _ => panic!(
-                "Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {:?}",
-                res
-            ),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {res:?}",),
         }
     }
 
     #[test]
     fn test_osaka_eip7823_analysis_cases() {
         // "Empty inputs"
-        let res = ModExp::<Osaka>::new().run(&[], Some(EthGas::new(1000)), &new_context(), false);
+        let res = run_modexp(&[], 1000);
         // Should return success with empty output and min gas
         assert!(res.is_ok());
         assert_eq!(res.unwrap().cost.as_u64(), 500);
@@ -977,15 +968,17 @@ mod tests_osaka {
         // parse(0) -> reads [9e, 5f, aa, fc, 00, ... 00] -> Huge number!
         // This should trigger the size limit error.
         let input = hex::decode("9e5faafc").unwrap();
-        let res = ModExp::<Osaka>::new().run(
-            &input,
-            Some(EthGas::new(10_000_000)),
-            &new_context(),
-            false,
-        );
+        let res = run_modexp(&input, 10_000_000);
         match res {
             Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
-            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for short junk input interpreted as huge length, got {:?}", res),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for short junk input interpreted as huge length, got {res:?}"),
+        }
+
+        let input2 = hex::decode("85474728").unwrap();
+        let res2 = run_modexp(&input2, 10_000_000);
+        match res2 {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for 85474728"),
         }
     }
 }
