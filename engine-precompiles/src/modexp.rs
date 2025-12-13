@@ -20,10 +20,28 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
 }
 
 impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
-    /// Calculate the iteration count for gas cost calculation
-    /// EIP-7883 changes `BITS_PER_BYTE` from 8 to 16 for Osaka hard fork
+    /// Compute the iteration count used to calculate ModExp gas costs.
     ///
-    /// NOTE: the output of this function is bounded by 2^67
+    /// The count follows EIP-7883 semantics: when `exp_len` ≤ 32 the result is
+    /// `0` if the encoded exponent is zero, otherwise `exp.bits() - 1`. When
+    /// `exp_len` > 32 the result is `BITS_PER_BYTE * (exp_len - 32) + (exp.bits() - 1)`,
+    /// where `BITS_PER_BYTE` is the const generic parameter (8 for pre‑Osaka forks,
+    /// 16 for Osaka). The returned value is a `U256` and is bounded by 2^67.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use primitive_types::U256;
+    ///
+    /// // Construct input: three 32-byte lengths (base_len=0, exp_len=1, mod_len=0)
+    /// // followed by the exponent byte 0x05 at offset 96.
+    /// let mut input = vec![0u8; 96];
+    /// input[32 + 31] = 1; // exp_len = 1
+    /// input.push(0x05); // exponent = 5 (bits = 3 -> bits - 1 = 2)
+    ///
+    /// let count = crate::calc_iter_count::<8>(1, 0, &input).unwrap();
+    /// assert_eq!(count, U256::from(2));
+    /// ```
     fn calc_iter_count<const BITS_PER_BYTE: u64>(
         exp_len: u64,
         base_len: u64,
@@ -92,6 +110,19 @@ impl<M: ModExpAlgorithm> ModExp<Byzantium, M> {
     const MIN_GAS: EthGas = EthGas::new(0);
 
     // output of this function is bounded by 2^128
+    /// Computes the multiplication complexity factor for modular exponentiation gas calculations.
+    ///
+    /// The returned value is a piecewise function of `x` (the larger of base and modulus lengths):
+    /// - If `x <= 64`: returns `x * x`.
+    /// - If `64 < x <= 1024`: returns `x * x / 4 + 96 * x - 3072`.
+    /// - If `x > 1024`: returns `x * x / 16 + 480 * x - 199_680` (computed with 256-bit arithmetic to avoid overflow).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let c = mul_complexity(10);
+    /// assert_eq!(c, U256::from(100u64));
+    /// ```
     fn mul_complexity(x: u64) -> U256 {
         if x <= 64 {
             U256::from(x * x)
@@ -107,6 +138,24 @@ impl<M: ModExpAlgorithm> ModExp<Byzantium, M> {
 }
 
 impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
+    /// Compute the gas required to execute the modular-exponentiation precompile using the Byzantium cost formula.
+    ///
+    /// If both the base length and modulus length are zero this returns the precompile minimum gas. Otherwise it:
+    /// - computes the complexity multiplier from the larger of base and modulus lengths,
+    /// - computes the exponent iteration count using 8 bits per byte,
+    /// - evaluates gas as (mul * max(iter_count, 1)) / 20,
+    /// and clamps the result into an `EthGas` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ExitError` if input parsing or iteration-count calculation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Calling with empty input yields the precompile minimum gas.
+    /// let _ = required_gas(&[]).unwrap();
+    /// ```
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
@@ -147,6 +196,18 @@ impl<M: ModExpAlgorithm> ModExp<Berlin, M> {
     const MIN_GAS: EthGas = EthGas::new(200);
 
     // output bounded by 2^122
+    /// Computes the multiplicative complexity factor used for gas: the square of
+    /// the number of 8-byte words covering the larger of `base_len` and `mod_len`.
+    ///
+    /// The result is ceil(max(base_len, mod_len) / 8)^2 as a `U256`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let c = mul_complexity(10, 20);
+    /// // max_len = 20 -> words = ceil(20/8) = 3 -> 3*3 = 9
+    /// assert_eq!(c, U256::from(9u64));
+    /// ```
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
         let words = U256::from(Integer::div_ceil(&max_len, &8));
@@ -155,6 +216,21 @@ impl<M: ModExpAlgorithm> ModExp<Berlin, M> {
 }
 
 impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
+    /// Compute the gas cost for a modular exponentiation precompile input using the Berlin gas formula.
+    ///
+    /// If both base and modulus lengths are zero, returns the configured minimum gas. Otherwise,
+    /// computes a multiplicative complexity from the operand lengths, derives an exponent iteration
+    /// count (8 bits per byte), applies the Berlin division factor, and returns the larger of the
+    /// computed gas and the minimum gas.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // `input` is the 96-byte lengths header followed by base, exponent, and modulus bytes.
+    /// let input: Vec<u8> = vec![0u8; 96];
+    /// let gas = ModExp::<Berlin, MyModExpAlgo>::required_gas(&input).unwrap();
+    /// assert!(gas.as_u64() >= ModExp::<Berlin, MyModExpAlgo>::MIN_GAS.as_u64());
+    /// ```
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
         if base_len == 0 && mod_len == 0 {
@@ -173,6 +249,19 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
         }
     }
 
+    /// Execute the precompile: validate gas, run the computation, and return the costed output.
+    ///
+    /// Computes the required gas for `input` and, if `target_gas` is provided, returns `ExitError::OutOfGas` when the required gas exceeds it. On success, runs the precompile computation and returns a `PrecompileOutput` containing the consumed gas and resulting output bytes. Any error produced by the gas calculation is propagated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Construct the precompile and execute it with no gas limit.
+    /// let precompile = ModExp::<Byzantium, DummyModExpAlgo>::new();
+    /// let ctx = Context::default();
+    /// let result = precompile.run(&[], None, &ctx, false);
+    /// assert!(result.is_ok());
+    /// ```
     fn run(
         &self,
         input: &[u8],
@@ -203,6 +292,30 @@ impl<M: ModExpAlgorithm> ModExp<Osaka, M> {
     // EIP-7883: New logic for multiplication complexity
     // Introduces doubles the complexity if the base or modulus
     // length exceeds 32 bytes.
+    /// Compute the multiplication complexity factor used by the Osaka ModExp precompile.
+    ///
+    /// The complexity is derived from the larger of the base and modulus lengths (in bytes).
+    /// For lengths greater than 32 bytes, complexity = 2 * ceil(max_len / 8)^2. For lengths
+    /// less than or equal to 32 bytes, a minimal complexity of 16 is returned.
+    ///
+    /// # Parameters
+    ///
+    /// - `base_len`: length of the base value in bytes.
+    /// - `mod_len`: length of the modulus value in bytes.
+    ///
+    /// # Returns
+    ///
+    /// A `U256` containing the computed complexity factor.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let c_small = mul_complexity(16, 16);
+    /// assert_eq!(c_small, U256::from(16));
+    ///
+    /// let c_large = mul_complexity(65, 32); // max_len = 65 -> ceil(65/8) = 9 -> 2*9*9 = 162
+    /// assert_eq!(c_large, U256::from(162));
+    /// ```
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
 
@@ -220,6 +333,30 @@ impl<M: ModExpAlgorithm> ModExp<Osaka, M> {
 
 /// `EIP-7823` and `EIP-7883` for Osaka hard fork
 impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
+    /// Compute the gas cost for a modular exponentiation input using Osaka rules (EIP-7883 / EIP-7823).
+    ///
+    /// The input is the ABI encoding of three 32-byte big-endian lengths (base_len, exp_len, mod_len)
+    /// followed by the corresponding byte arrays for base, exponent, and modulus. If both `base_len`
+    /// and `mod_len` are zero this returns the configured minimum gas; otherwise it computes the
+    /// Osaka-specific multiplication complexity, multiplies it by the iteration count computed with
+    /// 16 bits per byte, and returns the larger of that value and the minimum gas.
+    ///
+    /// # Parameters
+    ///
+    /// - `input`: byte slice containing 96 bytes of length fields followed by the base, exponent, and modulus bytes (zero-padded/truncated as needed).
+    ///
+    /// # Returns
+    ///
+    /// An `EthGas` value representing the gas required for the operation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Example: an input with zero lengths yields the minimum gas.
+    /// let input = [0u8; 96]; // base_len = 0, exp_len = 0, mod_len = 0
+    /// let gas = Self::required_gas(&input).unwrap();
+    /// assert_eq!(gas.as_u64(), Self::MIN_GAS.as_u64());
+    /// ```
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
@@ -242,6 +379,24 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
         }
     }
 
+    /// Executes the Osaka ModExp precompile: enforces size limits, charges gas, and returns the modular-exponentiation output.
+    ///
+    /// On success returns a `PrecompileOutput` containing the computed gas cost and the result of the modular exponentiation (padded to the modulus length).
+    ///
+    /// Errors:
+    /// - Returns `ExitError::Other("ERR_MODEXP_SIZE_LIMIT")` if `base_len`, `exp_len`, or `mod_len` (parsed from `input`) exceed `Self::INPUT_SIZE_LIMIT` (EIP-7823).
+    /// - Returns `ExitError::OutOfGas` if a provided `target_gas` is smaller than the required gas for the operation.
+    /// - Propagates other errors returned by `Self::required_gas`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // `precompile` is a ModExp precompile instance for Osaka (type parameters omitted).
+    /// // Call `run` with the pre-encoded input bytes, optional target gas, execution context, and `is_static` flag.
+    /// // The call either returns a `PrecompileOutput` with cost and output bytes or an `ExitError`.
+    /// let precompile = ModExp::<Osaka, _>::new();
+    /// let result = precompile.run(b"", None, &Context::default(), false);
+    /// ```
     fn run(
         &self,
         input: &[u8],
@@ -271,6 +426,34 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
     }
 }
 
+/// Extracts a contiguous slice of `size` bytes from `input` starting at `start`, returning a borrowed slice when fully available or an owned, zero-padded vector when the input is short.
+///
+/// If `start` is beyond `input.len()`, an owned empty vector is returned. If `input` contains fewer than `size` bytes from `start` to the end, the returned owned buffer contains the remaining bytes followed by zeros to reach `size`.
+///
+/// # Examples
+///
+/// ```
+/// use std::borrow::Cow;
+///
+/// let data = b"hello";
+/// // Borrowed slice when fully available
+/// match parse_input_range_to_slice(data, 1, 3) {
+///     Cow::Borrowed(s) => assert_eq!(s, b"ell"),
+///     _ => panic!("expected borrowed"),
+/// }
+///
+/// // Owned, zero-padded when input is short
+/// match parse_input_range_to_slice(data, 3, 5) {
+///     Cow::Owned(v) => assert_eq!(v, vec![b'l', b'o', 0, 0, 0]),
+///     _ => panic!("expected owned"),
+/// }
+///
+/// // Start beyond end -> owned empty
+/// match parse_input_range_to_slice(data, 10, 4) {
+///     Cow::Owned(v) => assert!(v.is_empty()),
+///     _ => panic!("expected owned empty"),
+/// }
+/// ```
 fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<[u8]> {
     let len = input.len();
     if start >= len {
@@ -835,6 +1018,24 @@ mod tests_osaka {
     use super::*;
     use crate::utils::new_context;
 
+    /// Builds a precompile-style input blob: three 32-byte big-endian length fields (base, exponent, modulus)
+    /// followed by the corresponding byte sequences for base, exponent, and modulus, each filled with `fill_byte`.
+    ///
+    /// `b_len`, `e_len`, and `m_len` specify the byte lengths of the base, exponent, and modulus sections respectively.
+    /// `fill_byte` is repeated to fill each data section.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let input = make_input(2, 3, 1, 0xAA);
+    /// // First 96 bytes are the three 32-byte length fields.
+    /// // The base starts at offset 96 and is 2 bytes long.
+    /// assert_eq!(&input[96..98], &[0xAA, 0xAA]);
+    /// // The exponent immediately follows the base (offset 98) and is 3 bytes long.
+    /// assert_eq!(&input[98..101], &[0xAA, 0xAA, 0xAA]);
+    /// // The modulus follows the exponent (offset 101) and is 1 byte long.
+    /// assert_eq!(input[101], 0xAA);
+    /// ```
     fn make_input(b_len: usize, e_len: usize, m_len: usize, fill_byte: u8) -> Vec<u8> {
         let mut out = Vec::new();
         // Lenths (32 bytes each)

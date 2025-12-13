@@ -342,6 +342,16 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::with_generic_precompiles(map, ctx)
     }
 
+    /// Builds a Precompiles set configured for the London hard fork.
+    ///
+    /// Returns a Precompiles instance populated with the precompiles active in the London hard fork.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let ctx = /* PrecompileConstructorContext::new(...) */ ;
+    /// let precompiles = Precompiles::new_london(ctx);
+    /// ```
     pub fn new_london<M: ModExpAlgorithm + 'static>(
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
@@ -349,6 +359,20 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::new_berlin(ctx)
     }
 
+    /// Constructs a Precompiles set configured for the Osaka hard fork.
+    ///
+    /// The returned Precompiles contains the standard precompiles enabled for Osaka:
+    /// ECRecover, SHA256, RIPEMD160, Identity, the Osaka ModExp implementation, BN256 ops
+    /// (Istanbul variants), Blake2F, RandomSeed, and CurrentAccount, wired into the
+    /// generic precompile map alongside the engine-provided cross-contract helpers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Given a prepared `ctx: PrecompileConstructorContext<_, _, _, _, _>`,
+    /// // construct the Osaka precompile set:
+    /// // let precompiles = Precompiles::new_osaka(ctx);
+    /// ```
     pub fn new_osaka<M: ModExpAlgorithm + 'static>(
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
@@ -387,6 +411,25 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::with_generic_precompiles(map, ctx)
     }
 
+    /// Inserts the standard built-in precompiles into a provided map and returns a `Precompiles`
+    /// instance with an empty paused set.
+    ///
+    /// This function augments `generic_precompiles` with the following precompiles keyed by their
+    /// canonical addresses: exit-to-near, exit-to-ethereum, cross-contract call, predecessor account,
+    /// prepaid gas, and promise result. The resulting `Precompiles` has `all_precompiles` set to the
+    /// augmented map and `paused_precompiles` initialized empty.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::collections::BTreeMap;
+    ///
+    /// // `ctx` must be a properly constructed `PrecompileConstructorContext`.
+    /// let generic: BTreeMap<_, _> = BTreeMap::new();
+    /// let ctx = /* construct context */ unimplemented!();
+    ///
+    /// let precompiles = with_generic_precompiles(generic, ctx);
+    /// ```
     fn with_generic_precompiles<M: ModExpAlgorithm + 'static>(
         mut generic_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
