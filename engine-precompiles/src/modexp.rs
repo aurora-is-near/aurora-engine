@@ -21,7 +21,7 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
 
 impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     /// Calculate the iteration count for gas cost calculation
-    /// EIP-7883 changes BITS_PER_BYTE from 8 to 16 for Osaka hard fork
+    /// EIP-7883 changes `BITS_PER_BYTE` from 8 to 16 for Osaka hard fork
     ///
     /// NOTE: the output of this function is bounded by 2^67
     fn calc_iter_count<const BITS_PER_BYTE: u64>(
@@ -827,5 +827,165 @@ mod tests {
         let gas = ModExp::<Berlin>::required_gas(&input.unwrap()).unwrap();
         let min_gas = EthGas::new(65536);
         assert_eq!(gas, min_gas);
+    }
+}
+
+#[cfg(test)]
+mod tests_osaka {
+    use super::*;
+    use crate::utils::new_context;
+
+    fn make_input(b_len: usize, e_len: usize, m_len: usize, fill_byte: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        // Lenths (32 bytes each)
+        out.extend_from_slice(&U256::from(b_len).to_big_endian());
+        out.extend_from_slice(&U256::from(e_len).to_big_endian());
+        out.extend_from_slice(&U256::from(m_len).to_big_endian());
+        // Data
+        out.extend(core::iter::repeat(fill_byte).take(b_len));
+        out.extend(core::iter::repeat(fill_byte).take(e_len));
+        out.extend(core::iter::repeat(fill_byte).take(m_len));
+        out
+    }
+
+    #[test]
+    fn test_osaka_eip7883_min_gas() {
+        // Case 1: All lengths = 1. Value = 1.
+        // Words = ceil(1/8) = 1.
+        // Complexity: max_len(1) <= 32 -> 16.
+        // Iterations: exp_len(1) <= 32. bit_len(1) - 1 = 0. Max(0, 1) = 1.
+        // Gas: 16 * 1 = 16.
+        // Floor limit: max(500, 16) = 500.
+        let input = make_input(1, 1, 1, 1);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 500, "Should be clamped to min gas 500");
+    }
+
+    #[test]
+    fn test_osaka_eip7883_standard_256() {
+        // Case 2: 32 bytes inputs, max value (all bits 1).
+        // Words = ceil(32/8) = 4.
+        // Complexity: max_len(32) <= 32 -> 16.
+        // Iterations: exp_len(32) <= 32. Exp is max u256. bit_len(256) - 1 = 255.
+        // Gas: 16 * 255 = 4080.
+        let input = make_input(32, 32, 32, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 4080, "Standard 256-bit modexp cost mismatch");
+    }
+
+    #[test]
+    fn test_osaka_eip7883_complexity_doubling() {
+        // Case 3: Base > 32 bytes (33 bytes).
+        // Words = ceil(33/8) = 5.
+        // Complexity: max_len(33) > 32. Formula: 2 * words^2 = 2 * 5^2 = 50.
+        // Iterations: exp_len(32). Exp is max. iter = 255.
+        // Gas: 50 * 255 = 12750.
+        let input = make_input(33, 32, 33, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(
+            gas.as_u64(),
+            12750,
+            "Complexity doubling for >32 bytes failed"
+        );
+    }
+
+    #[test]
+    fn test_osaka_eip7883_large_exponent_multiplier() {
+        // Case 4: Exp > 32 bytes (40 bytes). Base small.
+        // Words (Base) = ceil(32/8) = 4.
+        // Complexity: max_len(32) <= 32 -> 16.
+        // Iterations: exp_len(40) > 32.
+        // Formula: 16 * (exp_len - 32) + (bit_len_of_first_32 - 1)
+        //          16 * (40 - 32) + (256 - 1)
+        //          16 * 8 + 255 = 128 + 255 = 383.
+        // Gas: 16 * 383 = 6128.
+        let input = make_input(32, 40, 32, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 6128, "New iteration multiplier 16 failed");
+    }
+
+    #[test]
+    fn test_osaka_eip7823_limit_boundary() {
+        // Limit is 1024 bytes.
+        // 1. Exact limit (should pass)
+        let input_valid = make_input(1024, 1, 1, 1);
+        let res = ModExp::<Osaka>::required_gas(&input_valid);
+        assert!(res.is_ok(), "1024 bytes should be allowed");
+
+        // 2. Over limit (should fail with specific error or OutOfGas depending on impl)
+        // The run() method returns specific error, required_gas returns OutOfGas based on your code logic?
+        // Actually in your `Precompile` impl for `Osaka`, checks are inside `required_gas` too?
+        // Wait, looking at provided code: `run` calls `parse_lengths` and checks limit returning `Err(ExitError::Other(...))`.
+        // But `required_gas` does NOT have the check in your provided code block above (it was in my previous suggestion, but in your latest paste it's only in `run`).
+        // Let's verify where the check is.
+        // In the provided code:
+        // `fn required_gas` -> No limit check.
+        // `fn run` -> Has limit check `Err(ExitError::Other(Cow::Borrowed("ERR_MODEXP_SIZE_LIMIT")))`.
+
+        // Testing `run`:
+        let input_invalid = make_input(1025, 1, 1, 1);
+        let res = ModExp::<Osaka>::new().run(
+            &input_invalid,
+            Some(EthGas::new(10_000_000)),
+            &new_context(),
+            false,
+        );
+
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT, got {:?}", res),
+        }
+    }
+
+    #[test]
+    fn test_osaka_eip7823_junk_input() {
+        // Input consisting of random data where the first 32 bytes form a huge number.
+        // 0xFF...FF (Huge Base Length)
+        let mut input = Vec::new();
+        input.extend_from_slice(&[0xFF; 32]); // Base Len = Huge
+        input.extend_from_slice(&[0x00; 32]); // Exp Len = 0
+        input.extend_from_slice(&[0x00; 32]); // Mod Len = 0
+
+        let res = ModExp::<Osaka>::new().run(
+            &input,
+            Some(EthGas::new(10_000_000)),
+            &new_context(),
+            false,
+        );
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!(
+                "Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {:?}",
+                res
+            ),
+        }
+    }
+
+    #[test]
+    fn test_osaka_eip7823_analysis_cases() {
+        // "Empty inputs"
+        let res = ModExp::<Osaka>::new().run(&[], Some(EthGas::new(1000)), &new_context(), false);
+        // Should return success with empty output and min gas
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().cost.as_u64(), 500);
+
+        // "Inputs consisting of only 0x9e5faafc" (4 bytes)
+        // This is interpreted as [9e, 5f, aa, fc] padding with zeros for lengths.
+        // BaseLen = 9e5faafc...00 (interpreted big endian at offset 0).
+        // Actually `parse_lengths` reads 32 bytes padded with zeros on the right.
+        // Input: [0x9e, 0x5f, 0xaa, 0xfc]
+        // parse(0) -> reads [9e, 5f, aa, fc, 00, ... 00] -> Huge number!
+        // This should trigger the size limit error.
+        let input = hex::decode("9e5faafc").unwrap();
+        let res = ModExp::<Osaka>::new().run(
+            &input,
+            Some(EthGas::new(10_000_000)),
+            &new_context(),
+            false,
+        );
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for short junk input interpreted as huge length, got {:?}", res),
+        }
     }
 }
