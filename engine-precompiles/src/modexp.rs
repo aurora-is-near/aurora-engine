@@ -841,7 +841,7 @@ mod tests_osaka {
 
     fn make_input(b_len: usize, e_len: usize, m_len: usize, fill_byte: u8) -> Vec<u8> {
         let mut out = Vec::new();
-        // Lenths (32 bytes each)
+        // Lengths (32 bytes each)
         out.extend_from_slice(&U256::from(b_len).to_big_endian());
         out.extend_from_slice(&U256::from(e_len).to_big_endian());
         out.extend_from_slice(&U256::from(m_len).to_big_endian());
