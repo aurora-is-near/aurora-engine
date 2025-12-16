@@ -20,6 +20,7 @@ aurora-evm.workspace = true
 ethabi.workspace = true
 hex.workspace = true
 num.workspace = true
+p256 = { workspace = true, features = ["ecdsa"] }
 serde.workspace = true
 serde_json.workspace = true
 

@@ -13,6 +13,7 @@ pub mod prepaid_gas;
 pub mod promise_result;
 pub mod random;
 pub mod secp256k1;
+pub mod secp256r1;
 mod utils;
 pub mod xcc;
 
@@ -28,6 +29,7 @@ use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
 use crate::secp256k1::ECRecover;
+use crate::secp256r1::Secp256r1;
 use crate::xcc::CrossContractCall;
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::env::Env;
@@ -364,6 +366,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
+            Secp256r1::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
             Box::new(ECRecover),
@@ -377,6 +380,7 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
+            Box::new(Secp256r1),
         ];
         let map = addresses
             .into_iter()
