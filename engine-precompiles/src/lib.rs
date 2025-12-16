@@ -93,14 +93,17 @@ pub trait HardFork {}
 /// Homestead hard fork marker.
 pub struct Homestead;
 
-/// Homestead hard fork marker.
+/// Byzantium hard fork marker.
 pub struct Byzantium;
 
-/// Homestead hard fork marker.
+/// Istanbul hard fork marker.
 pub struct Istanbul;
 
-/// Homestead hard fork marker.
+/// Berlin hard fork marker.
 pub struct Berlin;
+
+/// Osaka hard fork marker.
+pub struct Osaka;
 
 impl HardFork for Homestead {}
 
@@ -109,6 +112,8 @@ impl HardFork for Byzantium {}
 impl HardFork for Istanbul {}
 
 impl HardFork for Berlin {}
+
+impl HardFork for Osaka {}
 
 pub struct Precompiles<'a, I, E, H> {
     pub all_precompiles: BTreeMap<Address, AllPrecompiles<'a, I, E, H>>,
@@ -342,6 +347,44 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
     ) -> Self {
         // no precompile changes in London HF
         Self::new_berlin(ctx)
+    }
+
+    pub fn new_osaka<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
+        let addresses = vec![
+            ECRecover::ADDRESS,
+            SHA256::ADDRESS,
+            RIPEMD160::ADDRESS,
+            Identity::ADDRESS,
+            ModExp::<Osaka, M>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
+            Blake2F::ADDRESS,
+            RandomSeed::ADDRESS,
+            CurrentAccount::ADDRESS,
+        ];
+        let fun: Vec<Box<dyn Precompile>> = vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Osaka, M>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
+            Box::new(Blake2F),
+            Box::new(RandomSeed::new(ctx.random_seed)),
+            Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
+        ];
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
+
+        Self::with_generic_precompiles(map, ctx)
     }
 
     fn with_generic_precompiles<M: ModExpAlgorithm + 'static>(
