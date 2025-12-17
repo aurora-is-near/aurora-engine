@@ -174,9 +174,13 @@ mod test {
             let input = hex::decode(input_hex).unwrap();
             let res = p.run(&input, None, &context(), false).unwrap();
             if expect_success {
-                assert_eq!(res.output, SUCCESS_RESULT.to_vec());
+                assert_eq!(
+                    res.output,
+                    SUCCESS_RESULT.to_vec(),
+                    "Input hex: {input_hex}",
+                );
             } else {
-                assert_eq!(res.output.len(), 0);
+                assert_eq!(res.output.len(), 0, "Input hex: {input_hex}");
             }
         }
     }
@@ -187,7 +191,117 @@ mod test {
         let p = Secp256r1;
 
         let input = hex::decode(input_hex).unwrap();
-        let err = p.run(&input, None, &context(), false).unwrap_err();
+        let err = p
+            .run(&input, Some(EthGas::new(2_500)), &context(), false)
+            .unwrap_err();
         assert_eq!(err, ExitError::OutOfGas);
+    }
+
+    #[test]
+    fn test_eip7951_spec_compliance_edge_cases() {
+        let p = Secp256r1;
+
+        let valid_full_hex = "4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4da73bd4903f0ce3b639bbbf6e8e80d16931ff4bcf5993d58468e8fb19086e8cac36dbcd03009df8c59286b162af3bd7fcc0450c9aa81be5d10d312af6c66b1d604aebd3099c618202fcfe16ae7770b0c49ab5eadf74b754204a3bb6060e44eff37618b065f9832de4ca6ca971a7a1adc826d0f7c00181a5fb2ddf79ae00b4e10e";
+
+        // Slicing string indices (each byte is 2 hex chars)
+        let h = &valid_full_hex[0..64];
+        let r = &valid_full_hex[64..128];
+        let s = &valid_full_hex[128..192];
+        let qx = &valid_full_hex[192..256];
+        let qy = &valid_full_hex[256..320];
+
+        // Constants for boundaries (hex strings must be exactly 64 chars)
+        let val_p = "ffffffff00000001000000000000000000000000ffffffffffffffffffffffff";
+        let val_n = "ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
+        let val_zero = "0000000000000000000000000000000000000000000000000000000000000000";
+
+        let failures = [
+            // Case 1: Public Key is Point at Infinity (0, 0)
+            // Spec: "The point (qx, qy) MUST NOT be the point at infinity (represented as (0, 0))"
+            format!("{h}{r}{s}{val_zero}{val_zero}"),
+            // Case 2: Public Key X coordinate >= P
+            // Spec: "Both qx and qy MUST satisfy 0 <= qx < p"
+            format!("{h}{r}{s}{val_p}{qy}"),
+            // Case 3: Public Key Y coordinate >= P
+            // Spec: "Both qx and qy MUST satisfy ... 0 <= qy < p"
+            format!("{h}{r}{s}{qx}{val_p}"),
+            // Case 4: Scalar r is Zero
+            // Spec: "Both r and s MUST satisfy 0 < r < n"
+            format!("{h}{val_zero}{s}{qx}{qy}"),
+            // Case 5: Scalar s is Zero
+            // Spec: "Both r and s MUST satisfy ... 0 < s < n"
+            format!("{h}{r}{val_zero}{qx}{qy}"),
+            // Case 6: Scalar r >= n
+            // Spec: "Both r and s MUST satisfy 0 < r < n"
+            format!("{h}{val_n}{s}{qx}{qy}"),
+            // Case 7: Scalar s >= n
+            // Spec: "Both r and s MUST satisfy ... 0 < s < n"
+            format!("{h}{r}{val_n}{qx}{qy}"),
+        ];
+
+        for (i, input_hex) in failures.iter().enumerate() {
+            let input = hex::decode(input_hex).unwrap_or_else(|e| {
+                panic!("Failed to decode hex for Case {i}: {e}");
+            });
+
+            // Ensure we built the test vector correctly
+            assert_eq!(input.len(), 160, "Case {i} input length is not 160 bytes");
+
+            let res = p.run(&input, None, &context(), false).unwrap();
+
+            // Should return empty bytes (failure), NOT revert
+            assert_eq!(
+                res.output.len(),
+                0,
+                "Case {i} expected failure (empty output), got success",
+            );
+        }
+    }
+
+    #[test]
+    fn test_eip7951_input_length_validation() {
+        let p = Secp256r1;
+
+        // A valid 160-byte input (derived from valid vector)
+        let valid_hex = "4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4da73bd4903f0ce3b639bbbf6e8e80d16931ff4bcf5993d58468e8fb19086e8cac36dbcd03009df8c59286b162af3bd7fcc0450c9aa81be5d10d312af6c66b1d604aebd3099c618202fcfe16ae7770b0c49ab5eadf74b754204a3bb6060e44eff37618b065f9832de4ca6ca971a7a1adc826d0f7c00181a5fb2ddf79ae00b4e10e";
+        let valid_bytes = hex::decode(valid_hex).unwrap();
+        assert_eq!(valid_bytes.len(), 160);
+
+        // Test Case 1: Empty input
+        // Spec: "if input_length != 160: return"
+        let res_empty = p.run(&[], None, &context(), false).unwrap();
+        assert_eq!(
+            res_empty.output.len(),
+            0,
+            "Empty input should return empty bytes"
+        );
+
+        // Test Case 2: Too short (159 bytes)
+        let input_short = &valid_bytes[0..159];
+        let res_short = p.run(input_short, None, &context(), false).unwrap();
+        assert_eq!(
+            res_short.output.len(),
+            0,
+            "159 bytes input should return empty bytes"
+        );
+
+        // Test Case 3: Too long (161 bytes)
+        let mut input_long = valid_bytes.clone();
+        input_long.push(0x00); // Add 1 byte
+        let res_long = p.run(&input_long, None, &context(), false).unwrap();
+        assert_eq!(
+            res_long.output.len(),
+            0,
+            "161 bytes input should return empty bytes"
+        );
+
+        // Test Case 4: Random length (e.g. 32 bytes)
+        let input_32 = &valid_bytes[0..32];
+        let res_32 = p.run(input_32, None, &context(), false).unwrap();
+        assert_eq!(
+            res_32.output.len(),
+            0,
+            "32 bytes input should return empty bytes"
+        );
     }
 }
