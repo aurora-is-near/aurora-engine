@@ -22,16 +22,18 @@ engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
 
 anyhow = "1"
-aurora-evm = { version = "2", default-features = false }
+ark-bn254 = { version = "0.5", default-features = false }
+ark-serialize = { version = "0.5", default-features = false }
+ark-ec = { version = "0.5", default-features = false }
+ark-ff = { version = "0.5", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 blst = "0.3"
-bn = { version = "0.5", package = "zeropool-bn", default-features = false }
 borsh = { version = "1", default-features = false, features = ["derive"] }
 bs58 = { version = "0.5", default-features = false, features = ["alloc", "sha2"] }
 bstr = "1"
-cargo-near-build = "0.7"
-criterion = "0.7"
+cargo-near-build = "0.9"
+criterion = "0.8"
 ethabi = { version = "18", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
@@ -40,17 +42,18 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.31"
+near-crypto = "0.34.0-rc.5"
 near-gas = "0.3"
-near-parameters = "0.31"
-near-primitives = "0.31"
-near-primitives-core = "0.31"
+near-parameters = "0.34.0-rc.5"
+near-primitives = "0.34.0-rc.5"
+near-primitives-core = "0.34.0-rc.5"
 near-sdk = "5"
-near-vm-runner = { version = "0.31", features = ["wasmtime_vm", "near_vm"] }
+near-vm-runner = { version = "0.34.0-rc.5", features = ["wasmtime_vm", "near_vm"] }
 near-workspaces = "0.21"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
+p256 = { version = "0.13", default-features = false }
 rand = "0.8"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.6", default-features = false }
@@ -63,7 +66,7 @@ strum = { version = "0.27", features = ["derive"] }
 tempfile = "3"
 test-case = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
-walrus = "0.23"
+walrus = "0.24"
 wee_alloc = { version = "0.4", default-features = false }
 
 [workspace.lints.clippy]

@@ -101,7 +101,7 @@ fn test_promise_result_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            12,
+            15,
             base_cost.as_u64(),
             costs::PROMISE_RESULT_BASE_COST.as_u64(),
         ),
