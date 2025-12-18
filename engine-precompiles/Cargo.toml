@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-precompiles"
-version = "1.2.0"
+version = "1.3.0"
 description = "Set of precompiles that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
@@ -20,6 +20,7 @@ aurora-evm.workspace = true
 ethabi.workspace = true
 hex.workspace = true
 num.workspace = true
+p256 = { workspace = true, features = ["ecdsa"] }
 serde.workspace = true
 serde_json.workspace = true
 
