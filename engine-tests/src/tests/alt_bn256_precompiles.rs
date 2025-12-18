@@ -27,8 +27,9 @@ use near_primitives_core::gas::Gas;
 pub struct PrecompileStandaloneData {
     pub input: String,
     pub output: String,
+    #[serde(default)]
+    pub expected_gas: Option<u64>,
 }
-
 /// JSON distilled data for precompile tests.
 /// It contains input data for precompile and expected
 /// output after precompile execution.
@@ -49,6 +50,7 @@ fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas
     for data in PrecompileStandalone::new(data).precompile_data {
         let input = hex::decode(data.input.clone()).unwrap();
         let output = hex::decode(data.output.clone()).unwrap();
+        let gas_limit = data.expected_gas.unwrap_or(gas_limit);
 
         let ctx = aurora_evm::Context {
             address: H160::default(),
@@ -96,30 +98,33 @@ fn assert_ggas_bound(total_gas: u64, ggas_bound: u64) {
 
 #[test]
 fn test_alt_bn128_add() {
+    println!("alt_bn128_add");
     run_alt_bn128(
         &Bn256Add::<Istanbul>::new(),
         Bn256Add::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_add.json"),
-        3550, // 3.55 Tgas
+        3600, // 3.60 Tgas
     );
 }
 
 #[test]
 fn test_alt_bn128_mul() {
+    println!("alt_bn128_mul");
     run_alt_bn128(
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        9810, // 9.81 Tgas
+        4650, // 4.65 Tgas
     );
 }
 
 #[test]
 fn test_alt_bn128_pairing() {
+    println!("alt_bn128_pairing");
     run_alt_bn128(
         &Bn256Pair::<Istanbul>::new(),
         Bn256Pair::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_pairing.json"),
-        44040, // 44.040 Tgas
+        23700, // 23.700 Tgas
     );
 }

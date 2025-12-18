@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![forbid(unsafe_code)]
 
 pub mod account_ids;
 pub mod alt_bn256;
 pub mod blake2;
+pub mod bls12_381;
 pub mod hash;
 pub mod identity;
 pub mod modexp;
@@ -17,6 +17,9 @@ pub mod secp256r1;
 mod utils;
 pub mod xcc;
 
+pub use aurora_engine_types::types::EthGas;
+pub use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
+
 use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use crate::blake2::Blake2F;
@@ -24,7 +27,6 @@ use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
-use crate::prelude::types::EthGas;
 use crate::prelude::{Vec, H256};
 use crate::prepaid_gas::PrepaidGas;
 use crate::random::RandomSeed;
@@ -41,7 +43,6 @@ use aurora_evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
 use promise_result::PromiseResult;
 use xcc::cross_contract_call;
 
@@ -63,7 +64,7 @@ impl PrecompileOutput {
     }
 }
 
-type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
+pub type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -351,6 +352,61 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
         Self::new_berlin(ctx)
     }
 
+    /// Prague hard fork includes `BLS12-381` precompiles.
+    ///
+    /// [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
+    pub fn new_prague<M: ModExpAlgorithm + 'static>(
+        ctx: PrecompileConstructorContext<'a, I, E, H, M>,
+    ) -> Self {
+        let addresses = vec![
+            ECRecover::ADDRESS,
+            SHA256::ADDRESS,
+            RIPEMD160::ADDRESS,
+            Identity::ADDRESS,
+            ModExp::<Berlin, M>::ADDRESS,
+            Bn256Add::<Istanbul>::ADDRESS,
+            Bn256Mul::<Istanbul>::ADDRESS,
+            Bn256Pair::<Istanbul>::ADDRESS,
+            Blake2F::ADDRESS,
+            RandomSeed::ADDRESS,
+            CurrentAccount::ADDRESS,
+            bls12_381::BlsG1Add::ADDRESS,
+            bls12_381::BlsG1Msm::ADDRESS,
+            bls12_381::BlsG2Add::ADDRESS,
+            bls12_381::BlsG2Msm::ADDRESS,
+            bls12_381::BlsPairingCheck::ADDRESS,
+            bls12_381::BlsMapFpToG1::ADDRESS,
+            bls12_381::BlsMapFp2ToG2::ADDRESS,
+        ];
+        let fun: Vec<Box<dyn Precompile>> = vec![
+            Box::new(ECRecover),
+            Box::new(SHA256),
+            Box::new(RIPEMD160),
+            Box::new(Identity),
+            Box::new(ModExp::<Berlin, M>::new()),
+            Box::new(Bn256Add::<Istanbul>::new()),
+            Box::new(Bn256Mul::<Istanbul>::new()),
+            Box::new(Bn256Pair::<Istanbul>::new()),
+            Box::new(Blake2F),
+            Box::new(RandomSeed::new(ctx.random_seed)),
+            Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
+            Box::new(bls12_381::BlsG1Add),
+            Box::new(bls12_381::BlsG1Msm),
+            Box::new(bls12_381::BlsG2Add),
+            Box::new(bls12_381::BlsG2Msm),
+            Box::new(bls12_381::BlsPairingCheck),
+            Box::new(bls12_381::BlsMapFpToG1),
+            Box::new(bls12_381::BlsMapFp2ToG2),
+        ];
+        let map = addresses
+            .into_iter()
+            .zip(fun)
+            .map(|(a, f)| (a, AllPrecompiles::Generic(f)))
+            .collect();
+
+        Self::with_generic_precompiles(map, ctx)
+    }
+
     pub fn new_osaka<M: ModExpAlgorithm + 'static>(
         ctx: PrecompileConstructorContext<'a, I, E, H, M>,
     ) -> Self {
@@ -366,6 +422,13 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Blake2F::ADDRESS,
             RandomSeed::ADDRESS,
             CurrentAccount::ADDRESS,
+            bls12_381::BlsG1Add::ADDRESS,
+            bls12_381::BlsG1Msm::ADDRESS,
+            bls12_381::BlsG2Add::ADDRESS,
+            bls12_381::BlsG2Msm::ADDRESS,
+            bls12_381::BlsPairingCheck::ADDRESS,
+            bls12_381::BlsMapFpToG1::ADDRESS,
+            bls12_381::BlsMapFp2ToG2::ADDRESS,
             Secp256r1::ADDRESS,
         ];
         let fun: Vec<Box<dyn Precompile>> = vec![
@@ -380,6 +443,13 @@ impl<'a, I: IO + Copy, E: Env, H: ReadOnlyPromiseHandler> Precompiles<'a, I, E, 
             Box::new(Blake2F),
             Box::new(RandomSeed::new(ctx.random_seed)),
             Box::new(CurrentAccount::new(ctx.current_account_id.clone())),
+            Box::new(bls12_381::BlsG1Add),
+            Box::new(bls12_381::BlsG1Msm),
+            Box::new(bls12_381::BlsG2Add),
+            Box::new(bls12_381::BlsG2Msm),
+            Box::new(bls12_381::BlsPairingCheck),
+            Box::new(bls12_381::BlsMapFpToG1),
+            Box::new(bls12_381::BlsMapFp2ToG2),
             Box::new(Secp256r1),
         ];
         let map = addresses

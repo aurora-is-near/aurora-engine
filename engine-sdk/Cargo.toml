@@ -24,6 +24,9 @@ ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+blst = { workspace = true, optional = true }
+
 [dev-dependencies]
 hex.workspace = true
 
@@ -44,5 +47,6 @@ std = [
     "dep:ark-ff"
 ]
 contract = []
+bls = ["dep:blst"]
 log = []
 all-promise-actions = []
