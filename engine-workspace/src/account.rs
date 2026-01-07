@@ -23,7 +23,7 @@ impl Account {
         CallTransaction::new(transaction)
     }
 
-    pub fn view<F: AsRef<str>>(&self, contract_id: &AccountId, function: F) -> ViewTransaction {
+    pub fn view<F: AsRef<str>>(&self, contract_id: &AccountId, function: F) -> ViewTransaction<'_> {
         let contract_id = near_workspaces::AccountId::from_str(contract_id.as_ref()).unwrap();
         let transaction = self.inner.view(&contract_id, function.as_ref());
 

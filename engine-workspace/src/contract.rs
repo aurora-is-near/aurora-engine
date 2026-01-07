@@ -418,22 +418,22 @@ impl EngineContract {
 /// View functions
 impl EngineContract {
     #[must_use]
-    pub fn ft_total_supply(&self) -> ViewFtTotalSupply {
+    pub fn ft_total_supply(&self) -> ViewFtTotalSupply<'_> {
         ViewFtTotalSupply::view(&self.contract)
     }
 
     #[must_use]
-    pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf<'_> {
         ViewFtBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
     }
 
     #[must_use]
-    pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf {
+    pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf<'_> {
         ViewStorageBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
     }
 
     #[must_use]
-    pub fn get_version(&self) -> ViewVersion {
+    pub fn get_version(&self) -> ViewVersion<'_> {
         ViewVersion::view(&self.contract)
     }
 
@@ -443,7 +443,7 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn get_chain_id(&self) -> ViewChainId {
+    pub fn get_chain_id(&self) -> ViewChainId<'_> {
         ViewChainId::view(&self.contract)
     }
 
@@ -500,7 +500,7 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn get_nep141_from_erc20(&self, address: Address) -> ViewNep141FromErc20 {
+    pub fn get_nep141_from_erc20(&self, address: Address) -> ViewNep141FromErc20<'_> {
         ViewNep141FromErc20::view(&self.contract).args_borsh(address)
     }
 

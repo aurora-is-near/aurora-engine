@@ -60,7 +60,7 @@ pub fn extract_g2_input(
     subgroup_check: bool,
 ) -> Result<blst_p2_affine, Bls12381Error> {
     if input.len() != G2_INPUT_ITEM_LENGTH {
-        return Err(Bls12381Error::G1InputLength);
+        return Err(Bls12381Error::G2InputLength);
     }
 
     let mut input_fps = [&[0; FP_LENGTH]; 4];

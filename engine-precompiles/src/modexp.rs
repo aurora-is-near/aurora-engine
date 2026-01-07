@@ -306,7 +306,7 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
     }
 }
 
-fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<[u8]> {
+fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<'_, [u8]> {
     let len = input.len();
     if start >= len {
         return Cow::Owned(Vec::new());
