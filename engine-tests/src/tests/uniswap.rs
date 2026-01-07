@@ -63,7 +63,7 @@ fn test_uniswap_exact_output() {
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (50..=60).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 40% and 50%",
+        "{wasm_fraction}% is not between 50% and 60%",
     );
 }
 
