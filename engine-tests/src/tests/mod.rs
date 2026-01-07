@@ -20,6 +20,7 @@ mod promise_results_precompile;
 mod random;
 mod repro;
 pub mod sanity;
+mod secp256r1_precompiles;
 mod self_destruct_state;
 mod serde;
 mod silo;

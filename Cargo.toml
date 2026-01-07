@@ -54,6 +54,7 @@ near-workspaces = "0.21"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
+p256 = { version = "0.13", default-features = false }
 rand = "0.8"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.6", default-features = false }

@@ -163,7 +163,7 @@ impl OneShotAuroraRunner<'_> {
 }
 
 impl AuroraRunner {
-    pub fn one_shot(&self) -> OneShotAuroraRunner {
+    pub fn one_shot(&self) -> OneShotAuroraRunner<'_> {
         OneShotAuroraRunner {
             base: self,
             ext: self.ext.clone(),
