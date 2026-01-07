@@ -1,6 +1,7 @@
 use super::{
-    Bls12381Error, FP_LENGTH, G1_INPUT_ITEM_LENGTH, G1_MUL_INPUT_LENGTH, G2_INPUT_ITEM_LENGTH,
-    G2_MUL_INPUT_LENGTH, PADDED_FP_LENGTH, PADDING_LENGTH, PAIRING_INPUT_LENGTH,
+    remove_padding, Bls12381Error, FP_LENGTH, G1_INPUT_ITEM_LENGTH, G1_MUL_INPUT_LENGTH,
+    G2_INPUT_ITEM_LENGTH, G2_MUL_INPUT_LENGTH, PADDED_FP_LENGTH, PADDING_LENGTH,
+    PAIRING_INPUT_LENGTH,
 };
 use crate::prelude::{vec, Vec};
 
@@ -59,22 +60,6 @@ fn extract_g2(input: &[u8]) -> Result<([u8; 2 * FP_LENGTH], [u8; 2 * FP_LENGTH])
     p_y[FP_LENGTH..].copy_from_slice(p1_last);
 
     Ok((p_x, p_y))
-}
-
-/// Removes zeros with which the precompile inputs are left padded to 64 bytes.
-fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], Bls12381Error> {
-    if input.len() != PADDED_FP_LENGTH {
-        return Err(Bls12381Error::Padding);
-    }
-    // Check is prefix contains only zero elements. As it's known size
-    // 16 bytes for efficiency we validate it via slice with zero elements
-    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
-        return Err(Bls12381Error::Padding);
-    }
-    // SAFETY: we checked PADDED_FP_LENGTH
-    input[PADDING_LENGTH..]
-        .try_into()
-        .map_err(|_| Bls12381Error::Padding)
 }
 
 #[allow(clippy::range_plus_one)]

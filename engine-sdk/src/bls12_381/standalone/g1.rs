@@ -1,10 +1,13 @@
-use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
+use super::utils::{fp_from_bendian, fp_to_bytes};
 use super::Bls12381Error;
-use crate::bls12_381::{G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
+use crate::bls12_381::{remove_padding, G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
 use crate::prelude::{vec, Vec};
 use blst::{blst_p1_affine, blst_p1_affine_in_g1, blst_p1_affine_on_curve};
 
 /// Encodes a G1 point in affine format into byte slice with padded elements.
+///
+/// ## SAFETY
+/// The caller must ensure that `input` is a valid, non-null pointer to a `blst_p1_affine`.
 pub fn encode_g1_point(input: *const blst_p1_affine) -> Vec<u8> {
     let mut out = vec![0u8; G1_INPUT_ITEM_LENGTH];
     // SAFETY: outcomes from fixed length array, input is a blst value.

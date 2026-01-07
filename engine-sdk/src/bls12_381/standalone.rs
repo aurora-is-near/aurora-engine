@@ -3,7 +3,8 @@
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
 
 use super::{
-    Bls12381Error, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP2_LENGTH, PADDED_FP_LENGTH,
+    remove_padding, Bls12381Error, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP2_LENGTH,
+    PADDED_FP_LENGTH,
 };
 use crate::prelude::Vec;
 use blst::{
@@ -167,8 +168,8 @@ pub fn g2_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 }
 
 pub fn map_fp2_to_g2(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
-    let input_p0_x = utils::remove_padding(&input[..PADDED_FP_LENGTH])?;
-    let input_p0_y = utils::remove_padding(&input[PADDED_FP_LENGTH..PADDED_FP2_LENGTH])?;
+    let input_p0_x = remove_padding(&input[..PADDED_FP_LENGTH])?;
+    let input_p0_y = remove_padding(&input[PADDED_FP_LENGTH..PADDED_FP2_LENGTH])?;
     let fp2 = g2::check_canonical_fp2(input_p0_x, input_p0_y)?;
 
     let mut p = blst_p2::default();
@@ -184,7 +185,7 @@ pub fn map_fp2_to_g2(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 }
 
 pub fn map_fp_to_g1(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
-    let input_p0 = utils::remove_padding(input)?;
+    let input_p0 = remove_padding(input)?;
     let fp = utils::fp_from_bendian(input_p0)?;
 
     let mut p = blst_p1::default();

@@ -1,6 +1,6 @@
-use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
+use super::utils::{fp_from_bendian, fp_to_bytes};
 use super::Bls12381Error;
-use crate::bls12_381::{FP_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
+use crate::bls12_381::{remove_padding, FP_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
 use crate::prelude::{vec, Vec};
 use blst::{blst_fp2, blst_p2_affine, blst_p2_affine_in_g2, blst_p2_affine_on_curve};
 

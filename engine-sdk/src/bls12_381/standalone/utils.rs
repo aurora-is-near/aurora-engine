@@ -1,5 +1,5 @@
 use crate::bls12_381::standalone::SCALAR_LENGTH;
-use crate::bls12_381::{Bls12381Error, FP_LENGTH, PADDED_FP_LENGTH, PADDING_LENGTH};
+use crate::bls12_381::{Bls12381Error, PADDED_FP_LENGTH, PADDING_LENGTH};
 use blst::{
     blst_bendian_from_fp, blst_fp, blst_fp_from_bendian, blst_scalar, blst_scalar_from_bendian,
 };
@@ -12,6 +12,9 @@ const MODULUS_REPR: [u8; 48] = [
 ];
 
 /// BLS Encodes a single finite field element into byte slice with padding.
+///
+/// ## SAFETY
+/// output must be exactly `PADDED_FP_LENGTH` bytes long.
 pub fn fp_to_bytes(out: &mut [u8], input: *const blst_fp) {
     if out.len() != PADDED_FP_LENGTH {
         return;
@@ -75,20 +78,4 @@ pub fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, Bls12381Error> 
     };
 
     Ok(out)
-}
-
-/// Removes zeros with which the precompile inputs are left padded to 64 bytes.
-pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], Bls12381Error> {
-    if input.len() != PADDED_FP_LENGTH {
-        return Err(Bls12381Error::Padding);
-    }
-    // Check is prefix contains only zero elements. As it's known size
-    // 16 bytes for efficiency we validate it via slice with zero elements
-    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
-        return Err(Bls12381Error::Padding);
-    }
-    // SAFETY: we checked PADDED_FP_LENGTH
-    input[PADDING_LENGTH..]
-        .try_into()
-        .map_err(|_| Bls12381Error::Padding)
 }
