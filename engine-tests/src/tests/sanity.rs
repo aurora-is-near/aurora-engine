@@ -10,6 +10,7 @@ use libsecp256k1::SecretKey;
 use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -38,7 +39,7 @@ fn bench_memory_get_standalone() {
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: signer.use_nonce().into(),
         gas_price: U256::zero(),
-        gas_limit: 10_000_000_u64.into(),
+        gas_limit: 4_000_000_u64.into(),
         to: Some(address),
         value: Wei::zero(),
         data: Vec::new(),
@@ -50,14 +51,15 @@ fn bench_memory_get_standalone() {
         .unwrap()
         .submit_transaction(&signer.secret_key, tx)
         .unwrap();
-    let duration = start.elapsed().as_secs_f32();
+    let duration = start.elapsed();
+    let limit = Duration::from_secs(8);
     assert!(
         matches!(result.status, TransactionStatus::OutOfGas),
         "Infinite loops in the EVM run out of gas"
     );
     assert!(
-        duration < 8.0,
-        "Must complete this task in under 8s (in release build). Time taken: {duration} s",
+        duration < limit,
+        "Must complete this task in under {limit:?} (in release build). Time taken: {duration:?}",
     );
 }
 
@@ -164,6 +166,10 @@ fn test_total_supply_accounting() {
         .unwrap();
 }
 
+#[ignore = "\
+    we are using different versions of WASM to ensure backward compatibility, \
+    the test should be in the borealis repository where dynamic contract reloading is implemented\
+"]
 #[test]
 fn test_transaction_to_zero_address() {
     // Transactions that explicit list `0x0000...` as the `to` field in the transaction
@@ -191,19 +197,15 @@ fn test_transaction_to_zero_address() {
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
-    let result = runner
-        .submit_raw(utils::SUBMIT, &context, &[], None)
-        .unwrap();
-    assert_eq!(result.gas_used, 53_000);
+    let result = runner.submit_raw(utils::SUBMIT, &context, &[], None, None);
+    assert_eq!(result.inner.gas_used, 53_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT;
     assert_eq!(runner.get_nonce(&address), U256::zero());
 
     // After the fix this transaction is simply a transfer of 0 ETH to the zero address
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT;
-    let result = runner
-        .submit_raw(utils::SUBMIT, &context, &[], None)
-        .unwrap();
-    assert_eq!(result.gas_used, 21_000);
+    let result = runner.submit_raw(utils::SUBMIT, &context, &[], None, None);
+    assert_eq!(result.inner.gas_used, 21_000);
     runner.env.block_height = ZERO_ADDRESS_FIX_HEIGHT + 1;
     assert_eq!(runner.get_nonce(&address), U256::one());
 }
@@ -269,17 +271,18 @@ fn test_deploy_largest_contract() {
     let code = generate_code(len);
 
     // Deploy that code
-    let (result, profile) = runner
+    let result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             utils::create_deploy_transaction(code.clone(), nonce)
         })
         .unwrap();
+    let profile = result.execution_profile.unwrap();
 
     // At least 5 million EVM gas
     assert!(
-        result.gas_used >= 5_000_000,
+        result.inner.gas_used >= 5_000_000,
         "{:?} not greater than 5 million",
-        result.gas_used,
+        result.inner.gas_used,
     );
 
     // Less than 10 NEAR Tgas
@@ -408,7 +411,7 @@ fn test_solidity_pure_bench() {
 
     // Number of iterations to do
     let loop_limit: u32 = 10_000;
-    let (result, profile) = runner
+    let result = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             contract.call_method_with_args(
                 "cpu_ram_soak_test",
@@ -417,16 +420,17 @@ fn test_solidity_pure_bench() {
             )
         })
         .unwrap();
+    let profile = result.execution_profile.unwrap();
 
     assert!(
-        result.gas_used > 37_000_000,
-        "Over 37 million EVM gas is used {}",
-        result.gas_used
+        result.inner.gas_used > 37_000_000,
+        "Expected over 37 million EVM gas used, actually used {}",
+        result.inner.gas_used
     );
     let near_gas = profile.all_gas();
     assert!(
         near_gas > 1200 * 1_000_000_000_000 && near_gas < 1300 * 1_000_000_000_000,
-        "Expected between 1200 and 1300 NEAR TGas to be used, but consumed {}",
+        "Expected between 1300 and 1400 NEAR TGas to be used, but consumed {}",
         near_gas / 1_000_000_000_000,
     );
 

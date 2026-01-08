@@ -1,0 +1,328 @@
+#![cfg_attr(not(test), no_std)]
+
+extern crate alloc;
+
+/// The contract must compile with feature `contract`. This code is only for clippy and udeps.
+#[cfg(not(any(feature = "contract", test)))]
+pub mod noop_allocator {
+    use core::alloc::{GlobalAlloc, Layout};
+
+    pub struct Allocator;
+
+    unsafe impl GlobalAlloc for Allocator {
+        unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
+            core::ptr::null_mut()
+        }
+
+        unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
+            unreachable!("should never be called, since alloc never returns non-null");
+        }
+    }
+
+    #[global_allocator]
+    static ALLOC: Allocator = Allocator;
+
+    #[cfg(not(test))]
+    #[panic_handler]
+    const fn on_panic(info: &core::panic::PanicInfo) -> ! {
+        let _ = info;
+        loop {}
+    }
+}
+
+#[cfg(feature = "contract")]
+mod dbg {
+    use alloc::format;
+    use aurora_engine_sdk::{
+        io::{StorageIntermediate, IO},
+        near_runtime::Runtime as Rt,
+    };
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use engine_standalone_tracing::{
+        sputnik::{self, TransactionTraceBuilder},
+        types::call_tracer::CallTracer,
+        TraceKind,
+    };
+
+    pub struct Runtime;
+
+    impl Runtime {
+        pub fn read<A>(key: &[u8]) -> Option<A>
+        where
+            A: BorshDeserialize,
+        {
+            match Rt.read_storage(key).map(|v| v.to_value()).transpose() {
+                Ok(v) => v,
+                Err(err) => aurora_engine_sdk::panic_utf8(err.as_ref()),
+            }
+        }
+
+        pub fn write<R>(key: &[u8], response: R)
+        where
+            R: BorshSerialize,
+        {
+            match borsh::to_vec(&response) {
+                Ok(bytes) => drop(Rt.write_storage(key, &bytes)),
+                Err(err) => {
+                    let msg = format!("write response: {err}").into_bytes();
+                    aurora_engine_sdk::panic_utf8(&msg);
+                }
+            }
+        }
+
+        pub fn trace<F, R>(f: F) -> R
+        where
+            F: FnOnce() -> R,
+        {
+            match Self::read(b"borealis/trace_kind") {
+                None => f(),
+                Some(TraceKind::CallFrame) => {
+                    let mut listener = CallTracer::default();
+                    let r = sputnik::traced_call(&mut listener, f);
+                    Self::write(b"borealis/call_frame_tracing", listener);
+                    r
+                }
+                Some(TraceKind::Transaction) => {
+                    let mut listener = TransactionTraceBuilder::default();
+                    let r = sputnik::traced_call(&mut listener, f);
+                    let trace_log = listener.finish().logs().clone();
+                    Self::write(b"borealis/transaction_tracing", trace_log);
+                    r
+                }
+            }
+        }
+    }
+}
+
+#[cfg(feature = "contract")]
+mod simulate;
+
+#[cfg(feature = "contract")]
+mod contract {
+    use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
+
+    use aurora_engine::{contract_methods, errors::ERR_SERIALIZE};
+    use aurora_engine_sdk::{io::IO, near_runtime::Runtime, types::SdkUnwrap};
+    use aurora_engine_types::parameters::{
+        engine::TransactionExecutionResult,
+        silo::{Erc20FallbackAddressArgs, FixedGasArgs},
+        PromiseOrValue,
+    };
+
+    use super::dbg;
+
+    #[no_mangle]
+    #[allow(clippy::too_many_lines)]
+    pub extern "C" fn execute() {
+        let mut io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+
+        let Some(method) = dbg::Runtime::read::<String>(b"borealis/method") else {
+            return;
+        };
+
+        let result = dbg::Runtime::trace(|| match method.as_str() {
+            "submit" => contract_methods::evm_transactions::submit(io, &env, &mut handler)
+                .map(TransactionExecutionResult::Submit)
+                .map(Some)
+                .map_err(|err| format!("{err:?}")),
+            "submit_with_args" => {
+                contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
+                    .map(TransactionExecutionResult::Submit)
+                    .map(Some)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "call" => contract_methods::evm_transactions::call(io, &env, &mut handler)
+                .map(TransactionExecutionResult::Submit)
+                .map(Some)
+                .map_err(|err| format!("{err:?}")),
+            "deploy_code" => {
+                contract_methods::evm_transactions::deploy_code(io, &env, &mut handler)
+                    .map(TransactionExecutionResult::Submit)
+                    .map(Some)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "deploy_erc20_token" => {
+                contract_methods::connector::deploy_erc20_token(io, &env, &mut handler)
+                    .map(|result| match result {
+                        PromiseOrValue::Value(address) => {
+                            TransactionExecutionResult::DeployErc20(address)
+                        }
+                        PromiseOrValue::Promise(promise_args) => {
+                            TransactionExecutionResult::Promise(promise_args)
+                        }
+                    })
+                    .map(Some)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "deploy_erc20_token_callback" => {
+                contract_methods::connector::deploy_erc20_token_callback(io, &env, &mut handler)
+                    .map(TransactionExecutionResult::DeployErc20)
+                    .map(Some)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "ft_on_transfer" => contract_methods::connector::ft_on_transfer(io, &env, &mut handler)
+                .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Submit))
+                .map_err(|err| format!("{err:?}")),
+            "ft_transfer_call"
+            | "ft_resolve_transfer"
+            | "ft_transfer"
+            | "withdraw"
+            | "deposit"
+            | "finish_deposit"
+            | "storage_deposit"
+            | "storage_unregister"
+            | "storage_withdraw"
+            | "set_paused_flags"
+            | "register_relayer"
+            | "set_eth_connector_contract_data"
+            | "new_eth_connector"
+            | "unknown" => Ok(None),
+            "exit_to_near_precompile_callback" => {
+                contract_methods::connector::exit_to_near_precompile_callback(
+                    io,
+                    &env,
+                    &mut handler,
+                )
+                .map(|maybe_output| maybe_output.map(TransactionExecutionResult::Submit))
+                .map_err(|err| format!("{err:?}"))
+            }
+            "new" => contract_methods::admin::new(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_eth_connector_contract_account" => {
+                contract_methods::connector::set_eth_connector_contract_account(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "factory_update" => contract_methods::xcc::factory_update(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "factory_update_address_version" => {
+                contract_methods::xcc::factory_update_address_version(io, &env, &handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "factory_set_wnear_address" => {
+                contract_methods::xcc::factory_set_wnear_address(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "fund_xcc_sub_account" => {
+                contract_methods::xcc::fund_xcc_sub_account(io, &env, &mut handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "withdraw_wnear_to_router" => {
+                contract_methods::xcc::withdraw_wnear_to_router(io, &env, &mut handler)
+                    .map(TransactionExecutionResult::Submit)
+                    .map(Some)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "pause_precompiles" => contract_methods::admin::pause_precompiles(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "resume_precompiles" => contract_methods::admin::resume_precompiles(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_owner" => contract_methods::admin::set_owner(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_upgrade_delay_blocks" => {
+                contract_methods::admin::set_upgrade_delay_blocks(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "pause_contract" => contract_methods::admin::pause_contract(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "resume_contract" => contract_methods::admin::resume_contract(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_key_manager" => contract_methods::admin::set_key_manager(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "add_relayer_key" => contract_methods::admin::add_relayer_key(io, &env, &mut handler)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "store_relayer_key_callback" => {
+                contract_methods::admin::store_relayer_key_callback(io, &env)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "remove_relayer_key" => {
+                contract_methods::admin::remove_relayer_key(io, &env, &mut handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "start_hashchain" => contract_methods::admin::start_hashchain(io, &env)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "set_erc20_metadata" => {
+                contract_methods::connector::set_erc20_metadata(io, &env, &mut handler)
+                    .map(|_| None)
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "set_fixed_gas" => {
+                let args: FixedGasArgs = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::set_fixed_gas(&mut io, args.fixed_gas);
+                Ok(None)
+            }
+            "set_erc20_fallback_address" => {
+                let args: Erc20FallbackAddressArgs = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::set_erc20_fallback_address(&mut io, args.address);
+                Ok(None)
+            }
+            "set_silo_params" => {
+                let args = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::set_silo_params(&mut io, args);
+                Ok(None)
+            }
+            "add_entry_to_whitelist" => {
+                let args = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::add_entry_to_whitelist(&io, &args);
+                Ok(None)
+            }
+            "add_entry_to_whitelist_batch" => {
+                let args = io.read_input_borsh::<Vec<_>>().sdk_unwrap();
+                contract_methods::silo::add_entry_to_whitelist_batch(&io, args);
+                Ok(None)
+            }
+            "remove_entry_from_whitelist" => {
+                let args = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::remove_entry_from_whitelist(&io, &args);
+                Ok(None)
+            }
+            "set_whitelist_status" => {
+                let args = io.read_input_borsh().sdk_unwrap();
+                contract_methods::silo::set_whitelist_status(&io, &args);
+                Ok(None)
+            }
+            "set_whitelists_statuses" => {
+                let args = io.read_input_borsh::<Vec<_>>().sdk_unwrap();
+                contract_methods::silo::set_whitelists_statuses(&io, args);
+                Ok(None)
+            }
+            "mirror_erc20_token_callback" => {
+                contract_methods::connector::mirror_erc20_token_callback(io, &env, &mut handler)
+                    .map(|()| None)
+                    .map_err(|err| format!("{err:?}"))
+                    .map_err(|err| format!("{err:?}"))
+            }
+            "get_version" => contract_methods::admin::get_version(io)
+                .map(|()| None)
+                .map_err(|err| format!("{err:?}")),
+            "simulate_eth_call" => super::simulate::eth_call(io, &env)
+                .map(TransactionExecutionResult::Submit)
+                .map(Some)
+                .map_err(|err| {
+                    serde_json::to_string(&err).unwrap_or_else(|_| ERR_SERIALIZE.to_owned())
+                }),
+            _ => Err(format!("Unknown method: {method}")),
+        });
+        // the type of the response must be: `Result<Option<TransactionExecutionResult>, String>`
+        dbg::Runtime::write(b"borealis/result", result);
+    }
+}

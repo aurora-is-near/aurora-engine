@@ -85,13 +85,11 @@ fn test_replay_transaction() {
                 .iter()
                 .enumerate()
                 .map(|(position, tx)| {
-                    let diff = runner
-                        .execute_transaction_at_position(
-                            tx,
-                            block_height,
-                            u16::try_from(position).unwrap(),
-                        )
-                        .unwrap();
+                    let diff = runner.execute_transaction_at_position(
+                        tx,
+                        block_height,
+                        u16::try_from(position).unwrap(),
+                    );
 
                     utils::standalone::storage::commit(&mut runner.storage, &diff);
 
@@ -123,7 +121,6 @@ fn test_replay_transaction() {
         for ((position, tx), diff) in txs {
             let replay_diff = runner
                 .execute_transaction_at_position(tx, block_height, u16::try_from(position).unwrap())
-                .unwrap()
                 .diff;
             assert_eq!(replay_diff, diff);
         }
@@ -164,7 +161,7 @@ fn test_consume_transaction() {
 
 #[test]
 fn test_block_index() {
-    let (temp_dir, mut storage) = create_db();
+    let (temp_dir, mut storage) = create_db(&"aurora".parse().unwrap());
 
     let block_hash = H256([3u8; 32]);
     let block_height = 17u64;
@@ -255,7 +252,7 @@ fn test_block_index() {
 
 #[test]
 fn test_transaction_index() {
-    let (temp_dir, mut storage) = create_db();
+    let (temp_dir, mut storage) = create_db(&"aurora".parse().unwrap());
 
     let block_height = 37u64;
     mocks::insert_block(&mut storage, block_height);
@@ -270,10 +267,10 @@ fn test_transaction_index() {
         signer: "placeholder.near".parse().unwrap(),
         caller: "placeholder.near".parse().unwrap(),
         attached_near: 0,
-        transaction: TransactionKind::Unknown,
+        transaction: TransactionKind::unknown(),
         promise_data: Vec::new(),
-        raw_input: Vec::new(),
         action_hash: H256::default(),
+        trace_kind: None,
     };
     let tx_included = engine_standalone_storage::TransactionIncluded {
         block_hash,

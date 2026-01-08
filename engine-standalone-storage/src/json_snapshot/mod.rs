@@ -64,7 +64,9 @@ mod test {
             "contract.aurora.block51077328.json",
         )
         .unwrap();
-        let storage = crate::Storage::open("rocks_tmp/").unwrap();
+        let storage =
+            crate::Storage::open_ensure_account_id("rocks_tmp/", &"aurora".parse().unwrap())
+                .unwrap();
         super::initialize_engine_state(&storage, snapshot).unwrap();
     }
 }

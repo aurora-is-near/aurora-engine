@@ -19,14 +19,17 @@ fn test_multisender_eth() {
             })
             .collect();
 
-        let (result, profile) = runner
+        let result = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {
                 call_contract(contract_address, nonce, send_eth_data(&destinations))
             })
             .unwrap();
-        utils::unwrap_success_slice(&result);
+        utils::unwrap_success_slice(&result.inner);
 
-        (result.gas_used, profile.all_gas())
+        (
+            result.inner.gas_used,
+            result.execution_profile.unwrap().all_gas(),
+        )
     };
 
     let (_evm_gas, near_gas) = multi_send_eth(350);
@@ -72,7 +75,7 @@ fn test_multisender_erc20() {
             })
             .collect();
 
-        let (result, profile) = runner
+        let result = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {
                 call_contract(
                     contract_address,
@@ -81,9 +84,12 @@ fn test_multisender_erc20() {
                 )
             })
             .unwrap();
-        utils::unwrap_success_slice(&result);
+        utils::unwrap_success_slice(&result.inner);
 
-        (result.gas_used, profile.all_gas())
+        (
+            result.inner.gas_used,
+            result.execution_profile.unwrap().all_gas(),
+        )
     };
 
     let (_evm_gas, near_gas) = multi_send_erc20(150);

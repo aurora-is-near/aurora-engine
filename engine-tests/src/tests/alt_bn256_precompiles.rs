@@ -68,7 +68,7 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = Gas::MAX;
 
-    let (submit_res, wasm_result) = runner
+    let submit_res_ext = runner
         .submit_with_signer_profiled(&mut signer, |nonce| {
             aurora_engine_transactions::legacy::TransactionLegacy {
                 nonce,
@@ -81,8 +81,14 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
         })
         .unwrap();
 
-    assert_ggas_bound(wasm_result.all_gas(), gas_limit);
-    assert_eq!(expected_output, utils::unwrap_success_slice(&submit_res));
+    assert_ggas_bound(
+        submit_res_ext.execution_profile.unwrap().all_gas(),
+        gas_limit,
+    );
+    assert_eq!(
+        expected_output,
+        utils::unwrap_success_slice(&submit_res_ext.inner)
+    );
 }
 
 /// Checks if `total_gas` is within 1 Ggas of `ggas_bound`.

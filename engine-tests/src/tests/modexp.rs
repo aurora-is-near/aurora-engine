@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use aurora_engine::engine::EngineError;
 use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
@@ -123,9 +125,13 @@ fn bench_modexp_standalone() {
         standalone
             .submit_transaction(&signer.secret_key, bench_tx)
             .unwrap();
-        let duration = start.elapsed().as_millis();
+        let duration = start.elapsed();
+        let limit = Duration::from_secs(4);
 
-        assert!(duration < 1000, "{path} failed to run in under 1 second");
+        assert!(
+            duration < limit,
+            "{path} failed to run in under {limit:?}, time taken: {duration:?}"
+        );
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting

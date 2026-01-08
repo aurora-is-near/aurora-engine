@@ -105,7 +105,7 @@ where
         env.random_seed = block_metadata.random_seed;
 
         let args = SubmitArgs {
-            tx_data: transaction_bytes.clone(),
+            tx_data: transaction_bytes,
             ..Default::default()
         };
         let result = storage.with_engine_access(block_height, transaction_position, &[], |io| {
@@ -154,10 +154,10 @@ where
             signer: env.signer_account_id(),
             caller: env.predecessor_account_id(),
             attached_near: 0,
-            transaction: crate::sync::types::TransactionKind::Submit(tx),
+            transaction: crate::sync::types::TransactionKind::submit(&tx),
             promise_data: Vec::new(),
-            raw_input: transaction_bytes,
             action_hash: H256::default(),
+            trace_kind: None,
         };
         storage.set_transaction_included(tx_hash, &tx_msg, &diff)?;
     }
@@ -216,7 +216,9 @@ mod test {
     #[test]
     #[ignore]
     fn test_fill_db() {
-        let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
+        let mut storage =
+            crate::Storage::open_ensure_account_id("rocks_tmp/", &"aurora".parse().unwrap())
+                .unwrap();
         let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();
         let engine_state = state::EngineState {
             chain_id: aurora_engine_types::types::u256_to_arr(&1_313_161_555.into()),
@@ -256,10 +258,10 @@ mod test {
                         signer: "aurora".parse().unwrap(),
                         caller: "aurora".parse().unwrap(),
                         attached_near: 0,
-                        transaction: TransactionKind::Unknown,
+                        transaction: TransactionKind::unknown(),
                         promise_data: Vec::new(),
-                        raw_input: Vec::new(),
                         action_hash: H256::default(),
+                        trace_kind: None,
                     },
                     &diff,
                 )

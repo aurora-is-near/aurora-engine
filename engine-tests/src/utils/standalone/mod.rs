@@ -1,6 +1,5 @@
 use aurora_engine::engine;
-use aurora_engine::parameters::{SubmitResult, TransactionStatus};
-use aurora_engine_modexp::AuroraModExp;
+use aurora_engine::parameters::{SubmitResult, TransactionExecutionResult, TransactionStatus};
 use aurora_engine_sdk::env::{self, Env};
 use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, TransactionLegacy};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
@@ -9,13 +8,15 @@ use engine_standalone_storage::{
     sync::{
         self,
         types::{TransactionKind, TransactionMessage},
+        TransactionIncludedOutcome,
     },
     BlockMetadata, Diff, Storage,
 };
+use engine_standalone_tracing::{TraceKind, TraceLog};
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;
 
-use crate::utils;
+use crate::utils::{self, SubmitResultExt};
 
 pub mod mocks;
 pub mod storage;
@@ -38,12 +39,9 @@ impl StandaloneRunner {
         self.chain_id = chain_id;
         let storage = &mut self.storage;
         let env = &mut self.env;
-        storage
-            .set_engine_account_id(&env.current_account_id)
-            .unwrap();
         env.block_height += 1;
         let transaction_hash = H256::zero();
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
             mocks::init_connector(io);
@@ -53,6 +51,9 @@ impl StandaloneRunner {
             info: tx_msg,
             diff: result.diff,
             maybe_result: Ok(None),
+            trace_log: None,
+            call_tracer: None,
+            custom_debug_info: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
@@ -78,7 +79,7 @@ impl StandaloneRunner {
         };
 
         env.block_height += 1;
-        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
+        let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
 
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::mint_evm_account(address, balance, nonce, code, io, env);
@@ -88,6 +89,9 @@ impl StandaloneRunner {
             info: tx_msg,
             diff: result.diff,
             maybe_result: Ok(None),
+            trace_log: None,
+            call_tracer: None,
+            custom_debug_info: None,
         };
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
@@ -98,7 +102,7 @@ impl StandaloneRunner {
         signer: &mut utils::Signer,
         amount: Wei,
         dest: Address,
-    ) -> Result<SubmitResult, sync::error::Error> {
+    ) -> Result<SubmitResult, String> {
         let tx = TransactionLegacy {
             nonce: signer.use_nonce().into(),
             gas_price: U256::zero(),
@@ -110,11 +114,41 @@ impl StandaloneRunner {
         self.submit_transaction(&signer.secret_key, tx)
     }
 
+    pub fn submit_transaction_with_tracing(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+    ) -> Result<SubmitResultExt, String> {
+        let outcome =
+            self.submit_transaction_inner(account, transaction, Some(TraceKind::Transaction));
+        unwrap_result_ext(outcome)
+    }
+
+    pub fn submit_transaction_with_call_stack_tracing(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+    ) -> Result<SubmitResultExt, String> {
+        let outcome =
+            self.submit_transaction_inner(account, transaction, Some(TraceKind::CallFrame));
+        unwrap_result_ext(outcome)
+    }
+
     pub fn submit_transaction(
         &mut self,
         account: &SecretKey,
         transaction: TransactionLegacy,
-    ) -> Result<SubmitResult, sync::error::Error> {
+    ) -> Result<SubmitResult, String> {
+        let outcome = self.submit_transaction_inner(account, transaction, None);
+        unwrap_result(outcome)
+    }
+
+    fn submit_transaction_inner(
+        &mut self,
+        account: &SecretKey,
+        transaction: TransactionLegacy,
+        trace_kind: Option<TraceKind>,
+    ) -> TransactionIncludedOutcome {
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
@@ -124,6 +158,7 @@ impl StandaloneRunner {
         Self::internal_submit_transaction(
             &transaction_bytes,
             0,
+            trace_kind,
             storage,
             env,
             &mut self.cumulative_diff,
@@ -134,20 +169,24 @@ impl StandaloneRunner {
     pub fn submit_raw_transaction_bytes(
         &mut self,
         transaction_bytes: &[u8],
-    ) -> Result<SubmitResult, sync::error::Error> {
+        trace_kind: Option<TraceKind>,
+    ) -> Result<(SubmitResult, Option<Vec<TraceLog>>), String> {
         self.env.predecessor_account_id = "some-account.near".parse().unwrap();
         let storage = &mut self.storage;
         let env = &mut self.env;
         env.block_height += 1;
 
-        Self::internal_submit_transaction(
+        let mut outcome = Self::internal_submit_transaction(
             transaction_bytes,
             0,
+            trace_kind,
             storage,
             env,
             &mut self.cumulative_diff,
             &[],
-        )
+        );
+        let trace_log = outcome.trace_log.take();
+        unwrap_result(outcome).map(|res| (res, trace_log))
     }
 
     /// Note: does not persist the diff in the DB.
@@ -156,7 +195,7 @@ impl StandaloneRunner {
         signed_tx: &LegacyEthSignedTransaction,
         block_height: u64,
         transaction_position: u16,
-    ) -> Result<sync::TransactionIncludedOutcome, engine::EngineError> {
+    ) -> sync::TransactionIncludedOutcome {
         let storage = &mut self.storage;
         let env = &mut self.env;
 
@@ -164,29 +203,15 @@ impl StandaloneRunner {
         let transaction_bytes = rlp::encode(signed_tx).to_vec();
         let transaction_hash = aurora_engine_sdk::keccak(&transaction_bytes);
 
-        let mut tx_msg = Self::template_tx_msg(
-            storage,
-            env,
-            0,
-            transaction_hash,
-            &[],
-            transaction_bytes.clone(),
-        );
+        let mut tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[]);
         tx_msg.position = transaction_position;
         tx_msg.transaction =
-            TransactionKind::Submit(transaction_bytes.as_slice().try_into().unwrap());
-        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+            TransactionKind::submit(&transaction_bytes.as_slice().try_into().unwrap());
+        let outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
 
-        match outcome.maybe_result.as_ref().unwrap().as_ref().unwrap() {
-            sync::TransactionExecutionResult::Submit(result) => {
-                if let Err(e) = result.as_ref() {
-                    return Err(e.clone());
-                }
-            }
-            _ => unreachable!(),
-        }
+        let _ = outcome.maybe_result.as_ref().unwrap().as_ref().unwrap();
 
-        Ok(outcome)
+        outcome
     }
 
     #[allow(clippy::too_many_lines)]
@@ -196,7 +221,8 @@ impl StandaloneRunner {
         ctx: &near_vm_runner::logic::VMContext,
         promise_results: &[PromiseResult],
         block_random_value: Option<H256>,
-    ) -> Result<SubmitResult, engine::EngineError> {
+        trace_kind: Option<TraceKind>,
+    ) -> SubmitResultExt {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
         env.attached_deposit = ctx.attached_deposit.as_yoctonear();
@@ -216,26 +242,18 @@ impl StandaloneRunner {
                 PromiseResult::Failed | PromiseResult::NotReady => None,
             })
             .collect();
-        let transaction_kind =
-            sync::parse_transaction_kind(method_name, ctx.input.to_vec(), &promise_data)
-                .expect("All method names must be known by standalone");
+        let transaction_kind = TransactionKind::new(method_name, ctx.input.to_vec(), &promise_data);
 
-        let transaction_hash = if let TransactionKind::SubmitWithArgs(args) = &transaction_kind {
+        let transaction_hash = if let Some(args) = transaction_kind.get_submit_args() {
             aurora_engine_sdk::keccak(&args.tx_data)
         } else {
             aurora_engine_sdk::keccak(&ctx.input)
         };
 
         let storage = &mut self.storage;
-        let mut tx_msg = Self::template_tx_msg(
-            storage,
-            &env,
-            0,
-            transaction_hash,
-            promise_results,
-            ctx.input.to_vec(),
-        );
+        let mut tx_msg = Self::template_tx_msg(storage, &env, 0, transaction_hash, promise_results);
         tx_msg.transaction = transaction_kind;
+        tx_msg.trace_kind = trace_kind;
 
         if ctx.random_seed.len() == 32 {
             let runtime_random_value = {
@@ -250,22 +268,25 @@ impl StandaloneRunner {
             );
         }
 
-        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+        let mut outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
         self.cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
-        match outcome.maybe_result.unwrap() {
-            Some(sync::TransactionExecutionResult::Submit(result)) => result,
-            Some(sync::TransactionExecutionResult::DeployErc20(address)) => Ok(SubmitResult::new(
+        let inner = match outcome.maybe_result.unwrap() {
+            Some(TransactionExecutionResult::Submit(result)) => result,
+            Some(TransactionExecutionResult::DeployErc20(address)) => SubmitResult::new(
                 TransactionStatus::Succeed(address.raw().as_ref().to_vec()),
                 0,
                 Vec::new(),
-            )),
-            _ => Ok(SubmitResult::new(
-                TransactionStatus::Succeed(Vec::new()),
-                0,
-                Vec::new(),
-            )),
+            ),
+            _ => SubmitResult::new(TransactionStatus::Succeed(Vec::new()), 0, Vec::new()),
+        };
+
+        SubmitResultExt {
+            inner,
+            execution_profile: None,
+            call_tracer: outcome.call_tracer.take(),
+            trace_log: outcome.trace_log.take(),
         }
     }
 
@@ -308,7 +329,6 @@ impl StandaloneRunner {
         transaction_position: u16,
         transaction_hash: H256,
         promise_results: &[PromiseResult],
-        raw_input: Vec<u8>,
     ) -> TransactionMessage {
         let block_hash = mocks::compute_block_hash(env.block_height);
         let block_metadata = BlockMetadata {
@@ -340,21 +360,23 @@ impl StandaloneRunner {
             signer: env.signer_account_id(),
             caller: env.predecessor_account_id(),
             attached_near: env.attached_deposit,
-            transaction: TransactionKind::Unknown,
+            transaction: TransactionKind::unknown(),
             promise_data,
-            raw_input,
             action_hash,
+            trace_kind: None,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn internal_submit_transaction(
         transaction_bytes: &[u8],
         transaction_position: u16,
+        trace_kind: Option<TraceKind>,
         storage: &mut Storage,
         env: &env::Fixed,
         cumulative_diff: &mut Diff,
         promise_results: &[PromiseResult],
-    ) -> Result<SubmitResult, sync::error::Error> {
+    ) -> TransactionIncludedOutcome {
         let transaction_hash = aurora_engine_sdk::keccak(transaction_bytes);
         let mut tx_msg = Self::template_tx_msg(
             storage,
@@ -362,35 +384,61 @@ impl StandaloneRunner {
             transaction_position,
             transaction_hash,
             promise_results,
-            transaction_bytes.to_vec(),
         );
-        tx_msg.transaction = TransactionKind::Submit(transaction_bytes.try_into().unwrap());
+        tx_msg.transaction = TransactionKind::submit(&transaction_bytes.try_into().unwrap());
+        tx_msg.trace_kind = trace_kind;
 
-        let outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx_msg).unwrap();
+        let outcome = sync::execute_transaction_message::<false>(storage, tx_msg).unwrap();
         cumulative_diff.append(outcome.diff.clone());
         storage::commit(storage, &outcome);
 
-        unwrap_result(outcome)
+        outcome
     }
 }
 
-fn unwrap_result(
-    outcome: sync::TransactionIncludedOutcome,
-) -> Result<SubmitResult, sync::error::Error> {
-    match outcome.maybe_result?.unwrap() {
-        sync::TransactionExecutionResult::Submit(result) => result.map_err(Into::into),
-        sync::TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
-        sync::TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+fn unwrap_result(outcome: sync::TransactionIncludedOutcome) -> Result<SubmitResult, String> {
+    match outcome
+        .maybe_result?
+        .ok_or_else(|| "no result".to_string())?
+    {
+        TransactionExecutionResult::Submit(result) => Ok(result),
+        TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
+        TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
+    }
+}
+
+fn unwrap_result_ext(
+    mut outcome: sync::TransactionIncludedOutcome,
+) -> Result<SubmitResultExt, String> {
+    match outcome
+        .maybe_result?
+        .ok_or_else(|| "no result".to_string())?
+    {
+        TransactionExecutionResult::Submit(result) => Ok(SubmitResultExt {
+            inner: result,
+            execution_profile: None,
+            call_tracer: outcome.call_tracer.take(),
+            trace_log: outcome.trace_log.take(),
+        }),
+        TransactionExecutionResult::Promise(_) => panic!("Unexpected promise."),
+        TransactionExecutionResult::DeployErc20(_) => panic!("Unexpected DeployErc20."),
     }
 }
 
 impl Default for StandaloneRunner {
     fn default() -> Self {
-        let (storage_dir, mut storage) = storage::create_db();
         let env = mocks::default_env(0);
+        let (storage_dir, mut storage) = storage::create_db(&env.current_account_id);
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../bin/aurora-engine-compat.wasm"
+        );
         storage
-            .set_engine_account_id(&env.current_account_id)
+            .runner_mut()
+            .set_code(std::fs::read(path).unwrap())
             .unwrap();
+
         Self {
             storage_dir,
             storage,

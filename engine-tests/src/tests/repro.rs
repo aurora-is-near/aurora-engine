@@ -170,12 +170,10 @@ fn repro_common(context: &ReproContext) {
     // Also validate the SubmitResult in the standalone engine
     let mut standalone = standalone::StandaloneRunner::default();
     json_snapshot::initialize_engine_state(&standalone.storage, snapshot).unwrap();
-    let standalone_result = standalone
-        .submit_raw("submit", &runner.context, &[], None)
-        .unwrap();
+    let standalone_result = standalone.submit_raw("submit", &runner.context, &[], None, None);
     assert_eq!(
         borsh::to_vec(&submit_result).unwrap(),
-        borsh::to_vec(&standalone_result).unwrap()
+        borsh::to_vec(&standalone_result.inner).unwrap()
     );
     standalone.close();
 }

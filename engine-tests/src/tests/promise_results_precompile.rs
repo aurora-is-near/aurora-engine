@@ -51,7 +51,7 @@ fn test_promise_result_gas_cost() {
     );
 
     // Baseline transaction that does essentially nothing.
-    let (_, baseline) = runner
+    let result_ext = runner
         .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
             nonce,
             gas_price: U256::zero(),
@@ -61,11 +61,12 @@ fn test_promise_result_gas_cost() {
             data: Vec::new(),
         })
         .unwrap();
+    let baseline = result_ext.execution_profile.unwrap();
 
     let mut profile_for_promises = |promise_data: Vec<PromiseResult>| -> (u64, u64, u64) {
         let input_length: usize = promise_data.iter().map(PromiseResult::size).sum();
         runner.promise_results = promise_data;
-        let (submit_result, profile) = runner
+        let submit_result = runner
             .submit_with_signer_profiled(&mut signer, |nonce| TransactionLegacy {
                 nonce,
                 gas_price: U256::zero(),
@@ -75,12 +76,12 @@ fn test_promise_result_gas_cost() {
                 data: Vec::new(),
             })
             .unwrap();
-        assert!(submit_result.status.is_ok());
+        assert!(submit_result.inner.status.is_ok());
         // Subtract off baseline transaction to isolate just precompile things
         (
             u64::try_from(input_length).unwrap(),
-            profile.all_gas() - baseline.all_gas(),
-            submit_result.gas_used,
+            submit_result.execution_profile.unwrap().all_gas() - baseline.all_gas(),
+            submit_result.inner.gas_used,
         )
     };
 

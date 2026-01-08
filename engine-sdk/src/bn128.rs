@@ -7,7 +7,7 @@ use super::exports;
 /// This is an element in the base field of `bn254`.
 ///
 /// Note: The base field is used to define G1 and G2 elements.
-const FQ_LEN: usize = 32;
+pub const FQ_LEN: usize = 32;
 
 /// Specifies the number of bytes needed to represent a Fr element.
 /// This is an element in the scalar field of BN254.
@@ -17,7 +17,7 @@ pub const SCALAR_LEN: usize = 32;
 ///
 /// Note: This is the quadratic extension of Fq, and by definition
 /// means we need 2 Fq elements.
-const FQ2_LEN: usize = 2 * FQ_LEN;
+pub const FQ2_LEN: usize = 2 * FQ_LEN;
 
 /// Specifies the number of bytes needed to represent a G1 element.
 ///

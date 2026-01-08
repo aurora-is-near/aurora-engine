@@ -19,7 +19,7 @@ aurora-engine-modexp = { path = "engine-modexp", version = "1.2.0", default-feat
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
 aurora-engine-workspace = { path = "engine-workspace" }
 engine-standalone-storage = { path = "engine-standalone-storage" }
-engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
+engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false }
 
 anyhow = "1"
 ark-bn254 = { version = "0.5", default-features = false }
@@ -34,7 +34,7 @@ bstr = "1"
 cargo-near-build = "0.9"
 criterion = "0.8"
 ethabi = { version = "18", default-features = false }
-aurora-evm = { version = "2.0.0-rc.1", default-features = false }
+aurora-evm = { git = "https://github.com/aurora-is-near/aurora-evm.git", branch = "v2.1.3-serde-no-std", default-features = false }
 fixed-hash = { version = "0.8", default-features = false }
 function_name = "0.3"
 git2 = "0.20"
@@ -64,9 +64,11 @@ sha2 = { version = "0.10", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 strum = { version = "0.27", features = ["derive"] }
 tempfile = "3"
+thiserror = "2.0"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 test-case = "3.1"
 walrus = "0.24"
+wasmer = "6"
 wee_alloc = { version = "0.4", default-features = false }
 
 [workspace.lints.clippy]
@@ -96,6 +98,7 @@ members = [
     "engine-transactions",
     "engine-types",
     "engine-workspace",
+    "engine-compat",
 ]
 
 exclude = [

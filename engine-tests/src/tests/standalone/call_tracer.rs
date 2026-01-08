@@ -1,7 +1,6 @@
 use crate::prelude::{H160, H256};
 use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
 use crate::utils::{self, standalone, Signer};
-use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
@@ -10,10 +9,7 @@ use aurora_engine_types::{
     U256,
 };
 use engine_standalone_storage::sync;
-use engine_standalone_tracing::{
-    sputnik,
-    types::call_tracer::{self, CallTracer},
-};
+use engine_standalone_tracing::types::call_tracer;
 
 #[test]
 fn test_trace_contract_deploy() {
@@ -24,20 +20,18 @@ fn test_trace_contract_deploy() {
 
     let constructor = ERC20Constructor::load();
     let deploy_tx = constructor.deploy("Test", "TST", signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let deploy_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, deploy_tx)
-            .unwrap()
-    });
+    let deploy_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, deploy_tx)
+        .unwrap();
+    let mut call_tracer = deploy_result.call_tracer.unwrap();
     let contract_address = {
-        let bytes = utils::unwrap_success_slice(&deploy_result);
+        let bytes = utils::unwrap_success_slice(&deploy_result.inner);
         Address::try_from_slice(bytes).unwrap()
     };
     let code = runner.get_code(&contract_address);
 
-    assert_eq!(listener.call_stack.len(), 1);
-    let trace = listener.call_stack.pop().unwrap();
+    assert_eq!(call_tracer.call_stack.len(), 1);
+    let trace = call_tracer.call_stack.pop().unwrap();
 
     assert_eq!(trace.to, Some(contract_address));
     assert_eq!(trace.output, code);
@@ -80,14 +74,14 @@ fn test_trace_precompile_direct_call() {
             .unwrap()
     };
 
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner.submit_transaction(&signer.secret_key, tx).unwrap()
-    });
-    assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    let standalone_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let mut call_tracer = standalone_result.call_tracer.unwrap();
+    assert!(standalone_result.inner.status.is_ok());
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
 
     let expected_trace = call_tracer::CallFrame {
         call_type: call_tracer::CallType::Call,
@@ -127,13 +121,11 @@ fn test_trace_contract_single_call() {
     let contract = ERC20(constructor.0.deployed_at(contract_address));
 
     let tx = contract.balance_of(signer_address, signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
-    assert!(standalone_result.status.is_ok());
+    let standalone_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx.clone())
+        .unwrap();
+    let mut listener = standalone_result.call_tracer.unwrap();
+    assert!(standalone_result.inner.status.is_ok());
     assert_eq!(listener.call_stack.len(), 1);
 
     let trace = listener.call_stack.pop().unwrap();
@@ -175,17 +167,15 @@ fn test_trace_contract_with_sub_call() {
     let params =
         UniswapTestContext::exact_output_single_params(OUTPUT_AMOUNT.into(), &token_a, &token_b);
 
-    let mut listener = CallTracer::default();
-    let (_amount_in, _profile) = sputnik::traced_call(&mut listener, || {
-        context
-            .runner
-            .submit_with_signer_profiled(&mut context.signer, |nonce| {
-                context.swap_router.exact_output_single(&params, nonce)
-            })
-            .unwrap()
-    });
+    let result = context
+        .runner
+        .submit_with_signer_profiled_with_call_trace(&mut context.signer, |nonce| {
+            context.swap_router.exact_output_single(&params, nonce)
+        })
+        .unwrap();
+    let call_stack = result.call_tracer.unwrap().call_stack;
 
-    assert_eq!(listener.call_stack.len(), 1);
+    assert_eq!(call_stack.len(), 1);
 
     let user_address = utils::address_from_secret_key(&context.signer.secret_key);
     let router_address = context.swap_router.0.address;
@@ -198,7 +188,7 @@ fn test_trace_contract_with_sub_call() {
     //                                               -> A.balanceOf
     //                                               -> Router.uniswapV3SwapCallback -> A.transferFrom
     //                                               -> A.balanceOf
-    let root_call = listener.call_stack.first().unwrap();
+    let root_call = call_stack.first().unwrap();
     assert_eq!(root_call.from, user_address);
     assert_eq!(root_call.to.unwrap(), router_address);
 
@@ -250,16 +240,14 @@ fn test_trace_contract_with_precompile_sub_call() {
     // This transaction calls the standard precompiles (`ecrecover`, `sha256`, etc) one aft the other.
     // So the trace is one top-level call with multiple sub-calls (and the sub-calls contain no further sub-calls).
     let tx = contract.call_method("test_all", signer.use_nonce().into());
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
-    assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    let standalone_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let mut call_tracer = standalone_result.call_tracer.unwrap();
+    assert!(standalone_result.inner.status.is_ok());
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
     assert_eq!(trace.calls.len(), 9);
     for call in trace.calls {
         assert!(call.calls.is_empty());
@@ -295,12 +283,12 @@ fn test_contract_create_too_large() {
         data: tx_data,
     };
 
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner.submit_transaction(&signer.secret_key, tx)
-    });
+    let standalone_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let _call_tracer = standalone_result.call_tracer.unwrap();
     assert!(matches!(
-        standalone_result.unwrap().status,
+        standalone_result.inner.status,
         TransactionStatus::CreateContractLimit
     ));
 }
@@ -343,19 +331,12 @@ fn test_trace_precompiles_with_subcalls() {
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let tx_kind = sync::types::TransactionKind::DeployErc20(
-            aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
+        tx.transaction = sync::types::TransactionKind::deploy_erc20(
+            &aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
-        tx.transaction = tx_kind;
-        let mut outcome = sync::execute_transaction_message::<AuroraModExp>(storage, tx).unwrap();
+        let mut outcome = sync::execute_transaction_message::<false>(storage, tx).unwrap();
         let key = storage::bytes_to_key(storage::KeyPrefix::Nep141Erc20Map, b"wrap.near");
         outcome.diff.modify(key, wnear_address.as_bytes().to_vec());
         let key =
@@ -373,41 +354,26 @@ fn test_trace_precompiles_with_subcalls() {
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let tx_kind = sync::types::TransactionKind::FactoryUpdate(xcc_router_bytes);
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
-        tx.transaction = tx_kind;
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
+        tx.transaction = sync::types::TransactionKind::new_factory_update(xcc_router_bytes);
         tx
     };
     let outcome =
-        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, factory_update).unwrap();
+        sync::execute_transaction_message::<false>(&mut runner.storage, factory_update).unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
     let set_wnear_address = {
         runner.env.block_height += 1;
         let storage = &mut runner.storage;
         let env = &runner.env;
 
-        let tx_kind = sync::types::TransactionKind::FactorySetWNearAddress(wnear_address);
-        let mut tx = standalone::StandaloneRunner::template_tx_msg(
-            storage,
-            env,
-            0,
-            H256::default(),
-            &[],
-            tx_kind.raw_bytes(),
-        );
-        tx.transaction = tx_kind;
+        let mut tx =
+            standalone::StandaloneRunner::template_tx_msg(storage, env, 0, H256::default(), &[]);
+        tx.transaction = sync::types::TransactionKind::new_factory_set_wnear_address(wnear_address);
         tx
     };
     let outcome =
-        sync::execute_transaction_message::<AuroraModExp>(&runner.storage, set_wnear_address)
-            .unwrap();
+        sync::execute_transaction_message::<false>(&mut runner.storage, set_wnear_address).unwrap();
     standalone::storage::commit(&mut runner.storage, &outcome);
 
     // User calls XCC precompile
@@ -427,16 +393,14 @@ fn test_trace_precompiles_with_subcalls() {
         value: Wei::zero(),
         data: borsh::to_vec(&xcc_args).unwrap(),
     };
-    let mut listener = CallTracer::default();
-    let standalone_result = sputnik::traced_call(&mut listener, || {
-        runner
-            .submit_transaction(&signer.secret_key, tx.clone())
-            .unwrap()
-    });
-    assert!(standalone_result.status.is_ok());
-    assert_eq!(listener.call_stack.len(), 1);
+    let standalone_result = runner
+        .submit_transaction_with_call_stack_tracing(&signer.secret_key, tx)
+        .unwrap();
+    let mut call_tracer = standalone_result.call_tracer.unwrap();
+    assert!(standalone_result.inner.status.is_ok());
+    assert_eq!(call_tracer.call_stack.len(), 1);
 
-    let trace = listener.call_stack.pop().unwrap();
+    let trace = call_tracer.call_stack.pop().unwrap();
     assert_eq!(trace.calls.len(), 1);
     let subcall = trace.calls.first().unwrap();
     assert_eq!(subcall.call_type, call_tracer::CallType::Call);
