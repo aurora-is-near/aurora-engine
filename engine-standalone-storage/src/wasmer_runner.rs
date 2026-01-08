@@ -22,6 +22,7 @@ pub struct WasmerRunner {
     store: Store,
     env: FunctionEnv<WasmEnv>,
     imports: Imports,
+    module: Option<Module>,
     instance: Option<Instance>,
 }
 
@@ -69,6 +70,8 @@ pub enum WasmInitError {
 
 #[derive(Debug, Error, Clone)]
 pub enum WasmRuntimeError {
+    #[error("Wasmer instantiation error: {0}")]
+    InstantiationError(#[from] Box<wasmer::InstantiationError>),
     #[error("Wasmer runtime error: {0}")]
     Inner(#[from] wasmer::RuntimeError),
     #[error("Wasmer export error: {0}")]
@@ -335,17 +338,47 @@ impl WasmerRunner {
             store,
             env,
             imports,
+            module: None,
             instance: None,
         }
     }
 
     pub fn set_code(&mut self, code: Vec<u8>) -> Result<(), WasmInitError> {
+        let db = self.env.as_mut(&mut self.store).db.clone();
+        // Need to recreate the Store, Imports and Env.
+        *self = Self::new(db);
+
         let module = Module::new(&self.store, code)?;
         let instance = Instance::new(&mut self.store, &module, &self.imports).map_err(Box::new)?;
         let memory = instance.exports.get_memory("memory")?.clone();
         self.env.as_mut(&mut self.store).memory = Some(memory);
 
+        self.module = Some(module);
         self.instance = Some(instance);
+        Ok(())
+    }
+
+    /// Recreate the `Store`, but keep the same compiled `Module` if exists.
+    /// This can be called independently of `set_code`.
+    /// But you should `set_code` to be able to consume blocks.
+    pub fn recycle(&mut self) -> Result<(), WasmRuntimeError> {
+        let db = self.env.as_mut(&mut self.store).db.clone();
+
+        let module = self.module.take();
+        *self = Self::new(db);
+
+        // Warning, if you did not called `set_code` before, the module is absent
+        // To be able to consume block, you must call `set_code` ether before `recycle` or after.
+        if let Some(module) = module {
+            let instance =
+                Instance::new(&mut self.store, &module, &self.imports).map_err(Box::new)?;
+            let memory = instance.exports.get_memory("memory")?.clone();
+            self.env.as_mut(&mut self.store).memory = Some(memory);
+
+            self.module = Some(module);
+            self.instance = Some(instance);
+        }
+
         Ok(())
     }
 
@@ -388,71 +421,112 @@ impl WasmerRunner {
         transaction_position: u16,
         input: Vec<u8>,
     ) -> Result<WasmerRuntimeOutcome, WasmRuntimeError> {
+        self.call_contract_inner(
+            method_name,
+            trace_kind,
+            promise_data,
+            env,
+            block_height,
+            transaction_position,
+            input,
+            1,
+        )
+    }
+
+    fn call_contract_inner(
+        &mut self,
+        method_name: &str,
+        trace_kind: Option<TraceKind>,
+        promise_data: &[Option<Vec<u8>>],
+        env: Fixed,
+        block_height: u64,
+        transaction_position: u16,
+        input: Vec<u8>,
+        retry: u32,
+    ) -> Result<WasmerRuntimeOutcome, WasmRuntimeError> {
         {
             self.env.as_mut(&mut self.store).state.init(
                 method_name,
                 trace_kind,
                 block_height,
                 transaction_position,
-                input,
-                env,
+                input.clone(),
+                env.clone(),
                 promise_data.into(),
             );
         }
-        self.instance
+        let func = self
+            .instance
             .as_ref()
             .ok_or(WasmRuntimeError::ContractCodeNotSet)?
             .exports
-            .get_typed_function::<(), ()>(&self.store, "execute")?
-            .call(&mut self.store)
-            .map_err(WasmRuntimeError::from)
-            .and_then(|()| {
-                type R = Result<Option<TransactionExecutionResult>, String>;
+            .get_typed_function::<(), ()>(&self.store, "execute")?;
 
-                let state = &mut self.env.as_mut(&mut self.store).state;
-                let mut diff = state.get_transaction_diff();
+        if let Err(err) = func.call(&mut self.store) {
+            // if the heap fragmentation is too high it could fail with runtime error
+            // in this case, try to recycle the wasm store
+            return if retry == 0 {
+                Err(err.into())
+            } else {
+                self.recycle()?;
+                self.call_contract_inner(
+                    method_name,
+                    trace_kind,
+                    promise_data,
+                    env,
+                    block_height,
+                    transaction_position,
+                    input,
+                    retry - 1,
+                )
+            };
+        }
 
-                // Deserialize the execution result
-                let mut value = diff
-                    .get(b"borealis/result")
-                    .and_then(DiffValue::value)
-                    .ok_or(WasmRuntimeError::DeserializeResult)?;
-                let maybe_result = <R as BorshDeserialize>::deserialize(&mut value)
-                    .map_err(|_| WasmRuntimeError::DeserializeResult)?;
+        type R = Result<Option<TransactionExecutionResult>, String>;
 
-                // Deserialize tracing info if present
-                let trace_log = diff
-                    .get(b"borealis/transaction_tracing")
-                    .and_then(DiffValue::value)
-                    .map(|mut value| {
-                        BorshDeserialize::deserialize(&mut value)
-                            .map_err(|_| WasmRuntimeError::DeserializeTracing)
-                    })
-                    .transpose()?;
-                let call_tracer = diff
-                    .get(b"borealis/call_frame_tracing")
-                    .and_then(DiffValue::value)
-                    .map(|mut value| {
-                        BorshDeserialize::deserialize(&mut value)
-                            .map_err(|_| WasmRuntimeError::DeserializeTracing)
-                    })
-                    .transpose()?;
-                let custom_debug_info = diff
-                    .get(b"borealis/custom_debug_info")
-                    .and_then(DiffValue::value)
-                    .map(<[u8]>::to_vec);
-                diff.retain(|key, _| !key.starts_with(b"borealis/"));
-                let output = state.take_output();
+        let state = &mut self.env.as_mut(&mut self.store).state;
+        let mut diff = state.get_transaction_diff();
 
-                Ok(WasmerRuntimeOutcome {
-                    diff,
-                    maybe_result,
-                    trace_log,
-                    call_tracer,
-                    custom_debug_info,
-                    output,
-                })
+        // Deserialize the execution result
+        let mut value = diff
+            .get(b"borealis/result")
+            .and_then(DiffValue::value)
+            .ok_or(WasmRuntimeError::DeserializeResult)?;
+        let maybe_result = <R as BorshDeserialize>::deserialize(&mut value)
+            .map_err(|_| WasmRuntimeError::DeserializeResult)?;
+
+        // Deserialize tracing info if present
+        let trace_log = diff
+            .get(b"borealis/transaction_tracing")
+            .and_then(DiffValue::value)
+            .map(|mut value| {
+                BorshDeserialize::deserialize(&mut value)
+                    .map_err(|_| WasmRuntimeError::DeserializeTracing)
             })
+            .transpose()?;
+        let call_tracer = diff
+            .get(b"borealis/call_frame_tracing")
+            .and_then(DiffValue::value)
+            .map(|mut value| {
+                BorshDeserialize::deserialize(&mut value)
+                    .map_err(|_| WasmRuntimeError::DeserializeTracing)
+            })
+            .transpose()?;
+        let custom_debug_info = diff
+            .get(b"borealis/custom_debug_info")
+            .and_then(DiffValue::value)
+            .map(<[u8]>::to_vec);
+        diff.retain(|key, _| !key.starts_with(b"borealis/"));
+        let output = state.take_output();
+
+        Ok(WasmerRuntimeOutcome {
+            diff,
+            maybe_result,
+            trace_log,
+            call_tracer,
+            custom_debug_info,
+            output,
+        })
     }
 }
 
