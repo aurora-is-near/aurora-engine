@@ -308,7 +308,7 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh
 '''
 
 [tasks.build-xcc-router-docker-inner]
