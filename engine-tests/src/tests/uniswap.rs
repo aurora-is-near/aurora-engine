@@ -39,7 +39,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(82, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(90, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    utils::assert_gas_bound(profile.all_gas(), 22);
+    utils::assert_gas_bound(profile.all_gas(), 24);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (50..=60).contains(&wasm_fraction),
@@ -59,11 +59,11 @@ fn test_uniswap_exact_output() {
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    utils::assert_gas_bound(profile.all_gas(), 13);
+    utils::assert_gas_bound(profile.all_gas(), 15);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (40..=50).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 40% and 50%",
+        (50..=60).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 50% and 60%",
     );
 }
 

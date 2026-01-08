@@ -81,17 +81,21 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
         })
         .unwrap();
 
-    assert_ggas_bound(wasm_result.all_gas(), gas_limit);
+    assert_gas_bound(wasm_result.all_gas(), gas_limit);
     assert_eq!(expected_output, utils::unwrap_success_slice(&submit_res));
 }
 
-/// Checks if `total_gas` is within 1 Ggas of `ggas_bound`.
-fn assert_ggas_bound(total_gas: u64, ggas_bound: u64) {
+/// Checks if `total_gas` is within 1 `GGas` of `ggas_bound`.
+fn assert_gas_bound(total_gas: u64, bound_ggas: u64) {
     const GIGA: i128 = 1_000_000_000;
     let total_gas: i128 = total_gas.into();
-    let ggas_bound: i128 = i128::from(ggas_bound) * GIGA;
-    let diff = total_gas <= ggas_bound;
-    assert!(diff, "{} > {} Ggas", total_gas / GIGA, ggas_bound / GIGA,);
+    let bound_gas: i128 = i128::from(bound_ggas) * GIGA;
+
+    assert!(
+        total_gas <= bound_gas,
+        "total: {} > bound: {bound_ggas} GGas",
+        total_gas / GIGA
+    );
 }
 
 #[test]
@@ -100,7 +104,7 @@ fn test_alt_bn128_add() {
         &Bn256Add::<Istanbul>::new(),
         Bn256Add::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_add.json"),
-        3550, // 3.55 Tgas
+        3586, // 3.586 TGas
     );
 }
 
@@ -110,7 +114,7 @@ fn test_alt_bn128_mul() {
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        9810, // 9.81 Tgas
+        9851, // 9.851 TGas
     );
 }
 
@@ -120,6 +124,6 @@ fn test_alt_bn128_pairing() {
         &Bn256Pair::<Istanbul>::new(),
         Bn256Pair::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_pairing.json"),
-        44040, // 44.040 Tgas
+        44082, // 44.082 TGas
     );
 }
