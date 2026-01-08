@@ -40,7 +40,7 @@ near-crypto.workspace = true
 near-parameters.workspace = true
 near-primitives-core.workspace = true
 near-primitives.workspace = true
-near-sdk.workspace = true
+near-sdk = { workspace = true, features = ["non-contract-usage"] }
 near-vm-runner.workspace = true
 rand.workspace = true
 rlp.workspace = true

@@ -225,12 +225,12 @@ impl StandaloneRunner {
     ) -> SubmitResultExt {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
-        env.attached_deposit = ctx.attached_deposit;
+        env.attached_deposit = ctx.attached_deposit.as_yoctonear();
         env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_str().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_str().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_str().parse().unwrap();
-        env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
+        env.prepaid_gas = NearGas::new(ctx.prepaid_gas.as_gas());
         if let Some(value) = block_random_value {
             env.random_seed = value;
         }
@@ -242,7 +242,7 @@ impl StandaloneRunner {
                 PromiseResult::Failed | PromiseResult::NotReady => None,
             })
             .collect();
-        let transaction_kind = TransactionKind::new(method_name, ctx.input.clone(), &promise_data);
+        let transaction_kind = TransactionKind::new(method_name, ctx.input.to_vec(), &promise_data);
 
         let transaction_hash = if let Some(args) = transaction_kind.get_submit_args() {
             aurora_engine_sdk::keccak(&args.tx_data)

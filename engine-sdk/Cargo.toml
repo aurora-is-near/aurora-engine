@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-sdk"
-version = "1.2.0"
+version = "1.3.0"
 description = "SDK that used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
@@ -14,8 +14,11 @@ publish = true
 
 [dependencies]
 aurora-engine-types.workspace = true
+ark-bn254 = { workspace = true, features = ["curve"], optional = true }
+ark-serialize = { workspace = true, optional = true }
+ark-ec = { workspace = true, optional = true }
+ark-ff = { workspace = true, features = ["asm"], optional = true }
 base64.workspace = true
-bn.workspace = true
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 ripemd.workspace = true
 sha2.workspace = true
@@ -28,7 +31,18 @@ hex.workspace = true
 workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "base64/std", "libsecp256k1/std", "ripemd/std", "sha2/std", "sha3/std"]
+std = [
+    "aurora-engine-types/std",
+    "base64/std",
+    "libsecp256k1/std",
+    "ripemd/std",
+    "sha2/std",
+    "sha3/std",
+    "dep:ark-bn254",
+    "dep:ark-serialize",
+    "dep:ark-ec",
+    "dep:ark-ff"
+]
 contract = []
 log = []
 all-promise-actions = []

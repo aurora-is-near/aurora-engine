@@ -4,11 +4,10 @@
 
 use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
 
-pub use bn128::{alt_bn128_g1_scalar_multiple, alt_bn128_g1_sum, alt_bn128_pairing, BnError};
 pub use types::keccak;
 
 pub mod base64;
-mod bn128;
+pub mod bn128;
 pub mod caching;
 pub mod env;
 pub mod error;
@@ -50,8 +49,8 @@ pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
-        let bytes = H256::zero();
-        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as u64);
+        let mut bytes = H256::zero();
+        exports::read_register(REGISTER_ID, bytes.0.as_mut_ptr() as u64);
         bytes
     }
 }
@@ -72,8 +71,8 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::ripemd160(input.len() as u64, input.as_ptr() as u64, REGISTER_ID);
-        let bytes = [0u8; 20];
-        exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
+        let mut bytes = [0u8; 20];
+        exports::read_register(REGISTER_ID, bytes.as_mut_ptr() as u64);
         bytes
     }
 }
@@ -112,8 +111,8 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
             // register directly for the input to keccak256. This is why the length is
             // set to `u64::MAX`.
             exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
-            let keccak_hash_bytes = [0u8; 32];
-            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
+            let mut keccak_hash_bytes = [0u8; 32];
+            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_mut_ptr() as u64);
             Ok(Address::try_from_slice(&keccak_hash_bytes[12..]).map_err(|_| ECRecoverErr)?)
         } else {
             Err(ECRecoverErr)
