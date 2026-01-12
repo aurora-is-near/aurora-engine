@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.0] 2026-01-12
+
+### Additions
+
+- Added WASM contract optimization by using `wasm-opt` util by [@mrLSD]. ([#835])
+- Introduced a `cargo-near-build` crate for building contracts used in the tests by [@aleksuss]. ([#1015])
+- Added a possibility to deploy ERC-20 tokens with metadata by [@aleksuss]. ([#1008])
+- Osaka hard fork `MODEXP` precompile modification for EIP-7823 and EIP-7883 by [@mrLSD]. ([#1050])
+- Added `secp256r1` precompile for the Osaka hard fork - EIP-7951 by [@mrLSD]. ([#1052])
+- Added `PARGUE` hard fork support by [@mrLSD]. ([#988])
+
+### Changes
+
+- Added `wasm-opt` dependency in the scheduled tasks in the CI by [@aleksuss]. ([#1016])
+- Removed the `ext-connector` feature and the codebase related to ETH connector by [@aleksuss]. ([#1018])
+- Removed the `mainnet` and `testnet` features by [@aleksuss]. ([#1019])
+- Renamed view method `paused_precompiles` to `get_paused_precompiles` by [@joshuajbouw]. ([#609]) 
+- Updated `near` dependencies by [@aleksuss]. ([#1034]) 
+- Updated test contracts annotations after updating `near-sdk` to 5.18 by [@aleksuss]. ([#1048])
+- `alt-bn256` precompiles refactored by [@mrLSD]. ([#1047]) 
+
+### Fixes
+
+- Rolled back the backward compatibility of the `exit_to_near` precompilie by [@aleksuss]. ([#1014])
+- Fixed occasionally failing `1inch` tests by [@aleksuss]. ([#1029])
+- Fixed potential UB while mutating an immutable object by [@vlad9486]. ([#1046])
+
+[#609]: https://github.com/aurora-is-near/aurora-engine/pull/609
+[#835]: https://github.com/aurora-is-near/aurora-engine/pull/835
+[#988]: https://github.com/aurora-is-near/aurora-engine/pull/988
+[#1008]: https://github.com/aurora-is-near/aurora-engine/pull/1008
+[#1014]: https://github.com/aurora-is-near/aurora-engine/pull/1014
+[#1015]: https://github.com/aurora-is-near/aurora-engine/pull/1015
+[#1016]: https://github.com/aurora-is-near/aurora-engine/pull/1016
+[#1018]: https://github.com/aurora-is-near/aurora-engine/pull/1018
+[#1019]: https://github.com/aurora-is-near/aurora-engine/pull/1019
+[#1029]: https://github.com/aurora-is-near/aurora-engine/pull/1029
+[#1034]: https://github.com/aurora-is-near/aurora-engine/pull/1034
+[#1046]: https://github.com/aurora-is-near/aurora-engine/pull/1046
+[#1047]: https://github.com/aurora-is-near/aurora-engine/pull/1047
+[#1048]: https://github.com/aurora-is-near/aurora-engine/pull/1048
+[#1050]: https://github.com/aurora-is-near/aurora-engine/pull/1050
+[#1052]: https://github.com/aurora-is-near/aurora-engine/pull/1052
+
 ## [3.9.2] 2025-08-08
 
 ### Fixes
@@ -772,7 +816,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.2...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.0...develop
+[3.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.2...3.10.0
 [3.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...3.9.2
 [3.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...3.9.1
 [3.9.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.8.0...3.9.0
@@ -829,11 +874,12 @@ struct SubmitResult {
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
 
 [@0x3bfc]: https://github.com/0x3bfc
+[@Casuso]: https://github.com/Casuso
+[@DemoYeti]: https://github.com/DemoYeti
+[@RomanHodulak]: https://github.com/RomanHodulak
 [@aleksuss]: https://github.com/aleksuss
 [@andrcmdr]: https://github.com/andrcmdr
 [@birchmd]: https://github.com/birchmd
-[@Casuso]: https://github.com/Casuso
-[@DemoYeti]: https://github.com/DemoYeti
 [@diegofigs]: https://github.com/diegofigs
 [@dwiekawki]: https://github.com/dwiekawki
 [@guidovranken]: https://github.com/guidovranken
@@ -846,6 +892,6 @@ struct SubmitResult {
 [@mrLSD]: https://github.com/mrLSD
 [@olonho]: https://github.com/olonho
 [@raventid]: https://github.com/raventid
-[@RomanHodulak]: https://github.com/RomanHodulak
 [@sept-en]: https://github.com/sept-en
 [@spilin]: https://github.com/spilin
+[@vlad9486]: https://github.com/vlad9486

@@ -39,6 +39,7 @@ rm -Rf etc/tests/benchmark-contract/target
 rm -Rf etc/tests/ft-receiver/target
 rm -Rf etc/tests/self-contained-5bEgfRQ/target
 rm -Rf etc/xcc-router/target
+rm -Rf engine-tests/target
 '''
 
 [tasks.clean-bin]
