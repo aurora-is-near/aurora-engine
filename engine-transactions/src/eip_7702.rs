@@ -181,19 +181,28 @@ impl SignedTransaction7702 {
                 (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id) && v <= 1
             };
 
-            rlp_stream.begin_list(3);
-            rlp_stream.append(&auth.chain_id);
-            rlp_stream.append(&auth.address);
-            rlp_stream.append(&auth.nonce);
+            let auth_address = if is_valid {
+                rlp_stream.begin_list(3);
+                rlp_stream.append(&auth.chain_id);
+                rlp_stream.append(&auth.address);
+                rlp_stream.append(&auth.nonce);
 
-            message_bytes.extend_from_slice(rlp_stream.as_raw());
+                message_bytes.extend_from_slice(rlp_stream.as_raw());
 
-            let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
-            let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
-                .unwrap_or_else(|_| {
-                    is_valid = false;
-                    Address::default()
-                });
+                let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
+                let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
+                    .unwrap_or_else(|_| {
+                        is_valid = false;
+                        Address::default()
+                    });
+
+                message_bytes.truncate(1);
+                rlp_stream.clear();
+
+                auth_address
+            } else {
+                Address::default()
+            };
 
             // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {
@@ -202,9 +211,6 @@ impl SignedTransaction7702 {
                 nonce: auth.nonce,
                 is_valid,
             });
-
-            message_bytes.truncate(1);
-            rlp_stream.clear();
         }
         Ok(authorization_list)
     }
