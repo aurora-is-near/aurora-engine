@@ -159,42 +159,41 @@ impl SignedTransaction7702 {
         }
         let current_tx_chain_id = U256::from(self.transaction.chain_id);
         let mut authorization_list = Vec::with_capacity(self.transaction.authorization_list.len());
-        // According to EIP-7702 we should validate each authorization. We shouldn't skip any of them.
-        // And just put `is_valid` flag to `false` if any of them is invalid. It's related to
+        let mut rlp_stream = RlpStream::new();
+        let mut message_bytes = vec![MAGIC; 1];
+        // According to EIP-7702, we should validate each authorization. We shouldn't skip any of them.
+        // And just put the `is_valid` flag to `false` if any of them is invalid. It's related to
         // gas calculation, as each `authorization_list` must be charged, even if it's invalid.
         for auth in &self.transaction.authorization_list {
-            // According to EIP-7702 step 1. validation, we should verify is
+            // According to EIP-7702 step 1. validation, we should verify it as
             // `chain_id = 0 || current_chain_id`.
             // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
             // Engine `submit_transaction` method.
 
             // Step 2 - validation logic inside EVM itself.
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
-            // Validate the signature, as in tests it is possible to have invalid signatures values.
-            // Value `v` shouldn't be greater then 1
-            let mut is_valid = (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id)
-                && auth.parity <= U256::from(1);
-
+            // Validate the signature, as in tests it is possible to have invalid signature values.
+            // Value `v` shouldn't be greater than 1
             let v = u8::try_from(auth.parity.as_u64()).map_err(|_| Error::InvalidV)?;
-            // EIP-2 validation
-            if auth.s > SECP256K1N_HALF {
-                is_valid = false;
-            }
+            let mut is_valid = if auth.s > SECP256K1N_HALF {
+                false
+            } else {
+                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id) && v <= 1
+            };
 
-            let mut rlp_stream = RlpStream::new();
             rlp_stream.begin_list(3);
             rlp_stream.append(&auth.chain_id);
             rlp_stream.append(&auth.address);
             rlp_stream.append(&auth.nonce);
 
-            let message_bytes = [&[MAGIC], rlp_stream.as_raw()].concat();
-            let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
+            message_bytes.extend_from_slice(rlp_stream.as_raw());
 
-            let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s));
-            let auth_address = auth_address.unwrap_or_else(|_| {
-                is_valid = false;
-                Address::default()
-            });
+            let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
+            let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
+                .unwrap_or_else(|_| {
+                    is_valid = false;
+                    Address::default()
+                });
 
             // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {
@@ -203,6 +202,9 @@ impl SignedTransaction7702 {
                 nonce: auth.nonce,
                 is_valid,
             });
+
+            message_bytes.truncate(1);
+            rlp_stream.clear();
         }
         Ok(authorization_list)
     }
@@ -555,9 +557,9 @@ mod tests {
 
         // Fails
         tx.authorization_list = vec![AuthorizationTuple {
-            chain_id: 1.into(),
-            address: H160::from_low_u64_be(0x1234),
-            nonce: 1u64,
+            chain_id: U256::MAX,
+            address: H160::from_slice(&[255; 20]),
+            nonce: u64::MAX,
             parity: u8::MAX.into(),
             r: 2.into(),
             s: SECP256K1N_HALF + U256::from(1),

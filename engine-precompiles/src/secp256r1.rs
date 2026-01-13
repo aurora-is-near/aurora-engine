@@ -81,11 +81,8 @@ impl Secp256r1 {
         // `VerifyingKey::from_encoded_point` validates that the point satisfies y^2 = x^3 + ax + b.
         // Since secp256r1 coefficient b != 0, the point at infinity (0, 0) does not satisfy
         // the curve equation and will be rejected here.
-        let mut pubkey_bytes = [0u8; 64];
-        pubkey_bytes[0..32].copy_from_slice(qx_bytes);
-        pubkey_bytes[32..64].copy_from_slice(qy_bytes);
-
-        let encoded_point = EncodedPoint::from_untagged_bytes(&pubkey_bytes.into());
+        let encoded_point =
+            EncodedPoint::from_affine_coordinates(qx_bytes.into(), qy_bytes.into(), false);
         let public_key = VerifyingKey::from_encoded_point(&encoded_point).ok()?;
 
         // 5. Signature Verification

@@ -805,7 +805,7 @@ fn ft_transfer_call_args(
 
     serde_json::to_string(&FtTransferCallArgs {
         receiver_id,
-        amount: format!("{amount}"),
+        amount: amount.to_string(),
         msg,
     })
     .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))

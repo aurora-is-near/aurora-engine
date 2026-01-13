@@ -116,20 +116,20 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
     with_hashchain(io, env, function_name!(), |mut io| {
         require_running(&state::get_state(&io)?)?;
         let bytes = io.read_input().to_vec();
-        let args = DeployErc20TokenArgs::deserialize(&bytes)
-            .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
+        let args =
+            DeployErc20TokenArgs::deserialize(&bytes).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
 
         match args {
             DeployErc20TokenArgs::Legacy(nep141) => {
                 let address = engine::deploy_erc20_token(nep141, None, io, env, handler)?;
 
                 io.return_output(
-                    &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
+                    &borsh::to_vec(address.as_bytes()).map_err(|_| errors::ERR_SERIALIZE)?,
                 );
                 Ok(PromiseOrValue::Value(address))
             }
             DeployErc20TokenArgs::WithMetadata(nep141) => {
-                let args = borsh::to_vec(&nep141).map_err(|_| crate::errors::ERR_SERIALIZE)?;
+                let args = borsh::to_vec(&nep141).map_err(|_| errors::ERR_SERIALIZE)?;
                 let base = PromiseCreateArgs {
                     target_account_id: nep141,
                     method: "ft_metadata".to_string(),
@@ -168,7 +168,7 @@ pub fn deploy_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
         env.assert_private_call()?;
 
         if handler.promise_results_count() != 1 {
-            return Err(crate::errors::ERR_PROMISE_COUNT.into());
+            return Err(errors::ERR_PROMISE_COUNT.into());
         }
 
         let nep141 = io.read_input_borsh()?;
@@ -182,13 +182,11 @@ pub fn deploy_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
                     })
                     .map_err(Into::<ParseArgsError>::into)?
             } else {
-                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+                return Err(errors::ERR_GETTING_ERC20_FROM_NEP141.into());
             };
         let address = engine::deploy_erc20_token(nep141, Some(erc20_metadata), io, env, handler)?;
 
-        io.return_output(
-            &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
-        );
+        io.return_output(&borsh::to_vec(address.as_bytes()).map_err(|_| errors::ERR_SERIALIZE)?);
         Ok(address)
     })
 }
