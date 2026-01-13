@@ -174,7 +174,7 @@ impl SignedTransaction7702 {
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             // Validate the signature, as in tests it is possible to have invalid signature values.
             // Value `v` shouldn't be greater than 1
-            let v = u8::try_from(auth.parity.as_u64()).map_err(|_| Error::InvalidV)?;
+            let v = u8::try_from(auth.parity.as_u64()).unwrap_or(u8::MAX);
             let mut is_valid = if auth.s > SECP256K1N_HALF {
                 false
             } else {
@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(auth_list.len(), 1);
         assert!(auth_list[0].is_valid);
 
-        // Fails
+        // Failed `AuthorizationTuple` since parity > 1
         tx.authorization_list = vec![AuthorizationTuple {
             chain_id: U256::MAX,
             address: H160::from_slice(&[255; 20]),

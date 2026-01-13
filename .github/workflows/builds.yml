@@ -20,8 +20,6 @@ jobs:
         with:
           toolchain: stable
           override: true
-      - name: Install cargo-make
-        run: cargo install --no-default-features --force cargo-make
       - name: Install dependencies
         run: scripts/ci-deps/install-wasm-opt.sh
       - name: Install cargo-make
