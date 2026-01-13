@@ -174,11 +174,11 @@ impl SignedTransaction7702 {
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             // Validate the signature, as in tests it is possible to have invalid signature values.
             // Value `v` shouldn't be greater than 1
-            let v = u256_to_u8(auth.parity).unwrap_or(u8::MAX);
             let mut is_valid = if auth.s > SECP256K1N_HALF {
                 false
             } else {
-                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id) && v <= 1
+                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id)
+                    && auth.parity <= U256::one()
             };
 
             let auth_address = if is_valid {
@@ -190,6 +190,8 @@ impl SignedTransaction7702 {
                 message_bytes.extend_from_slice(rlp_stream.as_raw());
 
                 let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
+                // U256::as_u32() is safe because here we're sure that the parity <= 1.
+                let v = u8::try_from(auth.parity.as_u32()).unwrap_or(u8::MAX);
                 let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
                     .unwrap_or_else(|_| {
                         is_valid = false;
@@ -260,14 +262,6 @@ impl Decodable for SignedTransaction7702 {
             r,
             s,
         })
-    }
-}
-
-fn u256_to_u8(x: U256) -> Option<u8> {
-    if x <= U256::from(u8::MAX) {
-        Some(x.as_u32() as u8)
-    } else {
-        None
     }
 }
 
