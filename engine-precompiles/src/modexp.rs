@@ -308,17 +308,16 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
 
 fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<'_, [u8]> {
     let len = input.len();
+
     if start >= len {
-        return Cow::Owned(Vec::new());
+        return Cow::Borrowed(&[]);
     }
+
     let end = start.saturating_add(size);
+
     if end > len {
-        let bytes: Vec<u8> = input[start..]
-            .iter()
-            .copied()
-            .chain(core::iter::repeat(0u8))
-            .take(size)
-            .collect();
+        let mut bytes = input[start..].to_vec();
+        bytes.resize(size, 0u8);
         Cow::Owned(bytes)
     } else {
         Cow::Borrowed(&input[start..end])
@@ -333,12 +332,8 @@ fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize
     let end = start + size;
     if end > len {
         // Pad on the right with zeros if input is too short
-        let bytes: Vec<u8> = input[start..]
-            .iter()
-            .copied()
-            .chain(core::iter::repeat(0u8))
-            .take(size)
-            .collect();
+        let mut bytes = input[start..].to_vec();
+        bytes.resize(size, 0u8);
         f(&bytes)
     } else {
         f(&input[start..end])
