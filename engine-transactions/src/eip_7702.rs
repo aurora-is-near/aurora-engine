@@ -174,26 +174,37 @@ impl SignedTransaction7702 {
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             // Validate the signature, as in tests it is possible to have invalid signature values.
             // Value `v` shouldn't be greater than 1
-            let v = u8::try_from(auth.parity.as_u64()).map_err(|_| Error::InvalidV)?;
             let mut is_valid = if auth.s > SECP256K1N_HALF {
                 false
             } else {
-                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id) && v <= 1
+                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id)
+                    && auth.parity <= U256::one()
             };
 
-            rlp_stream.begin_list(3);
-            rlp_stream.append(&auth.chain_id);
-            rlp_stream.append(&auth.address);
-            rlp_stream.append(&auth.nonce);
+            let auth_address = if is_valid {
+                rlp_stream.begin_list(3);
+                rlp_stream.append(&auth.chain_id);
+                rlp_stream.append(&auth.address);
+                rlp_stream.append(&auth.nonce);
 
-            message_bytes.extend_from_slice(rlp_stream.as_raw());
+                message_bytes.extend_from_slice(rlp_stream.as_raw());
 
-            let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
-            let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
-                .unwrap_or_else(|_| {
-                    is_valid = false;
-                    Address::default()
-                });
+                let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
+                // U256::as_u32() is safe because here we're sure that the parity <= 1.
+                let v = u8::try_from(auth.parity.as_u32()).unwrap_or(u8::MAX);
+                let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
+                    .unwrap_or_else(|_| {
+                        is_valid = false;
+                        Address::default()
+                    });
+
+                message_bytes.truncate(1);
+                rlp_stream.clear();
+
+                auth_address
+            } else {
+                Address::default()
+            };
 
             // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {
@@ -202,9 +213,6 @@ impl SignedTransaction7702 {
                 nonce: auth.nonce,
                 is_valid,
             });
-
-            message_bytes.truncate(1);
-            rlp_stream.clear();
         }
         Ok(authorization_list)
     }
@@ -555,7 +563,7 @@ mod tests {
         assert_eq!(auth_list.len(), 1);
         assert!(auth_list[0].is_valid);
 
-        // Fails
+        // Failed `AuthorizationTuple` since parity > 1
         tx.authorization_list = vec![AuthorizationTuple {
             chain_id: U256::MAX,
             address: H160::from_slice(&[255; 20]),

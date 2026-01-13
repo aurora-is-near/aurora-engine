@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.10.0] 2026-01-12
+## [3.10.0] 2026-01-14
 
 ### Additions
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
-- Rolled back the backward compatibility of the `exit_to_near` precompilie by [@aleksuss]. ([#1014])
+- Rolled back the backward compatibility of the `exit_to_near` precompile by [@aleksuss]. ([#1014])
 - Fixed occasionally failing `1inch` tests by [@aleksuss]. ([#1029])
 - Fixed potential UB while mutating an immutable object by [@vlad9486]. ([#1046])
 

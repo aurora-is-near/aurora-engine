@@ -586,7 +586,13 @@ where
 }
 
 fn calculate_attached_gas<E: Env>(env: &E) -> NearGas {
-    env.prepaid_gas() - env.used_gas() - GAS_FOR_PROMISE_CREATION
+    let required_gas = env.used_gas().saturating_add(GAS_FOR_PROMISE_CREATION);
+
+    if required_gas >= env.prepaid_gas() {
+        NearGas::new(0)
+    } else {
+        env.prepaid_gas() - required_gas
+    }
 }
 
 fn return_promise<I: IO + PromiseHandler, E: Env>(

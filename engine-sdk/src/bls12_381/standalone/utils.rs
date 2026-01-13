@@ -41,10 +41,10 @@ pub fn is_valid_be(input: &[u8; 48]) -> bool {
 /// element if successful.
 pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, Bls12381Error> {
     if !is_valid_be(input) {
-        return Err(Bls12381Error::ElementNotInG2);
+        return Err(Bls12381Error::InvalidFpValue);
     }
     let mut fp = blst_fp::default();
-    // SAFETY: input has fixed length, and fp is a blst value.
+    // SAFETY: input has a fixed length, and fp is a blst value.
     unsafe {
         // This performs the check for canonical field elements
         blst_fp_from_bendian(&mut fp, input.as_ptr());
