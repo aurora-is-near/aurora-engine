@@ -174,7 +174,7 @@ impl SignedTransaction7702 {
             // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
             // Validate the signature, as in tests it is possible to have invalid signature values.
             // Value `v` shouldn't be greater than 1
-            let v = u8::try_from(auth.parity.as_u64()).unwrap_or(u8::MAX);
+            let v = u256_to_u8(auth.parity).unwrap_or(u8::MAX);
             let mut is_valid = if auth.s > SECP256K1N_HALF {
                 false
             } else {
@@ -260,6 +260,14 @@ impl Decodable for SignedTransaction7702 {
             r,
             s,
         })
+    }
+}
+
+fn u256_to_u8(x: U256) -> Option<u8> {
+    if x <= U256::from(u8::MAX) {
+        Some(x.as_u32() as u8)
+    } else {
+        None
     }
 }
 
