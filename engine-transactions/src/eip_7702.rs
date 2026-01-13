@@ -2,7 +2,7 @@ use crate::eip_2930::AccessTuple;
 use crate::Error;
 use aurora_engine_sdk::ecrecover;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{Vec, H160, U256};
+use aurora_engine_types::{vec, Vec, H160, U256};
 use aurora_evm::executor::stack::Authorization;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 #[cfg(feature = "serde")]
