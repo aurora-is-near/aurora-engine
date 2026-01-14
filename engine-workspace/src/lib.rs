@@ -1,6 +1,6 @@
+use aurora_engine_types::U256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-use aurora_engine_types::U256;
 use near_workspaces::types::NearToken;
 
 use crate::node::Node;

@@ -1,17 +1,18 @@
-use crate::utils;
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-/// Simulation tests for exit to NEAR precompile.
-/// Note: `AuroraRunner` is not suitable for these tests because
-/// it does not execute promises; but `aurora-workspaces` does.
-use crate::utils::AuroraRunner;
+use aurora_engine_types::U256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::parameters::engine::DeployErc20TokenArgs;
 use aurora_engine_types::types::Address;
-use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
+use aurora_engine_workspace::{EngineContract, RawContract, types::NearToken};
 use serde_json::json;
+
+use crate::utils;
+/// Simulation tests for exit to NEAR precompile.
+/// Note: `AuroraRunner` is not suitable for these tests because
+/// it does not execute promises; but `aurora-workspaces` does.
+use crate::utils::AuroraRunner;
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
 
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);

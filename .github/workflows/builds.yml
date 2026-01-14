@@ -14,12 +14,11 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          override: true
       - name: Install dependencies
         run: scripts/ci-deps/install-wasm-opt.sh
       - name: Install cargo-make

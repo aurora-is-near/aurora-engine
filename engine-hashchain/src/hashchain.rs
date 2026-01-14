@@ -1,12 +1,13 @@
-use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompactMerkleTree};
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
+    Cow, Vec,
     account_id::AccountId,
-    borsh::{self, io, BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshDeserialize, BorshSerialize, io},
     format,
     types::RawH256,
-    Cow, Vec,
 };
+
+use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompactMerkleTree};
 
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.

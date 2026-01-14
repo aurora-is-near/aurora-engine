@@ -1,9 +1,9 @@
+use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::U256;
+use aurora_engine_types::types::{Address, Wei};
+
 use crate::utils;
 use crate::utils::solidity::erc20::ERC20;
-use aurora_engine_transactions::legacy::TransactionLegacy;
-use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::U256;
-use libsecp256k1::SecretKey;
 
 const INITIAL_NONCE: u64 = 0;
 
@@ -124,8 +124,8 @@ fn initialize() -> (utils::AuroraRunner, utils::Signer, Address) {
     let mut runner = utils::deploy_runner();
     runner.max_gas_burnt(u64::MAX);
 
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = utils::random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     let initial_balance = Wei::new(U256::from(u128::MAX));
     runner.create_address(source_address, initial_balance, INITIAL_NONCE.into());

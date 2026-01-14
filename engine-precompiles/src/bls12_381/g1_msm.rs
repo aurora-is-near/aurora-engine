@@ -1,9 +1,10 @@
-use super::msm_required_gas;
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::{Borrowed, Vec};
-use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_sdk::bls12_381::{self, G1_MUL_INPUT_LENGTH};
 use aurora_evm::{Context, ExitError};
+
+use super::msm_required_gas;
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::prelude::{Borrowed, Vec};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
 
 /// Base gas fee for BLS12-381 `g1_mul` operation.
 pub const BASE_GAS_FEE: u64 = 12000;

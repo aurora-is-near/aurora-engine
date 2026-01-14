@@ -1,10 +1,11 @@
-use crate::utils;
 use aurora_engine_precompiles::promise_result::{self, costs};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{
-    types::{Address, EthGas, NearGas, PromiseResult, Wei},
     U256,
+    types::{Address, EthGas, NearGas, PromiseResult, Wei},
 };
+
+use crate::utils;
 
 const NEAR_GAS_PER_EVM: u64 = 175_000_000;
 

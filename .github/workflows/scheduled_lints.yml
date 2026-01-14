@@ -10,6 +10,7 @@ jobs:
     runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         version: [ mainnet, testnet ]
     steps:
@@ -18,7 +19,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -65,7 +66,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache

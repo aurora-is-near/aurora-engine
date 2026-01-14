@@ -1,8 +1,7 @@
 use crate::prelude::Wei;
 use crate::utils::{
-    self,
+    self, AuroraRunner, ExecutionProfile, Signer,
     solidity::standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
-    AuroraRunner, ExecutionProfile, Signer,
 };
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);

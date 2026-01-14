@@ -1,7 +1,3 @@
-use crate::{
-    prelude::{Address, Wei},
-    utils::{self, validate_address_balance_and_nonce, AuroraRunner},
-};
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::account_id::AccountId;
@@ -13,8 +9,13 @@ use aurora_engine_types::parameters::silo::{
 };
 use aurora_engine_types::types::EthGas;
 use libsecp256k1::SecretKey;
-use rand::{rngs::ThreadRng, Rng, RngCore};
+use rand::{Rng, RngCore, rngs::ThreadRng};
 use std::fmt::Debug;
+
+use crate::{
+    prelude::{Address, Wei},
+    utils::{self, AuroraRunner, random_sk, validate_address_balance_and_nonce},
+};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(10u64.pow(18) * 10);
 const ZERO_BALANCE: Wei = Wei::zero();
@@ -706,8 +707,8 @@ fn test_deploy_access_rights() {
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
-        let mut rng = rand::thread_rng();
-        let len = rng.gen_range(512..=1024);
+        let mut rng = rand::rng();
+        let len = rng.random_range(512..=1024);
         let mut buf = vec![0u8; len];
         rng.fill_bytes(&mut buf);
         buf
@@ -764,8 +765,8 @@ fn test_deploy_with_disabled_whitelist() {
     let (mut runner, signer, _) = initialize_transfer();
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
-        let mut rng = rand::thread_rng();
-        let len = rng.gen_range(512..=1024);
+        let mut rng = rand::rng();
+        let len = rng.random_range(512..=1024);
         let mut buf = vec![0u8; len];
         rng.fill_bytes(&mut buf);
         buf
@@ -918,7 +919,7 @@ fn test_set_fixed_gas() {
 fn initialize_transfer() -> (AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let (source_address, source_account) = keys(&mut rng);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
     let (dest_address, _) = keys(&mut rng);
@@ -929,7 +930,7 @@ fn initialize_transfer() -> (AuroraRunner, utils::Signer, Address) {
 }
 
 fn keys(rng: &mut ThreadRng) -> (Address, SecretKey) {
-    let sk = SecretKey::random(rng);
+    let sk = random_sk(rng);
     let address = utils::address_from_secret_key(&sk);
     (address, sk)
 }
@@ -1060,7 +1061,7 @@ pub mod workspace {
     };
     use aurora_engine_types::types::Address;
     use aurora_engine_workspace::types::NearToken;
-    use aurora_engine_workspace::{account::Account, EngineContract, RawContract};
+    use aurora_engine_workspace::{EngineContract, RawContract, account::Account};
 
     const FT_ACCOUNT: &str = "test_token";
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;

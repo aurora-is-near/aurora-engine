@@ -1,5 +1,3 @@
-use crate::prelude::{Address, Balance, Wei, WeiU256, U256};
-use crate::utils::{self, create_eth_transaction, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 use aurora_engine::engine::EngineError;
 use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
 use aurora_engine_transactions::legacy::LegacyEthSignedTransaction;
@@ -10,6 +8,9 @@ use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
 use serde_json::json;
 use sha3::Digest;
+
+use crate::prelude::{Address, Balance, U256, Wei, WeiU256};
+use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID, create_eth_transaction};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
@@ -29,8 +30,8 @@ fn build_input(str_selector: &str, inputs: &[Token]) -> Vec<u8> {
 }
 
 fn create_ethereum_address() -> Address {
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = utils::random_sk(&mut rng);
     utils::address_from_secret_key(&source_account)
 }
 
@@ -103,8 +104,8 @@ impl AuroraRunner {
     }
 
     pub fn create_account(&mut self) -> EthereumAddress {
-        let mut rng = rand::thread_rng();
-        let source_account = SecretKey::random(&mut rng);
+        let mut rng = rand::rng();
+        let source_account = utils::random_sk(&mut rng);
         let source_address = utils::address_from_secret_key(&source_account);
         self.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
         EthereumAddress {
@@ -382,8 +383,14 @@ fn test_transfer_erc20_token() {
 }
 
 pub mod workspace {
+    use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
+    use aurora_engine_types::parameters::engine::TransactionStatus;
+    use aurora_engine_workspace::account::Account;
+    use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
+    use aurora_engine_workspace::{EngineContract, RawContract};
+
     use super::build_input;
-    use crate::prelude::{Address, Wei, WeiU256, U256};
+    use crate::prelude::{Address, U256, Wei, WeiU256};
     use crate::utils;
     use crate::utils::solidity::erc20::ERC20;
     use crate::utils::solidity::exit_precompile::TesterConstructor;
@@ -391,11 +398,6 @@ pub mod workspace {
         create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
         nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
-    use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
-    use aurora_engine_types::parameters::engine::TransactionStatus;
-    use aurora_engine_workspace::account::Account;
-    use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
-    use aurora_engine_workspace::{EngineContract, RawContract};
 
     const BALANCE: NearToken = NearToken::from_near(50);
     const FT_TOTAL_SUPPLY: u128 = 1_000_000;

@@ -1,12 +1,12 @@
+use aurora_engine_types::Vec;
 use aurora_evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
 use crate::prelude::{
-    types::{make_address, Address},
     Borrowed,
+    types::{Address, make_address},
 };
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_types::Vec;
 
 /// Blake2 costs.
 mod costs {

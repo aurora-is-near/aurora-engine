@@ -4,7 +4,7 @@ use crate::{
         in_place_add, in_place_mul_sub, in_place_shl, in_place_shr, join_as_double, mod_inv,
         monpro, monsq,
     },
-    maybe_std::{vec, Vec},
+    maybe_std::{Vec, vec},
 };
 
 pub type Word = u64;
@@ -628,7 +628,9 @@ fn test_modpow_even() {
     let result = crate::modexp(&base, &exponent, &modulus);
     assert_eq!(
         result,
-        vec![2, 63, 79, 118, 41, 54, 235, 9, 115, 212, 107, 110, 173, 181, 157, 104, 208, 97, 1]
+        vec![
+            2, 63, 79, 118, 41, 54, 235, 9, 115, 212, 107, 110, 173, 181, 157, 104, 208, 97, 1
+        ]
     );
 
     let base = hex::decode("36abd4524e89a34c89c420942547e12c7be1").unwrap();

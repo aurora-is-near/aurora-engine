@@ -1,7 +1,7 @@
 //! This module defines data structure to produce traces compatible with geths "callTracer":
 //! `https://github.com/ethereum/go-ethereum/blob/ad15050c7fbedd0f05a49e81400de18c2cc2c284/eth/tracers/native/call.go`
 
-use aurora_engine_types::{types::Address, U256};
+use aurora_engine_types::{U256, types::Address};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CallFrame {

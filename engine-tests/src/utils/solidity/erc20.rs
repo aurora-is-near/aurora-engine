@@ -1,9 +1,10 @@
-use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
-use crate::utils::solidity;
 use aurora_engine_transactions::NormalizedEthTransaction;
 use aurora_engine_types::types::Wei;
 use std::path::{Path, PathBuf};
 use std::sync::Once;
+
+use crate::prelude::{Address, U256, transactions::legacy::TransactionLegacy};
+use crate::utils::solidity;
 
 pub struct ERC20Constructor(pub solidity::ContractConstructor);
 
