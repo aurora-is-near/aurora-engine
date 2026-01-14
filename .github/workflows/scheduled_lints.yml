@@ -8,18 +8,12 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on:
-      group: gha-larger-managed
-      labels: managed-64cpu
+    runs-on: github-hosted-heavy-runner
     strategy:
       fail-fast: false
       matrix:
         version: [ mainnet, testnet ]
     steps:
-      - name: Setup RunsOn
-        uses: runs-on/action@v2
-        with:
-          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
       - name: Install Rust toolchain
@@ -60,15 +54,8 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on:
-      group: gha-larger-managed
-      labels: managed-64cpu
-    container: rust:latest
+    runs-on: github-hosted-heavy-runner
     steps:
-      - name: Setup RunsOn
-        uses: runs-on/action@v2
-        with:
-          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
       - name: Install dependencies
