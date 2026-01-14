@@ -1,7 +1,8 @@
-use crate::error;
-use crate::prelude::{vec, Vec};
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::{borsh, U256};
+use aurora_engine_types::{U256, borsh};
+
+use crate::error;
+use crate::prelude::{Vec, vec};
 
 /// The purpose of this trait is to represent a reference to a value that
 /// could be obtained by IO, but without eagerly loading it into memory.

@@ -1,9 +1,10 @@
-use crate::prelude::{
-    make_address, parameters::SubmitResult, transactions::legacy::TransactionLegacy, Address, Wei,
-    U256,
-};
-use crate::utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine::engine::EngineError;
+
+use crate::prelude::{
+    Address, U256, Wei, make_address, parameters::SubmitResult,
+    transactions::legacy::TransactionLegacy,
+};
+use crate::utils::{self, AuroraRunner, Signer, solidity};
 
 pub struct TesterConstructor(pub solidity::ContractConstructor);
 

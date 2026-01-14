@@ -1,9 +1,10 @@
-use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::account_id::AccountId;
 use aurora_evm::{Context, ExitError};
+
+use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::{PrecompileOutput, utils};
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -20,7 +21,7 @@ pub struct PredecessorAccount<'a, E> {
 }
 
 pub mod predecessor_account {
-    use aurora_engine_types::types::{make_address, Address};
+    use aurora_engine_types::types::{Address, make_address};
 
     /// `predecessor_account_id` precompile address
     ///
@@ -109,7 +110,7 @@ impl Precompile for CurrentAccount {
 
 #[cfg(test)]
 mod tests {
-    use crate::account_ids::{predecessor_account, CurrentAccount};
+    use crate::account_ids::{CurrentAccount, predecessor_account};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]

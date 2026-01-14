@@ -3,7 +3,7 @@ use aurora_engine_sdk::env::DEFAULT_PREPAID_GAS;
 use aurora_engine_test_doubles::io::{Storage, StoragePointer};
 use aurora_engine_test_doubles::promise::PromiseTracker;
 use aurora_engine_types::types::{Address, NearGas, Wei};
-use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
+use aurora_engine_types::{H160, H256, U256, account_id::AccountId};
 use std::cell::RefCell;
 
 #[test]

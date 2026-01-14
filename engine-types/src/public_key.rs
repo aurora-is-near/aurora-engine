@@ -1,5 +1,6 @@
-use crate::{fmt, str::FromStr, String, ToString};
-use borsh::{io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, io};
+
+use crate::{String, ToString, fmt, str::FromStr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PublicKey {

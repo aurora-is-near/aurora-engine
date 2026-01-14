@@ -4,8 +4,9 @@
 //! `https://github.com/aurora-is-near/aurora-engine/pull/458` for more details, but external
 //! users of this library should _never_ use the adapter in this module.
 
+use aurora_engine_types::{H160, types::Address};
+
 use crate::{Error, EthTransactionKind};
-use aurora_engine_types::{types::Address, H160};
 
 const ZERO_ADDRESS: Option<Address> = Some(Address::new(H160::zero()));
 

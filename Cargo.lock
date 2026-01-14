@@ -377,14 +377,14 @@ dependencies = [
  "hex",
  "num",
  "p256",
- "rand 0.8.5",
+ "rand 0.9.1",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "aurora-engine-sdk"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -440,7 +440,7 @@ dependencies = [
  "near-primitives-core 0.34.0",
  "near-sdk",
  "near-vm-runner",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rlp",
  "serde",
  "serde_json",
@@ -477,13 +477,13 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-types"
-version = "2.0.0"
+version = "3.0.0"
 dependencies = [
  "borsh",
  "bs58 0.5.1",
  "hex",
  "primitive-types 0.13.1",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rlp",
  "serde",
  "serde_json",

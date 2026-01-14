@@ -1,6 +1,7 @@
-use crate::{format, AsBytes, String, H160};
-use borsh::{io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, io};
 use serde::{Deserialize, Serialize};
+
+use crate::{AsBytes, H160, String, format};
 
 /// Base Eth Address type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -132,7 +133,7 @@ pub const fn make_address(x: u32, y: u128) -> Address {
 }
 
 pub mod error {
-    use crate::{fmt, String};
+    use crate::{String, fmt};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
     pub enum AddressError {
@@ -237,9 +238,9 @@ mod tests {
             assert_eq!(make_address(0, i.into()), u8_to_address(i));
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for _ in 0..u8::MAX {
-            let address = Address::new(H160(rng.gen()));
+            let address = Address::from_array(rng.random());
             let (x, y) = split_address(address);
             assert_eq!(address, make_address(x, y));
         }

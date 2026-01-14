@@ -1,34 +1,35 @@
-use super::{EvmPrecompileResult, Precompile};
-use crate::native::events::{ExitToNearLegacy, ExitToNearOmni};
-use crate::prelude::types::EthGas;
-use crate::prelude::{
-    format,
-    parameters::{PromiseArgs, PromiseCreateArgs},
-    sdk::io::{StorageIntermediate, IO},
-    storage::{bytes_to_key, KeyPrefix},
-    str,
-    types::{Address, Yocto},
-    vec, Cow, String, ToString, Vec, H256, U256,
-};
-#[cfg(feature = "error_refund")]
-use crate::prelude::{parameters::connector::RefundCallArgs, types};
-use crate::xcc::state::get_wnear_address;
-use crate::PrecompileOutput;
 use aurora_engine_types::{
     account_id::AccountId,
     borsh,
     parameters::{
+        PromiseWithCallbackArgs,
         connector::{
             ExitToNearPrecompileCallbackArgs, TransferNearArgs, WithdrawCallArgs,
             WithdrawSerializeType,
         },
-        PromiseWithCallbackArgs,
     },
     storage::EthConnectorStorageId,
     types::NEP141Wei,
 };
 use aurora_evm::backend::Log;
 use aurora_evm::{Context, ExitError};
+
+use super::{EvmPrecompileResult, Precompile};
+use crate::PrecompileOutput;
+use crate::native::events::{ExitToNearLegacy, ExitToNearOmni};
+use crate::prelude::types::EthGas;
+use crate::prelude::{
+    Cow, H256, String, ToString, U256, Vec, format,
+    parameters::{PromiseArgs, PromiseCreateArgs},
+    sdk::io::{IO, StorageIntermediate},
+    storage::{KeyPrefix, bytes_to_key},
+    str,
+    types::{Address, Yocto},
+    vec,
+};
+#[cfg(feature = "error_refund")]
+use crate::prelude::{parameters::connector::RefundCallArgs, types};
+use crate::xcc::state::get_wnear_address;
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 const UNWRAP_WNEAR_MSG: &str = "unwrap";
@@ -61,7 +62,7 @@ mod costs {
 }
 
 pub mod events {
-    use crate::prelude::{types::Address, vec, String, ToString, H256, U256};
+    use crate::prelude::{H256, String, ToString, U256, types::Address, vec};
 
     /// Derived from event signature (see `tests::test_exit_signatures`)
     pub const EXIT_TO_NEAR_SIGNATURE: H256 = crate::make_h256(
@@ -267,7 +268,7 @@ pub struct ExitToNear<I> {
 }
 
 pub mod exit_to_near {
-    use crate::prelude::types::{make_address, Address};
+    use crate::prelude::types::{Address, make_address};
 
     /// Exit to NEAR precompile address
     ///
@@ -708,15 +709,15 @@ fn refund_call_args(
             ExitToNearParams::BaseToken(_) => None,
             ExitToNearParams::Erc20TokenParams(_) => {
                 let erc20_address = match event {
-                    events::ExitToNear::Legacy(ref legacy) => legacy.erc20_address,
-                    events::ExitToNear::Omni(ref omni) => omni.erc20_address,
+                    events::ExitToNear::Legacy(legacy) => legacy.erc20_address,
+                    events::ExitToNear::Omni(omni) => omni.erc20_address,
                 };
                 Some(erc20_address)
             }
         },
         amount: types::u256_to_arr(&match event {
-            events::ExitToNear::Legacy(ref legacy) => legacy.amount,
-            events::ExitToNear::Omni(ref omni) => omni.amount,
+            events::ExitToNear::Legacy(legacy) => legacy.amount,
+            events::ExitToNear::Omni(omni) => omni.amount,
         }),
     })
 }
@@ -725,7 +726,7 @@ impl<'a> TryFrom<&'a [u8]> for ExitToNearParams<'a> {
     type Error = ExitError;
 
     fn try_from(input: &'a [u8]) -> Result<Self, Self::Error> {
-        // First byte of the input is a flag, selecting the behavior to be triggered:
+        // The first byte of the input is a flag, selecting the behavior to be triggered:
         // 0x00 -> Eth(base) token withdrawal
         // 0x01 -> ERC-20 token withdrawal
         let flag = input
@@ -816,7 +817,7 @@ pub struct ExitToEthereum<I> {
 }
 
 pub mod exit_to_ethereum {
-    use crate::prelude::types::{make_address, Address};
+    use crate::prelude::types::{Address, make_address};
 
     /// Exit to Ethereum precompile address
     ///
@@ -1001,13 +1002,13 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 #[cfg(test)]
 mod tests {
     use super::{
-        exit_to_ethereum, exit_to_near, parse_amount, parse_input, parse_recipient,
-        validate_input_size, BaseTokenParams, Erc20TokenParams, ExitToNearParams, Message,
+        BaseTokenParams, Erc20TokenParams, ExitToNearParams, Message, exit_to_ethereum,
+        exit_to_near, parse_amount, parse_input, parse_recipient, validate_input_size,
     };
     use crate::{native::Recipient, prelude::sdk::types::near_account_to_evm_address};
+    use aurora_engine_types::U256;
     #[cfg(feature = "error_refund")]
     use aurora_engine_types::types::Address;
-    use aurora_engine_types::U256;
 
     #[test]
     fn test_precompile_id() {
@@ -1258,7 +1259,8 @@ mod tests {
             "{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}".as_bytes(),
         ]
         .concat();
-        assert_input(input,
+        assert_input(
+            input,
             ExitToNearParams::Erc20TokenParams(Erc20TokenParams {
                 #[cfg(feature = "error_refund")]
                 refund_address,
@@ -1267,8 +1269,10 @@ mod tests {
                         .parse()
                         .unwrap(),
                 amount,
-                message: Some(Message::Omni("{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}")),
-            })
+                message: Some(Message::Omni(
+                    "{\\\"recipient\\\":\\\"eth:013fe02fb1470d0f4ff072f40960658c4ec8139a\\\",\\\"fee\\\":\\\"0\\\",\\\"native_token_fee\\\":\\\"0\\\"}",
+                )),
+            }),
         );
     }
 

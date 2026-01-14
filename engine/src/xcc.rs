@@ -1,20 +1,20 @@
-use crate::engine::{Engine, EngineResult};
-use crate::errors::ERR_SERIALIZE;
-use crate::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_precompiles::xcc::state::ERR_MISSING_WNEAR_ADDRESS;
 use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
+pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
-use aurora_engine_types::{format, Cow, Vec};
+use aurora_engine_types::{Cow, Vec, format};
 
-pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
+use crate::engine::{Engine, EngineResult};
+use crate::errors::ERR_SERIALIZE;
+use crate::parameters::{CallArgs, FunctionCallArgsV2, SubmitResult};
 
 pub const ERR_NO_ROUTER_CODE: &str = "ERR_MISSING_XCC_BYTECODE";
 pub const ERR_INVALID_ACCOUNT: &str = "ERR_INVALID_XCC_ACCOUNT";
@@ -36,8 +36,8 @@ pub const WITHDRAW_TO_NEAR_SELECTOR: [u8; 4] = [0x6b, 0x35, 0x18, 0x48];
 const FIRST_UPGRADABLE: &[u8] = b"first_upgrd";
 
 pub use aurora_engine_precompiles::xcc::state::{
-    get_code_version_of_address, get_latest_code_version, get_wnear_address, ERR_CORRUPTED_STORAGE,
-    STORAGE_AMOUNT, VERSION_KEY, WNEAR_KEY,
+    ERR_CORRUPTED_STORAGE, STORAGE_AMOUNT, VERSION_KEY, WNEAR_KEY, get_code_version_of_address,
+    get_latest_code_version, get_wnear_address,
 };
 pub use aurora_engine_types::parameters::xcc::CodeVersion;
 
@@ -152,7 +152,7 @@ where
         actions: promise_actions,
     };
     // Safety: same as safety in `handle_precompile_promise`
-    let promise_id = unsafe { handler.promise_create_batch(&batch) };
+    let promise_id = handler.promise_create_batch(&batch);
 
     if let AddressVersionStatus::DeployNeeded { .. } = deploy_needed {
         // If a create and/or deploy was needed then we must attach a callback to update
@@ -169,8 +169,7 @@ where
             attached_balance: ZERO_YOCTO,
             attached_gas: VERSION_UPDATE_GAS,
         };
-        // Safety: same as safety in `handle_precompile_promise`
-        let _promise_id = unsafe { handler.promise_attach_callback(promise_id, &callback) };
+        let _promise_id = handler.promise_attach_callback(promise_id, &callback);
     }
 
     Ok(())
@@ -257,11 +256,9 @@ where
             // (not the main engine account), and the actions performed are only (1) create it
             // for the first time and/or (2) deploy the code from our storage (i.e. the deployed
             // code is controlled by us, not the user).
-            let promise_id = unsafe {
-                match base_id {
-                    Some(id) => handler.promise_attach_batch_callback(id, &batch),
-                    None => handler.promise_create_batch(&batch),
-                }
+            let promise_id = match base_id {
+                Some(id) => handler.promise_attach_batch_callback(id, &batch),
+                None => handler.promise_create_batch(&batch),
             };
             // Add a callback here to update the version of the account
             let args = AddressVersionUpdateArgs {
@@ -279,7 +276,7 @@ where
             // Safety: A call from the engine to the engine's `factory_update_address_version`
             // method is safe because that method only writes the specific router sub-account
             // metadata that has just been deployed above.
-            unsafe { Some(handler.promise_attach_callback(promise_id, &callback)) }
+            Some(handler.promise_attach_callback(promise_id, &callback))
         }
         AddressVersionStatus::UpToDate => base_id,
     };
@@ -308,11 +305,9 @@ where
         // is controlled entirely by us (not any user). This call will only execute the wnear
         // exit precompile, and only for the necessary amount. Note that this amount will always
         // be present, otherwise the user's call to the xcc precompile would have failed.
-        let id = unsafe {
-            match setup_id {
-                None => handler.promise_create_call(&withdraw_call),
-                Some(setup_id) => handler.promise_attach_callback(setup_id, &withdraw_call),
-            }
+        let id = match setup_id {
+            None => handler.promise_create_call(&withdraw_call),
+            Some(setup_id) => handler.promise_attach_callback(setup_id, &withdraw_call),
         };
         let refund_needed = match deploy_needed {
             AddressVersionStatus::DeployNeeded { create_needed } => create_needed,
@@ -328,7 +323,7 @@ where
             };
             // Safety: This call is safe because the router's `send_refund` method
             // does not violate any security invariants. It only sends NEAR back to this contract.
-            unsafe { Some(handler.promise_attach_callback(id, &refund_call)) }
+            Some(handler.promise_attach_callback(id, &refund_call))
         } else {
             Some(id)
         }
@@ -339,11 +334,9 @@ where
     // user directly. The XCC precompile will only construct promises that target the `execute`
     // and `schedule` methods of the user's router contract. Therefore, the user cannot have
     // the engine make arbitrary calls.
-    unsafe {
-        match withdraw_id {
-            None => handler.promise_create_call(promise),
-            Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
-        }
+    match withdraw_id {
+        None => handler.promise_create_call(promise),
+        Some(withdraw_id) => handler.promise_attach_callback(withdraw_id, promise),
     }
 }
 
@@ -520,19 +513,19 @@ impl<H: PromiseHandler> PromiseHandler for PromiseInterceptor<'_, H> {
         self.inner.promise_result(index)
     }
 
-    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let id = self.inner.promise_create_call(args);
         self.promises.push(id);
         id
     }
 
-    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+    fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
         let id = self.inner.promise_create_and_combine(args);
         self.promises.push(id);
         id
     }
 
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -542,13 +535,13 @@ impl<H: PromiseHandler> PromiseHandler for PromiseInterceptor<'_, H> {
         id
     }
 
-    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let id = self.inner.promise_create_batch(args);
         self.promises.push(id);
         id
     }
 
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         base: PromiseId,
         args: &PromiseBatchAction,

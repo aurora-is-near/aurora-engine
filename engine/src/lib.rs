@@ -26,7 +26,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]
 #[cfg_attr(not(feature = "log"), allow(unused_variables))]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
@@ -46,19 +46,8 @@ pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
 
 #[cfg(feature = "contract")]
 mod contract {
-    use crate::contract_methods::{require_owner_and_running, require_running};
-    use crate::engine::{self, Engine};
-    use crate::errors;
-    use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
-    use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
-    use crate::prelude::storage::{bytes_to_key, KeyPrefix};
-    use crate::prelude::{sdk, u256_to_arr, Address, ToString, Vec, H256};
-    use crate::{
-        contract_methods::{self, silo, ContractError},
-        state,
-    };
     use aurora_engine_sdk::env::Env;
-    use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_sdk::io::{IO, StorageIntermediate};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::account_id::AccountId;
     use aurora_engine_types::borsh;
@@ -67,13 +56,25 @@ mod contract {
         WhitelistStatusArgs,
     };
 
+    use crate::contract_methods::{require_owner_and_running, require_running};
+    use crate::engine::{self, Engine};
+    use crate::errors;
+    use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
+    use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
+    use crate::prelude::storage::{KeyPrefix, bytes_to_key};
+    use crate::prelude::{Address, H256, ToString, Vec, sdk, u256_to_arr};
+    use crate::{
+        contract_methods::{self, ContractError, silo},
+        state,
+    };
+
     const CODE_KEY: &[u8; 4] = b"CODE";
     const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
 
     /// ADMINISTRATIVE METHODS
     /// Sets the configuration for the Engine.
     /// Should be called on deployment.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn new() {
         let io = Runtime;
         let env = Runtime;
@@ -83,7 +84,7 @@ mod contract {
     }
 
     /// Get a version of the contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_version() {
         let io = Runtime;
         contract_methods::admin::get_version(io)
@@ -92,7 +93,7 @@ mod contract {
     }
 
     /// Get owner account id for this contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_owner() {
         let io = Runtime;
         contract_methods::admin::get_owner(io)
@@ -101,7 +102,7 @@ mod contract {
     }
 
     /// Set owner account id for this contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_owner() {
         let io = Runtime;
         let env = Runtime;
@@ -111,7 +112,7 @@ mod contract {
     }
 
     /// Get chain id for this contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_chain_id() {
         let io = Runtime;
         contract_methods::admin::get_chain_id(io)
@@ -119,7 +120,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_upgrade_delay_blocks() {
         let io = Runtime;
         contract_methods::admin::get_upgrade_delay_blocks(io)
@@ -127,7 +128,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_upgrade_delay_blocks() {
         let io = Runtime;
         let env = Runtime;
@@ -136,7 +137,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_upgrade_index() {
         let io = Runtime;
         contract_methods::admin::get_upgrade_index(io)
@@ -145,7 +146,7 @@ mod contract {
     }
 
     /// Upgrade the contract with the provided code bytes.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn upgrade() {
         let io = Runtime;
         let env = Runtime;
@@ -157,7 +158,7 @@ mod contract {
     }
 
     /// Stage new code for deployment.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn stage_upgrade() {
         let io = Runtime;
         let env = Runtime;
@@ -167,7 +168,7 @@ mod contract {
     }
 
     /// Deploy staged upgrade.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn deploy_upgrade() {
         // This function is intentionally not implemented in `contract_methods`
         // because it only makes sense in the context of the NEAR runtime.
@@ -188,7 +189,7 @@ mod contract {
     /// Called as part of the upgrade process (see `engine-sdk::self_deploy`). This function is meant
     /// to make any necessary changes to the state such that it aligns with the newly deployed
     /// code.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     #[allow(clippy::missing_const_for_fn)]
     pub extern "C" fn state_migration() {
         // TODO: currently we don't have migrations
@@ -197,7 +198,7 @@ mod contract {
     /// Resumes previously [`paused`] precompiles.
     ///
     /// [`paused`]: pause_precompiles
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn resume_precompiles() {
         let io = Runtime;
         let env = Runtime;
@@ -207,7 +208,7 @@ mod contract {
     }
 
     /// Pauses a precompile.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn pause_precompiles() {
         let io = Runtime;
         let env = Runtime;
@@ -218,7 +219,7 @@ mod contract {
 
     /// Returns an unsigned integer where each bit set to 1 means that corresponding precompile
     /// to that bit is paused and 0-bit means not paused.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_paused_precompiles() {
         let io = Runtime;
         contract_methods::admin::paused_precompiles(io)
@@ -227,7 +228,7 @@ mod contract {
     }
 
     /// Sets the flag to pause the contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn pause_contract() {
         let io = Runtime;
         let env = Runtime;
@@ -237,7 +238,7 @@ mod contract {
     }
 
     /// Sets the flag to resume the contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn resume_contract() {
         let io = Runtime;
         let env = Runtime;
@@ -249,7 +250,7 @@ mod contract {
     // TODO: rust-2023-08-24  #[allow(clippy::empty_line_after_doc_comments)]
     /// MUTATIVE METHODS
     /// Deploy code into the EVM.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn deploy_code() {
         let io = Runtime;
         let env = Runtime;
@@ -260,7 +261,7 @@ mod contract {
     }
 
     /// Call method on the EVM contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn call() {
         let io = Runtime;
         let env = Runtime;
@@ -272,7 +273,7 @@ mod contract {
 
     /// Process signed Ethereum transaction.
     /// Must match `CHAIN_ID` to make sure it's signed for given chain vs replayed from another chain.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn submit() {
         let io = Runtime;
         let env = Runtime;
@@ -284,7 +285,7 @@ mod contract {
 
     /// Analog of the `submit` function, but waits for the `SubmitArgs` structure rather than
     /// the array of bytes representing the transaction.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn submit_with_args() {
         let io = Runtime;
         let env = Runtime;
@@ -294,7 +295,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn register_relayer() {
         let io = Runtime;
         let env = Runtime;
@@ -306,7 +307,7 @@ mod contract {
     /// Updates the bytecode for user's router contracts created by the engine.
     /// These contracts are where cross-contract calls initiated by the EVM precompile
     /// will be sent from.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn factory_update() {
         let io = Runtime;
         let env = Runtime;
@@ -317,7 +318,7 @@ mod contract {
 
     /// Updates the bytecode version for the given account. This is only called as a callback
     /// when a new version of the router contract is deployed to an account.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn factory_update_address_version() {
         let io = Runtime;
         let env = Runtime;
@@ -329,7 +330,7 @@ mod contract {
 
     /// Sets the address for the `wNEAR` ERC-20 contract. This contract will be used by the
     /// cross-contract calls feature to have users pay for their NEAR transactions.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn factory_set_wnear_address() {
         let io = Runtime;
         let env = Runtime;
@@ -339,7 +340,7 @@ mod contract {
     }
 
     /// Returns the address for the `wNEAR` ERC-20 contract in borsh format.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn factory_get_wnear_address() {
         let io = Runtime;
         contract_methods::xcc::factory_get_wnear_address(io)
@@ -350,7 +351,7 @@ mod contract {
     /// Create and/or fund an XCC sub-account directly (as opposed to having one be automatically
     /// created via the XCC precompile in the EVM). The purpose of this method is to enable
     /// XCC on engine instances where wrapped NEAR (`wNEAR`) is not bridged.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn fund_xcc_sub_account() {
         let io = Runtime;
         let env = Runtime;
@@ -363,7 +364,7 @@ mod contract {
     /// A private function (only callable by the contract itself) used as part of the XCC flow.
     /// This function uses the exit to Near precompile to move wNear from Aurora to a user's
     /// XCC account.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn withdraw_wnear_to_router() {
         let io = Runtime;
         let env = Runtime;
@@ -375,7 +376,7 @@ mod contract {
 
     /// Mirror existing ERC-20 token on the main Aurora contract.
     /// Notice: It works if the SILO mode is on.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn mirror_erc20_token() {
         let io = Runtime;
         let mut handler = Runtime;
@@ -385,7 +386,7 @@ mod contract {
     }
 
     /// Callback used by the `mirror_erc20_token` function.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn mirror_erc20_token_callback() {
         let io = Runtime;
         let env = Runtime;
@@ -396,7 +397,7 @@ mod contract {
     }
 
     /// Sets relayer key manager.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_key_manager() {
         let io = Runtime;
         let env = Runtime;
@@ -406,7 +407,7 @@ mod contract {
     }
 
     /// Adds a relayer function call key.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn add_relayer_key() {
         let io = Runtime;
         let env = Runtime;
@@ -418,7 +419,7 @@ mod contract {
 
     /// Callback which is called by `add_relayer_key` and stores the relayer function
     /// call key into the storage.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn store_relayer_key_callback() {
         let io = Runtime;
         let env = Runtime;
@@ -428,7 +429,7 @@ mod contract {
     }
 
     /// Removes a relayer function call key.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn remove_relayer_key() {
         let io = Runtime;
         let env = Runtime;
@@ -439,7 +440,7 @@ mod contract {
     }
 
     /// Initialize the hashchain.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn start_hashchain() {
         let io = Runtime;
         let env = Runtime;
@@ -449,7 +450,7 @@ mod contract {
     }
 
     /// Attach a full access key.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn attach_full_access_key() {
         let io = Runtime;
         let env = Runtime;
@@ -462,7 +463,7 @@ mod contract {
     ///
     /// READ-ONLY METHODS
     ///
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn view() {
         let mut io = Runtime;
         let env = ViewEnv;
@@ -474,7 +475,7 @@ mod contract {
         io.return_output(&borsh::to_vec(&result).sdk_expect(errors::ERR_SERIALIZE));
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_block_hash() {
         let mut io = Runtime;
         let block_height = io.read_input_borsh().sdk_unwrap();
@@ -486,7 +487,7 @@ mod contract {
         io.return_output(block_hash.as_bytes());
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_code() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
@@ -494,7 +495,7 @@ mod contract {
         io.return_output(&code);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_balance() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
@@ -502,7 +503,7 @@ mod contract {
         io.return_output(&balance.to_bytes());
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_nonce() {
         let mut io = Runtime;
         let address = io.read_input_arr20().sdk_unwrap();
@@ -510,7 +511,7 @@ mod contract {
         io.return_output(&u256_to_arr(&nonce));
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_storage_at() {
         let mut io = Runtime;
         let args: GetStorageAtArgs = io.read_input_borsh().sdk_unwrap();
@@ -520,7 +521,7 @@ mod contract {
         io.return_output(&value.0);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_latest_hashchain() {
         let mut io = Runtime;
         contract_methods::admin::get_latest_hashchain(&mut io)
@@ -529,7 +530,7 @@ mod contract {
     }
 
     /// Return metadata of the ERC-20 contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_erc20_metadata() {
         let io = Runtime;
         let env = ViewEnv;
@@ -541,7 +542,7 @@ mod contract {
     ///
     /// ETH-CONNECTOR
     ///
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn withdraw() {
         let io = Runtime;
         let env = Runtime;
@@ -550,7 +551,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_total_supply() {
         let io = Runtime;
         contract_methods::connector::ft_total_eth_supply_on_near(io)
@@ -558,7 +559,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_balance_of() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of(io)
@@ -566,7 +567,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_balance_of_eth() {
         let io = Runtime;
         contract_methods::connector::ft_balance_of_eth(io)
@@ -574,7 +575,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_transfer() {
         let io = Runtime;
         let env = Runtime;
@@ -583,7 +584,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_transfer_call() {
         let io = Runtime;
         let env = Runtime;
@@ -600,7 +601,7 @@ mod contract {
     /// There are two possible outcomes:
     /// 1. If an error occurs during the token transfer, all the transferred tokens are returned to the sender.
     /// 2. If the token transfer is successful, no tokens are returned, and the contract keeps the transferred tokens.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_on_transfer() {
         let io = Runtime;
         let env = Runtime;
@@ -611,7 +612,7 @@ mod contract {
     }
 
     /// Deploy ERC20 token mapped to a NEP141
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn deploy_erc20_token() {
         let io = Runtime;
         let env = Runtime;
@@ -622,7 +623,7 @@ mod contract {
     }
 
     /// Callback used by the `deploy_erc20_token` function.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn deploy_erc20_token_callback() {
         let io = Runtime;
         let env = Runtime;
@@ -633,7 +634,7 @@ mod contract {
     }
 
     /// Set metadata of ERC-20 contract.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_erc20_metadata() {
         let io = Runtime;
         let env = Runtime;
@@ -645,7 +646,7 @@ mod contract {
 
     /// Callback invoked by exit to NEAR precompile to handle potential
     /// errors in the exit call or to perform the near tokens transfer.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn exit_to_near_precompile_callback() {
         let io = Runtime;
         let env = Runtime;
@@ -655,7 +656,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn storage_deposit() {
         let io = Runtime;
         let env = Runtime;
@@ -664,7 +665,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn storage_unregister() {
         let io = Runtime;
         let env = Runtime;
@@ -673,7 +674,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn storage_withdraw() {
         let io = Runtime;
         let env = Runtime;
@@ -682,7 +683,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn storage_balance_of() {
         let io = Runtime;
         contract_methods::connector::storage_balance_of(io)
@@ -690,7 +691,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_eth_connector_contract_account() {
         let io = Runtime;
         contract_methods::connector::get_eth_connector_contract_account(io)
@@ -698,7 +699,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_eth_connector_contract_account() {
         let io = Runtime;
         let env = Runtime;
@@ -707,7 +708,7 @@ mod contract {
             .sdk_unwrap();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_erc20_from_nep141() {
         let mut io = Runtime;
         let nep141: AccountId = io.read_input_borsh().sdk_unwrap();
@@ -719,7 +720,7 @@ mod contract {
         );
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
         let erc20_address: engine::ERC20Address = io.read_input().to_vec().try_into().sdk_unwrap();
@@ -731,7 +732,7 @@ mod contract {
         );
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn ft_metadata() {
         let io = Runtime;
         let env = Runtime;
@@ -742,7 +743,7 @@ mod contract {
 
     /// Function used to create accounts for tests
     #[cfg(feature = "integration-test")]
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn mint_account() {
         use crate::prelude::{NEP141Wei, U256};
         use aurora_evm::backend::ApplyBackend;
@@ -771,7 +772,7 @@ mod contract {
     ///
     /// Silo
     ///
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_fixed_gas() {
         let mut io = Runtime;
         let args = FixedGasArgs {
@@ -781,7 +782,7 @@ mod contract {
         io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_fixed_gas() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -793,7 +794,7 @@ mod contract {
         silo::set_fixed_gas(&mut io, args.fixed_gas);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_erc20_fallback_address() {
         let mut io = Runtime;
         let args = Erc20FallbackAddressArgs {
@@ -803,7 +804,7 @@ mod contract {
         io.return_output(&borsh::to_vec(&args).map_err(|e| e.to_string()).sdk_unwrap());
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_erc20_fallback_address() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -815,7 +816,7 @@ mod contract {
         silo::set_erc20_fallback_address(&mut io, args.address);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_silo_params() {
         let mut io = Runtime;
         let params = silo::get_silo_params(&io);
@@ -827,7 +828,7 @@ mod contract {
         );
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_silo_params() {
         let mut io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -839,7 +840,7 @@ mod contract {
         silo::set_silo_params(&mut io, args);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_whitelist_status() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -851,7 +852,7 @@ mod contract {
         silo::set_whitelist_status(&io, &args);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn set_whitelists_statuses() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -863,7 +864,7 @@ mod contract {
         silo::set_whitelists_statuses(&io, args);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_whitelist_status() {
         let mut io = Runtime;
         let args: WhitelistKindArgs = io.read_input_borsh().sdk_unwrap();
@@ -874,7 +875,7 @@ mod contract {
         io.return_output(&status);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_whitelists_statuses() {
         let mut io = Runtime;
         let statuses = borsh::to_vec(&silo::get_whitelists_statuses(&io))
@@ -884,7 +885,7 @@ mod contract {
         io.return_output(&statuses);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn add_entry_to_whitelist() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -896,7 +897,7 @@ mod contract {
         silo::add_entry_to_whitelist(&io, &args);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn add_entry_to_whitelist_batch() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();
@@ -908,7 +909,7 @@ mod contract {
         silo::add_entry_to_whitelist_batch(&io, args);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn remove_entry_from_whitelist() {
         let io = Runtime;
         let state = state::get_state(&io).sdk_unwrap();

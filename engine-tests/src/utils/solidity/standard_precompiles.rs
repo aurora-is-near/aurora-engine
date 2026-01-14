@@ -1,6 +1,7 @@
-use crate::prelude::{transactions::legacy::TransactionLegacy, U256};
-use crate::utils::solidity;
 use std::path::{Path, PathBuf};
+
+use crate::prelude::{U256, transactions::legacy::TransactionLegacy};
+use crate::utils::solidity;
 
 pub struct PrecompilesConstructor(pub solidity::ContractConstructor);
 

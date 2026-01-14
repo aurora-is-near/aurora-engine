@@ -1,8 +1,9 @@
-use super::utils::{fp_from_bendian, fp_to_bytes};
-use super::Bls12381Error;
-use crate::bls12_381::{remove_padding, G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
-use crate::prelude::{vec, Vec};
 use blst::{blst_p1_affine, blst_p1_affine_in_g1, blst_p1_affine_on_curve};
+
+use super::Bls12381Error;
+use super::utils::{fp_from_bendian, fp_to_bytes};
+use crate::bls12_381::{G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH, remove_padding};
+use crate::prelude::{Vec, vec};
 
 /// Encodes a G1 point in affine format into byte slice with padded elements.
 ///
