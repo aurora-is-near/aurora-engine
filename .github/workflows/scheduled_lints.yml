@@ -11,7 +11,6 @@ jobs:
     runs-on:
       group: gha-larger-managed
       labels: managed-64cpu
-    container: rust:latest
     strategy:
       fail-fast: false
       matrix:
