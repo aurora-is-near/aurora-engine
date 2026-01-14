@@ -14,7 +14,6 @@ use aurora_engine_workspace::account::Account;
 use aurora_engine_workspace::types::NearToken;
 use aurora_engine_workspace::{EngineContract, RawContract};
 
-const AURORA_VERSION: &str = include_str!("../../../VERSION");
 const TRANSFER_AMOUNT: u128 = 1000;
 
 #[tokio::test]
@@ -258,8 +257,29 @@ async fn test_transfer_from_silo_to_silo() {
     );
 }
 
+#[tokio::test]
+async fn test_deploy_erc20_token_with_meta() {
+    let main_contract = deploy_main_contract().await;
+    let (nep141, _) = deploy_nep141(&main_contract).await;
+    let erc20 = deploy_erc20_from_nep_141(nep141.id().as_ref(), &main_contract)
+        .await
+        .unwrap();
+
+    let metadata = main_contract
+        .get_erc20_metadata(Erc20Identifier::Erc20 {
+            address: erc20.0.address,
+        })
+        .await
+        .unwrap()
+        .result;
+
+    assert_eq!(metadata.name, "Example NEAR fungible token");
+    assert_eq!(metadata.symbol, "EXAMPLE");
+    assert_eq!(metadata.decimals, 24);
+}
+
 async fn deploy_main_contract() -> EngineContract {
-    let code = get_main_contract_code().await.unwrap();
+    let code = AuroraRunner::get_engine_code();
     deploy_engine_with_code(code).await
 }
 
@@ -322,38 +342,4 @@ async fn deploy_nep141(main_contract: &EngineContract) -> (RawContract, Account)
         .unwrap();
 
     (contract, ft_owner)
-}
-
-async fn download_main_contract_code() -> anyhow::Result<Vec<u8>> {
-    let version = AURORA_VERSION.trim();
-    let wasm_url =
-        format!("https://github.com/aurora-is-near/aurora-engine/releases/download/{version}/aurora-mainnet.wasm");
-    let response = reqwest::get(wasm_url).await?;
-
-    assert!(
-        response.status().is_success(),
-        "{:?}",
-        response.text().await
-    );
-
-    response
-        .bytes()
-        .await
-        .map(|b| b.to_vec())
-        .map_err(Into::into)
-}
-
-async fn get_main_contract_code() -> anyhow::Result<Vec<u8>> {
-    let path = if cfg!(feature = "mainnet-test") {
-        "../bin/aurora-mainnet-test.wasm"
-    } else if cfg!(feature = "testnet-test") {
-        "../bin/aurora-testnet-test.wasm"
-    } else {
-        panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-    };
-
-    match std::fs::read(path) {
-        Ok(bytes) => Ok(bytes),
-        Err(_) => download_main_contract_code().await,
-    }
 }

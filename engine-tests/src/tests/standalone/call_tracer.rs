@@ -260,7 +260,7 @@ fn test_trace_contract_with_precompile_sub_call() {
     assert_eq!(listener.call_stack.len(), 1);
 
     let trace = listener.call_stack.pop().unwrap();
-    assert_eq!(trace.calls.len(), 8);
+    assert_eq!(trace.calls.len(), 9);
     for call in trace.calls {
         assert!(call.calls.is_empty());
     }
@@ -344,9 +344,7 @@ fn test_trace_precompiles_with_subcalls() {
         let env = &runner.env;
 
         let tx_kind = sync::types::TransactionKind::DeployErc20(
-            aurora_engine::parameters::DeployErc20TokenArgs {
-                nep141: "wrap.near".parse().unwrap(),
-            },
+            aurora_engine::parameters::DeployErc20TokenArgs::Legacy("wrap.near".parse().unwrap()),
         );
         let mut tx = standalone::StandaloneRunner::template_tx_msg(
             storage,

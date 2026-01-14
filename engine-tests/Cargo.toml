@@ -27,6 +27,7 @@ aurora-engine-workspace.workspace = true
 anyhow.workspace = true
 borsh.workspace = true
 bstr.workspace = true
+cargo-near-build = { workspace = true, features = ["build_internal"] }
 criterion.workspace = true
 engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true
@@ -39,10 +40,9 @@ near-crypto.workspace = true
 near-parameters.workspace = true
 near-primitives-core.workspace = true
 near-primitives.workspace = true
-near-sdk.workspace = true
+near-sdk = { workspace = true, features = ["non-contract-usage"] }
 near-vm-runner.workspace = true
 rand.workspace = true
-reqwest.workspace = true
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -55,13 +55,7 @@ walrus.workspace = true
 workspace = true
 
 [features]
-mainnet-test = ["aurora-engine-workspace/mainnet-test"]
-testnet-test = ["aurora-engine-workspace/testnet-test"]
 error_refund = ["aurora-engine/error_refund", "aurora-engine-precompiles/error_refund"]
-ext-connector = [
-    "aurora-engine/ext-connector",
-    "aurora-engine-precompiles/ext-connector",
-    "engine-standalone-storage/ext-connector",
-    "aurora-engine-workspace/ext-connector",
-    "dep:cargo-near-build"
-]
+# This feature skips heavy BLS tests.
+# E.g. of usage the feature: `cargo make test --features skip-bls-tests`
+skip-bls-tests = []

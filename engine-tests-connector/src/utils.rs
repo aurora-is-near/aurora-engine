@@ -1,5 +1,6 @@
-use aurora_engine::parameters::{FungibleTokenMetadata, SetEthConnectorContractAccountArgs};
-use aurora_engine_types::parameters::connector::WithdrawSerializeType;
+use aurora_engine_types::parameters::connector::{
+    FungibleTokenMetadata, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+};
 use aurora_engine_types::types::{Address, Wei};
 use near_sdk::json_types::U128;
 use near_sdk::serde_json::json;
@@ -44,15 +45,14 @@ static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     .unwrap();
 
     std::fs::read(artifact.path.into_std_path_buf())
-        .map_err(|e| anyhow::anyhow!("failed read wasm file: {e}"))
+        .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
         .unwrap()
 });
 
 static MOCK_CONTROLLER_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     let base_path = Path::new("../etc").join("tests").join("mock-controller");
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/mock_controller.wasm");
-    crate::rust::compile(base_path);
-    std::fs::read(output_path).unwrap()
+    let artifact_path = crate::rust::compile(base_path);
+    std::fs::read(artifact_path).unwrap()
 });
 
 pub struct TestContract {
@@ -70,7 +70,7 @@ impl TestContract {
         };
         let worker = near_workspaces::sandbox()
             .await
-            .map_err(|err| anyhow::anyhow!("Failed init sandbox: {:?}", err))?;
+            .map_err(|err| anyhow::anyhow!("Failed init sandbox: {err:?}"))?;
         let registrar: AccountId = "registrar".parse()?;
         let sk = SecretKey::from_seed(KeyType::ED25519, registrar.as_str());
         let registrar = worker
@@ -298,7 +298,7 @@ impl TestContract {
     pub async fn get_eth_balance(&self, address: &Address) -> anyhow::Result<u128> {
         let res = self
             .engine_contract
-            .call("ft_balance_of_eth") // `get_balance` returns tha same value
+            .call("ft_balance_of_eth") // `get_balance` returns tha same value but in borsh
             .args_borsh((address,))
             .view()
             .await?;
@@ -322,27 +322,14 @@ impl TestContract {
     }
 }
 
-#[must_use]
-pub fn get_eth_connector_contract() -> Vec<u8> {
-    let contract_path = Path::new("etc/aurora-eth-connector");
-    std::fs::read(contract_path.join("bin/aurora-eth-connector-test.wasm")).unwrap()
-}
-
 fn get_engine_contract() -> Vec<u8> {
-    if cfg!(feature = "mainnet-test") {
-        std::fs::read("../bin/aurora-mainnet-silo-test.wasm").unwrap()
-    } else if cfg!(feature = "testnet-test") {
-        std::fs::read("../bin/aurora-testnet-silo-test.wasm").unwrap()
-    } else {
-        panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-    }
+    std::fs::read("../bin/aurora-engine-test.wasm").expect("Failed to read the wasm file")
 }
 
 /// Bytes for a NEAR smart contract implementing `ft_on_transfer`
 #[must_use]
 pub fn dummy_ft_receiver_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("tests").join("ft-receiver");
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/ft_receiver.wasm");
-    crate::rust::compile(base_path);
-    std::fs::read(output_path).unwrap()
+    let artifact_path = crate::rust::compile(base_path);
+    std::fs::read(artifact_path).unwrap()
 }

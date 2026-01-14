@@ -3,23 +3,24 @@
 #![allow(clippy::as_conversions)]
 
 use crate::prelude::{Address, H256, STORAGE_PRICE_PER_BYTE};
-#[cfg(feature = "contract")]
-use crate::prelude::{Vec, U256};
+
 pub use types::keccak;
 
 pub mod base64;
+#[cfg(feature = "bls")]
+pub mod bls12_381;
+pub mod bn128;
 pub mod caching;
 pub mod env;
 pub mod error;
+#[cfg(feature = "contract")]
+mod exports;
 pub mod io;
 #[cfg(feature = "contract")]
 pub mod near_runtime;
 mod prelude;
 pub mod promise;
 pub mod types;
-
-#[cfg(feature = "contract")]
-use near_runtime::exports;
 
 #[cfg(feature = "contract")]
 const ECRECOVER_MESSAGE_SIZE: u64 = 32;
@@ -50,8 +51,8 @@ pub fn sha256(input: &[u8]) -> H256 {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::sha256(input.len() as u64, input.as_ptr() as u64, 1);
-        let bytes = H256::zero();
-        exports::read_register(REGISTER_ID, bytes.0.as_ptr() as u64);
+        let mut bytes = H256::zero();
+        exports::read_register(REGISTER_ID, bytes.0.as_mut_ptr() as u64);
         bytes
     }
 }
@@ -72,81 +73,21 @@ pub fn ripemd160(input: &[u8]) -> [u8; 20] {
     unsafe {
         const REGISTER_ID: u64 = 1;
         exports::ripemd160(input.len() as u64, input.as_ptr() as u64, REGISTER_ID);
-        let bytes = [0u8; 20];
-        exports::read_register(REGISTER_ID, bytes.as_ptr() as u64);
+        let mut bytes = [0u8; 20];
+        exports::read_register(REGISTER_ID, bytes.as_mut_ptr() as u64);
         bytes
     }
 }
 
-#[cfg(feature = "contract")]
+#[cfg(not(feature = "contract"))]
 #[must_use]
-pub fn alt_bn128_g1_sum(left: [u8; 64], right: [u8; 64]) -> [u8; 64] {
-    let mut bytes = Vec::with_capacity(64 * 2 + 2); // 64 bytes per G1 + 2 positive integer bytes.
+pub fn ripemd160(input: &[u8]) -> [u8; 20] {
+    use ripemd::{Digest, Ripemd160};
 
-    bytes.push(0); // positive sign
-    bytes.extend_from_slice(&left);
-    bytes.push(0);
-    bytes.extend_from_slice(&right);
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    unsafe {
-        const REGISTER_ID: u64 = 1;
-        exports::alt_bn128_g1_sum(value_len, value_ptr, REGISTER_ID);
-        let mut output = [0u8; 64];
-        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
-        let x = U256::from_little_endian(&output[0..32]);
-        let y = U256::from_little_endian(&output[32..64]);
-        output[0..32].copy_from_slice(&x.to_big_endian());
-        output[32..64].copy_from_slice(&y.to_big_endian());
-        output
-    }
-}
-
-#[cfg(feature = "contract")]
-#[must_use]
-pub fn alt_bn128_g1_scalar_multiple(g1: [u8; 64], fr: [u8; 32]) -> [u8; 64] {
-    let mut bytes = [0u8; 96];
-    bytes[0..64].copy_from_slice(&g1);
-    bytes[64..96].copy_from_slice(&fr);
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    unsafe {
-        const REGISTER_ID: u64 = 1;
-        exports::alt_bn128_g1_multiexp(value_len, value_ptr, REGISTER_ID);
-        let mut output = [0u8; 64];
-        exports::read_register(REGISTER_ID, output.as_ptr() as u64);
-        let x = U256::from_little_endian(&output[0..32]);
-        let y = U256::from_little_endian(&output[32..64]);
-        output[0..32].copy_from_slice(&x.to_big_endian());
-        output[32..64].copy_from_slice(&y.to_big_endian());
-        output
-    }
-}
-
-#[cfg(feature = "contract")]
-pub fn alt_bn128_pairing<I>(pairs: I) -> bool
-where
-    I: ExactSizeIterator<Item = ([u8; 64], [u8; 128])>,
-{
-    let n = pairs.len();
-    let mut bytes = Vec::with_capacity(n * 6 * 32);
-    let mut buf = [0u8; 64 + 128];
-    for (g1, g2) in pairs {
-        buf[0..64].copy_from_slice(&g1);
-        buf[64..192].copy_from_slice(&g2);
-        bytes.extend_from_slice(&buf);
-    }
-
-    let value_ptr = bytes.as_ptr() as u64;
-    let value_len = bytes.len() as u64;
-
-    let result = unsafe { exports::alt_bn128_pairing_check(value_len, value_ptr) };
-
-    result == 1
+    let hash = Ripemd160::digest(input);
+    let mut output = [0u8; 20];
+    output.copy_from_slice(&hash);
+    output
 }
 
 /// Recover address from message hash and signature.
@@ -172,8 +113,8 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
             // register directly for the input to keccak256. This is why the length is
             // set to `u64::MAX`.
             exports::keccak256(u64::MAX, RECOVER_REGISTER_ID, KECCACK_REGISTER_ID);
-            let keccak_hash_bytes = [0u8; 32];
-            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_ptr() as u64);
+            let mut keccak_hash_bytes = [0u8; 32];
+            exports::read_register(KECCACK_REGISTER_ID, keccak_hash_bytes.as_mut_ptr() as u64);
             Ok(Address::try_from_slice(&keccak_hash_bytes[12..]).map_err(|_| ECRecoverErr)?)
         } else {
             Err(ECRecoverErr)

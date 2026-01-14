@@ -1,7 +1,7 @@
 use crate::prelude::types::{make_address, Address, EthGas};
 use crate::prelude::{Cow, PhantomData, Vec, U256};
 use crate::{
-    utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Precompile, PrecompileOutput,
+    utils, Berlin, Byzantium, EvmPrecompileResult, HardFork, Osaka, Precompile, PrecompileOutput,
 };
 use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_evm::{Context, ExitError};
@@ -9,6 +9,11 @@ use num::{Integer, Zero};
 
 #[derive(Default)]
 pub struct ModExp<HF: HardFork, M = AuroraModExp>(PhantomData<HF>, PhantomData<M>);
+
+/// Number of iteration bits per input byte used in legacy gas calculation (pre EIP-7883).
+const ITER_BITS_PER_BYTE: u64 = 8;
+/// Number of iteration bits per input byte used when EIP-7883 / Osaka rules apply.
+const ITER_BITS_PER_BYTE_EIP7883: u64 = 16;
 
 impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
     pub const ADDRESS: Address = make_address(0, 5);
@@ -20,24 +25,40 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
 }
 
 impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
-    // Note: the output of this function is bounded by 2^67
-    fn calc_iter_count(exp_len: u64, base_len: u64, bytes: &[u8]) -> Result<U256, ExitError> {
+    const HEADER_OFFSET: usize = 96;
+    const WORD_SIZE: usize = 32;
+
+    /// Calculate the iteration count for gas cost calculation
+    /// EIP-7883 changes `BITS_PER_BYTE` from 8 to 16 for Osaka hard fork
+    ///
+    /// NOTE: the output of this function is bounded by approximately `BITS_PER_BYTE * 2^64`
+    /// (For `BITS_PER_BYTE=8: ~2^67`, for `BITS_PER_BYTE=16: ~2^68`)
+    fn calc_iter_count<const BITS_PER_BYTE: u64>(
+        exp_len: u64,
+        base_len: u64,
+        bytes: &[u8],
+    ) -> Result<U256, ExitError> {
         let start = usize::try_from(base_len).map_err(utils::err_usize_conv)?;
         let exp_len = usize::try_from(exp_len).map_err(utils::err_usize_conv)?;
         let exp = parse_bytes(
             bytes,
-            start.saturating_add(96),
-            core::cmp::min(32, exp_len),
+            start.saturating_add(Self::HEADER_OFFSET),
+            core::cmp::min(Self::WORD_SIZE, exp_len),
             U256::from_big_endian,
         );
 
-        if exp_len <= 32 && exp.is_zero() {
-            Ok(U256::zero())
-        } else if exp_len <= 32 {
-            Ok(U256::from(exp.bits()) - U256::from(1))
+        if exp_len <= Self::WORD_SIZE {
+            if exp.is_zero() {
+                Ok(U256::zero())
+            } else {
+                Ok(U256::from(exp.bits() - 1))
+            }
         } else {
             // else > 32
-            Ok(U256::from(8) * U256::from(exp_len - 32) + U256::from(exp.bits().saturating_sub(1)))
+            let iter_from_len =
+                u128::from(BITS_PER_BYTE) * u128::try_from(exp_len - 32).unwrap_or(u128::MAX);
+            let exp_bits = u128::try_from(exp.bits().saturating_sub(1)).unwrap_or(u128::MAX);
+            Ok(U256::from(iter_from_len + exp_bits))
         }
     }
 
@@ -65,11 +86,11 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
         };
 
         // The result must be the same length as the input modulus.
-        // To ensure this we pad on the left with zeros.
+        // To ensure that we pad on the left with zeros.
         if mod_len > computed_result.len() {
             let diff = mod_len - computed_result.len();
             let mut padded_result = Vec::with_capacity(mod_len);
-            padded_result.extend(core::iter::repeat(0).take(diff));
+            padded_result.extend(core::iter::repeat_n(0, diff));
             padded_result.extend_from_slice(&computed_result);
             padded_result
         } else {
@@ -80,17 +101,35 @@ impl<HF: HardFork, M: ModExpAlgorithm> ModExp<HF, M> {
 
 impl<M: ModExpAlgorithm> ModExp<Byzantium, M> {
     const MIN_GAS: EthGas = EthGas::new(0);
+
+    // EIP-198: Gas calculation constants
+    const GAS_DIVISOR: u64 = 20;
+
+    // Polynomial coefficients for multiplication complexity
+    const LIMIT_SQR: u64 = 64;
+    const LIMIT_LIN: u64 = 1024;
+
+    // x <= 1024 case: x^2 / 4 + 96x - 3072
+    const MID_DIVISOR: u64 = 4;
+    const MID_COEFF: u64 = 96;
+    const MID_CONST: u64 = 3_072;
+
+    // x > 1024 case: x^2 / 16 + 480x - 199680
+    const HIGH_DIVISOR: u64 = 16;
+    const HIGH_COEFF: u64 = 480;
+    const HIGH_CONST: u64 = 199_680;
+
     // output of this function is bounded by 2^128
     fn mul_complexity(x: u64) -> U256 {
-        if x <= 64 {
-            U256::from(x * x)
-        } else if x <= 1_024 {
-            U256::from(x * x / 4 + 96 * x - 3_072)
+        let x_u256 = U256::from(x);
+        let x_sq = x_u256 * x_u256;
+        if x <= Self::LIMIT_SQR {
+            x_sq
+        } else if x <= Self::LIMIT_LIN {
+            x_sq / U256::from(Self::MID_DIVISOR) + U256::from(Self::MID_COEFF * x - Self::MID_CONST)
         } else {
-            // up-cast to avoid overflow
-            let x = U256::from(x);
-            let x_sq = x * x; // x < 2^64 => x*x < 2^128 < 2^256 (no overflow)
-            x_sq / U256::from(16) + U256::from(480) * x - U256::from(199_680)
+            x_sq / U256::from(Self::HIGH_DIVISOR) + U256::from(Self::HIGH_COEFF) * x_u256
+                - U256::from(Self::HIGH_CONST)
         }
     }
 }
@@ -102,9 +141,10 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
             Ok(Self::MIN_GAS)
         } else {
             let mul = Self::mul_complexity(core::cmp::max(mod_len, base_len));
-            let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+            // BITS_PER_BYTE = 8
+            let iter_count = Self::calc_iter_count::<ITER_BITS_PER_BYTE>(exp_len, base_len, input)?;
             // mul * iter_count bounded by 2^195 < 2^256 (no overflow)
-            let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(20);
+            let gas = mul * core::cmp::max(iter_count, U256::one()) / U256::from(Self::GAS_DIVISOR);
 
             Ok(EthGas::new(saturating_round(gas)))
         }
@@ -133,6 +173,10 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
 
 impl<M: ModExpAlgorithm> ModExp<Berlin, M> {
     const MIN_GAS: EthGas = EthGas::new(200);
+
+    // EIP-2565: GQUADDIVISOR = 3
+    const GQUADDIVISOR: u64 = 3;
+
     // output bounded by 2^122
     fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
         let max_len = core::cmp::max(mod_len, base_len);
@@ -148,11 +192,15 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
             Ok(Self::MIN_GAS)
         } else {
             let mul = Self::mul_complexity(base_len, mod_len);
-            let iter_count = Self::calc_iter_count(exp_len, base_len, input)?;
+            // BITS_PER_BYTE = 8
+            let iter_count = Self::calc_iter_count::<ITER_BITS_PER_BYTE>(exp_len, base_len, input)?;
             // mul * iter_count bounded by 2^189 (so no overflow)
-            let gas = mul * iter_count.max(U256::one()) / U256::from(3);
+            let gas = mul * iter_count.max(U256::one()) / U256::from(Self::GQUADDIVISOR);
 
-            Ok(EthGas::new(core::cmp::max(200, saturating_round(gas))))
+            Ok(EthGas::new(core::cmp::max(
+                Self::MIN_GAS.as_u64(),
+                saturating_round(gas),
+            )))
         }
     }
 
@@ -175,19 +223,101 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
     }
 }
 
-fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<[u8]> {
-    let len = input.len();
-    if start >= len {
-        return Cow::Owned(Vec::new());
+/// `EIP-7823` and `EIP-7883` for Osaka hard fork
+impl<M: ModExpAlgorithm> ModExp<Osaka, M> {
+    // EIP-7883: Increased minimal price from 200 to 500
+    const MIN_GAS: EthGas = EthGas::new(500);
+
+    // EIP-7823: 1024 bytes (8192 bits)
+    const INPUT_SIZE_LIMIT: u64 = 1024;
+
+    const COMPLEXITY_THRESHOLD: u64 = 32;
+    const MIN_MUL_COMPLEXITY: u64 = 16;
+    const LARGE_MOD_MULTIPLIER: u64 = 2;
+
+    /// EIP-7883: New logic for multiplication complexity.
+    /// Doubles the complexity if the base or modulus length exceeds 32 bytes.
+    fn mul_complexity(base_len: u64, mod_len: u64) -> U256 {
+        let max_len = core::cmp::max(mod_len, base_len);
+
+        // Multiplication complexity for lengths > 32 bytes
+        if max_len > Self::COMPLEXITY_THRESHOLD {
+            let words = U256::from(Integer::div_ceil(&max_len, &8));
+            // complexity = 2 * words^2
+            U256::from(Self::LARGE_MOD_MULTIPLIER) * words * words
+        } else {
+            // minimal complexity = 16
+            U256::from(Self::MIN_MUL_COMPLEXITY)
+        }
     }
+}
+
+/// `EIP-7823` and `EIP-7883` for Osaka hard fork
+impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
+    fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
+        let (base_len, exp_len, mod_len) = parse_lengths(input);
+
+        if base_len == 0 && mod_len == 0 {
+            Ok(Self::MIN_GAS)
+        } else {
+            let mul = Self::mul_complexity(base_len, mod_len);
+            // EIP-7883: Changed BITS_PER_BYTE from 8 to 16
+            let iter_count =
+                Self::calc_iter_count::<ITER_BITS_PER_BYTE_EIP7883>(exp_len, base_len, input)?;
+
+            // With INPUT_SIZE_LIMIT=1024, mul * iter_count bounded by ~2^30 (no overflow)
+            // Old: floor(mult * iter / 3)
+            // New: floor(mult * iter)
+            let gas = mul * iter_count.max(U256::one());
+
+            Ok(EthGas::new(core::cmp::max(
+                Self::MIN_GAS.as_u64(),
+                saturating_round(gas),
+            )))
+        }
+    }
+
+    fn run(
+        &self,
+        input: &[u8],
+        target_gas: Option<EthGas>,
+        _context: &Context,
+        _is_static: bool,
+    ) -> EvmPrecompileResult {
+        // Enforce maximum length per EIP-7823
+        let (base_len, exp_len, mod_len) = parse_lengths(input);
+        if base_len > Self::INPUT_SIZE_LIMIT
+            || exp_len > Self::INPUT_SIZE_LIMIT
+            || mod_len > Self::INPUT_SIZE_LIMIT
+        {
+            return Err(ExitError::Other(Cow::Borrowed("ERR_MODEXP_SIZE_LIMIT")));
+        }
+
+        let cost = Self::required_gas(input)?;
+
+        if let Some(target_gas) = target_gas {
+            if cost > target_gas {
+                return Err(ExitError::OutOfGas);
+            }
+        }
+
+        let output = Self::run_inner(input);
+        Ok(PrecompileOutput::without_logs(cost, output))
+    }
+}
+
+fn parse_input_range_to_slice(input: &[u8], start: usize, size: usize) -> Cow<'_, [u8]> {
+    let len = input.len();
+
+    if start >= len {
+        return Cow::Borrowed(&[]);
+    }
+
     let end = start.saturating_add(size);
+
     if end > len {
-        let bytes: Vec<u8> = input[start..]
-            .iter()
-            .copied()
-            .chain(core::iter::repeat(0u8))
-            .take(size)
-            .collect();
+        let mut bytes = input[start..].to_vec();
+        bytes.resize(size, 0u8);
         Cow::Owned(bytes)
     } else {
         Cow::Borrowed(&input[start..end])
@@ -202,12 +332,8 @@ fn parse_bytes<T, F: FnOnce(&[u8]) -> T>(input: &[u8], start: usize, size: usize
     let end = start + size;
     if end > len {
         // Pad on the right with zeros if input is too short
-        let bytes: Vec<u8> = input[start..]
-            .iter()
-            .copied()
-            .chain(core::iter::repeat(0u8))
-            .take(size)
-            .collect();
+        let mut bytes = input[start..].to_vec();
+        bytes.resize(size, 0u8);
         f(&bytes)
     } else {
         f(&input[start..end])
@@ -731,5 +857,158 @@ mod tests {
         let gas = ModExp::<Berlin>::required_gas(&input.unwrap()).unwrap();
         let min_gas = EthGas::new(65536);
         assert_eq!(gas, min_gas);
+    }
+}
+
+#[cfg(test)]
+mod tests_osaka {
+    use super::*;
+    use crate::utils::new_context;
+
+    fn run_modexp(input: &[u8], gas_limit: u64) -> Result<PrecompileOutput, ExitError> {
+        ModExp::<Osaka>::new().run(input, Some(EthGas::new(gas_limit)), &new_context(), false)
+    }
+
+    fn make_input(b_len: usize, e_len: usize, m_len: usize, fill_byte: u8) -> Vec<u8> {
+        let mut out = Vec::new();
+        // Lengths (32 bytes each)
+        out.extend_from_slice(&U256::from(b_len).to_big_endian());
+        out.extend_from_slice(&U256::from(e_len).to_big_endian());
+        out.extend_from_slice(&U256::from(m_len).to_big_endian());
+        // Data
+        out.extend(core::iter::repeat_n(fill_byte, b_len));
+        out.extend(core::iter::repeat_n(fill_byte, e_len));
+        out.extend(core::iter::repeat_n(fill_byte, m_len));
+        out
+    }
+
+    #[test]
+    fn test_osaka_eip7883_min_gas() {
+        // Case 1: All lengths = 1. Value = 1.
+        // Words = ceil(1/8) = 1.
+        // Complexity: max_len(1) <= 32 -> 16.
+        // Iterations: exp_len(1) <= 32. bit_len(1) - 1 = 0. Max(0, 1) = 1.
+        // Gas: 16 * 1 = 16.
+        // Floor limit: max(500, 16) = 500.
+        let input = make_input(1, 1, 1, 1);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 500, "Should be clamped to min gas 500");
+    }
+
+    #[test]
+    fn test_osaka_eip7883_standard_256() {
+        // Case 2: 32 bytes inputs, max value (all bits 1).
+        // Words = ceil(32/8) = 4.
+        // Complexity: max_len(32) <= 32 -> 16.
+        // Iterations: exp_len(32) <= 32. Exp is max u256. bit_len(256) - 1 = 255.
+        // Gas: 16 * 255 = 4080.
+        let input = make_input(32, 32, 32, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 4080, "Standard 256-bit modexp cost mismatch");
+    }
+
+    #[test]
+    fn test_osaka_eip7883_complexity_doubling() {
+        // Case 3: Base > 32 bytes (33 bytes).
+        // Words = ceil(33/8) = 5.
+        // Complexity: max_len(33) > 32. Formula: 2 * words^2 = 2 * 5^2 = 50.
+        // Iterations: exp_len(32). Exp is max. iter = 255.
+        // Gas: 50 * 255 = 12750.
+        let input = make_input(33, 32, 33, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(
+            gas.as_u64(),
+            12750,
+            "Complexity doubling for >32 bytes failed"
+        );
+    }
+
+    #[test]
+    fn test_osaka_eip7883_large_exponent_multiplier() {
+        // Case 4: Exp > 32 bytes (40 bytes). Base small.
+        // Words (Base) = ceil(32/8) = 4.
+        // Complexity: max_len(32) <= 32 -> 16.
+        // Iterations: exp_len(40) > 32.
+        // Formula: 16 * (exp_len - 32) + (bit_len_of_first_32 - 1)
+        //          16 * (40 - 32) + (256 - 1)
+        //          16 * 8 + 255 = 128 + 255 = 383.
+        // Gas: 16 * 383 = 6128.
+        let input = make_input(32, 40, 32, 0xFF);
+        let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
+        assert_eq!(gas.as_u64(), 6128, "New iteration multiplier 16 failed");
+    }
+
+    #[test]
+    fn test_osaka_eip7823_limit_boundary() {
+        // Limit is 1024 bytes.
+        // 1. Exact limit (should pass)
+        let input_valid = make_input(1024, 1, 1, 1);
+        let res = ModExp::<Osaka>::required_gas(&input_valid);
+        assert!(res.is_ok(), "1024 bytes should be allowed");
+
+        // 2. Over limit (should fail with specific error or OutOfGas depending on impl)
+        // The run() method returns specific error, required_gas returns OutOfGas based on your code logic?
+        // Actually in your `Precompile` impl for `Osaka`, checks are inside `required_gas` too?
+        // Wait, looking at provided code: `run` calls `parse_lengths` and checks limit returning `Err(ExitError::Other(...))`.
+        // But `required_gas` does NOT have the check in your provided code block above (it was in my previous suggestion, but in your latest paste it's only in `run`).
+        // Let's verify where the check is.
+        // In the provided code:
+        // `fn required_gas` -> No limit check.
+        // `fn run` -> Has limit check `Err(ExitError::Other(Cow::Borrowed("ERR_MODEXP_SIZE_LIMIT")))`.
+
+        // Testing `run`:
+        let input_invalid = make_input(1025, 1, 1, 1);
+        let res = run_modexp(&input_invalid, 10_000_000);
+
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT, got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_osaka_eip7823_junk_input() {
+        // Input consisting of random data where the first 32 bytes form a huge number.
+        // 0xFF...FF (Huge Base Length)
+        let mut input = Vec::new();
+        input.extend_from_slice(&[0xFF; 32]); // Base Len = Huge
+        input.extend_from_slice(&[0x00; 32]); // Exp Len = 0
+        input.extend_from_slice(&[0x00; 32]); // Mod Len = 0
+
+        let res = run_modexp(&input, 10_000_000);
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {res:?}",),
+        }
+    }
+
+    #[test]
+    fn test_osaka_eip7823_analysis_cases() {
+        // "Empty inputs"
+        let res = run_modexp(&[], 1000);
+        // Should return success with empty output and min gas
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().cost.as_u64(), 500);
+
+        // "Inputs consisting of only 0x9e5faafc" (4 bytes)
+        // This is interpreted as [9e, 5f, aa, fc] padding with zeros for lengths.
+        // BaseLen = 9e5faafc...00 (interpreted big endian at offset 0).
+        // Actually `parse_lengths` reads 32 bytes padded with zeros on the right.
+        // Input: [0x9e, 0x5f, 0xaa, 0xfc]
+        // parse(0) -> reads [9e, 5f, aa, fc, 00, ... 00] -> Huge number!
+        // This should trigger the size limit error.
+        let input = hex::decode("9e5faafc").unwrap();
+        let res = run_modexp(&input, 10_000_000);
+        match res {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for short junk input interpreted as huge length, got {res:?}"),
+        }
+
+        let input2 = hex::decode("85474728").unwrap();
+        let res2 = run_modexp(&input2, 10_000_000);
+        match res2 {
+            Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for 85474728"),
+        }
     }
 }

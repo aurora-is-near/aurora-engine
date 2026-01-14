@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-sdk"
-version = "1.2.0"
-description = "SDK that used in Aurora Engine"
+version = "2.0.0"
+description = "SDK used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -14,10 +14,18 @@ publish = true
 
 [dependencies]
 aurora-engine-types.workspace = true
+ark-bn254 = { workspace = true, features = ["curve"], optional = true }
+ark-serialize = { workspace = true, optional = true }
+ark-ec = { workspace = true, optional = true }
+ark-ff = { workspace = true, features = ["asm"], optional = true }
 base64.workspace = true
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
+ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+blst = { workspace = true, optional = true }
 
 [dev-dependencies]
 hex.workspace = true
@@ -26,9 +34,19 @@ hex.workspace = true
 workspace = true
 
 [features]
-std = ["aurora-engine-types/std", "libsecp256k1/std", "sha3/std", "sha2/std", "base64/std"]
+std = [
+    "aurora-engine-types/std",
+    "base64/std",
+    "libsecp256k1/std",
+    "ripemd/std",
+    "sha2/std",
+    "sha3/std",
+    "dep:ark-bn254",
+    "dep:ark-serialize",
+    "dep:ark-ec",
+    "dep:ark-ff"
+]
 contract = []
+bls = ["dep:blst"]
 log = []
 all-promise-actions = []
-mainnet = []
-testnet = []

@@ -8,64 +8,59 @@ on:
 
 name: Lints
 jobs:
-  fmt:
-    name: Format
-    runs-on: [ self-hosted, light ]
+  rust:
+    name: Run ${{ matrix.command }}
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    container: rust:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [ check-fmt, clippy, udeps ]
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Run cargo fmt
-        run: cargo make check-fmt
-  clippy:
-    name: Clippy
-    runs-on: [ self-hosted, heavy ]
-    steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Clone the repository
-        uses: actions/checkout@v4
-      - name: Update Node and Yarn
-        run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm alias default 18
-          npm install -g yarn
-          echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
-      - name: Build contracts
-        run: cargo make build-contracts
-      - name: Run Contract cargo clippy
-        run: cargo make clippy
-  udeps:
-    name: Udeps
-    runs-on: [ self-hosted, heavy ]
-    steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
-      - name: Clone the repository
-        uses: actions/checkout@v4
-      - name: Run udeps
-        run: cargo make udeps
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: aurora-${{ matrix.command }}-check
+          cache-on-failure: "true"
+          cache-all-crates: "true"
+      - name: Install Rust toolchain and components
+        run: rustup toolchain add nightly
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Run ${{ matrix.command }}
+        run: cargo make ${{ matrix.command }}
+
   contracts:
     name: Contracts
-    runs-on: [ self-hosted, light ]
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    container: rust:latest
     steps:
-      - name: Potential broken submodules fix
-        run: |
-          git checkout -f $(git -c user.name=x -c user.email=x@x commit-tree $(git hash-object -t tree /dev/null) < /dev/null) || :
+      - name: Setup RunsOn
+        uses: runs-on/action@v2
+        with:
+          metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v4
-      - name: Update Node and Yarn
-        run: |
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install 18 && nvm alias default 18
-          npm install -g yarn
-          echo "$(dirname $(nvm which node))" >> $GITHUB_PATH
+      - name: Install dependencies
+        run: scripts/ci-deps/native.sh
+      - name: Setup Node and cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
+      - name: Install cargo-make
+        run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run yarn lint
         run: cargo make check-contracts
       - name: Check committed EvmErc20.bin

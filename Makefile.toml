@@ -1,13 +1,3 @@
-env_files = [
-    { path = ".env/mainnet.env", profile = "mainnet" },
-    { path = ".env/mainnet-silo.env", profile = "mainnet-silo" },
-    { path = ".env/testnet.env", profile = "testnet" },
-    { path = ".env/testnet-silo.env", profile = "testnet-silo" },
-    { path = ".env/local.env", profile = "local" },
-    { path = ".env/custom.env", profile = "custom" },
-    { path = ".env/local.env", profile = "development" },
-]
-
 [config]
 default_to_workspace = false
 skip_core_tasks = true
@@ -15,6 +5,12 @@ skip_core_tasks = true
 [env]
 CARGO = "cargo"
 ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
+CARGO_FEATURES_BUILD = "contract"
+CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
+RUSTC_FLAGS_BUILD = "-C link-arg=-s"
+WASM_FILE = "aurora-engine.wasm"
+WASM_FILE_TEST = "aurora-engine-test.wasm"
+XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
 BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
 
@@ -43,6 +39,7 @@ rm -Rf etc/tests/benchmark-contract/target
 rm -Rf etc/tests/ft-receiver/target
 rm -Rf etc/tests/self-contained-5bEgfRQ/target
 rm -Rf etc/xcc-router/target
+rm -Rf engine-tests/target
 '''
 
 [tasks.clean-bin]
@@ -74,7 +71,7 @@ args = [
 category = "Check"
 env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
 toolchain = "nightly"
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.53", test_arg = ["udeps", "-h"], force = true }
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.55", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
@@ -89,21 +86,6 @@ args = [
     "clippy",
     "--workspace",
     "--all-targets",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
-]
-
-[tasks.clippy-ext-connector]
-extend = "clippy-base"
-args = [
-    "clippy",
-    "--workspace",
-    "--all-targets",
-    "--features",
-    "ext-connector",
     "--",
     "-D",
     "warnings",
@@ -144,7 +126,6 @@ args = [
 [tasks.clippy]
 dependencies = [
     "clippy-base",
-    "clippy-ext-connector",
     "clippy-contract",
     "clippy-contract-refund",
 ]
@@ -180,7 +161,6 @@ category = "Tools"
 script = '''
 echo "Environment:"
 echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
-echo "    IS_PROD:              ${IS_PROD}"
 echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
 echo "    WASM_FILE:            ${WASM_FILE}"
 echo "    SIZE_WASM_FILE:       $(wc -c bin/${WASM_FILE} | awk '{print $1}')"
@@ -194,7 +174,6 @@ category = "Tools"
 script = '''
 echo "Environment:"
 echo "    CARGO_MAKE_PROFILE:   ${CARGO_MAKE_PROFILE}"
-echo "    IS_PROD:              ${IS_PROD}"
 echo "    CARGO_FEATURES:       ${CARGO_FEATURES}"
 echo "    WASM_FILE:            ${XCC_ROUTER_WASM_FILE}"
 echo "    SIZE_WASM_FILE:       $(wc -c bin/${XCC_ROUTER_WASM_FILE} | awk '{print $1}')"
@@ -249,14 +228,6 @@ args = [
     "aurora-engine"
 ]
 
-[tasks.build-xcc-router]
-category = "Build"
-script = '''
-cd etc/xcc-router
-cargo build --target ${ENGINE_CARGO_TARGET} --release
-cd ../..
-'''
-
 [tasks.build-engine-flow]
 category = "Build"
 dependencies = [
@@ -264,6 +235,7 @@ dependencies = [
     "build-engine",
     "make-bin-directory",
     "copy-engine-build",
+    "wasm-opt",
     "post-engine-build-env",
 ]
 
@@ -273,32 +245,63 @@ dependencies = [
     "build-engine",
     "make-bin-directory",
     "copy-engine-build",
+    "wasm-opt",
     "post-engine-build-env",
+]
+
+[tasks.build-xcc-router-inner]
+category = "Build"
+env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+script = '''
+cd etc/xcc-router
+cargo build --target ${ENGINE_CARGO_TARGET} --release
+cd ../..
+'''
+
+[tasks.build-xcc-router]
+category = "Build"
+dependencies = [
+    "build-xcc-router-inner",
+    "make-bin-directory",
+    "copy-xcc-router-build",
+    "wasm-opt-xcc-router",
+    "post-xcc-router-build-env",
 ]
 
 [tasks.build-xcc-router-flow-docker]
 category = "Build"
-dependencies = [
-    "build-xcc-router",
-    "make-bin-directory",
-    "copy-xcc-router-build",
-    "post-xcc-router-build-env",
-]
+alias = "build-xcc-router"
 
 [tasks.build-test]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
 env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
+[tasks.wasm-opt-common]
+category = "Build"
+script = '''
+  filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
+  wasm-opt -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
+  echo "File size before: [$filesize_before] and after: [$filesize_after]"
+'''
+
+[tasks.wasm-opt]
+env = { "CONTRACT_FILE" = "${WASM_FILE}" }
+category = "Build"
+run_task = "wasm-opt-common"
+
+[tasks.wasm-opt-xcc-router]
+env = { "CONTRACT_FILE" = "${XCC_ROUTER_WASM_FILE}" }
+category = "Build"
+run_task = "wasm-opt-common"
+
 [tasks.build]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.build-docker-inner]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow-docker"
@@ -306,20 +309,18 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh
 '''
 
 [tasks.build-xcc-router-docker-inner]
-condition = { profiles = ["mainnet", "testnet"] }
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-xcc-router-flow-docker"
 
 [tasks.build-xcc-docker]
-condition = { profiles = ["mainnet", "testnet"] }
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-xcc-router-entrypoint.sh ${PROFILE}
+docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-xcc-router-entrypoint.sh
 '''
 
 [tasks.test-contracts]
@@ -332,42 +333,21 @@ yarn test
 '''
 
 [tasks.test-workspace]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "custom"] }
 category = "Test"
 command = "${CARGO}"
 dependencies = ["build-test", "clone-aurora-eth-connector"]
 args = [
     "test",
     "--workspace",
-    "--exclude",
-    "aurora-engine-tests-connector",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
-    "${@}",
-]
-
-[tasks.test-connector]
-condition = { profiles = ["mainnet-silo", "testnet-silo"] }
-category = "Test"
-command = "${CARGO}"
-args = [
-    "test",
-    "-p",
-    "aurora-engine-tests-connector",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
     "${@}",
 ]
 
 [tasks.bench-modexp-test]
-condition = { profiles = ["mainnet", "testnet", "custom"] }
 category = "Test"
 command = "${CARGO}"
 args = [
     "test",
     "--release",
-    "--features",
-    "${CARGO_FEATURES_TEST}",
     "bench_m",
     "--",
     "--ignored",
@@ -375,7 +355,6 @@ args = [
 
 [tasks.clone-aurora-eth-connector]
 category = "Build"
-condition = { profiles = ["mainnet-silo", "testnet-silo"] }
 script = '''
 AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
 AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
@@ -398,7 +377,6 @@ category = "Test"
 dependencies = [
     "test-contracts",
     "test-workspace",
-    "test-connector",
 ]
 
 [tasks.bench-modexp]
@@ -416,10 +394,4 @@ dependencies = [
 ]
 
 [tasks.default]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
 run_task = "build"
-
-[tasks.deploy]
-condition = { profiles = ["mainnet", "mainnet-silo", "testnet", "testnet-silo", "localnet", "development", "custom"] }
-category = "Deploy"
-script = "${NEAR_CLI} deploy --acount-id${NEAR_EVM_ACCOUNT} --wasm-file=bin/${WASM_FILE}"

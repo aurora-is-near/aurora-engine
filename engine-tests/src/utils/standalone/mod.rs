@@ -46,10 +46,7 @@ impl StandaloneRunner {
         let tx_msg = Self::template_tx_msg(storage, env, 0, transaction_hash, &[], Vec::new());
         let result = storage.with_engine_access(env.block_height, 0, &[], |io| {
             mocks::init_evm(io, env, chain_id);
-            #[cfg(feature = "ext-connector")]
             mocks::init_connector(io);
-            #[cfg(not(feature = "ext-connector"))]
-            mocks::init_connector(io, env);
         });
         let outcome = sync::TransactionIncludedOutcome {
             hash: transaction_hash,
@@ -187,7 +184,7 @@ impl StandaloneRunner {
                 }
             }
             _ => unreachable!(),
-        };
+        }
 
         Ok(outcome)
     }
@@ -202,12 +199,12 @@ impl StandaloneRunner {
     ) -> Result<SubmitResult, engine::EngineError> {
         let mut env = self.env.clone();
         env.block_height = ctx.block_height;
-        env.attached_deposit = ctx.attached_deposit;
+        env.attached_deposit = ctx.attached_deposit.as_yoctonear();
         env.block_timestamp = env::Timestamp::new(ctx.block_timestamp);
         env.predecessor_account_id = ctx.predecessor_account_id.as_str().parse().unwrap();
         env.current_account_id = ctx.current_account_id.as_str().parse().unwrap();
         env.signer_account_id = ctx.signer_account_id.as_str().parse().unwrap();
-        env.prepaid_gas = NearGas::new(ctx.prepaid_gas);
+        env.prepaid_gas = NearGas::new(ctx.prepaid_gas.as_gas());
         if let Some(value) = block_random_value {
             env.random_seed = value;
         }
@@ -220,7 +217,7 @@ impl StandaloneRunner {
             })
             .collect();
         let transaction_kind =
-            sync::parse_transaction_kind(method_name, ctx.input.clone(), &promise_data)
+            sync::parse_transaction_kind(method_name, ctx.input.to_vec(), &promise_data)
                 .expect("All method names must be known by standalone");
 
         let transaction_hash = if let TransactionKind::SubmitWithArgs(args) = &transaction_kind {
@@ -236,7 +233,7 @@ impl StandaloneRunner {
             0,
             transaction_hash,
             promise_results,
-            ctx.input.clone(),
+            ctx.input.to_vec(),
         );
         tx_msg.transaction = transaction_kind;
 
@@ -245,11 +242,11 @@ impl StandaloneRunner {
                 use near_primitives_core::hash::CryptoHash;
                 let action_hash = CryptoHash(tx_msg.action_hash.0);
                 let random_seed = CryptoHash(env.random_seed.0);
-                near_primitives::utils::create_random_seed(u32::MAX, action_hash, random_seed)
+                near_primitives::utils::create_random_seed(action_hash, random_seed)
             };
             assert_eq!(
                 ctx.random_seed, runtime_random_value,
-                "Runtime random value should match computed value when it is specified"
+                "Runtime random value should match a computed value when it is specified"
             );
         }
 

@@ -501,7 +501,7 @@ struct PromiseInterceptor<'a, H> {
 }
 
 impl<'a, H> PromiseInterceptor<'a, H> {
-    fn new(inner: &'a mut H) -> Self {
+    const fn new(inner: &'a mut H) -> Self {
         Self {
             inner,
             promises: Vec::new(),

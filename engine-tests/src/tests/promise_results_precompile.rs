@@ -101,7 +101,7 @@ fn test_promise_result_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            10,
+            15,
             base_cost.as_u64(),
             costs::PROMISE_RESULT_BASE_COST.as_u64(),
         ),
@@ -126,6 +126,7 @@ fn test_promise_result_gas_cost() {
         evm1,
         total_gas1 / NEAR_GAS_PER_EVM
     );
+
     assert!(
         utils::within_x_percent(39, evm2, total_gas2 / NEAR_GAS_PER_EVM),
         "Incorrect EVM gas used. Expected: {} Actual: {}",

@@ -25,6 +25,3 @@ tokio = { workspace = true, features = ["time"] }
 workspace = true
 
 [features]
-mainnet-test = []
-testnet-test = []
-ext-connector = []

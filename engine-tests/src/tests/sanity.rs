@@ -5,8 +5,6 @@ use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_H
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::borsh::BorshDeserialize;
-#[cfg(not(feature = "ext-connector"))]
-use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
 use aurora_engine_types::H160;
 use libsecp256k1::SecretKey;
 use near_vm_runner::ContractCode;
@@ -140,19 +138,6 @@ fn test_total_supply_accounting() {
         constructor.deployed_at(contract_address)
     };
 
-    #[cfg(not(feature = "ext-connector"))]
-    let get_total_supply = |runner: &utils::AuroraRunner| -> Wei {
-        let result = runner
-            .one_shot()
-            .call("ft_total_eth_supply_on_aurora", "aurora", Vec::new());
-        let amount: u128 = String::from_utf8(result.unwrap().return_data.as_value().unwrap())
-            .unwrap()
-            .replace('"', "")
-            .parse()
-            .unwrap();
-        Wei::new(U256::from(amount))
-    };
-
     // Self-destruct with some benefactor does not reduce the total supply
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner
@@ -165,10 +150,8 @@ fn test_total_supply_accounting() {
         })
         .unwrap();
     assert_eq!(runner.get_balance(benefactor), TRANSFER_AMOUNT);
-    #[cfg(not(feature = "ext-connector"))]
-    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 
-    // Self-destruct with self benefactor burns any ETH in the destroyed contract
+    // Self-destruct with self-benefactor burns any ETH in the destroyed contract
     let contract = deploy_contract(&mut runner, &mut signer);
     let _submit_result = runner
         .submit_with_signer(&mut signer, |nonce| {
@@ -179,9 +162,6 @@ fn test_total_supply_accounting() {
             )
         })
         .unwrap();
-    #[cfg(not(feature = "ext-connector"))]
-    // For CANCUN hard fork `total_supply` can't change
-    assert_eq!(get_total_supply(&mut runner), INITIAL_BALANCE);
 }
 
 #[test]
@@ -207,7 +187,7 @@ fn test_transaction_to_zero_address() {
     let mut runner = utils::standalone::StandaloneRunner::default();
     runner.init_evm_with_chain_id(normalized_tx.chain_id.unwrap());
     let mut context = utils::AuroraRunner::default().context;
-    context.input = tx_bytes;
+    context.input = tx_bytes.into();
     // Prior to the fix the zero address is interpreted as None, causing a contract deployment.
     // It also incorrectly derives the sender address, so does not increment the right nonce.
     context.block_height = ZERO_ADDRESS_FIX_HEIGHT - 1;
@@ -302,8 +282,8 @@ fn test_deploy_largest_contract() {
         result.gas_used,
     );
 
-    // Less than 12 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 12);
+    // Less than 10 NEAR Tgas
+    utils::assert_gas_bound(profile.all_gas(), 10);
 }
 
 #[test]
@@ -445,20 +425,18 @@ fn test_solidity_pure_bench() {
     );
     let near_gas = profile.all_gas();
     assert!(
-        near_gas > 1400 * 1_000_000_000_000,
-        "Expected 1500 NEAR Tgas to be used, but only consumed {}",
+        near_gas > 1200 * 1_000_000_000_000 && near_gas < 1300 * 1_000_000_000_000,
+        "Expected between 1200 and 1300 NEAR TGas to be used, but consumed {}",
         near_gas / 1_000_000_000_000,
     );
 
     // Pure rust version of the same contract
     let base_path = Path::new("../etc").join("tests").join("benchmark-contract");
-    let output_path =
-        base_path.join("target/wasm32-unknown-unknown/release/benchmark_contract.wasm");
-    utils::rust::compile(base_path);
-    let contract_bytes = std::fs::read(output_path).unwrap();
+    let artifact_path = utils::rust::compile(base_path);
+    let contract_bytes = std::fs::read(artifact_path).unwrap();
     runner.set_code(ContractCode::new(contract_bytes, None));
     let mut context = runner.context.clone();
-    context.input = loop_limit.to_le_bytes().to_vec();
+    context.input = loop_limit.to_le_bytes().into();
 
     let contract = near_vm_runner::prepare(
         &runner.ext.underlying,
@@ -1075,22 +1053,6 @@ fn test_block_hash_contract() {
 
     let res = utils::panic_on_fail(result.status);
     assert!(res.is_none(), "Status: {res:?}");
-}
-
-#[cfg(not(feature = "ext-connector"))]
-#[test]
-fn test_ft_metadata() {
-    let runner = utils::deploy_runner();
-    let account_id: String = runner.context.signer_account_id.clone().into();
-    let outcome = runner
-        .one_shot()
-        .call("ft_metadata", &account_id, Vec::new())
-        .unwrap();
-    let metadata =
-        serde_json::from_slice::<FungibleTokenMetadata>(&outcome.return_data.as_value().unwrap())
-            .unwrap();
-
-    assert_eq!(metadata, FungibleTokenMetadata::default());
 }
 
 /// Tests transfer Eth from one account to another with custom argument `max_gas_price`.

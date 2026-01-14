@@ -1,10 +1,9 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
+use aurora_engine_transactions::eip_7702;
+use aurora_engine_transactions::eip_7702::{SignedTransaction7702, Transaction7702};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshDeserialize;
-#[cfg(not(feature = "ext-connector"))]
-use aurora_engine_types::parameters::connector::FungibleTokenMetadata;
-#[cfg(feature = "ext-connector")]
 use aurora_engine_types::parameters::connector::{
     SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
@@ -16,6 +15,8 @@ use libsecp256k1::{self, Message, PublicKey, SecretKey};
 use near_parameters::{RuntimeConfigStore, RuntimeFeesConfig};
 use near_primitives::version::PROTOCOL_VERSION;
 use near_primitives_core::config::ViewConfig;
+use near_primitives_core::gas::Gas;
+use near_primitives_core::types::Balance;
 use near_vm_runner::logic::errors::FunctionCallError;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::ReturnData;
@@ -23,10 +24,9 @@ use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
 use near_vm_runner::{ContractCode, MockContractRuntimeCache, ProfileDataV3};
 use rlp::RlpStream;
 use std::borrow::Cow;
+use std::rc::Rc;
 use std::sync::Arc;
 
-#[cfg(not(feature = "ext-connector"))]
-use crate::prelude::parameters::InitCallArgs;
 use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
     eip_1559::{self, SignedTransaction1559, Transaction1559},
@@ -40,7 +40,7 @@ pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
 pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
 pub const PAUSE_PRECOMPILES: &str = "pause_precompiles";
-pub const PAUSED_PRECOMPILES: &str = "paused_precompiles";
+pub const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
@@ -155,7 +155,7 @@ impl OneShotAuroraRunner<'_> {
         .unwrap();
 
         if let Some(aborted) = outcome.aborted.as_ref() {
-            Err(into_engine_error(outcome.used_gas, aborted))
+            Err(into_engine_error(outcome.used_gas.as_gas(), aborted))
         } else {
             Ok(outcome)
         }
@@ -163,7 +163,7 @@ impl OneShotAuroraRunner<'_> {
 }
 
 impl AuroraRunner {
-    pub fn one_shot(&self) -> OneShotAuroraRunner {
+    pub fn one_shot(&self) -> OneShotAuroraRunner<'_> {
         OneShotAuroraRunner {
             base: self,
             ext: self.ext.clone(),
@@ -179,7 +179,7 @@ impl AuroraRunner {
     ) {
         context.block_height += 1;
         context.block_timestamp += 1_000_000_000;
-        context.input = input;
+        context.input = input.into();
         context.signer_account_id = signer_account_id.parse().unwrap();
         context.predecessor_account_id = caller_account_id.parse().unwrap();
     }
@@ -214,7 +214,7 @@ impl AuroraRunner {
                 PromiseResult::Failed => near_vm_runner::logic::types::PromiseResult::Failed,
                 PromiseResult::NotReady => near_vm_runner::logic::types::PromiseResult::NotReady,
                 PromiseResult::Successful(bytes) => {
-                    near_vm_runner::logic::types::PromiseResult::Successful(bytes.clone())
+                    near_vm_runner::logic::types::PromiseResult::Successful(Rc::from(bytes.clone()))
                 }
             })
             .collect();
@@ -238,7 +238,7 @@ impl AuroraRunner {
         .unwrap();
 
         if let Some(error) = outcome.aborted.as_ref() {
-            return Err(into_engine_error(outcome.used_gas, error));
+            return Err(into_engine_error(outcome.used_gas.as_gas(), error));
         }
 
         self.context.storage_usage = outcome.storage_usage;
@@ -315,52 +315,6 @@ impl AuroraRunner {
         trie.insert(balance_key.to_vec(), balance_value.to_vec());
         if !init_nonce.is_zero() {
             trie.insert(nonce_key.to_vec(), nonce_value.to_vec());
-        }
-
-        #[cfg(not(feature = "ext-connector"))]
-        {
-            use aurora_engine::contract_methods::connector::fungible_token::FungibleToken;
-            let ft_key = crate::prelude::storage::bytes_to_key(
-                crate::prelude::storage::KeyPrefix::EthConnector,
-                &[crate::prelude::storage::EthConnectorStorageId::FungibleToken.into()],
-            );
-            let ft_value = {
-                let mut current_ft: FungibleToken = trie
-                    .get(&ft_key)
-                    .map(|bytes| FungibleToken::try_from_slice(bytes).unwrap())
-                    .unwrap_or_default();
-                current_ft.total_eth_supply_on_near = current_ft.total_eth_supply_on_near
-                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
-                current_ft.total_eth_supply_on_aurora = current_ft.total_eth_supply_on_aurora
-                    + aurora_engine_types::types::NEP141Wei::new(init_balance.raw().as_u128());
-                current_ft
-            };
-
-            let aurora_balance_key = [
-                ft_key.as_slice(),
-                self.context.current_account_id.as_bytes(),
-            ]
-            .concat();
-            let aurora_balance_value = {
-                let mut current_balance: u128 = trie
-                    .get(&aurora_balance_key)
-                    .map(|bytes| u128::try_from_slice(bytes).unwrap())
-                    .unwrap_or_default();
-                current_balance += init_balance.raw().as_u128();
-                current_balance
-            };
-
-            let proof_key = crate::prelude::storage::bytes_to_key(
-                crate::prelude::storage::KeyPrefix::EthConnector,
-                &[crate::prelude::storage::EthConnectorStorageId::UsedEvent.into()],
-            );
-
-            trie.insert(ft_key, borsh::to_vec(&ft_value).unwrap());
-            trie.insert(proof_key, vec![0]);
-            trie.insert(
-                aurora_balance_key,
-                borsh::to_vec(&aurora_balance_value).unwrap(),
-            );
         }
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
@@ -480,7 +434,7 @@ impl AuroraRunner {
         let input = borsh::to_vec(&args).unwrap();
         let mut runner = self.one_shot();
         runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
+            max_gas_burnt: Gas::MAX,
         });
 
         runner.call("view", "viewer", input).map(|outcome| {
@@ -496,7 +450,7 @@ impl AuroraRunner {
         let mut runner = self.one_shot();
 
         runner.context.view_config = Some(ViewConfig {
-            max_gas_burnt: u64::MAX,
+            max_gas_burnt: Gas::MAX,
         });
 
         let (outcome, profile) = runner.profiled_call("view", "viewer", input)?;
@@ -599,31 +553,11 @@ impl AuroraRunner {
     }
 
     pub fn get_engine_code() -> Vec<u8> {
-        let path = if cfg!(feature = "mainnet-test") {
-            if cfg!(feature = "ext-connector") {
-                "../bin/aurora-mainnet-silo-test.wasm"
-            } else {
-                "../bin/aurora-mainnet-test.wasm"
-            }
-        } else if cfg!(feature = "testnet-test") {
-            if cfg!(feature = "ext-connector") {
-                "../bin/aurora-testnet-silo-test.wasm"
-            } else {
-                "../bin/aurora-testnet-test.wasm"
-            }
-        } else {
-            panic!("AuroraRunner requires mainnet-test or testnet-test feature enabled.")
-        };
-
-        std::fs::read(path).unwrap()
+        std::fs::read("../bin/aurora-engine-test.wasm").expect("Failed to read engine code")
     }
 
     pub fn get_engine_v331_code() -> Vec<u8> {
-        let path = if cfg!(feature = "ext-connector") {
-            "src/tests/res/aurora_silo_v3.3.1.wasm"
-        } else {
-            "src/tests/res/aurora_v3.3.1.wasm"
-        };
+        let path = "src/tests/res/aurora_v3.3.1.wasm";
         std::fs::read(path).unwrap()
     }
 
@@ -635,7 +569,7 @@ impl AuroraRunner {
         Arc::get_mut(&mut self.wasm_config)
             .unwrap()
             .limit_config
-            .max_gas_burnt = max_gas_burnt;
+            .max_gas_burnt = Gas::from_gas(max_gas_burnt);
     }
 
     pub fn set_code(&mut self, code: ContractCode) {
@@ -665,17 +599,19 @@ impl Default for AuroraRunner {
                 current_account_id: origin_account_id.clone(),
                 signer_account_id: origin_account_id.clone(),
                 signer_account_pk: vec![],
-                predecessor_account_id: origin_account_id,
-                input: vec![],
-                promise_results: Arc::new([]),
+                predecessor_account_id: origin_account_id.clone(),
+                refund_to_account_id: origin_account_id,
+                input: Rc::default(),
+                promise_results: Arc::default(),
                 block_height: 0,
                 block_timestamp: 0,
                 epoch_height: 0,
-                account_balance: 10u128.pow(25),
-                account_locked_balance: 0,
+                account_balance: Balance::from_near(10),
+                account_locked_balance: Balance::ZERO,
                 storage_usage: 100,
-                attached_deposit: 0,
-                prepaid_gas: 10u64.pow(18),
+                account_contract: near_primitives_core::account::AccountContract::None,
+                attached_deposit: Balance::ZERO,
+                prepaid_gas: Gas::MAX,
                 random_seed: vec![],
                 output_data_receivers: vec![],
                 view_config: None,
@@ -702,12 +638,12 @@ impl ExecutionProfile {
     pub fn new(outcome: &VMOutcome) -> Self {
         Self {
             host_breakdown: outcome.profile.clone(),
-            total_gas_cost: outcome.burnt_gas,
+            total_gas_cost: outcome.burnt_gas.as_gas(),
         }
     }
 
     pub fn wasm_gas(&self) -> u64 {
-        self.host_breakdown.get_wasm_cost()
+        self.host_breakdown.get_wasm_cost().as_gas()
     }
 
     pub const fn all_gas(&self) -> u64 {
@@ -731,21 +667,6 @@ pub fn deploy_runner() -> AuroraRunner {
 
     assert!(result.is_ok());
 
-    #[cfg(not(feature = "ext-connector"))]
-    let result = {
-        let args = InitCallArgs {
-            prover_account: str_to_account_id("prover.near"),
-            eth_custodian_address: "d045f7e19B2488924B97F9c145b5E51D0D895A65".to_string(),
-            metadata: FungibleTokenMetadata::default(),
-        };
-        runner.call(
-            "new_eth_connector",
-            &account_id,
-            borsh::to_vec(&args).unwrap(),
-        )
-    };
-
-    #[cfg(feature = "ext-connector")]
     let result = {
         let args = SetEthConnectorContractAccountArgs {
             account: AccountId::new("aurora_eth_connector.root").unwrap(),
@@ -938,6 +859,28 @@ pub fn sign_eip_1559_transaction(
     let s = U256::from_big_endian(&signature.s.b32());
 
     SignedTransaction1559 {
+        transaction: tx,
+        parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
+pub fn sign_eip_7702_transaction(
+    tx: Transaction7702,
+    secret_key: &SecretKey,
+) -> SignedTransaction7702 {
+    let mut rlp_stream = RlpStream::new();
+    rlp_stream.append(&eip_7702::TYPE_BYTE);
+    tx.rlp_append_unsigned(&mut rlp_stream);
+    let message_hash = sdk::keccak(rlp_stream.as_raw());
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    SignedTransaction7702 {
         transaction: tx,
         parity: recovery_id.serialize(),
         r,

@@ -1,4 +1,5 @@
 use aurora_engine::engine::EngineError;
+use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
 use rand::{Rng, SeedableRng};
 
@@ -84,7 +85,7 @@ fn bench_modexp() {
 
 // This test is marked as ignored because it should only be run with `--release`
 // specified (it requires the standalone engine to be compiled with an optimized build).
-// This test can be run with `cargo make --profile mainnet bench-modexp`
+// This test can be run with the command: `cargo make bench-modexp`
 #[ignore]
 #[test]
 fn bench_modexp_standalone() {
@@ -238,11 +239,11 @@ impl BenchInput {
 #[derive(Debug)]
 struct BenchResult {
     /// Amount of Near gas used by Aurora's modexp implementation
-    aurora: u64,
+    aurora: Gas,
     /// Amount of Near gas used by ibig crate modexp implementation
-    ibig: u64,
+    ibig: Gas,
     /// Amount of Near gas used by num crate modexp implementation
-    num: Result<u64, EngineError>,
+    num: Result<Gas, EngineError>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -254,7 +255,7 @@ enum Implementation {
 
 impl BenchResult {
     fn least(&self) -> Implementation {
-        let num = self.num.as_ref().copied().unwrap_or(u64::MAX);
+        let num = self.num.as_ref().copied().unwrap_or(Gas::MAX);
 
         if self.aurora <= self.ibig && self.aurora <= num {
             Implementation::Aurora
@@ -313,10 +314,8 @@ impl Default for ModExpBenchContext {
             let base_path = std::path::Path::new("../etc")
                 .join("tests")
                 .join("modexp-bench");
-            let output_path =
-                base_path.join("target/wasm32-unknown-unknown/release/modexp_bench.wasm");
-            utils::rust::compile(base_path);
-            std::fs::read(output_path).unwrap()
+            let artifact_path = utils::rust::compile(base_path);
+            std::fs::read(artifact_path).unwrap()
         };
 
         // Standalone not relevant here because this is not an Aurora Engine instance

@@ -205,7 +205,7 @@ fn test_xcc_schedule_gas() {
         )
         .unwrap();
     assert!(
-        outcome.burnt_gas < costs::ROUTER_SCHEDULE.as_u64(),
+        outcome.burnt_gas.as_gas() < costs::ROUTER_SCHEDULE.as_u64(),
         "{:?} not less than {:?}",
         outcome.burnt_gas,
         costs::ROUTER_SCHEDULE
@@ -252,7 +252,7 @@ fn test_xcc_exec_gas() {
         let router_exec_cost = costs::ROUTER_EXEC_BASE
             + NearGas::new(callback_count * costs::ROUTER_EXEC_PER_CALLBACK.as_u64());
         assert!(
-            outcome.burnt_gas < router_exec_cost.as_u64(),
+            outcome.burnt_gas.as_gas() < router_exec_cost.as_u64(),
             "{:?} not less than {:?}",
             outcome.burnt_gas,
             router_exec_cost
@@ -269,14 +269,17 @@ fn test_xcc_exec_gas() {
                 } => {
                     assert_eq!(method_name, promise.method.as_bytes());
                     assert_eq!(args, &promise.args);
-                    assert_eq!(attached_deposit, &promise.attached_balance.as_u128());
-                    assert_eq!(prepaid_gas, &promise.attached_gas.as_u64());
+                    assert_eq!(
+                        attached_deposit.as_yoctonear(),
+                        promise.attached_balance.as_u128()
+                    );
+                    assert_eq!(prepaid_gas.as_gas(), promise.attached_gas.as_u64());
                 }
                 MockAction::CreateReceipt { receiver_id, .. } => {
                     assert_eq!(receiver_id.as_bytes(), promise.target_account_id.as_bytes());
                 }
                 other => panic!("Unexpected action {other:?}"),
-            };
+            }
         }
 
         router.ext.underlying.action_log.clear();
@@ -300,16 +303,14 @@ fn deploy_router() -> AuroraRunner {
             init_args.as_bytes().to_vec(),
         )
         .unwrap();
-    assert!(outcome.used_gas < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
+    assert!(outcome.used_gas.as_gas() < aurora_engine::xcc::INITIALIZE_GAS.as_u64());
 
     router
 }
 
 fn deploy_erc20(runner: &mut AuroraRunner, signer: &utils::Signer) -> ERC20 {
     let engine_account = runner.aurora_account_id.clone();
-    let args = aurora_engine::parameters::DeployErc20TokenArgs {
-        nep141: "wrap.near".parse().unwrap(),
-    };
+    let args: AccountId = "wrap.near".parse().unwrap();
     let outcome = runner
         .call(
             "deploy_erc20_token",
@@ -359,9 +360,8 @@ fn approve_erc20(
 
 pub fn contract_bytes() -> Vec<u8> {
     let base_path = Path::new(XCC_ROUTER_BASE_PATH);
-    let output_path = base_path.join("target/wasm32-unknown-unknown/release/xcc_router.wasm");
-    utils::rust::compile(base_path);
-    fs::read(output_path).unwrap()
+    let artifact_path = utils::rust::compile(base_path);
+    fs::read(artifact_path).unwrap()
 }
 
 pub fn router_version() -> u32 {
@@ -408,7 +408,8 @@ pub mod workspace {
     use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_engine_v331, deploy_erc20_from_nep_141,
-        deploy_nep_141, get_xcc_router_version, nep_141_balance_of, transfer_nep_141_to_erc_20,
+        deploy_erc20_from_nep_141_legacy, deploy_nep_141, get_xcc_router_version,
+        nep_141_balance_of, transfer_nep_141_to_erc_20,
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
@@ -946,7 +947,11 @@ pub mod workspace {
 
         // Setup wNEAR contract and bridge it to Aurora
         let wnear_contract = deploy_wnear(&aurora).await?;
-        let wnear_erc20 = deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora).await?;
+        let wnear_erc20 = if use_v331 {
+            deploy_erc20_from_nep_141_legacy(wnear_contract.id().as_ref(), &aurora).await?
+        } else {
+            deploy_erc20_from_nep_141(wnear_contract.id().as_ref(), &aurora).await?
+        };
 
         transfer_nep_141_to_erc_20(
             &wnear_contract,
@@ -1015,7 +1020,7 @@ pub mod workspace {
             .await?;
         if !result.is_success() {
             return Err(anyhow::Error::msg("Failed Approve transaction"));
-        };
+        }
         Ok(())
     }
 
@@ -1103,10 +1108,8 @@ pub mod workspace {
     async fn deploy_fibonacci(aurora: &EngineContract) -> anyhow::Result<AccountId> {
         let fib_contract_bytes = {
             let base_path = Path::new("..").join("etc").join("tests").join("fibonacci");
-            let output_path =
-                base_path.join("target/wasm32-unknown-unknown/release/fibonacci_on_near.wasm");
-            utils::rust::compile(base_path);
-            std::fs::read(output_path)?
+            let artifact_path = utils::rust::compile(base_path);
+            std::fs::read(artifact_path)?
         };
         let fib_account =
             create_sub_account(&aurora.root(), "fib", NearToken::from_near(50)).await?;

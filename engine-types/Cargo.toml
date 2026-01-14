@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-types"
-version = "1.2.0"
+version = "2.0.0"
 description = "Essential types which used in Aurora Engine"
 autobenches = false
 keywords.workspace = true
@@ -13,11 +13,10 @@ readme.workspace = true
 publish = true
 
 [dependencies]
-base64.workspace = true
 borsh.workspace = true
 bs58.workspace = true
 hex.workspace = true
-primitive-types.workspace = true
+primitive-types = { workspace = true, features = ["byteorder"] }
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -30,6 +29,7 @@ workspace = true
 
 [features]
 default = ["std"]
+byteorder = ["primitive-types/byteorder"]
 std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std", "rlp/std"]
 # `primitive-types/std` is excluded because it's `std` implementation includes a transitive
 # dependency on `getrandom` which uses OS call to obtain entropy. Such calls are not

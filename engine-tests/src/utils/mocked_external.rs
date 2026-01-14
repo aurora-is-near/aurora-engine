@@ -2,8 +2,11 @@ use near_crypto::PublicKey;
 use near_primitives_core::hash::CryptoHash;
 use near_primitives_core::types::GasWeight;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
-use near_vm_runner::logic::types::{AccountId, Balance, Gas, ReceiptIndex};
-use near_vm_runner::logic::{StorageGetMode, TrieNodesCount, VMLogicError};
+use near_vm_runner::logic::types::{
+    AccountId, ActionIndex, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier,
+    ReceiptIndex,
+};
+use near_vm_runner::logic::{StorageAccessTracker, VMLogicError};
 use std::cell::Cell;
 
 /// Derived from mainnet data reported here: `https://hackmd.io/@birchmd/r1HRjr0P9`
@@ -51,46 +54,45 @@ impl MockedExternalWithTrie {
 }
 
 impl near_vm_runner::logic::External for MockedExternalWithTrie {
-    fn storage_set(&mut self, key: &[u8], value: &[u8]) -> Result<(), VMLogicError> {
+    fn storage_set(
+        &mut self,
+        access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<Option<Vec<u8>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TRIE_DEPTH);
-        self.underlying.storage_set(key, value)
+        self.underlying.storage_set(access_tracker, key, value)
     }
 
     fn storage_get<'a>(
         &'a self,
+        access_tracker: &mut dyn StorageAccessTracker,
         key: &[u8],
-        mode: StorageGetMode,
     ) -> Result<Option<Box<dyn near_vm_runner::logic::ValuePtr + 'a>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TOUCHED_TRIE_PER_READ);
         self.increment_cached_trie_node_count(MAINNET_AVERAGE_READ_CACHED_TRIE_PER_READ);
-        self.underlying.storage_get(key, mode)
+        self.underlying.storage_get(access_tracker, key)
     }
 
-    fn storage_remove(&mut self, key: &[u8]) -> Result<(), VMLogicError> {
+    fn storage_remove(
+        &mut self,
+        access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+    ) -> Result<Option<Vec<u8>>, VMLogicError> {
         self.increment_new_trie_node_count(MAINNET_AVERAGE_TRIE_DEPTH);
-        self.underlying.storage_remove(key)
+        self.underlying.storage_remove(access_tracker, key)
     }
 
-    fn storage_remove_subtree(&mut self, prefix: &[u8]) -> Result<(), VMLogicError> {
-        self.underlying.storage_remove_subtree(prefix)
-    }
-
-    fn storage_has_key(&mut self, key: &[u8], mode: StorageGetMode) -> Result<bool, VMLogicError> {
-        self.underlying.storage_has_key(key, mode)
+    fn storage_has_key(
+        &mut self,
+        access_tracker: &mut dyn StorageAccessTracker,
+        key: &[u8],
+    ) -> Result<bool, VMLogicError> {
+        self.underlying.storage_has_key(access_tracker, key)
     }
 
     fn generate_data_id(&mut self) -> CryptoHash {
         self.underlying.generate_data_id()
-    }
-
-    fn get_trie_nodes_count(&self) -> TrieNodesCount {
-        let db_reads = self.new_trie_node_count.get();
-        let mem_reads = self.cached_trie_node_count.get();
-
-        TrieNodesCount {
-            db_reads,
-            mem_reads,
-        }
     }
 
     fn get_recorded_storage_size(&self) -> usize {
@@ -143,6 +145,50 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
     ) -> Result<(), VMLogicError> {
         self.underlying
             .append_action_deploy_contract(receipt_index, code)
+    }
+
+    fn append_action_deploy_global_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        code: Vec<u8>,
+        mode: GlobalContractDeployMode,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_deploy_global_contract(receipt_index, code, mode)
+    }
+
+    fn append_action_use_global_contract(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        contract_id: GlobalContractIdentifier,
+    ) -> Result<(), VMLogicError> {
+        self.underlying
+            .append_action_use_global_contract(receipt_index, contract_id)
+    }
+
+    fn append_action_deterministic_state_init(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        contract_id: GlobalContractIdentifier,
+        amount: Balance,
+    ) -> Result<ActionIndex, VMLogicError> {
+        self.underlying
+            .append_action_deterministic_state_init(receipt_index, contract_id, amount)
+    }
+
+    fn set_deterministic_state_init_data_entry(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        action_index: ActionIndex,
+        key: Vec<u8>,
+        value: Vec<u8>,
+    ) -> Result<(), VMLogicError> {
+        self.underlying.set_deterministic_state_init_data_entry(
+            receipt_index,
+            action_index,
+            key,
+            value,
+        )
     }
 
     fn append_action_function_call_weight(
@@ -228,5 +274,9 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
 
     fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {
         self.underlying.get_receipt_receiver(receipt_index)
+    }
+
+    fn set_refund_to(&mut self, receipt_index: ReceiptIndex, refund_to: AccountId) {
+        self.underlying.set_refund_to(receipt_index, refund_to);
     }
 }

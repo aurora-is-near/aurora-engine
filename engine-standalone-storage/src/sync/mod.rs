@@ -1,15 +1,13 @@
 use crate::engine_state::EngineStateAccess;
 use aurora_engine::contract_methods::silo;
-use aurora_engine::{
-    contract_methods, engine,
-    parameters::{self, SubmitResult},
-};
+use aurora_engine::{contract_methods, parameters::SubmitResult};
 use aurora_engine_modexp::ModExpAlgorithm;
 use aurora_engine_sdk::{
     env::{self, DEFAULT_PREPAID_GAS},
     io::IO,
 };
 use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::parameters::{connector, engine, PromiseOrValue};
 use aurora_engine_types::types::NearGas;
 use aurora_engine_types::{
     account_id::AccountId,
@@ -48,35 +46,38 @@ pub fn parse_transaction_kind(
             TransactionKind::Submit(eth_tx)
         }
         TransactionKindTag::SubmitWithArgs => {
-            let args = parameters::SubmitArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::SubmitArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SubmitWithArgs(args)
         }
         TransactionKindTag::Call => {
-            let call_args = parameters::CallArgs::deserialize(&bytes).ok_or_else(|| {
+            let call_args = engine::CallArgs::deserialize(&bytes).ok_or_else(|| {
                 ParseTransactionKindError::failed_deserialization::<io::Error>(tx_kind_tag, None)
             })?;
             TransactionKind::Call(call_args)
         }
         TransactionKindTag::PausePrecompiles => {
-            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::PausePrecompiles(args)
         }
         TransactionKindTag::ResumePrecompiles => {
-            let args = parameters::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::PausePrecompilesCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::ResumePrecompiles(args)
         }
         TransactionKindTag::SetOwner => {
-            let args = parameters::SetOwnerArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::SetOwnerArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetOwner(args)
         }
         TransactionKindTag::Deploy => TransactionKind::Deploy(bytes),
         TransactionKindTag::DeployErc20 => {
-            let deploy_args =
-                parameters::DeployErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            let deploy_args = engine::DeployErc20TokenArgs::deserialize(&bytes).map_err(f)?;
             TransactionKind::DeployErc20(deploy_args)
         }
+        TransactionKindTag::DeployErc20Callback => {
+            let args = AccountId::try_from_slice(&bytes).map_err(f)?;
+            TransactionKind::DeployErc20Callback(args)
+        }
         TransactionKindTag::FtOnTransfer => {
-            let transfer_args: parameters::NEP141FtOnTransferArgs =
+            let transfer_args: connector::FtOnTransferArgs =
                 serde_json::from_slice(bytes.as_slice()).map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
@@ -85,7 +86,7 @@ pub fn parse_transaction_kind(
         }
         TransactionKindTag::Deposit => TransactionKind::Deposit(bytes),
         TransactionKindTag::FtTransferCall => {
-            let transfer_args: parameters::TransferCallCallArgs =
+            let transfer_args: connector::FtTransferCallArgs =
                 serde_json::from_slice(bytes.as_slice()).map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
@@ -93,11 +94,11 @@ pub fn parse_transaction_kind(
             TransactionKind::FtTransferCall(transfer_args)
         }
         TransactionKindTag::FinishDeposit => {
-            let args = parameters::FinishDepositCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::FinishDepositArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::FinishDeposit(args)
         }
         TransactionKindTag::ResolveTransfer => {
-            let args = parameters::ResolveTransferCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::FtResolveTransferArgs::try_from_slice(&bytes).map_err(f)?;
             let promise_result = promise_data
                 .first()
                 .and_then(Option::as_ref)
@@ -107,7 +108,7 @@ pub fn parse_transaction_kind(
             TransactionKind::ResolveTransfer(args, promise_result)
         }
         TransactionKindTag::FtTransfer => {
-            let args: parameters::TransferCallArgs = serde_json::from_slice(bytes.as_slice())
+            let args: connector::FtTransferArgs = serde_json::from_slice(bytes.as_slice())
                 .map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
@@ -115,12 +116,11 @@ pub fn parse_transaction_kind(
             TransactionKind::FtTransfer(args)
         }
         TransactionKindTag::Withdraw => {
-            let args = aurora_engine_types::parameters::WithdrawCallArgs::try_from_slice(&bytes)
-                .map_err(f)?;
+            let args = connector::WithdrawCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::Withdraw(args)
         }
         TransactionKindTag::StorageDeposit => {
-            let args: parameters::StorageDepositCallArgs = serde_json::from_slice(bytes.as_slice())
+            let args: connector::StorageDepositArgs = serde_json::from_slice(bytes.as_slice())
                 .map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
@@ -140,15 +140,15 @@ pub fn parse_transaction_kind(
             TransactionKind::StorageUnregister(force)
         }
         TransactionKindTag::StorageWithdraw => {
-            let args: parameters::StorageWithdrawCallArgs =
-                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+            let args: connector::StorageWithdrawArgs = serde_json::from_slice(bytes.as_slice())
+                .map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
 
             TransactionKind::StorageWithdraw(args)
         }
         TransactionKindTag::SetPausedFlags => {
-            let args = parameters::PauseEthConnectorCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::PauseEthConnectorArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetPausedFlags(args)
         }
         TransactionKindTag::RegisterRelayer => {
@@ -161,21 +161,21 @@ pub fn parse_transaction_kind(
             if promise_data.first().and_then(Option::as_ref).is_none() {
                 TransactionKind::ExitToNear(None)
             } else {
-                let args = aurora_engine_types::parameters::ExitToNearPrecompileCallbackCallArgs::try_from_slice(&bytes)
-                             .map_err(f)?;
+                let args = connector::ExitToNearPrecompileCallbackArgs::try_from_slice(&bytes)
+                    .map_err(f)?;
                 TransactionKind::ExitToNear(Some(args))
             }
         }
         TransactionKindTag::SetConnectorData => {
-            let args = parameters::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetConnectorData(args)
         }
         TransactionKindTag::NewConnector => {
-            let args = parameters::InitCallArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::InitCallArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::NewConnector(args)
         }
         TransactionKindTag::NewEngine => {
-            let args = parameters::NewCallArgs::deserialize(&bytes).map_err(|e| {
+            let args = engine::NewCallArgs::deserialize(&bytes).map_err(|e| {
                 ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
             })?;
             TransactionKind::NewEngine(args)
@@ -196,7 +196,7 @@ pub fn parse_transaction_kind(
             TransactionKind::WithdrawWnearToRouter(args)
         }
         TransactionKindTag::SetUpgradeDelayBlocks => {
-            let args = parameters::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::SetUpgradeDelayBlocksArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetUpgradeDelayBlocks(args)
         }
         TransactionKindTag::FundXccSubAccount => {
@@ -206,30 +206,30 @@ pub fn parse_transaction_kind(
         TransactionKindTag::PauseContract => TransactionKind::PauseContract,
         TransactionKindTag::ResumeContract => TransactionKind::ResumeContract,
         TransactionKindTag::SetKeyManager => {
-            let args: parameters::RelayerKeyManagerArgs = serde_json::from_slice(bytes.as_slice())
+            let args: engine::RelayerKeyManagerArgs = serde_json::from_slice(bytes.as_slice())
                 .map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
             TransactionKind::SetKeyManager(args)
         }
         TransactionKindTag::AddRelayerKey => {
-            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::AddRelayerKey(args)
         }
         TransactionKindTag::StoreRelayerKeyCallback => {
-            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::StoreRelayerKeyCallback(args)
         }
         TransactionKindTag::RemoveRelayerKey => {
-            let args = parameters::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::RelayerKeyArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::RemoveRelayerKey(args)
         }
         TransactionKindTag::StartHashchain => {
-            let args = parameters::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = engine::StartHashchainArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::StartHashchain(args)
         }
         TransactionKindTag::SetErc20Metadata => {
-            let args: parameters::SetErc20MetadataArgs =
+            let args: connector::SetErc20MetadataArgs =
                 serde_json::from_slice(&bytes).map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
@@ -271,12 +271,12 @@ pub fn parse_transaction_kind(
             TransactionKind::RemoveEntryFromWhitelist(args)
         }
         TransactionKindTag::SetEthConnectorContractAccount => {
-            let args = parameters::SetEthConnectorContractAccountArgs::try_from_slice(&bytes)
-                .map_err(f)?;
+            let args =
+                connector::SetEthConnectorContractAccountArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::SetEthConnectorContractAccount(args)
         }
         TransactionKindTag::MirrorErc20TokenCallback => {
-            let args = parameters::MirrorErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::MirrorErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
             TransactionKind::MirrorErc20TokenCallback(args)
         }
         TransactionKindTag::Unknown => {
@@ -500,9 +500,21 @@ fn non_submit_execute<I: IO + Copy>(
             Some(TransactionExecutionResult::Submit(Ok(result)))
         }
         TransactionKind::DeployErc20(_) => {
-            // No promises can be created by `deploy_erc20_token`
             let mut handler = crate::promise::NoScheduler { promise_data };
             let result = contract_methods::connector::deploy_erc20_token(io, env, &mut handler)?;
+
+            Some(match result {
+                PromiseOrValue::Value(address) => TransactionExecutionResult::DeployErc20(address),
+                PromiseOrValue::Promise(promise_args) => {
+                    TransactionExecutionResult::Promise(promise_args)
+                }
+            })
+        }
+        TransactionKind::DeployErc20Callback(_) => {
+            // No promises can be created by `deploy_erc20_token_callback`
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let result =
+                contract_methods::connector::deploy_erc20_token_callback(io, env, &mut handler)?;
 
             Some(TransactionExecutionResult::DeployErc20(result))
         }
@@ -513,100 +525,18 @@ fn non_submit_execute<I: IO + Copy>(
 
             maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
-        TransactionKind::FtTransferCall(_) => {
-            #[cfg(feature = "ext-connector")]
-            return Ok(None);
-
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let mut handler = crate::promise::NoScheduler { promise_data };
-                let maybe_promise_args =
-                    contract_methods::connector::ft_transfer_call(io, env, &mut handler)?;
-
-                maybe_promise_args.map(TransactionExecutionResult::Promise)
-            }
-        }
-        TransactionKind::ResolveTransfer(_, _) => {
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let handler = crate::promise::NoScheduler { promise_data };
-                contract_methods::connector::ft_resolve_transfer(io, env, &handler)?;
-            }
-
-            None
-        }
-        TransactionKind::FtTransfer(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::ft_transfer(io, env)?;
-
-            None
-        }
-        TransactionKind::Withdraw(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::withdraw(io, env)?;
-
-            None
-        }
-        TransactionKind::Deposit(_) => {
-            #[cfg(feature = "ext-connector")]
-            return Ok(None);
-
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let mut handler = crate::promise::NoScheduler { promise_data };
-                let maybe_promise_args =
-                    contract_methods::connector::deposit(io, env, &mut handler)?;
-                maybe_promise_args.map(TransactionExecutionResult::Promise)
-            }
-        }
-
-        TransactionKind::FinishDeposit(_) => {
-            #[cfg(feature = "ext-connector")]
-            return Ok(None);
-
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let mut handler = crate::promise::NoScheduler { promise_data };
-                let maybe_promise_args =
-                    contract_methods::connector::finish_deposit(io, env, &mut handler)?;
-
-                maybe_promise_args.map(TransactionExecutionResult::Promise)
-            }
-        }
-
-        TransactionKind::StorageDeposit(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let mut handler = crate::promise::NoScheduler { promise_data };
-                contract_methods::connector::storage_deposit(io, env, &mut handler)?;
-            }
-
-            None
-        }
-        TransactionKind::StorageUnregister(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            {
-                let mut handler = crate::promise::NoScheduler { promise_data };
-                contract_methods::connector::storage_unregister(io, env, &mut handler)?;
-            }
-
-            None
-        }
-        TransactionKind::StorageWithdraw(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::storage_withdraw(io, env)?;
-
-            None
-        }
-        TransactionKind::SetPausedFlags(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::set_paused_flags(io, env)?;
-
-            None
-        }
+        TransactionKind::FtTransferCall(_) => None,
+        TransactionKind::ResolveTransfer(_, _) => None,
+        TransactionKind::FtTransfer(_) => None,
+        TransactionKind::Withdraw(_) => None,
+        TransactionKind::Deposit(_) => None,
+        TransactionKind::FinishDeposit(_) => None,
+        TransactionKind::StorageDeposit(_) => None,
+        TransactionKind::StorageUnregister(_) => None,
+        TransactionKind::StorageWithdraw(_) => None,
+        TransactionKind::SetPausedFlags(_) => None,
         TransactionKind::RegisterRelayer(_) => {
             contract_methods::admin::register_relayer(io, env)?;
-
             None
         }
         TransactionKind::ExitToNear(_) => {
@@ -619,27 +549,14 @@ fn non_submit_execute<I: IO + Copy>(
 
             maybe_result.map(|submit_result| TransactionExecutionResult::Submit(Ok(submit_result)))
         }
-        TransactionKind::SetConnectorData(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::set_eth_connector_contract_data(io, env)?;
-
-            None
-        }
-        TransactionKind::NewConnector(_) => {
-            #[cfg(not(feature = "ext-connector"))]
-            contract_methods::connector::new_eth_connector(io, env)?;
-
-            None
-        }
+        TransactionKind::SetConnectorData(_) => None,
+        TransactionKind::NewConnector(_) => None,
         TransactionKind::NewEngine(_) => {
             contract_methods::admin::new(io, env)?;
-
             None
         }
         TransactionKind::SetEthConnectorContractAccount(_) => {
-            #[cfg(feature = "ext-connector")]
             contract_methods::connector::set_eth_connector_contract_account(io, env)?;
-
             None
         }
         TransactionKind::FactoryUpdate(_) => {
@@ -808,115 +725,30 @@ impl TransactionIncludedOutcome {
         match self.maybe_result.as_ref() {
             Err(_) | Ok(Some(TransactionExecutionResult::Submit(Err(_)))) => (), // do not persist if Engine encounters an error
             _ => storage.set_transaction_included(self.hash, &self.info, &self.diff)?,
-        };
+        }
         Ok(())
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransactionExecutionResult {
-    Submit(engine::EngineResult<SubmitResult>),
+    Submit(aurora_engine::engine::EngineResult<SubmitResult>),
     DeployErc20(Address),
     Promise(PromiseWithCallbackArgs),
 }
 
 pub mod error {
-    use aurora_engine::contract_methods::connector::errors;
-    use aurora_engine::{contract_methods, engine, state, xcc};
+    use aurora_engine::{contract_methods, engine};
 
     #[derive(Debug)]
     pub enum Error {
-        EngineState(state::EngineStateError),
         Engine(engine::EngineError),
-        DeployErc20(engine::DeployErc20Error),
-        FtOnTransfer(errors::FtTransferCallError),
-        Deposit(errors::DepositError),
-        FinishDeposit(errors::FinishDepositError),
-        FtTransfer(errors::TransferError),
-        FtWithdraw(errors::WithdrawError),
-        FtStorageFunding(errors::StorageFundingError),
-        InvalidAddress(aurora_engine_types::types::address::error::AddressError),
-        ConnectorInit(errors::InitContractError),
-        ConnectorStorage(errors::StorageReadError),
-        FundXccError(xcc::FundXccError),
         ContractError(contract_methods::ContractError),
-    }
-
-    impl From<state::EngineStateError> for Error {
-        fn from(e: state::EngineStateError) -> Self {
-            Self::EngineState(e)
-        }
     }
 
     impl From<engine::EngineError> for Error {
         fn from(e: engine::EngineError) -> Self {
             Self::Engine(e)
-        }
-    }
-
-    impl From<engine::DeployErc20Error> for Error {
-        fn from(e: engine::DeployErc20Error) -> Self {
-            Self::DeployErc20(e)
-        }
-    }
-
-    impl From<errors::FtTransferCallError> for Error {
-        fn from(e: errors::FtTransferCallError) -> Self {
-            Self::FtOnTransfer(e)
-        }
-    }
-
-    impl From<errors::DepositError> for Error {
-        fn from(e: errors::DepositError) -> Self {
-            Self::Deposit(e)
-        }
-    }
-
-    impl From<errors::FinishDepositError> for Error {
-        fn from(e: errors::FinishDepositError) -> Self {
-            Self::FinishDeposit(e)
-        }
-    }
-
-    impl From<errors::TransferError> for Error {
-        fn from(e: errors::TransferError) -> Self {
-            Self::FtTransfer(e)
-        }
-    }
-
-    impl From<errors::WithdrawError> for Error {
-        fn from(e: errors::WithdrawError) -> Self {
-            Self::FtWithdraw(e)
-        }
-    }
-
-    impl From<errors::StorageFundingError> for Error {
-        fn from(e: errors::StorageFundingError) -> Self {
-            Self::FtStorageFunding(e)
-        }
-    }
-
-    impl From<aurora_engine_types::types::address::error::AddressError> for Error {
-        fn from(e: aurora_engine_types::types::address::error::AddressError) -> Self {
-            Self::InvalidAddress(e)
-        }
-    }
-
-    impl From<errors::InitContractError> for Error {
-        fn from(e: errors::InitContractError) -> Self {
-            Self::ConnectorInit(e)
-        }
-    }
-
-    impl From<errors::StorageReadError> for Error {
-        fn from(e: errors::StorageReadError) -> Self {
-            Self::ConnectorStorage(e)
-        }
-    }
-
-    impl From<xcc::FundXccError> for Error {
-        fn from(e: xcc::FundXccError) -> Self {
-            Self::FundXccError(e)
         }
     }
 
