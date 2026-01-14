@@ -22,7 +22,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
@@ -48,7 +48,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Node and cache

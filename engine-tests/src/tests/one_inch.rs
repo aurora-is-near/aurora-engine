@@ -1,10 +1,10 @@
-use crate::prelude::parameters::SubmitResult;
-use crate::prelude::{Wei, U256};
-use crate::utils::one_inch::{liquidity_protocol, LIMIT_ORDER_PROTOCOL_PATH};
-use crate::utils::{self, assert_gas_bound};
 use aurora_engine_types::{borsh::BorshDeserialize, types::Address};
-use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
+
+use crate::prelude::parameters::SubmitResult;
+use crate::prelude::{U256, Wei};
+use crate::utils::one_inch::{LIMIT_ORDER_PROTOCOL_PATH, liquidity_protocol};
+use crate::utils::{self, assert_gas_bound, random_sk};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -129,8 +129,8 @@ fn deploy_1_inch_limit_order_contract(
 fn initialize() -> (utils::AuroraRunner, utils::Signer) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
     let mut signer = utils::Signer::new(source_account);

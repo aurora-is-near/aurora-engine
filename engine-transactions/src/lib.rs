@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{vec, Vec, H160, U256};
+use aurora_engine_types::{H160, U256, Vec, vec};
 use aurora_evm::executor::stack::Authorization;
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};

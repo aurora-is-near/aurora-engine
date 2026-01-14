@@ -14,13 +14,14 @@
 //! JSON test data set fully represents all tests from `execution-spec-tests` for
 //! `alt-bn-128` precompiles. We run this test in standalone manner.
 
-use crate::prelude::{Address, Wei, H160, U256};
-use crate::tests::sanity::initialize_transfer;
-use crate::utils;
-use aurora_engine_precompiles::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use aurora_engine_precompiles::Istanbul;
 use aurora_engine_precompiles::Precompile;
+use aurora_engine_precompiles::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use near_primitives_core::gas::Gas;
+
+use crate::prelude::{Address, H160, U256, Wei};
+use crate::tests::sanity::initialize_transfer;
+use crate::utils;
 
 /// Precompile input and output data struct
 #[derive(Debug, Clone, serde::Deserialize)]

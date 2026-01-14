@@ -1,8 +1,9 @@
-use crate::prelude::{Borrowed, Vec};
-use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_engine_sdk::bls12_381::{self, PAIRING_INPUT_LENGTH};
-use aurora_engine_types::types::{make_address, Address, EthGas};
+use aurora_engine_types::types::{Address, EthGas, make_address};
 use aurora_evm::{Context, ExitError};
+
+use crate::prelude::{Borrowed, Vec};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, utils};
 
 /// Multiplier gas fee for BLS12-381 pairing operation.
 const PAIRING_MULTIPLIER_BASE: u64 = 32600;

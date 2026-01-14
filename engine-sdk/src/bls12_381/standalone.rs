@@ -2,17 +2,18 @@
 //!
 //! Represents [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537)
 
-use super::{
-    remove_padding, Bls12381Error, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP2_LENGTH,
-    PADDED_FP_LENGTH,
-};
-use crate::prelude::Vec;
 use blst::{
     blst_final_exp, blst_fp12, blst_fp12_is_one, blst_fp12_mul, blst_map_to_g1, blst_map_to_g2,
     blst_miller_loop, blst_p1, blst_p1_add_or_double_affine, blst_p1_affine, blst_p1_from_affine,
     blst_p1_to_affine, blst_p2, blst_p2_add_or_double_affine, blst_p2_affine, blst_p2_from_affine,
     blst_p2_to_affine, p1_affines, p2_affines,
 };
+
+use super::{
+    Bls12381Error, G1_INPUT_ITEM_LENGTH, G2_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH, PADDED_FP2_LENGTH,
+    remove_padding,
+};
+use crate::prelude::Vec;
 
 mod g1;
 mod g2;

@@ -2,12 +2,15 @@
 on:
   schedule:
     - cron: '0 8 * * 1-5'
+  pull_request:
 
 name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
+    runs-on:
+      group: gha-larger-managed
+      labels: managed-64cpu
     strategy:
       fail-fast: false
       matrix:
@@ -18,7 +21,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -57,7 +60,9 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-32cpu-64gb
+    runs-on:
+      group: gha-larger-managed
+      labels: managed-64cpu
     container: rust:latest
     steps:
       - name: Setup RunsOn
@@ -65,7 +70,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache

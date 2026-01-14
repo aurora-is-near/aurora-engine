@@ -1,8 +1,9 @@
-use crate::utils;
 use aurora_engine_precompiles::prepaid_gas;
 use aurora_engine_transactions::legacy::TransactionLegacy;
-use aurora_engine_types::{types::Wei, U256};
+use aurora_engine_types::{U256, types::Wei};
 use near_primitives_core::types::Gas;
+
+use crate::utils;
 
 #[test]
 fn test_prepaid_gas_precompile() {

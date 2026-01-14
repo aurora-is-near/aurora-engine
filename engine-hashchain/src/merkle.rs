@@ -1,12 +1,12 @@
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
+    Vec,
     borsh::{BorshDeserialize, BorshSerialize},
     types::RawH256,
-    Vec,
 };
 
 /// Stream Compact Merkle Tree.
-/// It can be feed by a stream of hashes (leaves) adding them to the right of the tree.
+/// It can be fed by a stream of hashes (leaves) adding them to the right of the tree.
 /// Internally, compacts full binary subtrees maintaining only the growing branch.
 /// Space used is O(log n) where n is the number of leaf hashes added. It is usually less.
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -51,7 +51,7 @@ impl StreamCompactMerkleTree {
             let right_subtree = &self.subtrees[index];
             let left_subtree = &self.subtrees[index - 1];
 
-            // same height means they are siblings so we can compact them
+            // the same height means they are siblings so we can compact them
             if left_subtree.height == right_subtree.height {
                 let father_subtree = CompactMerkleSubtree {
                     height: left_subtree.height + 1,
@@ -64,13 +64,14 @@ impl StreamCompactMerkleTree {
 
                 index -= 1;
             }
-            // all remaining subtrees have different heights so we can't compact anything else
+            // all remaining subtrees have different heights, so we can't compact anything else
             else {
-                debug_assert!(self
-                    .subtrees
-                    .iter()
-                    .zip(self.subtrees.iter().skip(1))
-                    .all(|(left, right)| left.height > right.height));
+                debug_assert!(
+                    self.subtrees
+                        .iter()
+                        .zip(self.subtrees.iter().skip(1))
+                        .all(|(left, right)| left.height > right.height)
+                );
                 break;
             }
         }
@@ -91,7 +92,7 @@ impl StreamCompactMerkleTree {
         while index >= 1 {
             let left_subtree = &self.subtrees[index - 1];
 
-            // same height means they are siblings so we can compact hashes
+            // the same height means they are siblings so we can compact hashes
             if left_subtree.height == right_subtree.height {
                 right_subtree.hash = keccak(&[left_subtree.hash, right_subtree.hash].concat()).0;
                 index -= 1;
@@ -235,7 +236,11 @@ mod tests {
 
         let merkle_tree_hash = merkle_tree.compute_hash();
 
-        assert_eq!(merkle_tree.subtrees.len(), 1, "1 and 2 should be compacted, 3 and 4 also, and then both resulting should be compacted too.");
+        assert_eq!(
+            merkle_tree.subtrees.len(),
+            1,
+            "1 and 2 should be compacted, 3 and 4 also, and then both resulting should be compacted too."
+        );
         assert_eq!(merkle_tree.subtrees[0].hash, expected_merkle_tree_hash);
         assert_eq!(merkle_tree_hash, expected_merkle_tree_hash);
     }

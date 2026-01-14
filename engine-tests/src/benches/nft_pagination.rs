@@ -1,11 +1,11 @@
-use crate::prelude::{Address, Wei, U256};
-use crate::utils::{self, solidity};
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::parameters::engine::TransactionStatus;
-use libsecp256k1::SecretKey;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Once;
+
+use crate::prelude::{Address, U256, Wei};
+use crate::utils::{self, solidity};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000);
 const INITIAL_NONCE: u64 = 0;
@@ -160,11 +160,11 @@ impl MarketPlace {
 fn initialize_evm() -> (utils::AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = utils::random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let dest_address = utils::address_from_secret_key(&utils::random_sk(&mut rng));
     let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
     runner.max_gas_burnt(u64::MAX);

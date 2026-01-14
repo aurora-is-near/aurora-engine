@@ -1,4 +1,3 @@
-use crate::contract_methods::ContractError;
 use aurora_engine_hashchain::{
     bloom::{self, Bloom},
     error::BlockchainHashchainError,
@@ -7,13 +6,15 @@ use aurora_engine_hashchain::{
 };
 use aurora_engine_sdk::{
     env::Env,
-    io::{StorageIntermediate, IO},
+    io::{IO, StorageIntermediate},
 };
 use aurora_engine_types::{
     parameters::engine::SubmitResult,
     storage::{self, KeyPrefix},
 };
 use core::cell::RefCell;
+
+use crate::contract_methods::ContractError;
 
 pub const HASHCHAIN_STATE: &[u8] = b"HC_STATE";
 

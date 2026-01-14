@@ -1,5 +1,5 @@
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
-use std::collections::{btree_map, BTreeMap};
+use std::collections::{BTreeMap, btree_map};
 
 #[derive(Debug, Default, Clone, BorshDeserialize, BorshSerialize, PartialEq, Eq)]
 #[borsh(crate = "aurora_engine_types::borsh")]

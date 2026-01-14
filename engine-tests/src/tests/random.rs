@@ -1,15 +1,14 @@
-use crate::utils;
-use crate::utils::solidity::random::{Random, RandomConstructor};
 use aurora_engine_types::H256;
 use rand::SeedableRng;
+
+use crate::utils;
+use crate::utils::solidity::random::{Random, RandomConstructor};
 
 #[test]
 fn test_random_number_precompile() {
     let random_seed = H256::from_slice(vec![7; 32].as_slice());
-    let secret_key = {
-        let mut rng = rand::rngs::StdRng::from_seed(random_seed.0);
-        libsecp256k1::SecretKey::random(&mut rng)
-    };
+    let mut rng = rand::rngs::StdRng::from_seed(random_seed.0);
+    let secret_key = utils::random_sk(&mut rng);
     let mut signer = utils::Signer::new(secret_key);
     let mut runner = utils::deploy_runner().with_block_random_value(random_seed);
 

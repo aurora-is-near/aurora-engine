@@ -1,8 +1,9 @@
-use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::H256;
-use crate::{utils, PrecompileOutput};
 use aurora_evm::{Context, ExitError};
+
+use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::H256;
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::{PrecompileOutput, utils};
 
 mod costs {
     use crate::prelude::types::EthGas;

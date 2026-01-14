@@ -1,9 +1,10 @@
+use aurora_engine_types::types::Wei;
+
 use crate::prelude::parameters::SubmitResult;
 use crate::prelude::{Address, U256};
 use crate::utils::one_inch::LIQUIDITY_PROTOCOL_PATH;
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-use crate::utils::{self, solidity, ExecutionProfile};
-use aurora_engine_types::types::Wei;
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
+use crate::utils::{self, ExecutionProfile, solidity};
 
 pub struct Helper<'a> {
     pub runner: &'a mut utils::AuroraRunner,

@@ -1,18 +1,17 @@
+use aurora_engine_types::H160;
+use aurora_engine_types::types::Wei;
+use rand::SeedableRng;
+use std::sync::Arc;
+
 use crate::prelude::{Address, U256};
 use crate::utils::{
-    self,
-    solidity::erc20::{ERC20Constructor, ERC20},
+    self, AuroraRunner, ExecutionProfile, Signer,
+    solidity::erc20::{ERC20, ERC20Constructor},
     solidity::uniswap::{
         ExactInputParams, ExactOutputSingleParams, Factory, FactoryConstructor, MintParams, Pool,
         PositionManager, PositionManagerConstructor, SwapRouter, SwapRouterConstructor,
     },
-    AuroraRunner, ExecutionProfile, Signer,
 };
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::H160;
-use libsecp256k1::SecretKey;
-use rand::SeedableRng;
-use std::sync::Arc;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -88,7 +87,7 @@ impl UniswapTestContext {
     pub fn new(name: &str) -> Self {
         let mut runner = utils::deploy_runner();
         let mut rng = rand::rngs::StdRng::seed_from_u64(414_243);
-        let source_account = SecretKey::random(&mut rng);
+        let source_account = utils::random_sk(&mut rng);
         let source_address = utils::address_from_secret_key(&source_account);
         runner.create_address(
             source_address,

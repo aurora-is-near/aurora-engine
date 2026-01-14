@@ -2,8 +2,8 @@ use aurora_engine_sdk::env::Timestamp;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::{
-    sync::types::{TransactionKind, TransactionMessage},
     BlockMetadata,
+    sync::types::{TransactionKind, TransactionMessage},
 };
 
 use crate::utils::standalone::{mocks, storage::create_db};
@@ -112,7 +112,7 @@ fn test_replay_transaction() {
         .collect();
 
     // should be able to replay all transactions in any order
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut shuffled: Vec<_> = blockchain.iter().zip(sequential_diffs).collect();
     rand::seq::SliceRandom::shuffle(shuffled.as_mut_slice(), &mut rng);
 

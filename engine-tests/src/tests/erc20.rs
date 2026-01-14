@@ -1,9 +1,9 @@
 use crate::prelude::Wei;
 use crate::prelude::{Address, U256};
 use crate::utils::{
-    self,
-    solidity::erc20::{self, ERC20Constructor, ERC20},
-    str_to_account_id, Signer,
+    self, Signer,
+    solidity::erc20::{self, ERC20, ERC20Constructor},
+    str_to_account_id,
 };
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::TransactionStatus;
@@ -14,7 +14,6 @@ use aurora_engine_types::parameters::connector::{
 };
 use aurora_engine_types::parameters::engine::SetOwnerArgs;
 use bstr::ByteSlice;
-use libsecp256k1::SecretKey;
 use std::str::FromStr;
 
 const INITIAL_BALANCE: u64 = 1_000_000;
@@ -206,8 +205,8 @@ fn erc20_transfer_insufficient_balance() {
 #[test]
 fn deploy_erc_20_out_of_gas() {
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = utils::random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(
         source_address,
@@ -394,15 +393,15 @@ fn parse_erc20_error_message(result: &[u8]) -> &str {
 fn initialize_erc20() -> (utils::AuroraRunner, Signer, Address, ERC20) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = utils::random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(
         source_address,
         Wei::new_u64(INITIAL_BALANCE),
         INITIAL_NONCE.into(),
     );
-    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let dest_address = utils::address_from_secret_key(&utils::random_sk(&mut rng));
 
     let mut signer = Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;

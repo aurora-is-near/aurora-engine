@@ -4,7 +4,7 @@
 //! The purpose of this struct is to capture the input and output from the underlying
 //! IO instance for the purpose of passing it to `Hashchain::add_block_tx`.
 
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::Vec;
 use core::cell::RefCell;
 

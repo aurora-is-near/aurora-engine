@@ -1,4 +1,4 @@
-use crate::prelude::{transactions::legacy::TransactionLegacy, Address, U256};
+use crate::prelude::{Address, U256, transactions::legacy::TransactionLegacy};
 use aurora_engine_types::types::Wei;
 use serde::Deserialize;
 use std::fs;

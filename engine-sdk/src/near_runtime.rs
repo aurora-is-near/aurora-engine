@@ -1,12 +1,13 @@
-use crate::exports;
-use crate::io::StorageIntermediate;
-use crate::prelude::{NearGas, Vec};
-use crate::promise::PromiseId;
+use aurora_engine_types::H256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::PromiseResult;
-use aurora_engine_types::H256;
+
+use crate::exports;
+use crate::io::StorageIntermediate;
+use crate::prelude::{NearGas, Vec};
+use crate::promise::PromiseId;
 
 /// The mainnet `eth_custodian` address 0x6BFaD42cFC4EfC96f529D786D643Ff4A8B89FA52. We use the
 /// address for the mainnet only, since for the testnet it's not so critical.
@@ -101,20 +102,22 @@ impl Runtime {
         for action in &args.actions {
             match action {
                 PromiseAction::CreateAccount => {
-                    exports::promise_batch_action_create_account(id);
+                    unsafe { exports::promise_batch_action_create_account(id) };
                 }
                 PromiseAction::Transfer { amount } => {
                     let amount = amount.as_u128();
                     let amount_addr = core::ptr::addr_of!(amount);
-                    exports::promise_batch_action_transfer(id, amount_addr as _);
+                    unsafe { exports::promise_batch_action_transfer(id, amount_addr as _) };
                 }
                 PromiseAction::DeployContract { code } => {
                     let code = code.as_slice();
-                    exports::promise_batch_action_deploy_contract(
-                        id,
-                        code.len() as _,
-                        code.as_ptr() as _,
-                    );
+                    unsafe {
+                        exports::promise_batch_action_deploy_contract(
+                            id,
+                            code.len() as _,
+                            code.as_ptr() as _,
+                        );
+                    }
                 }
                 PromiseAction::FunctionCall {
                     name,
@@ -126,15 +129,17 @@ impl Runtime {
                     let arguments = args.as_slice();
                     let amount = attached_yocto.as_u128();
                     let amount_addr = core::ptr::addr_of!(amount);
-                    exports::promise_batch_action_function_call(
-                        id,
-                        method_name.len() as _,
-                        method_name.as_ptr() as _,
-                        arguments.len() as _,
-                        arguments.as_ptr() as _,
-                        amount_addr as _,
-                        gas.as_u64(),
-                    );
+                    unsafe {
+                        exports::promise_batch_action_function_call(
+                            id,
+                            method_name.len() as _,
+                            method_name.as_ptr() as _,
+                            arguments.len() as _,
+                            arguments.as_ptr() as _,
+                            amount_addr as _,
+                            gas.as_u64(),
+                        );
+                    }
                 }
                 PromiseAction::Stake { amount, public_key } => {
                     feature_gated!("all-promise-actions", {
@@ -142,23 +147,29 @@ impl Runtime {
                         let amount_addr = core::ptr::addr_of!(amount);
                         let pk: RawPublicKey = public_key.into();
                         let pk_bytes = pk.as_bytes();
-                        exports::promise_batch_action_stake(
-                            id,
-                            amount_addr as _,
-                            pk_bytes.len() as _,
-                            pk_bytes.as_ptr() as _,
-                        );
+
+                        unsafe {
+                            exports::promise_batch_action_stake(
+                                id,
+                                amount_addr as _,
+                                pk_bytes.len() as _,
+                                pk_bytes.as_ptr() as _,
+                            );
+                        }
                     });
                 }
                 PromiseAction::AddFullAccessKey { public_key, nonce } => {
                     let pk: RawPublicKey = public_key.into();
                     let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_add_key_with_full_access(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                    );
+
+                    unsafe {
+                        exports::promise_batch_action_add_key_with_full_access(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                        );
+                    }
                 }
                 PromiseAction::AddFunctionCallKey {
                     public_key,
@@ -173,35 +184,44 @@ impl Runtime {
                     let allowance_addr = core::ptr::addr_of!(allowance);
                     let receiver_id = receiver_id.as_bytes();
                     let function_names = function_names.as_bytes();
-                    exports::promise_batch_action_add_key_with_function_call(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                        *nonce,
-                        allowance_addr as _,
-                        receiver_id.len() as _,
-                        receiver_id.as_ptr() as _,
-                        function_names.len() as _,
-                        function_names.as_ptr() as _,
-                    );
+
+                    unsafe {
+                        exports::promise_batch_action_add_key_with_function_call(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                            *nonce,
+                            allowance_addr as _,
+                            receiver_id.len() as _,
+                            receiver_id.as_ptr() as _,
+                            function_names.len() as _,
+                            function_names.as_ptr() as _,
+                        );
+                    }
                 }
                 PromiseAction::DeleteKey { public_key } => {
                     let pk: RawPublicKey = public_key.into();
                     let pk_bytes = pk.as_bytes();
-                    exports::promise_batch_action_delete_key(
-                        id,
-                        pk_bytes.len() as _,
-                        pk_bytes.as_ptr() as _,
-                    );
+
+                    unsafe {
+                        exports::promise_batch_action_delete_key(
+                            id,
+                            pk_bytes.len() as _,
+                            pk_bytes.as_ptr() as _,
+                        );
+                    }
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
                     feature_gated!("all-promise-actions", {
                         let beneficiary_id = beneficiary_id.as_bytes();
-                        exports::promise_batch_action_delete_key(
-                            id,
-                            beneficiary_id.len() as _,
-                            beneficiary_id.as_ptr() as _,
-                        );
+
+                        unsafe {
+                            exports::promise_batch_action_delete_key(
+                                id,
+                                beneficiary_id.len() as _,
+                                beneficiary_id.as_ptr() as _,
+                            );
+                        }
                     });
                 }
             }
@@ -400,14 +420,13 @@ impl crate::promise::PromiseHandler for Runtime {
         }
     }
 
-    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
         let method_name = args.method.as_bytes();
         let arguments = args.args.as_slice();
         let amount = args.attached_balance.as_u128();
         let gas = args.attached_gas.as_u64();
-
-        let id = {
+        let id = unsafe {
             exports::promise_create(
                 account_id.len() as _,
                 account_id.as_ptr() as _,
@@ -419,20 +438,21 @@ impl crate::promise::PromiseHandler for Runtime {
                 gas,
             )
         };
+
         PromiseId::new(id)
     }
 
-    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+    fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
         let ids = args
             .iter()
             .map(|args| self.promise_create_call(args))
             .collect::<Vec<_>>();
-        let id = exports::promise_and(ids.as_ptr() as _, ids.len() as _);
+        let id = unsafe { exports::promise_and(ids.as_ptr() as _, ids.len() as _) };
 
         PromiseId::new(id)
     }
 
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -442,8 +462,7 @@ impl crate::promise::PromiseHandler for Runtime {
         let arguments = callback.args.as_slice();
         let amount = callback.attached_balance.as_u128();
         let gas = callback.attached_gas.as_u64();
-
-        let id = {
+        let id = unsafe {
             exports::promise_then(
                 base.raw(),
                 account_id.len() as _,
@@ -460,28 +479,34 @@ impl crate::promise::PromiseHandler for Runtime {
         PromiseId::new(id)
     }
 
-    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
+        let id = unsafe {
+            let id = exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _);
+            Self::append_batch_actions(id, args);
 
-        let id = { exports::promise_batch_create(account_id.len() as _, account_id.as_ptr() as _) };
-
-        Self::append_batch_actions(id, args);
+            id
+        };
 
         PromiseId::new(id)
     }
 
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         base: PromiseId,
         args: &PromiseBatchAction,
     ) -> PromiseId {
         let account_id = args.target_account_id.as_bytes();
+        let id = unsafe {
+            let id = exports::promise_batch_then(
+                base.raw(),
+                account_id.len() as _,
+                account_id.as_ptr() as _,
+            );
+            Self::append_batch_actions(id, args);
 
-        let id = {
-            exports::promise_batch_then(base.raw(), account_id.len() as _, account_id.as_ptr() as _)
+            id
         };
-
-        Self::append_batch_actions(id, args);
 
         PromiseId::new(id)
     }

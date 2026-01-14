@@ -2,9 +2,10 @@
 //!
 //! Inspired by: `https://github.com/near/nearcore/tree/master/core/account-id`
 
-use crate::{fmt, str, str::FromStr, AsBytes, Box, String, ToString, Vec};
-use borsh::{io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, io};
 use serde::{Deserialize, Serialize};
+
+use crate::{AsBytes, Box, String, ToString, Vec, fmt, str, str::FromStr};
 
 pub const MIN_ACCOUNT_ID_LEN: usize = 2;
 pub const MAX_ACCOUNT_ID_LEN: usize = 64;

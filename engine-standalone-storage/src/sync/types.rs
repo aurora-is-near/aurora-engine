@@ -1,4 +1,3 @@
-use crate::Storage;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -6,13 +5,15 @@ use aurora_engine_types::parameters::connector::FtTransferMessageData;
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{connector, engine, silo};
 use aurora_engine_types::{
+    H256, U256,
     borsh::{self, BorshDeserialize, BorshSerialize},
     types::{self, Address, Wei},
-    H256, U256,
 };
 use serde::Serialize;
 use std::borrow::Cow;
 use strum::EnumString;
+
+use crate::Storage;
 
 /// Type describing the format of messages sent to the storage layer for keeping
 /// it in sync with the blockchain.

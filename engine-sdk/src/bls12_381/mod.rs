@@ -4,9 +4,9 @@ mod contract;
 mod standalone;
 
 #[cfg(feature = "contract")]
-pub use contract::{g1_add, g1_msm, g2_add, g2_msm, map_fp2_to_g2, map_fp_to_g1, pairing_check};
+pub use contract::{g1_add, g1_msm, g2_add, g2_msm, map_fp_to_g1, map_fp2_to_g2, pairing_check};
 #[cfg(not(feature = "contract"))]
-pub use standalone::{g1_add, g1_msm, g2_add, g2_msm, map_fp2_to_g2, map_fp_to_g1, pairing_check};
+pub use standalone::{g1_add, g1_msm, g2_add, g2_msm, map_fp_to_g1, map_fp2_to_g2, pairing_check};
 
 /// Finite field element padded input length.
 pub const PADDED_FP_LENGTH: usize = 64;

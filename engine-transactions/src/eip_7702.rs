@@ -1,12 +1,13 @@
-use crate::eip_2930::AccessTuple;
-use crate::Error;
 use aurora_engine_sdk::ecrecover;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{vec, Vec, H160, U256};
+use aurora_engine_types::{H160, U256, Vec, vec};
 use aurora_evm::executor::stack::Authorization;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
+use crate::eip_2930::AccessTuple;
 
 /// Type indicator (per EIP-7702)
 pub const TYPE_BYTE: u8 = 0x04;

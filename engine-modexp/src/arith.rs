@@ -1,6 +1,6 @@
 use crate::{
     maybe_std::vec,
-    mpnat::{DoubleWord, MPNat, Word, BASE, WORD_BITS},
+    mpnat::{BASE, DoubleWord, MPNat, WORD_BITS, Word},
 };
 
 // Computes the "Montgomery Product" of two numbers.

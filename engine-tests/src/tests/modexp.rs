@@ -5,8 +5,8 @@ use rand::{Rng, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
-use crate::prelude::{make_address, Address, U256};
-use crate::utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
+use crate::prelude::{Address, U256, make_address};
+use crate::utils::{self, AuroraRunner, Signer, standalone::StandaloneRunner};
 
 const MODEXP_ADDRESS: Address = make_address(0, 5);
 
