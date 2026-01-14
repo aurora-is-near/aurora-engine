@@ -216,7 +216,7 @@ impl Runtime {
                         let beneficiary_id = beneficiary_id.as_bytes();
 
                         unsafe {
-                            exports::promise_batch_action_delete_key(
+                            exports::promise_batch_action_delete_account(
                                 id,
                                 beneficiary_id.len() as _,
                                 beneficiary_id.as_ptr() as _,

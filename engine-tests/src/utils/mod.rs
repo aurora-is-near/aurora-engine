@@ -1020,5 +1020,7 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
 }
 
 pub fn random_sk<R: Rng>(rng: &mut R) -> SecretKey {
-    SecretKey::parse(&rng.random()).unwrap()
+    let mut buff = [0u8; libsecp256k1::util::SECRET_KEY_SIZE];
+    rng.fill_bytes(&mut buff);
+    SecretKey::parse(&buff).unwrap()
 }
