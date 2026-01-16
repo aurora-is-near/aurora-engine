@@ -1,4 +1,3 @@
-use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 use aurora_evm::{Context, ExitError};
 use num::{Integer, Zero};
 
@@ -7,6 +6,8 @@ use crate::prelude::{Cow, PhantomData, U256, Vec};
 use crate::{
     Berlin, Byzantium, EvmPrecompileResult, HardFork, Osaka, Precompile, PrecompileOutput, utils,
 };
+
+pub use aurora_engine_modexp::{AuroraModExp, ModExpAlgorithm};
 
 #[derive(Default)]
 pub struct ModExp<HF: HardFork, M = AuroraModExp>(PhantomData<HF>, PhantomData<M>);
