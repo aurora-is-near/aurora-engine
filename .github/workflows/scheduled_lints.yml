@@ -8,9 +8,7 @@ name: Scheduled checks
 jobs:
   tests:
     name: Run tests (${{ matrix.version }} neard)
-    runs-on:
-      group: aurora-ephemeral
-      labels: rcny-lab-ax41
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
     strategy:
       fail-fast: false
       matrix:
@@ -49,7 +47,7 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
-        run: cargo make test
+        run: cargo make test -- --test-threads 32
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
@@ -60,9 +58,7 @@ jobs:
 
   checks:
     name: Run checks
-    runs-on:
-      group: aurora-ephemeral
-      labels: rcny-lab-ax41
+    runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-32cpu-64gb
     container: rust:latest
     steps:
       - name: Setup RunsOn
