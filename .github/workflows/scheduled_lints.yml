@@ -2,7 +2,6 @@
 on:
   schedule:
     - cron: '0 8 * * 1-5'
-  pull_request:
 
 name: Scheduled checks
 jobs:
@@ -47,7 +46,9 @@ jobs:
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
-        run: cargo make test -- --test-threads 32
+        run: cargo make test
+        env:
+          RUST_TEST_THREADS: 32 # decrease the number of the test threads to reduce the overall load on the VM and prevent the occasional failure of the tests.
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
