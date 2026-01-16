@@ -9,7 +9,9 @@ use aurora_evm::executor::{
     self,
     stack::{PrecompileFailure, PrecompileHandle},
 };
-use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
+
+pub use aurora_engine_types::types::EthGas;
+pub use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
 
 use crate::account_ids::{CurrentAccount, PredecessorAccount, predecessor_account};
 use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
@@ -18,7 +20,6 @@ use crate::hash::{RIPEMD160, SHA256};
 use crate::identity::Identity;
 use crate::modexp::ModExp;
 use crate::native::{ExitToEthereum, ExitToNear, exit_to_ethereum, exit_to_near};
-use crate::prelude::types::EthGas;
 use crate::prelude::{H256, Vec};
 use crate::prepaid_gas::PrepaidGas;
 use crate::promise_result::PromiseResult;
