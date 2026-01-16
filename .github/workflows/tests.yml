@@ -40,6 +40,8 @@ jobs:
         run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test-flow
+        env:
+          RUST_TEST_THREADS: 32 # decrease the number of the test threads to reduce the overall load on the VM and prevent the occasional failure of the tests.
 
   test_modexp:
     name: Test modexp suite

@@ -10,7 +10,6 @@ jobs:
     runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         version: [ mainnet, testnet ]
     steps:
@@ -48,6 +47,8 @@ jobs:
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
         run: cargo make test
+        env:
+          RUST_TEST_THREADS: 32 # decrease the number of the test threads to reduce the overall load on the VM and prevent the occasional failure of the tests.
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
