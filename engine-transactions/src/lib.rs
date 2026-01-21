@@ -207,7 +207,10 @@ impl NormalizedEthTransaction {
         let gas_authorization_list = if config.has_authorization_list {
             config
                 .gas_per_auth_base_cost
-                .checked_mul(self.authorization_list.len() as u64)
+                .checked_mul(
+                    u64::try_from(self.authorization_list.len())
+                        .map_err(|_e| Error::IntegerConversion)?,
+                )
                 .ok_or(Error::GasOverflow)?
         } else {
             0
@@ -368,6 +371,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn test_intrinsic_gas() {
         use super::NormalizedEthTransaction;
 
@@ -470,13 +474,12 @@ mod tests {
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_create
-            + INITCODE_WORD_COST * 1
+            + INITCODE_WORD_COST
             + config.gas_transaction_non_zero_data * 32;
         assert_eq!(gas, expected);
 
         // Test transaction with an access list
-        use crate::eip_2930::AccessTuple;
-        let access_tuple = AccessTuple {
+        let access_tuple = eip_2930::AccessTuple {
             address: Address::default().raw(),
             storage_keys: vec![H256::zero(), H256::zero()],
         };
