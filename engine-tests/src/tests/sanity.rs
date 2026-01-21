@@ -997,7 +997,7 @@ fn check_selector() {
 fn test_block_hash() {
     let runner = utils::AuroraRunner::default();
     let chain_id = {
-        let number = crate::prelude::U256::from(runner.chain_id);
+        let number = U256::from(runner.chain_id);
         crate::prelude::u256_to_arr(&number)
     };
     let account_id = runner.aurora_account_id.as_bytes();
