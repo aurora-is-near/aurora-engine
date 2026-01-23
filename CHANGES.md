@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.10.1] 2026-01-23
+
+### Additions
+
+- Added floor gas calculation for transactions to be aligned with EIP-7623 by [@aleksuss]. ([#1064])
+
+### Changes
+
+- Updated the intrinsic gas calculation for EIP-7702 transactions by [@aleksuss]. ([#1063])
+- Bumped the rust edition to 2024 by [@aleksuss]. ([#1059])
+- Some `modexp` and `aurora-evm` types were re-exported in precompiles by [@mrLSD]. ([#1060] [#1061])
+
+[#1059]: https://github.com/aurora-is-near/aurora-engine/pull/1059
+[#1060]: https://github.com/aurora-is-near/aurora-engine/pull/1060
+[#1061]: https://github.com/aurora-is-near/aurora-engine/pull/1061
+[#1063]: https://github.com/aurora-is-near/aurora-engine/pull/1063
+[#1064]: https://github.com/aurora-is-near/aurora-engine/pull/1064
+
 ## [3.10.0] 2026-01-14
 
 ### Additions

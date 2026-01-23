@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-transactions"
-version = "1.3.0"
+version = "1.4.0"
 description = "EVM transactions used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
