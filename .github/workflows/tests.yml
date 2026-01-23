@@ -18,7 +18,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -40,6 +40,8 @@ jobs:
         run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test-flow
+        env:
+          RUST_TEST_THREADS: 32 # decrease the number of the test threads to reduce the overall load on the VM and prevent the occasional failure of the tests.
 
   test_modexp:
     name: Test modexp suite
@@ -51,7 +53,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
@@ -79,7 +81,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
@@ -96,4 +98,3 @@ jobs:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  NEAR_ENABLE_SANDBOX_LOG: 1

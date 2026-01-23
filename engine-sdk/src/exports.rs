@@ -1,5 +1,5 @@
 #[allow(unused)]
-extern "C" {
+unsafe extern "C" {
     // #############
     // # Registers #
     // #############

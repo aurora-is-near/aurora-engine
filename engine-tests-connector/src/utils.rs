@@ -6,7 +6,7 @@ use near_sdk::json_types::U128;
 use near_sdk::serde_json::json;
 use near_workspaces::network::NetworkClient;
 use near_workspaces::types::NearToken;
-use near_workspaces::{result::ExecutionFinalResult, Account, AccountId, Contract, Worker};
+use near_workspaces::{Account, AccountId, Contract, Worker, result::ExecutionFinalResult};
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -65,8 +65,8 @@ pub struct TestContract {
 impl TestContract {
     async fn deploy_contracts() -> anyhow::Result<(Contract, Contract, Account)> {
         use near_workspaces::{
-            types::{KeyType, SecretKey},
             AccessKey,
+            types::{KeyType, SecretKey},
         };
         let worker = near_workspaces::sandbox()
             .await

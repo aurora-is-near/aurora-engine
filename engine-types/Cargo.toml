@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-types"
-version = "2.0.0"
-description = "Essential types which used in Aurora Engine"
+version = "3.0.0"
+description = "Essential types used in Aurora Engine"
 autobenches = false
 keywords.workspace = true
 authors.workspace = true
@@ -33,7 +33,7 @@ byteorder = ["primitive-types/byteorder"]
 std = ["borsh/std", "hex/std", "primitive-types/std", "primitive-types/serde", "serde/std", "serde_json/std", "rlp/std"]
 # `primitive-types/std` is excluded because it's `std` implementation includes a transitive
 # dependency on `getrandom` which uses OS call to obtain entropy. Such calls are not
-# available in Wasm, therefore we cannot use the `std` implementation of `primitive-types`
+# available in WASM; therefore, we cannot use the `std` implementation of `primitive-types`
 # in other Rust contracts.
 contracts-std = ["borsh/std", "hex/std"]
 impl-serde = ["primitive-types/impl-serde"]

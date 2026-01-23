@@ -1,15 +1,15 @@
-use crate::prelude::{Address, U256};
-use crate::prelude::{Wei, ERC20_MINT_SELECTOR};
-use crate::utils::{self, str_to_account_id};
 use aurora_engine::engine::{EngineErrorKind, GasPaymentError, ZERO_ADDRESS_FIX_HEIGHT};
 use aurora_engine::parameters::{SetOwnerArgs, SetUpgradeDelayBlocksArgs, TransactionStatus};
 use aurora_engine_sdk as sdk;
-use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::H160;
-use libsecp256k1::SecretKey;
+use aurora_engine_types::borsh::BorshDeserialize;
 use near_vm_runner::ContractCode;
 use rand::RngCore;
 use std::path::{Path, PathBuf};
+
+use crate::prelude::{Address, U256};
+use crate::prelude::{ERC20_MINT_SELECTOR, Wei};
+use crate::utils::{self, random_sk, str_to_account_id};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -21,7 +21,7 @@ const GAS_PRICE: u64 = 10;
 fn bench_memory_get_standalone() {
     let (mut runner, mut signer, _) = initialize_transfer();
 
-    // This EVM program is an infinite loop which causes a large amount of memory to be
+    // This EVM program is an infinite loop, which causes a large amount of memory to be
     // copied onto the EVM stack.
     let contract_bytes = vec![
         0x5b, 0x3a, 0x33, 0x43, 0x03, 0x59, 0x52, 0x59, 0x42, 0x59, 0x3a, 0x60, 0x05, 0x34, 0xf4,
@@ -234,7 +234,7 @@ fn test_state_format() {
 }
 
 fn generate_code(len: usize) -> Vec<u8> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut buf = vec![0u8; len];
     rng.fill_bytes(&mut buf);
     buf
@@ -971,11 +971,11 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
 pub fn initialize_transfer() -> (utils::AuroraRunner, utils::Signer, Address) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
-    let dest_address = utils::address_from_secret_key(&SecretKey::random(&mut rng));
+    let dest_address = utils::address_from_secret_key(&random_sk(&mut rng));
     let mut signer = utils::Signer::new(source_account);
     signer.nonce = INITIAL_NONCE;
 
@@ -997,7 +997,7 @@ fn check_selector() {
 fn test_block_hash() {
     let runner = utils::AuroraRunner::default();
     let chain_id = {
-        let number = crate::prelude::U256::from(runner.chain_id);
+        let number = U256::from(runner.chain_id);
         crate::prelude::u256_to_arr(&number)
     };
     let account_id = runner.aurora_account_id.as_bytes();

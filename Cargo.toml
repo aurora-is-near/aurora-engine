@@ -1,6 +1,6 @@
 [workspace.package]
 authors = ["Aurora Labs <hello@aurora.dev>"]
-edition = "2021"
+edition = "2024"
 keywords = ["aurora", "engine", "evm", "blockchain"]
 homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
@@ -13,10 +13,10 @@ aurora-engine = { path = "engine", default-features = false }
 aurora-engine-hashchain = { path = "engine-hashchain", default-features = false }
 aurora-engine-modexp = { path = "engine-modexp", version = "1.2.0", default-features = false }
 aurora-engine-precompiles = { path = "engine-precompiles", version = "2.0.0", default-features = false }
-aurora-engine-sdk = { path = "engine-sdk", version = "2.0.0", default-features = false }
+aurora-engine-sdk = { path = "engine-sdk", version = "2.0.1", default-features = false }
 aurora-engine-test-doubles = { path = "engine-test-doubles" }
-aurora-engine-transactions = { path = "engine-transactions", version = "1.3.0", default-features = false }
-aurora-engine-types = { path = "engine-types", version = "2.0.0", default-features = false }
+aurora-engine-transactions = { path = "engine-transactions", version = "1.4.0", default-features = false }
+aurora-engine-types = { path = "engine-types", version = "3.0.0", default-features = false }
 aurora-engine-workspace = { path = "engine-workspace" }
 engine-standalone-storage = { path = "engine-standalone-storage" }
 engine-standalone-tracing = { path = "engine-standalone-tracing", default-features = false, features = ["impl-serde"] }
@@ -26,7 +26,7 @@ ark-bn254 = { version = "0.5", default-features = false }
 ark-serialize = { version = "0.5", default-features = false }
 ark-ec = { version = "0.5", default-features = false }
 ark-ff = { version = "0.5", default-features = false }
-aurora-evm = { version = "2", default-features = false }
+aurora-evm = { version = "2.2.1", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bitflags = { version = "1", default-features = false }
 blst = "0.3"
@@ -55,7 +55,7 @@ num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
 primitive-types = { version = "0.13", default-features = false, features = ["rlp", "serde_no_std"] }
 p256 = { version = "0.13", default-features = false }
-rand = "0.8"
+rand = "0.9"
 ripemd = { version = "0.1", default-features = false }
 rlp = { version = "0.6", default-features = false }
 rocksdb = { version = "0.21", default-features = false }

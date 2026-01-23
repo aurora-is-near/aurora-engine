@@ -1,6 +1,6 @@
 use aurora_engine_transactions::legacy::TransactionLegacy;
-use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::U256;
+use aurora_engine_types::types::{Address, Wei};
 
 use crate::utils::solidity;
 

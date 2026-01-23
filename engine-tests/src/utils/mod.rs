@@ -22,6 +22,7 @@ use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::ReturnData;
 use near_vm_runner::logic::{Config, HostError, VMContext, VMOutcome};
 use near_vm_runner::{ContractCode, MockContractRuntimeCache, ProfileDataV3};
+use rand::Rng;
 use rlp::RlpStream;
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -33,7 +34,7 @@ use crate::prelude::transactions::{
     eip_2930::{self, SignedTransaction2930, Transaction2930},
     legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
-use crate::prelude::{sdk, Address, Wei, H256, U256};
+use crate::prelude::{Address, H256, U256, Wei, sdk};
 use crate::utils::solidity::{ContractConstructor, DeployedContract};
 
 pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
@@ -67,8 +68,8 @@ impl Signer {
     }
 
     pub fn random() -> Self {
-        let mut rng = rand::thread_rng();
-        let sk = SecretKey::random(&mut rng);
+        let mut rng = rand::rng();
+        let sk = random_sk(&mut rng);
         Self::new(sk)
     }
 
@@ -538,7 +539,9 @@ impl AuroraRunner {
                     .collect::<std::collections::HashSet<_>>();
                 let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
 
-                panic!("The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}");
+                panic!(
+                    "The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}"
+                );
             }
 
             for (key, value) in standalone_state {
@@ -1014,4 +1017,10 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
     };
 
     EngineError { kind, gas_used }
+}
+
+pub fn random_sk<R: Rng>(rng: &mut R) -> SecretKey {
+    let mut buff = [0u8; libsecp256k1::util::SECRET_KEY_SIZE];
+    rng.fill_bytes(&mut buff);
+    SecretKey::parse(&buff).unwrap()
 }

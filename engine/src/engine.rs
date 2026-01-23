@@ -3,29 +3,30 @@ use aurora_engine_precompiles::PrecompileConstructorContext;
 use aurora_engine_sdk::{
     caching::FullCache,
     env::Env,
-    io::{StorageIntermediate, IO},
+    io::{IO, StorageIntermediate},
     promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
 };
-use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
 use aurora_engine_types::parameters::connector::FtTransferMessageData;
+use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
 use aurora_engine_types::{
+    PhantomData,
     parameters::{
         connector::{Erc20Identifier, Erc20Metadata, FtOnTransferArgs, MirrorErc20TokenArgs},
         engine::FunctionCallArgsV2,
     },
     public_key::PublicKey,
     types::EthGas,
-    PhantomData,
 };
 use aurora_evm::executor::stack::Authorization;
 use aurora_evm::{
+    Config, CreateScheme, ExitError, ExitFatal, ExitReason, Opcode,
     backend::{Apply, ApplyBackend, Backend, Basic, Log},
-    executor, Config, CreateScheme, ExitError, ExitFatal, ExitReason, Opcode,
+    executor,
 };
 use core::cell::RefCell;
 use core::iter::once;
 
-use crate::contract_methods::{silo, ContractError};
+use crate::contract_methods::{ContractError, silo};
 use crate::map::BijectionMap;
 use crate::parameters::TransactionStatus;
 use crate::parameters::{CallArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs};
@@ -33,15 +34,15 @@ use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
 use crate::prelude::parameters::connector::RefundCallArgs;
+use crate::prelude::precompiles::Precompiles;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::xcc::cross_contract_call;
-use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
-    address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
-    Address, BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, String, Vec,
-    Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
-    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    AccountId, Address, BTreeMap, BorshDeserialize, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR,
+    ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, KeyPrefix,
+    PromiseArgs, PromiseCreateArgs, String, U256, Vec, Wei, Yocto, address_to_key, bytes_to_key,
+    format, sdk, storage_to_key, u256_to_arr, vec,
 };
 use crate::state;
 use crate::state::EngineState;
@@ -697,8 +698,13 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
         let key = Self::relayer_key(account_id);
-        let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
-        Address::try_from_slice(&raw_addr[..]).ok()
+
+        self.io.read_storage(&key).map(|v| {
+            let mut buf = [0; 20];
+
+            v.copy_to_slice(&mut buf);
+            Address::from_array(buf)
+        })
     }
 
     pub fn register_token(
@@ -1044,21 +1050,22 @@ pub fn submit_with_alt_modexp<
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check that fixed gas is not greater than gasLimit from the transaction.
+    // Check that fixed gas is not greater than the gas limit from the transaction.
     if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
-    // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(CONFIG) {
-        Err(_e) => {
-            return Err(EngineErrorKind::GasOverflow.into());
-        }
-        Ok(intrinsic_gas) => {
-            if transaction.gas_limit < intrinsic_gas.into() {
-                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
-            }
-        }
+    let intrinsic_gas = transaction
+        .intrinsic_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let floor_gas = transaction
+        .floor_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+
+    // Check that the max value of intrinsic gas and floor gas is covered by the transaction
+    // gas limit, EIP-7623 https://eips.ethereum.org/EIPS/eip-7623
+    if transaction.gas_limit < core::cmp::max(intrinsic_gas, floor_gas).into() {
+        return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
@@ -1627,34 +1634,27 @@ where
                         match promise {
                             PromiseArgs::Create(promise) => {
                                 // Safety: this promise creation is safe because it does not come from
-                                // users directly. The exit precompiles only create promises which we
+                                // users directly. The exit precompile only create promises which we
                                 // are able to execute without violating any security invariants.
-                                let id = unsafe {
-                                    match previous_promise {
-                                        Some(base_id) => {
-                                            schedule_promise_callback(handler, base_id, &promise)
-                                        }
-                                        None => schedule_promise(handler, &promise),
+                                let id = match previous_promise {
+                                    Some(base_id) => {
+                                        schedule_promise_callback(handler, base_id, &promise)
                                     }
+                                    None => schedule_promise(handler, &promise),
                                 };
                                 previous_promise = Some(id);
                             }
                             PromiseArgs::Callback(promise) => {
                                 // Safety: This is safe because the promise data comes from our own
                                 // exit precompiles. See note above.
-                                let base_id = unsafe {
-                                    match previous_promise {
-                                        Some(base_id) => schedule_promise_callback(
-                                            handler,
-                                            base_id,
-                                            &promise.base,
-                                        ),
-                                        None => schedule_promise(handler, &promise.base),
+                                let base_id = match previous_promise {
+                                    Some(base_id) => {
+                                        schedule_promise_callback(handler, base_id, &promise.base)
                                     }
+                                    None => schedule_promise(handler, &promise.base),
                                 };
-                                let id = unsafe {
-                                    schedule_promise_callback(handler, base_id, &promise.callback)
-                                };
+                                let id =
+                                    schedule_promise_callback(handler, base_id, &promise.callback);
                                 previous_promise = Some(id);
                             }
                             PromiseArgs::Recursive(_) => {
@@ -1662,10 +1662,10 @@ where
                             }
                         }
                     }
-                    // do not pass on these "internal logs" to caller
+                    // do not pass on these "internal logs" to the caller
                     None
                 } else {
-                    // The exit precompiles do produce externally consumable logs in
+                    // The exit precompile does produce externally consumable logs in
                     // addition to the promises. The external logs have a non-empty
                     // `topics` field.
                     Some(evm_log_to_result_log(log))
@@ -1689,7 +1689,7 @@ where
                         previous_promise = Some(id);
                     }
                 }
-                // do not pass on these "internal logs" to caller
+                // do not pass on these "internal logs" to the caller
                 None
             } else {
                 Some(evm_log_to_result_log(log))
@@ -1711,10 +1711,7 @@ fn evm_log_to_result_log(log: Log) -> ResultLog {
     }
 }
 
-unsafe fn schedule_promise<P: PromiseHandler>(
-    handler: &mut P,
-    promise: &PromiseCreateArgs,
-) -> PromiseId {
+fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {
     sdk::log!(
         "call_contract {}.{}",
         promise.target_account_id,
@@ -1723,7 +1720,7 @@ unsafe fn schedule_promise<P: PromiseHandler>(
     handler.promise_create_call(promise)
 }
 
-unsafe fn schedule_promise_callback<P: PromiseHandler>(
+fn schedule_promise_callback<P: PromiseHandler>(
     handler: &mut P,
     base_id: PromiseId,
     promise: &PromiseCreateArgs,
@@ -1733,6 +1730,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
         promise.target_account_id,
         promise.method
     );
+
     handler.promise_attach_callback(base_id, promise)
 }
 
@@ -2160,7 +2158,7 @@ mod tests {
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::parameters::connector::FtOnTransferArgs;
     use aurora_engine_types::parameters::engine::RelayerKeyArgs;
-    use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
+    use aurora_engine_types::types::{Balance, NearGas, RawU256, make_address};
     use std::cell::RefCell;
 
     #[test]
@@ -2570,8 +2568,7 @@ mod tests {
             attached_balance: Yocto::default(),
             attached_gas: NearGas::default(),
         };
-        // This is safe because it's just a test
-        let actual_id = unsafe { schedule_promise(&mut promise_tracker, &args) };
+        let actual_id = schedule_promise(&mut promise_tracker, &args);
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();
@@ -2596,8 +2593,7 @@ mod tests {
             attached_gas: NearGas::default(),
         };
         let base_id = PromiseId::new(6);
-        // This is safe because it's just a test
-        let actual_id = unsafe { schedule_promise_callback(&mut promise_tracker, base_id, &args) };
+        let actual_id = schedule_promise_callback(&mut promise_tracker, base_id, &args);
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();

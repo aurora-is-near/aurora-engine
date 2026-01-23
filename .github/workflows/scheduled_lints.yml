@@ -18,7 +18,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -47,6 +47,8 @@ jobs:
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run tests
         run: cargo make test
+        env:
+          RUST_TEST_THREADS: 32 # decrease the number of the test threads to reduce the overall load on the VM and prevent the occasional failure of the tests.
       - uses: 8398a7/action-slack@v3
         if: failure()
         with:
@@ -65,7 +67,7 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
         run: scripts/ci-deps/native.sh
       - name: Setup Rust cache

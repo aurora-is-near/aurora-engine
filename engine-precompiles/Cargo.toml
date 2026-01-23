@@ -1,6 +1,6 @@
 [package]
 name = "aurora-engine-precompiles"
-version = "2.0.0"
+version = "2.1.0"
 description = "Set of precompiles used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true

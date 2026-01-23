@@ -1,4 +1,32 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+use aurora_engine_modexp::ModExpAlgorithm;
+use aurora_engine_sdk::env::Env;
+use aurora_engine_sdk::io::IO;
+use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
+use aurora_engine_types::{BTreeMap, BTreeSet, Box, account_id::AccountId, types::Address, vec};
+use aurora_evm::backend::Log;
+use aurora_evm::executor::{
+    self,
+    stack::{PrecompileFailure, PrecompileHandle},
+};
+
+pub use aurora_engine_types::types::EthGas;
+pub use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
+
+use crate::account_ids::{CurrentAccount, PredecessorAccount, predecessor_account};
+use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
+use crate::blake2::Blake2F;
+use crate::hash::{RIPEMD160, SHA256};
+use crate::identity::Identity;
+use crate::modexp::ModExp;
+use crate::native::{ExitToEthereum, ExitToNear, exit_to_ethereum, exit_to_near};
+use crate::prelude::{H256, Vec};
+use crate::prepaid_gas::PrepaidGas;
+use crate::promise_result::PromiseResult;
+use crate::random::RandomSeed;
+use crate::secp256k1::ECRecover;
+use crate::secp256r1::Secp256r1;
+use crate::xcc::{CrossContractCall, cross_contract_call};
 
 pub mod account_ids;
 pub mod alt_bn256;
@@ -16,34 +44,6 @@ pub mod secp256k1;
 pub mod secp256r1;
 mod utils;
 pub mod xcc;
-
-use crate::account_ids::{predecessor_account, CurrentAccount, PredecessorAccount};
-use crate::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
-use crate::blake2::Blake2F;
-use crate::hash::{RIPEMD160, SHA256};
-use crate::identity::Identity;
-use crate::modexp::ModExp;
-use crate::native::{exit_to_ethereum, exit_to_near, ExitToEthereum, ExitToNear};
-use crate::prelude::types::EthGas;
-use crate::prelude::{Vec, H256};
-use crate::prepaid_gas::PrepaidGas;
-use crate::random::RandomSeed;
-use crate::secp256k1::ECRecover;
-use crate::secp256r1::Secp256r1;
-use crate::xcc::CrossContractCall;
-use aurora_engine_modexp::ModExpAlgorithm;
-use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::IO;
-use aurora_engine_sdk::promise::ReadOnlyPromiseHandler;
-use aurora_engine_types::{account_id::AccountId, types::Address, vec, BTreeMap, BTreeSet, Box};
-use aurora_evm::backend::Log;
-use aurora_evm::executor::{
-    self,
-    stack::{PrecompileFailure, PrecompileHandle},
-};
-use aurora_evm::{Context, ExitError, ExitFatal, ExitSucceed};
-use promise_result::PromiseResult;
-use xcc::cross_contract_call;
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct PrecompileOutput {
@@ -63,7 +63,7 @@ impl PrecompileOutput {
     }
 }
 
-type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
+pub type EvmPrecompileResult = Result<PrecompileOutput, ExitError>;
 
 /// A precompiled function for use in the EVM.
 pub trait Precompile {
@@ -552,7 +552,7 @@ const fn make_h256(x: u128, y: u128) -> H256 {
 #[cfg(test)]
 mod tests {
     use crate::prelude::H160;
-    use crate::{prelude, Byzantium, Istanbul};
+    use crate::{Byzantium, Istanbul, prelude};
     use prelude::types::Address;
 
     #[test]

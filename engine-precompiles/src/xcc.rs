@@ -2,20 +2,22 @@
 //!
 //! Allow Aurora users interacting with NEAR smart contracts using cross contract call primitives.
 
-use crate::{utils, HandleBasedPrecompile, PrecompileOutput};
 use aurora_engine_sdk::io::IO;
 use aurora_engine_types::{
+    Cow, H160, H256, U256, Vec,
     account_id::AccountId,
     borsh::{self, BorshDeserialize},
     format,
     parameters::{CrossContractCallArgs, PromiseCreateArgs},
     str,
-    types::{balance::ZERO_YOCTO, Address, EthGas, NearGas},
-    vec, Cow, Vec, H160, H256, U256,
+    types::{Address, EthGas, NearGas, balance::ZERO_YOCTO},
+    vec,
 };
+use aurora_evm::ExitError;
 use aurora_evm::backend::Log;
 use aurora_evm::executor::stack::{PrecompileFailure, PrecompileHandle};
-use aurora_evm::ExitError;
+
+use crate::{HandleBasedPrecompile, PrecompileOutput, utils};
 
 pub mod costs {
     use crate::prelude::types::{EthGas, NearGas};
@@ -76,8 +78,8 @@ impl<I> CrossContractCall<I> {
 
 pub mod cross_contract_call {
     use aurora_engine_types::{
-        types::{make_address, Address},
         H256,
+        types::{Address, make_address},
     };
 
     /// NEAR Cross Contract Call precompile address
@@ -240,7 +242,7 @@ pub mod state {
     //! Functions for reading state related to the cross-contract call feature
 
     use aurora_engine_sdk::error::ReadU32Error;
-    use aurora_engine_sdk::io::{StorageIntermediate, IO};
+    use aurora_engine_sdk::io::{IO, StorageIntermediate};
     use aurora_engine_types::parameters::xcc::CodeVersion;
     use aurora_engine_types::storage::{self, KeyPrefix};
     use aurora_engine_types::types::{Address, Yocto};
@@ -334,11 +336,11 @@ mod tests {
 
     #[test]
     fn test_transfer_from_encoding() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
-        let from = rng.gen::<[u8; 20]>().into();
-        let to = rng.gen::<[u8; 20]>().into();
-        let amount = rng.gen::<[u8; 32]>().into();
+        let from = rng.random::<[u8; 20]>().into();
+        let to = rng.random::<[u8; 20]>().into();
+        let amount = rng.random::<[u8; 32]>().into();
 
         #[allow(deprecated)]
         let transfer_from_function = ethabi::Function {
