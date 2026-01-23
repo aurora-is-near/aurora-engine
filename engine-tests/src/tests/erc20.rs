@@ -217,18 +217,24 @@ fn deploy_erc_20_out_of_gas() {
     let constructor = ERC20Constructor::load();
     let mut deploy_transaction = constructor.deploy("OutOfGas", "OOG", INITIAL_NONCE.into());
 
-    // not enough gas to cover intrinsic cost
-    let intrinsic_gas = erc20::legacy_into_normalized_tx(deploy_transaction.clone())
-        .intrinsic_gas(&aurora_evm::Config::shanghai())
+    let normalized_deploy_tx = erc20::legacy_into_normalized_tx(deploy_transaction.clone());
+    let intrinsic_gas = normalized_deploy_tx
+        .intrinsic_gas(&aurora_evm::Config::prague())
         .unwrap();
-    deploy_transaction.gas_limit = (intrinsic_gas - 1).into();
+    let floor_gas = normalized_deploy_tx
+        .floor_gas(&aurora_evm::Config::prague())
+        .unwrap();
+    let max_gas = std::cmp::max(intrinsic_gas, floor_gas);
+
+    // not enough gas to cover intrinsic or floor cost
+    deploy_transaction.gas_limit = (max_gas - 1).into();
     let error = runner
         .submit_transaction(&source_account, deploy_transaction.clone())
         .unwrap_err();
     assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
 
     // not enough gas to complete transaction
-    deploy_transaction.gas_limit = U256::from(intrinsic_gas + 1);
+    deploy_transaction.gas_limit = U256::from(max_gas + 1);
     let outcome = runner.submit_transaction(&source_account, deploy_transaction);
     let error = outcome.unwrap();
     assert_eq!(error.status, TransactionStatus::OutOfGas);
