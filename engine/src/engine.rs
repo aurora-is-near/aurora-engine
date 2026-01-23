@@ -1050,21 +1050,22 @@ pub fn submit_with_alt_modexp<
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check that fixed gas is not greater than gasLimit from the transaction.
+    // Check that fixed gas is not greater than the gas limit from the transaction.
     if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
-    // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(CONFIG) {
-        Err(_e) => {
-            return Err(EngineErrorKind::GasOverflow.into());
-        }
-        Ok(intrinsic_gas) => {
-            if transaction.gas_limit < intrinsic_gas.into() {
-                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
-            }
-        }
+    let intrinsic_gas = transaction
+        .intrinsic_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let floor_gas = transaction
+        .floor_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+
+    // Check that the max value of intrinsic gas and floor gas is covered by the transaction
+    // gas limit, EIP-7623 https://eips.ethereum.org/EIPS/eip-7623
+    if transaction.gas_limit < core::cmp::max(intrinsic_gas, floor_gas).into() {
+        return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
@@ -1661,10 +1662,10 @@ where
                             }
                         }
                     }
-                    // do not pass on these "internal logs" to caller
+                    // do not pass on these "internal logs" to the caller
                     None
                 } else {
-                    // The exit precompiles do produce externally consumable logs in
+                    // The exit precompile does produce externally consumable logs in
                     // addition to the promises. The external logs have a non-empty
                     // `topics` field.
                     Some(evm_log_to_result_log(log))
@@ -1688,7 +1689,7 @@ where
                         previous_promise = Some(id);
                     }
                 }
-                // do not pass on these "internal logs" to caller
+                // do not pass on these "internal logs" to the caller
                 None
             } else {
                 Some(evm_log_to_result_log(log))

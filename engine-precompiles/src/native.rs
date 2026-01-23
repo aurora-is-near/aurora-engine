@@ -938,9 +938,8 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                         ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS"))
                     })?;
                     // unwrap cannot fail since we checked the length already
-                    let recipient_address = Address::try_from_slice(input).map_err(|_| {
-                        ExitError::Other(crate::prelude::Cow::from("ERR_WRONG_ADDRESS"))
-                    })?;
+                    let recipient_address = Address::try_from_slice(input)
+                        .map_err(|_| ExitError::Other(Cow::from("ERR_WRONG_ADDRESS")))?;
 
                     (
                         nep141_address,
