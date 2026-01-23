@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Additions
 
-- Added floor gas calculation for transactions to be aligned with EIP-7623 by [@aleksuss]. (#[#1064])
+- Added floor gas calculation for transactions to be aligned with EIP-7623 by [@aleksuss]. ([#1064])
 
 ### Changes
 
