@@ -224,6 +224,31 @@ impl NormalizedEthTransaction {
             .and_then(|gas| gas.checked_add(gas_authorization_list))
             .ok_or(Error::GasOverflow)
     }
+
+    #[allow(clippy::naive_bytecount)]
+    pub fn floor_gas(&self, config: &aurora_evm::Config) -> Result<u64, Error> {
+        if config.has_floor_gas {
+            let num_zero_bytes = u64::try_from(self.data.iter().filter(|b| **b == 0).count())
+                .map_err(|_e| Error::IntegerConversion)?;
+            let data_len = u64::try_from(self.data.len()).map_err(|_e| Error::IntegerConversion)?;
+            let num_non_zero_bytes = data_len
+                .checked_sub(num_zero_bytes)
+                .ok_or(Error::GasOverflow)?;
+
+            let base_gas = config.gas_transaction_call;
+            let tokens_in_calldata = num_non_zero_bytes
+                .checked_mul(4)
+                .and_then(|gas| gas.checked_add(num_zero_bytes))
+                .ok_or(Error::GasOverflow)?;
+
+            tokens_in_calldata
+                .checked_mul(config.total_cost_floor_per_token)
+                .and_then(|gas| gas.checked_add(base_gas))
+                .ok_or(Error::GasOverflow)
+        } else {
+            Ok(0)
+        }
+    }
 }
 
 fn init_code_cost(config: &aurora_evm::Config, data: &[u8]) -> Result<u64, Error> {
@@ -526,5 +551,122 @@ mod tests {
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call + config.gas_per_auth_base_cost;
         assert_eq!(gas, expected);
+    }
+
+    fn create_test_transaction(data: Vec<u8>) -> super::NormalizedEthTransaction {
+        super::NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data,
+            access_list: vec![],
+            authorization_list: vec![],
+        }
+    }
+
+    #[test]
+    fn test_floor_gas_disabled() {
+        let config = aurora_evm::Config::cancun();
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        assert_eq!(gas, 0);
+    }
+
+    #[test]
+    fn test_floor_gas_empty_data() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        assert_eq!(gas, 21000);
+    }
+
+    #[test]
+    fn test_floor_gas_all_zero_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![0u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 0 * 4 + 10 = 10
+        // floor_gas = 10 * 10 + 21000 = 21100
+        assert_eq!(gas, 21100);
+    }
+
+    #[test]
+    fn test_floor_gas_all_non_zero_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 10 * 4 + 0 = 40
+        // floor_gas = 40 * 10 + 21000 = 21400
+        assert_eq!(gas, 21400);
+    }
+
+    #[test]
+    fn test_floor_gas_mixed_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![0, 1, 0, 1, 0, 1, 1, 1]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // num_zero_bytes = 3
+        // num_non_zero_bytes = 5
+        // tokens_in_calldata = 5 * 4 + 3 = 23
+        // floor_gas = 23 * 10 + 21000 = 21230
+        assert_eq!(gas, 21230);
+    }
+
+    #[test]
+    fn test_floor_gas_large_data() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![1u8; 1000]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 1000 * 4 + 0 = 4000
+        // floor_gas = 4000 * 10 + 21000 = 61000
+        assert_eq!(gas, 61000);
+    }
+
+    #[test]
+    fn test_floor_gas_overflow_on_mul_cost_per_token() {
+        let mut config = aurora_evm::Config::prague();
+        config.total_cost_floor_per_token = u64::MAX;
+
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let result = tx.floor_gas(&config);
+
+        assert!(matches!(result, Err(Error::GasOverflow)));
+    }
+
+    #[test]
+    fn test_floor_gas_overflow_on_add_base() {
+        let mut config = aurora_evm::Config::prague();
+        config.has_floor_gas = true;
+        config.total_cost_floor_per_token = u64::MAX;
+
+        let tx = create_test_transaction(vec![0u8; 1]);
+        let result = tx.floor_gas(&config);
+
+        assert!(matches!(result, Err(Error::GasOverflow)));
+    }
+
+    #[test]
+    fn test_floor_gas_with_different_cost_per_token() {
+        let mut config = aurora_evm::Config::prague();
+        config.has_floor_gas = true;
+        config.total_cost_floor_per_token = 500;
+
+        let tx = create_test_transaction(vec![1u8; 5]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 5 * 4 + 0 = 20
+        // floor_gas = 20 * 500 + 21000 = 31000
+        assert_eq!(gas, 31000);
     }
 }
