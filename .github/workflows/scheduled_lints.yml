@@ -75,8 +75,6 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
-      #      - name: Install dependencies
-      #        run: scripts/ci-deps/native.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -97,6 +95,8 @@ jobs:
             etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
+      - name: Install wasm-opt
+        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Install nightly rust toolchain
         run: rustup toolchain add nightly
       - name: Run checks
