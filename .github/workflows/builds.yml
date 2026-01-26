@@ -20,7 +20,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install dependencies
-        run: scripts/ci-deps/install-wasm-opt.sh
+        run: scripts/ci-deps.sh
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Compile smart contracts
