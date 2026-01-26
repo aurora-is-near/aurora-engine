@@ -32,8 +32,8 @@ jobs:
           node-version: 18
           cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install wasm-opt
@@ -66,6 +66,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run bench-modexp tests
