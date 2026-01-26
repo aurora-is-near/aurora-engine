@@ -1,6 +1,5 @@
 ---
 on:
-  pull_request:
   schedule:
     - cron: '0 8 * * 1-5'
 
