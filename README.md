@@ -45,7 +45,7 @@ cargo install --force cargo-make
 For WebAssembly optimization we use `wasm-opt` from the [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen).
 
 We recommend installing the release:
-https://github.com/WebAssembly/binaryen/releases/tag/version_123
+https://github.com/WebAssembly/binaryen/releases/tag/version_125
 
 `wasm-opt` command should be available for the build process.
 
@@ -53,7 +53,7 @@ Verify version:
 
 ```bash
 $ wasm-opt --version
-wasm-opt version 123 (version_123)
+wasm-opt version 125 (version_125)
 ```
 
 Please be aware that you don't need to run `wasm-opt` explicitly, The `wasm-opt` runs automatically

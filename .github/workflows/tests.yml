@@ -19,6 +19,8 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
+      - name: Install dependencies
+        run: scripts/ci-deps.sh
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -26,18 +28,22 @@ jobs:
           key: aurora-cargo-tests
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Setup Node and cache
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Enable Yarn Caching
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
           cache: yarn
           cache-dependency-path: |
-            etc/eth-contracts
-            etc/tests/uniswap
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test-flow
         env:
@@ -55,17 +61,27 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v6
       - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
           key: aurora-modexp-tests
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Setup Node and cache
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Enable Yarn Caching
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Run bench-modexp tests
@@ -83,7 +99,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v6
       - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
