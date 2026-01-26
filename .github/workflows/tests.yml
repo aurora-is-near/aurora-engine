@@ -19,6 +19,8 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
+      - name: Install dependencies
+        run: scripts/ci-deps.sh
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -42,8 +44,6 @@ jobs:
             etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run tests
         run: cargo make test-flow
         env:
@@ -60,6 +60,8 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
+      - name: Install dependencies
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -82,8 +84,6 @@ jobs:
             etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run bench-modexp tests
         run: cargo make bench-modexp
 
@@ -98,6 +98,8 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
+      - name: Install dependencies
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -106,8 +108,6 @@ jobs:
           cache-all-crates: "true"
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Build XCC router
         run: cargo make build-xcc-router
 

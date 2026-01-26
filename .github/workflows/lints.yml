@@ -23,6 +23,8 @@ jobs:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
         uses: actions/checkout@v6
+      - name: Install dependencies
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -33,8 +35,6 @@ jobs:
         run: rustup toolchain add nightly
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
-      - name: Install wasm-opt
-        run: scripts/ci-deps/install-wasm-opt.sh
       - name: Run ${{ matrix.command }}
         run: cargo make ${{ matrix.command }}
 

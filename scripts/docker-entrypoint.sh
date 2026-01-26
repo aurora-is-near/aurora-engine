@@ -1,5 +1,5 @@
 #!/bin/bash
 rustup toolchain add stable
 cargo +stable install --no-default-features --force cargo-make
-scripts/ci-deps/install-wasm-opt.sh
+scripts/ci-deps.sh
 cargo make build-docker-inner
