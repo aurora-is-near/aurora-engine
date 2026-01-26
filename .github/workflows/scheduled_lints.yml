@@ -35,7 +35,7 @@ jobs:
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: yarn
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock
@@ -78,7 +78,7 @@ jobs:
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: yarn
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock
