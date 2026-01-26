@@ -32,8 +32,8 @@ jobs:
           key: ${{matrix.version}}
           cache-on-failure: "true"
           cache-all-crates: "true"
-      - name: Install Yarn via Corepack
-        run: corepack enable
+      - name: Install Yarn
+        run: npm install -g yarn
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
@@ -77,8 +77,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           cache-all-crates: "true"
-      - name: Install Yarn via Corepack
-        run: corepack enable
+      - name: Install Yarn
+        run: npm install -g yarn
       - name: Setup Node and cache
         uses: actions/setup-node@v4
         with:
