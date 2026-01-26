@@ -41,8 +41,11 @@ jobs:
       - name: Enable Yarn Caching
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'yarn'
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Build actual neard-sandbox
         run: scripts/build-neard-sandbox.sh ${{ matrix.version }}
       - name: Install wasm-opt
@@ -87,8 +90,11 @@ jobs:
       - name: Enable Yarn Caching
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'yarn'
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: |
+            etc/eth-contracts/yarn.lock
+            etc/tests/uniswap/yarn.lock
       - name: Install cargo-make
         run: cargo +stable make -V || cargo +stable install cargo-make
       - name: Install nightly rust toolchain
