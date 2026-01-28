@@ -1,6 +1,4 @@
 name: Security audit
-permissions:
-  contents: read
 on:
   schedule:
     - cron: '0 8 * * *'
@@ -14,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RUSTUP_TOOLCHAIN: stable
+    permissions:
+      checks: write
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v6
       - uses: rustsec/audit-check@v2
