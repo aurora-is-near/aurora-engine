@@ -3,7 +3,7 @@ name: "Contract Security Analysis"
 on:
   push:
     branches:
-      - main
+      - master
       - develop
   pull_request:
   schedule:
