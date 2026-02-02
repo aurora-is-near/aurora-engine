@@ -184,6 +184,7 @@ where
         .args([
             "docker",
             "run",
+            "--rm",
             "-v",
             &source_mount_arg,
             "-v",
