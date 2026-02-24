@@ -13,8 +13,8 @@ autobenches = false
 [dev-dependencies]
 aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
 anyhow.workspace = true
-cargo-near-build.workspace = true
-near-sdk.workspace = true
+cargo-near-build = { workspace = true, features = ["build_internal"] }
+near-sdk = { workspace = true, features = ["non-contract-usage"] }
 near-workspaces.workspace = true
 tokio = { workspace = true, features = ["macros"] }
 serde = { workspace = true, features = ["derive"] }
@@ -23,4 +23,3 @@ serde = { workspace = true, features = ["derive"] }
 workspace = true
 
 [features]
-
