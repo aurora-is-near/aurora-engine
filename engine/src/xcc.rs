@@ -155,7 +155,7 @@ where
     let promise_id = handler.promise_create_batch(&batch);
 
     if let AddressVersionStatus::DeployNeeded { .. } = deploy_needed {
-        // If a create and/or deploy was needed then we must attach a callback to update
+        // If a creation and/or deployment were needed, then we must attach a callback to update
         // the Engine's record of the account.
 
         let args = AddressVersionUpdateArgs {
