@@ -25,7 +25,7 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_logs_hashchain(io, env, function_name!(), |io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -60,7 +60,7 @@ pub fn withdraw_wnear_to_router<I: IO + Copy, E: Env, H: PromiseHandler>(
         }
         let id = ids.last().ok_or(b"ERR_NO_PROMISE_CREATED")?;
         handler.promise_return(*id);
-        Ok(result)
+        Ok(Some(result))
     })
 }
 

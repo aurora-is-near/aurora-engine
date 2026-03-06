@@ -7,7 +7,9 @@ use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{self, BorshDeserialize, BorshSerialize};
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 pub use aurora_engine_types::parameters::xcc::{AddressVersionUpdateArgs, FundXccArgs};
-use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::parameters::{
+    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseYieldCreateArgs,
+};
 use aurora_engine_types::storage::{self, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, Yocto, ZERO_YOCTO};
 use aurora_engine_types::{Cow, Vec, format};
@@ -557,6 +559,14 @@ impl<H: PromiseHandler> PromiseHandler for PromiseInterceptor<'_, H> {
 
     fn read_only(&self) -> Self::ReadOnly {
         self.inner.read_only()
+    }
+
+    fn promise_yield_create(&self, args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId) {
+        self.inner.promise_yield_create(args)
+    }
+
+    fn promise_yield_resume(&self, yield_id: [u8; 32], payload: &[u8]) {
+        self.inner.promise_yield_resume(yield_id, payload);
     }
 }
 

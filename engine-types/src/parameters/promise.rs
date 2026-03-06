@@ -219,6 +219,15 @@ pub struct PromiseCreateArgs {
 
 #[must_use]
 #[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
+pub struct PromiseYieldCreateArgs {
+    pub method: String,
+    pub args: Vec<u8>,
+    pub attached_gas: NearGas,
+    pub gas_weight: u64,
+}
+
+#[must_use]
+#[derive(Debug, BorshSerialize, BorshDeserialize, Clone, PartialEq, Eq)]
 pub struct PromiseWithCallbackArgs {
     pub base: PromiseCreateArgs,
     pub callback: PromiseCreateArgs,

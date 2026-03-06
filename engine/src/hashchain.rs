@@ -56,11 +56,11 @@ pub fn with_logs_hashchain<I, E, F>(
     env: &E,
     function_name: &str,
     f: F,
-) -> Result<SubmitResult, ContractError>
+) -> Result<Option<SubmitResult>, ContractError>
 where
     I: IO + Copy,
     E: Env,
-    F: for<'a> FnOnce(CachedIO<'a, I>) -> Result<SubmitResult, ContractError>,
+    F: for<'a> FnOnce(CachedIO<'a, I>) -> Result<Option<SubmitResult>, ContractError>,
 {
     let block_height = env.block_height();
     let maybe_hashchain = load_hashchain(&io, block_height)?;
@@ -69,17 +69,19 @@ where
     let hashchain_io = CachedIO::new(io, &cache);
     let result = f(hashchain_io)?;
 
-    if let Some(mut hashchain) = maybe_hashchain {
-        let log_bloom = bloom::get_logs_bloom(&result.logs);
-        let cache_ref = cache.borrow();
-        hashchain.add_block_tx(
-            block_height,
-            function_name,
-            &cache_ref.input,
-            &cache_ref.output,
-            &log_bloom,
-        )?;
-        save_hashchain(&mut io, &hashchain)?;
+    if let Some(result) = &result {
+        if let Some(mut hashchain) = maybe_hashchain {
+            let log_bloom = bloom::get_logs_bloom(&result.logs);
+            let cache_ref = cache.borrow();
+            hashchain.add_block_tx(
+                block_height,
+                function_name,
+                &cache_ref.input,
+                &cache_ref.output,
+                &log_bloom,
+            )?;
+            save_hashchain(&mut io, &hashchain)?;
+        }
     }
 
     Ok(result)

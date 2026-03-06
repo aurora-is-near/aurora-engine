@@ -430,7 +430,9 @@ where
             let tx_data: Vec<u8> = tx.into();
             let tx_hash = aurora_engine_sdk::keccak(&tx_data);
             let result = contract_methods::evm_transactions::submit(io, &env, &mut handler)
-                .map(|submit_result| Some(TransactionExecutionResult::Submit(Ok(submit_result))))
+                .map(|submit_result| {
+                    submit_result.map(|r| TransactionExecutionResult::Submit(Ok(r)))
+                })
                 .map_err(Into::into);
 
             (tx_hash, result)
@@ -443,7 +445,7 @@ where
             let result =
                 contract_methods::evm_transactions::submit_with_args(io, &env, &mut handler)
                     .map(|submit_result| {
-                        Some(TransactionExecutionResult::Submit(Ok(submit_result)))
+                        submit_result.map(|r| TransactionExecutionResult::Submit(Ok(r)))
                     })
                     .map_err(Into::into);
 
@@ -490,7 +492,7 @@ fn non_submit_execute<I: IO + Copy>(
             let mut handler = crate::promise::NoScheduler { promise_data };
             let result = contract_methods::evm_transactions::call(io, env, &mut handler)?;
 
-            Some(TransactionExecutionResult::Submit(Ok(result)))
+            result.map(|r| TransactionExecutionResult::Submit(Ok(r)))
         }
 
         TransactionKind::Deploy(_) => {
@@ -498,7 +500,7 @@ fn non_submit_execute<I: IO + Copy>(
             let mut handler = crate::promise::NoScheduler { promise_data };
             let result = contract_methods::evm_transactions::deploy_code(io, env, &mut handler)?;
 
-            Some(TransactionExecutionResult::Submit(Ok(result)))
+            result.map(|r| TransactionExecutionResult::Submit(Ok(r)))
         }
         TransactionKind::DeployErc20(_) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
@@ -586,7 +588,7 @@ fn non_submit_execute<I: IO + Copy>(
             let mut handler = crate::promise::NoScheduler { promise_data };
             let result = contract_methods::xcc::withdraw_wnear_to_router(io, env, &mut handler)?;
 
-            Some(TransactionExecutionResult::Submit(Ok(result)))
+            result.map(|r| TransactionExecutionResult::Submit(Ok(r)))
         }
         TransactionKind::Unknown => None,
         // Not handled in this function; is handled by the general `execute_transaction` function

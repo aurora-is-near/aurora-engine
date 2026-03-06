@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{AsBytes, H160, String, format};
 
 /// Base Eth Address type
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Address(H160);
 
 impl Address {
@@ -98,6 +98,12 @@ impl BorshDeserialize for Address {
 impl Default for Address {
     fn default() -> Self {
         Self::zero()
+    }
+}
+
+impl core::fmt::Debug for Address {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{:?}", self.0)
     }
 }
 

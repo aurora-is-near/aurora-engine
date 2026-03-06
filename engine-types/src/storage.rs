@@ -35,6 +35,7 @@ pub enum KeyPrefix {
     Hashchain = 0xc,
     Silo = 0xd,
     Whitelist = 0xe,
+    Yield = 0xf,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -55,6 +56,7 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Hashchain => 0xc,
             KeyPrefix::Silo => 0xd,
             KeyPrefix::Whitelist => 0xe,
+            KeyPrefix::Yield => 0xf,
         }
     }
 }

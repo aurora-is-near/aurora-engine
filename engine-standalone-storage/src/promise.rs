@@ -1,5 +1,7 @@
 use aurora_engine_sdk::promise::{PromiseHandler, PromiseId};
-use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::parameters::{
+    PromiseBatchAction, PromiseCreateArgs, PromiseYieldCreateArgs,
+};
 use aurora_engine_types::types::PromiseResult;
 
 /// Implements `PromiseHandler` so that it can be used in the standalone engine implementation of
@@ -66,4 +68,10 @@ impl PromiseHandler for NoScheduler<'_> {
     fn read_only(&self) -> Self::ReadOnly {
         *self
     }
+
+    fn promise_yield_create(&self, _args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId) {
+        ([0; 32], PromiseId::new(0))
+    }
+
+    fn promise_yield_resume(&self, _yield_id: [u8; 32], _payload: &[u8]) {}
 }

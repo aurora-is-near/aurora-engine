@@ -1,6 +1,8 @@
 use aurora_engine_types::H256;
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::{PromiseAction, PromiseBatchAction, PromiseCreateArgs};
+use aurora_engine_types::parameters::{
+    PromiseAction, PromiseBatchAction, PromiseCreateArgs, PromiseYieldCreateArgs,
+};
 use aurora_engine_types::public_key::PublicKey;
 use aurora_engine_types::types::PromiseResult;
 
@@ -43,7 +45,7 @@ impl Runtime {
 
     const GAS_FOR_STATE_MIGRATION: NearGas = NearGas::new(100_000_000_000_000);
 
-    /// Deploy code from given key in place of the current contract.
+    /// Deploy code from a given key in place of the current contract.
     /// Not implemented in terms of higher level traits (e.g. IO) for efficiency reasons.
     pub fn self_deploy(code_key: &[u8]) {
         unsafe {
@@ -535,6 +537,43 @@ impl crate::promise::PromiseHandler for Runtime {
             }
         }
         Some(true)
+    }
+
+    fn promise_yield_create(&self, args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId) {
+        let method_name = args.method.as_bytes();
+        let arguments = args.args.as_slice();
+        let gas = args.attached_gas.as_u64();
+        let gas_weight = args.gas_weight;
+        let data_register_id = 0;
+        let id = unsafe {
+            exports::promise_yield_create(
+                method_name.len() as _,
+                method_name.as_ptr() as _,
+                arguments.len() as _,
+                arguments.as_ptr() as _,
+                gas,
+                gas_weight,
+                data_register_id,
+            )
+        };
+
+        let mut yield_id = [0u8; 32];
+        unsafe {
+            exports::read_register(data_register_id, yield_id.as_mut_ptr() as u64);
+        }
+
+        (yield_id, PromiseId::new(id))
+    }
+
+    fn promise_yield_resume(&self, yield_id: [u8; 32], payload: &[u8]) {
+        unsafe {
+            exports::promise_yield_resume(
+                yield_id.len() as _,
+                yield_id.as_ptr() as _,
+                payload.len() as _,
+                payload.as_ptr() as _,
+            );
+        }
     }
 }
 

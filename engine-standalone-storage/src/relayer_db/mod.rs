@@ -130,7 +130,7 @@ where
                 }
                 continue;
             }
-            Ok(result) => {
+            Ok(Some(result)) => {
                 if result.status.is_fail() && tx_succeeded {
                     println!(
                         "WARN: Transaction with NEAR hash {near_tx_hash:?} expected to succeed, but failed with error message {:?}",
@@ -142,6 +142,9 @@ where
                 // should still persist the diff because failed transactions can impact the state.
                 // For example, a transaction that runs of out of gas still has its balance deducted
                 // for the gas spent. Therefore, we do not have a `continue` statement here.
+            }
+            Ok(None) => {
+                continue;
             }
         }
 

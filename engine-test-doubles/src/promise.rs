@@ -1,7 +1,7 @@
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_sdk::promise::PromiseId;
 use aurora_engine_types::parameters::{
-    NearPromise, PromiseBatchAction, PromiseCreateArgs, SimpleNearPromise,
+    NearPromise, PromiseBatchAction, PromiseCreateArgs, PromiseYieldCreateArgs, SimpleNearPromise,
 };
 use aurora_engine_types::types::PromiseResult;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ pub enum PromiseArgs {
     Recursive(NearPromise),
 }
 
-/// Doesn't actually schedule any promises, only tracks what promises should be scheduled
+/// Actually doesn't schedule any promises, only tracks what promises should be scheduled
 #[derive(Default)]
 pub struct PromiseTracker {
     internal_index: u64,
@@ -135,5 +135,13 @@ impl PromiseHandler for PromiseTracker {
             scheduled_promises: HashMap::default(),
             returned_promise: Option::default(),
         }
+    }
+
+    fn promise_yield_create(&self, _args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId) {
+        todo!()
+    }
+
+    fn promise_yield_resume(&self, _yield_id: [u8; 32], _payload: &[u8]) {
+        todo!()
     }
 }

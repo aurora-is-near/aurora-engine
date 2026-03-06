@@ -22,7 +22,7 @@ pub fn deploy_code<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_logs_hashchain(io, env, function_name!(), |mut io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -38,7 +38,8 @@ pub fn deploy_code<I: IO + Copy, E: Env, H: PromiseHandler>(
         let result = engine.deploy_code_with_input(input, None, handler)?;
         let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
-        Ok(result)
+
+        Ok(Some(result))
     })
 }
 
@@ -47,7 +48,7 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_logs_hashchain(io, env, function_name!(), |mut io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -66,7 +67,8 @@ pub fn call<I: IO + Copy, E: Env, H: PromiseHandler>(
         let result = engine.call_with_args(args, handler)?;
         let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
         io.return_output(&result_bytes);
-        Ok(result)
+
+        Ok(Some(result))
     })
 }
 
@@ -75,7 +77,7 @@ pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_logs_hashchain(io, env, function_name!(), |mut io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -95,8 +97,11 @@ pub fn submit<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
-        io.return_output(&result_bytes);
+
+        if let Some(result) = &result {
+            let result_bytes = borsh::to_vec(result).map_err(|_| errors::ERR_SERIALIZE)?;
+            io.return_output(&result_bytes);
+        }
 
         Ok(result)
     })
@@ -107,7 +112,7 @@ pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
     io: I,
     env: &E,
     handler: &mut H,
-) -> Result<SubmitResult, ContractError> {
+) -> Result<Option<SubmitResult>, ContractError> {
     with_logs_hashchain(io, env, function_name!(), |mut io| {
         let state = state::get_state(&io)?;
         require_running(&state)?;
@@ -123,8 +128,11 @@ pub fn submit_with_args<I: IO + Copy, E: Env, H: PromiseHandler>(
             relayer_address,
             handler,
         )?;
-        let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
-        io.return_output(&result_bytes);
+
+        if let Some(result) = &result {
+            let result_bytes = borsh::to_vec(&result).map_err(|_| errors::ERR_SERIALIZE)?;
+            io.return_output(&result_bytes);
+        }
 
         Ok(result)
     })

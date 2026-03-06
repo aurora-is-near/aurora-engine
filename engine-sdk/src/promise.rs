@@ -1,5 +1,5 @@
 use aurora_engine_types::parameters::{
-    PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs,
+    PromiseBatchAction, PromiseCreateArgs, PromiseWithCallbackArgs, PromiseYieldCreateArgs,
 };
 use aurora_engine_types::types::PromiseResult;
 
@@ -90,6 +90,10 @@ pub trait PromiseHandler {
         }
         Some(true)
     }
+
+    fn promise_yield_create(&self, args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId);
+
+    fn promise_yield_resume(&self, yield_id: [u8; 32], payload: &[u8]);
 }
 
 pub trait ReadOnlyPromiseHandler {
@@ -155,4 +159,10 @@ impl PromiseHandler for Noop {
     fn read_only(&self) -> Self::ReadOnly {
         Self
     }
+
+    fn promise_yield_create(&self, _args: &PromiseYieldCreateArgs) -> ([u8; 32], PromiseId) {
+        ([0; 32], PromiseId::new(0))
+    }
+
+    fn promise_yield_resume(&self, _yield_id: [u8; 32], _payload: &[u8]) {}
 }

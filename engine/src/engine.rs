@@ -6,8 +6,10 @@ use aurora_engine_sdk::{
     io::{IO, StorageIntermediate},
     promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
 };
+use aurora_engine_types::parameters::PromiseYieldCreateArgs;
 use aurora_engine_types::parameters::connector::FtTransferMessageData;
 use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
+use aurora_engine_types::types::{NearGas, PromiseResult};
 use aurora_engine_types::{
     PhantomData,
     parameters::{
@@ -41,8 +43,8 @@ use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction}
 use crate::prelude::{
     AccountId, Address, BTreeMap, BorshDeserialize, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR,
     ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, KeyPrefix,
-    PromiseArgs, PromiseCreateArgs, String, U256, Vec, Wei, Yocto, address_to_key, bytes_to_key,
-    format, sdk, storage_to_key, u256_to_arr, vec,
+    PromiseArgs, PromiseCreateArgs, String, ToString, U256, Vec, Wei, Yocto, address_to_key,
+    bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec,
 };
 use crate::state;
 use crate::state::EngineState;
@@ -982,7 +984,7 @@ pub fn submit<I: IO + Copy, E: Env, P: PromiseHandler>(
     current_account_id: AccountId,
     relayer_address: Address,
     handler: &mut P,
-) -> EngineResult<SubmitResult> {
+) -> EngineResult<Option<SubmitResult>> {
     submit_with_alt_modexp::<_, _, _, AuroraModExp>(
         io,
         env,
@@ -1008,7 +1010,7 @@ pub fn submit_with_alt_modexp<
     current_account_id: AccountId,
     relayer_address: Address,
     handler: &mut P,
-) -> EngineResult<SubmitResult> {
+) -> EngineResult<Option<SubmitResult>> {
     #[cfg(feature = "contract")]
     let transaction = NormalizedEthTransaction::try_from(
         EthTransactionKind::try_from(args.tx_data.as_slice())
@@ -1047,9 +1049,55 @@ pub fn submit_with_alt_modexp<
         }
     }
 
-    sdk::log!("signer_address {:?}", sender);
+    let ac_nonce = get_nonce(&io, &sender);
+    let tx_nonce = transaction.nonce;
 
-    check_nonce(&io, &sender, &transaction.nonce)?;
+    sdk::log!("signer_address: {sender:?}, singer_nonce: {ac_nonce}");
+
+    match tx_nonce.cmp(&ac_nonce) {
+        core::cmp::Ordering::Less => {
+            return Err(EngineErrorKind::IncorrectNonce(format!(
+                "ERR_INCORRECT_NONCE: ac: {ac_nonce}, tx: {tx_nonce}"
+            ))
+            .into());
+        }
+        core::cmp::Ordering::Greater => {
+            // Check if the transaction with the nonce has been added earlier, if so, then
+            // delete yield_id from the state and resume with &[0] to notify that it
+            // was executed by the NEAR runtime because of the timeout.
+
+            let (yield_id, promise_id) = handler.promise_yield_create(&PromiseYieldCreateArgs {
+                method: "submit_with_args".to_string(),
+                args: aurora_engine_types::borsh::to_vec(&args).unwrap_or_default(),
+                attached_gas: NearGas::new(0),
+                gas_weight: 1, // allocate all unused gas for the promise
+            });
+
+            add_yield_id(&mut io, sender, tx_nonce, yield_id)?;
+            handler.promise_return(promise_id);
+
+            sdk::log!("tx_nonce: {tx_nonce} gt ac_nonce, putting it to the queue");
+
+            return Ok(None);
+        }
+        core::cmp::Ordering::Equal => {}
+    }
+
+    if handler.promise_results_count() > 0 {
+        if let Some(promise_result) = handler.promise_result(0) {
+            match promise_result {
+                PromiseResult::NotReady => {
+                    sdk::log!("promise_result not ready");
+                }
+                PromiseResult::Successful(bytes) => {
+                    sdk::log!("promise_result: {bytes:?}");
+                }
+                PromiseResult::Failed => {
+                    sdk::log!("promise_result failed");
+                }
+            }
+        }
+    }
 
     // Check that fixed gas is not greater than the gas limit from the transaction.
     if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
@@ -1140,8 +1188,15 @@ pub fn submit_with_alt_modexp<
         kind: EngineErrorKind::GasPayment(e),
     })?;
 
-    // return result to user
-    result
+    let next_nonce = ac_nonce + 1;
+    // Check if there is a transaction with the next nonce in the queue.
+    if let Some(yield_id) = remove_yield_id(&mut io, sender, next_nonce) {
+        aurora_engine_sdk::log!("tx with next nonce: {next_nonce} is in the queue, executing it");
+        handler.promise_yield_resume(yield_id, &[1]);
+    }
+
+    // return result to the user
+    result.map(Some)
 }
 
 #[must_use]
@@ -1590,6 +1645,35 @@ pub fn remove_function_call_key<I: IO>(io: &mut I, key: &PublicKey) -> Result<()
         .ok_or_else(|| EngineError::from(EngineErrorKind::NonExistedKey))?;
 
     Ok(())
+}
+
+pub fn add_yield_id<I: IO>(
+    io: &mut I,
+    address: Address,
+    nonce: U256,
+    yield_id: [u8; 32],
+) -> Result<(), EngineError> {
+    let mut key = [0; 52];
+    key[0..20].copy_from_slice(address.as_bytes());
+    key[20..52].copy_from_slice(&nonce.to_big_endian());
+
+    let prefixed_key = bytes_to_key(KeyPrefix::Yield, &key);
+    io.write_storage(&prefixed_key, &yield_id);
+
+    Ok(())
+}
+
+pub fn remove_yield_id<I: IO>(io: &mut I, address: Address, nonce: U256) -> Option<[u8; 32]> {
+    let mut key = [0; 52];
+    key[0..20].copy_from_slice(address.as_bytes());
+    key[20..52].copy_from_slice(&nonce.to_big_endian());
+
+    let prefixed_key = bytes_to_key(KeyPrefix::Yield, &key);
+    io.remove_storage(&prefixed_key).map(|v| {
+        let mut buf = [0u8; 32];
+        v.copy_to_slice(&mut buf);
+        buf
+    })
 }
 
 /// Removes all storage for the given address.
