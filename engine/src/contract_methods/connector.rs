@@ -335,7 +335,7 @@ pub fn storage_withdraw<I: IO + PromiseHandler + Copy, E: Env>(
             .map_err(Into::<ParseArgsError>::into)
     })?;
 
-    return_promise(io, env, "engine_storage_withdraw", args, ZERO_YOCTO)
+    return_promise(io, env, "engine_storage_withdraw", args, ONE_YOCTO)
 }
 
 pub fn storage_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {

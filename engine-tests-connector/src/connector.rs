@@ -837,6 +837,24 @@ async fn test_storage_unregister() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_storage_withdraw() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+
+    let res = contract
+        .engine_contract
+        .call("storage_withdraw")
+        .args_json(json!({
+            "amount": None::<U128>,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(res.is_success(), "{res:#?}");
+    Ok(())
+}
+
 async fn dummy_contract(contract: &TestContract) -> anyhow::Result<Contract> {
     contract
         .create_sub_account("ft-rec")

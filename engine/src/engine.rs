@@ -491,8 +491,8 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             price.min(priority_fee_per_gas)
         });
         let effective_gas_price = priority_fee_per_gas + block_base_fee_per_gas;
-        // First we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
-        // less than the `gas_limit`. It allows to avoid refund unused gas to the sender later.
+        // First, we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
+        // less than the `gas_limit`. It allows avoiding refunding unused gas to the sender later.
         let prepaid_amount = fixed_gas
             .map_or(transaction.gas_limit, EthGas::as_u256)
             .checked_mul(effective_gas_price)
@@ -652,6 +652,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
+
         // The logs could be encoded as base64 or hex string.
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -2059,7 +2060,7 @@ impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E,
                 }
             }
         }
-        // These variable are only used if logging feature is enabled.
+        // These variables are only used if the logging feature is enabled.
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
