@@ -18,7 +18,6 @@ etc/eth-contracts/.env
 bin/
 target/
 etc/tests/*/target/
-etc/tests/*/Cargo.lock
 
 # Solidity artifacts
 artifacts/
