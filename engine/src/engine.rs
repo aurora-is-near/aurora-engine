@@ -239,6 +239,8 @@ pub enum GasPaymentError {
     EthAmountOverflow,
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
+    /// `max_fee_per_gas` is less than `base_fee_per_gas`
+    MaxFeePerGasLessThanBaseFee,
 }
 
 impl AsRef<[u8]> for GasPaymentError {
@@ -247,6 +249,7 @@ impl AsRef<[u8]> for GasPaymentError {
             Self::BalanceOverflow(overflow) => overflow.as_ref(),
             Self::EthAmountOverflow => errors::ERR_GAS_ETH_AMOUNT_OVERFLOW,
             Self::OutOfFund => errors::ERR_OUT_OF_FUND,
+            Self::MaxFeePerGasLessThanBaseFee => errors::ERR_MAX_FEE_PER_GAS_LESS_THAN_BASE_FEE,
         }
     }
 }
@@ -469,17 +472,25 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         max_gas_price: Option<U256>,
         fixed_gas: Option<EthGas>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() && fixed_gas.is_none() {
+        let block_base_fee_per_gas = self.block_base_fee_per_gas();
+        if transaction.max_fee_per_gas.is_zero()
+            && fixed_gas.is_none()
+            && block_base_fee_per_gas.is_zero()
+        {
             return Ok(GasPaymentResult::default());
+        }
+
+        if transaction.max_fee_per_gas < block_base_fee_per_gas {
+            return Err(GasPaymentError::MaxFeePerGasLessThanBaseFee);
         }
 
         let priority_fee_per_gas = transaction
             .max_priority_fee_per_gas
-            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+            .min(transaction.max_fee_per_gas - block_base_fee_per_gas);
         let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
             price.min(priority_fee_per_gas)
         });
-        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+        let effective_gas_price = priority_fee_per_gas + block_base_fee_per_gas;
         // First, we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
         // less than the `gas_limit`. It allows avoiding refunding unused gas to the sender later.
         let prepaid_amount = fixed_gas
