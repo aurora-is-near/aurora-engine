@@ -105,7 +105,7 @@ fn test_alt_bn128_add() {
         &Bn256Add::<Istanbul>::new(),
         Bn256Add::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_add.json"),
-        3587, // 3.587 TGas
+        3588, // 3.588 TGas
     );
 }
 
@@ -115,7 +115,7 @@ fn test_alt_bn128_mul() {
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        10226, // 10.226 TGas
+        10227, // 10.227 TGas
     );
 }
 
