@@ -12,6 +12,7 @@ on:
 
 jobs:
   contract_analysis:
+    if: github.actor != 'dependabot[bot]'
     name: "Shared"
     uses: aurora-is-near/.github/.github/workflows/security_analysis.yml@master
     secrets: inherit
