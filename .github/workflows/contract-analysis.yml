@@ -6,13 +6,11 @@ on:
       - master
       - develop
   pull_request:
-  schedule:
-    - cron: "30 5 * * *"
   workflow_dispatch:
 
 jobs:
-  contract_analysis:
-    if: github.actor != 'dependabot[bot]'
-    name: "Shared"
-    uses: aurora-is-near/.github/.github/workflows/security_analysis.yml@master
-    secrets: inherit
+  notice:
+    runs-on: ubuntu-latest
+    name: "Deprecation notice"
+    steps:
+      - run: echo "Backstage integration removed. This workflow does nothing and can be removed."
