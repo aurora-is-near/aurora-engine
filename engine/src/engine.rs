@@ -1086,8 +1086,15 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
-    // EIP-3607
-    if !engine.code(sender.raw()).is_empty() {
+
+    let sender_code = engine.code(sender.raw());
+    // EIP-7702 - check if it's delegated designation. If it's a delegation designation, then,
+    // even if `caller_code` is non-empty, the transaction should be executed.
+    let is_delegated = Authorization::is_delegated(&sender_code);
+
+    // EIP-3607: Reject transactions from senders with deployed code
+    // EIP-7702: Accept transaction even if the caller has code.
+    if !(sender_code.is_empty() || is_delegated) {
         return Err(EngineErrorKind::RejectCallerWithCode.into());
     }
     let max_gas_price = args.max_gas_price.map(Into::into);
