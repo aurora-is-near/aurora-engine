@@ -556,7 +556,8 @@ fn example_signer() -> utils::Signer {
 /// Build contract code: PUSH20 <authority> | EXTCODESIZE | PUSH1 0 | SSTORE | STOP
 #[must_use]
 fn sample_code_for_contract_eip7702(authority_address: Address) -> Vec<u8> {
-    let mut code = vec![0x73]; // PUSH20
+    let mut code = Vec::with_capacity(26);
+    code.push(0x73); // PUSH20
     code.extend_from_slice(authority_address.as_bytes());
     code.push(0x3B); // EXTCODESIZE
     code.push(0x60); // PUSH1
