@@ -294,10 +294,9 @@ fn test_eip_7702_delegated_sender_can_transact() {
 
     let relay = "relay.aurora";
     let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
-    // Unwrapping execution results validates outcome
-    let _result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
 
-    // assert_eq!(result.gas_used, 68206);
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
     assert_eq!(runner.get_balance(contract_address), CONTRACT_BALANCE);
     assert_eq!(runner.get_nonce(contract_address), CONTRACT_NONCE.into());
@@ -405,12 +404,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
     let outcome_3 = runner.call(utils::SUBMIT, relay, tx_bytes_3).unwrap();
     let result_3 =
         SubmitResult::try_from_slice(&outcome_3.return_data.as_value().unwrap()).unwrap();
-
-    // ── The tx MUST succeed: EIP-3607 must not reject EF0100 senders ──
-    assert!(
-        result_3.status.is_ok(),
-        "tx from account with EIP-7702 delegation must succeed (EIP-3607 exception)"
-    );
+    assert!(result_3.status.is_ok());
 
     assert_eq!(runner.get_nonce(signer_address), 3.into());
 
@@ -430,6 +424,63 @@ fn test_eip_7702_delegated_sender_can_transact() {
         (INITIAL_BALANCE - transfer_value).into()
     );
     // As sponsored transaction executed - storage slot now changed
+    assert_eq!(
+        runner.get_storage(authority_address, H256::zero()),
+        H256::from(H160::from_low_u64_be(23))
+    );
+
+    // ══════════════════════════════════════════════════════════════
+    // Step 4: revoke authority delegation
+    // ══════════════════════════════════════════════════════════════
+    let auth_revoke = sign_eip7702_authorization(
+        0,
+        Address::zero(),
+        2, // Current nonce from authority EOA
+        &authority_sk.secret_key,
+    );
+
+    let revoke_tx = Transaction7702 {
+        chain_id: runner.chain_id,
+        nonce: 3.into(), // signer nonce
+        gas_limit: U256::from(0x3d0900),
+        max_fee_per_gas: U256::from(0x07d0),
+        max_priority_fee_per_gas: U256::from(0x0a),
+        to: contract_address,
+        value: Wei::zero(),
+        data: vec![],
+        access_list: vec![],
+        authorization_list: vec![auth_revoke],
+    };
+
+    let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &signer.secret_key);
+    let tx_bytes_4: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
+        .chain(rlp::encode(&signed_tx_4))
+        .collect();
+
+    let outcome_4 = runner.call(utils::SUBMIT, relay, tx_bytes_4).unwrap();
+    let result_4 =
+        SubmitResult::try_from_slice(&outcome_4.return_data.as_value().unwrap()).unwrap();
+    assert!(result_4.status.is_ok());
+
+    assert_eq!(runner.get_nonce(signer_address), 4.into());
+
+    // Delegation revoked — code should be empty
+    assert!(
+        runner.get_code(authority_address).is_empty(),
+        "authority code must be empty after revocation"
+    );
+    // Nonce increments: 2 → 3
+    assert_eq!(
+        runner.get_nonce(authority_address),
+        3.into(),
+        "authority nonce must be 3 after revocation"
+    );
+    // Balance unchanged
+    assert_eq!(
+        runner.get_balance(authority_address),
+        (INITIAL_BALANCE - transfer_value).into()
+    );
+    // Storage slot unchanged
     assert_eq!(
         runner.get_storage(authority_address, H256::zero()),
         H256::from(H160::from_low_u64_be(23))

@@ -927,12 +927,13 @@ pub fn sign_eip7702_authorization(
     let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
     let r = U256::from_big_endian(&signature.r.b32());
     let s = U256::from_big_endian(&signature.s.b32());
+    let parity = recovery_id.serialize().into();
 
     AuthorizationTuple {
         chain_id: chain_id.into(),
         address: address.raw(),
         nonce,
-        parity: recovery_id.serialize().into(),
+        parity,
         r,
         s,
     }
