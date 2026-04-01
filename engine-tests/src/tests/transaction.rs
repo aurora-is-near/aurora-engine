@@ -250,6 +250,7 @@ fn test_eip_7702_success() {
 /// Step 1: EIP-7702 tx installs delegation on authority address
 /// Step 2: EIP-1559 tx sent FROM that authority address succeeds
 /// Step 3 — Sponsored tx: signer calls authority, triggering delegated code in authority's context
+/// Step 4: revoke authority delegation
 #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 #[test]
 fn test_eip_7702_delegated_sender_can_transact() {
