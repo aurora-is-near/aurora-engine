@@ -14,7 +14,7 @@ use crate::prelude::transactions::eip_1559::{self, SignedTransaction1559, Transa
 use crate::prelude::transactions::eip_2930::AccessTuple;
 use crate::prelude::{H256, U256};
 use crate::utils;
-use crate::utils::sign_eip7702_authorization;
+use crate::utils::{sign_eip_1559_transaction, sign_eip7702_authorization};
 
 const SECRET_KEY: &str = "45a915e4d060149eb4365960e6a7a45f334393093061116b197e3240065ff2d8";
 const INITIAL_NONCE: u64 = 1;
@@ -453,7 +453,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
         authorization_list: vec![auth_revoke],
     };
 
-    let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &signer.secret_key);
+    let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &authority_sk.secret_key);
     let tx_bytes_4: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
         .chain(rlp::encode(&signed_tx_4))
         .collect();
@@ -485,6 +485,133 @@ fn test_eip_7702_delegated_sender_can_transact() {
     assert_eq!(
         runner.get_storage(authority_address, H256::zero()),
         H256::from(H160::from_low_u64_be(23))
+    );
+}
+
+/// Test: authority EOA revokes its own delegation.
+///
+/// Step 1: signer installs delegation on authority (EIP-7702)
+/// Step 2: authority sends EIP-7702 tx to revoke its own delegation (address=0)
+#[test]
+fn test_eip_7702_authority_self_revoke() {
+    let mut runner = utils::deploy_runner();
+
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
+    let authority_sk = example_authority_signer();
+    let authority_address = utils::address_from_secret_key(&authority_sk.secret_key);
+
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = sample_code_for_contract_eip7702(authority_address);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address(authority_address, INITIAL_BALANCE, 0.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code.clone(),
+    );
+
+    // ══════════════════════════════════════════════════════════════
+    // Step 1: signer installs delegation on authority
+    // ══════════════════════════════════════════════════════════════
+    let mut transaction = eip7702_transaction(0);
+    transaction.chain_id = runner.chain_id;
+    let signed_tx = utils::sign_eip_7702_transaction(transaction, &signer.secret_key);
+    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
+        .chain(rlp::encode(&signed_tx))
+        .collect();
+    let relay = "relay.aurora";
+    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
+
+    // Transfer to authority_address
+    let tx_transfer = Transaction1559 {
+        chain_id: runner.chain_id,
+        nonce: U256::from(2),
+        gas_limit: U256::from(0x3d0900),
+        max_fee_per_gas: U256::from(0x07d0),
+        max_priority_fee_per_gas: U256::from(0x0a),
+        to: Some(authority_address),
+        value: Wei::new_u64(10),
+        data: vec![],
+        access_list: vec![],
+    };
+    let signed_tx_transfer = sign_eip_1559_transaction(tx_transfer, &signer.secret_key);
+    let tx_bytes: Vec<u8> = iter::once(eip_1559::TYPE_BYTE)
+        .chain(rlp::encode(&signed_tx_transfer))
+        .collect();
+    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
+
+    let expected_delegation_code = format!("ef0100{}", hex::encode(contract_address.as_bytes()));
+    assert_eq!(
+        hex::encode(runner.get_code(authority_address)),
+        expected_delegation_code,
+    );
+    assert_eq!(runner.get_nonce(authority_address), 1.into());
+    assert_eq!(runner.get_nonce(signer_address), 3.into());
+    assert_eq!(
+        runner.get_balance(authority_address),
+        INITIAL_BALANCE + Wei::new_u64(10)
+    );
+
+    // ══════════════════════════════════════════════════════════════
+    // Step 2: authority itself revokes delegation
+    // ══════════════════════════════════════════════════════════════
+    let auth_revoke = sign_eip7702_authorization(
+        0,
+        Address::zero(),
+        2, // authority nonce AFTER sender nonce increment
+        &authority_sk.secret_key,
+    );
+
+    let revoke_tx = Transaction7702 {
+        chain_id: runner.chain_id,
+        nonce: 1.into(), // authority's current nonce as tx sender
+        gas_limit: U256::from(0x3d0900),
+        max_fee_per_gas: U256::from(0x07d0),
+        max_priority_fee_per_gas: U256::from(0x0a),
+        to: contract_address,
+        value: Wei::zero(),
+        data: vec![],
+        access_list: vec![],
+        authorization_list: vec![auth_revoke],
+    };
+
+    let signed_tx_2 = utils::sign_eip_7702_transaction(revoke_tx, &authority_sk.secret_key);
+    let tx_bytes_2: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
+        .chain(rlp::encode(&signed_tx_2))
+        .collect();
+
+    let outcome_2 = runner.call(utils::SUBMIT, relay, tx_bytes_2).unwrap();
+    let result_2 =
+        SubmitResult::try_from_slice(&outcome_2.return_data.as_value().unwrap()).unwrap();
+    assert!(result_2.status.is_ok());
+
+    // Delegation revoked — code must be empty
+    assert!(
+        runner.get_code(authority_address).is_empty(),
+        "authority code must be empty after self-revocation"
+    );
+    // Nonce: 1 → 2 (sender increment) → 3 (auth processing increment)
+    assert_eq!(
+        runner.get_nonce(authority_address),
+        3.into(),
+        "authority nonce: 1 +1 (sender) +1 (auth) = 3"
+    );
+    // Signer untouched
+    assert_eq!(runner.get_nonce(signer_address), 3.into());
+
+    // gas_preice * gas_used
+    let gas_fee = Wei::new_u64(0x0A * result_2.gas_used);
+    assert_eq!(
+        runner.get_balance(authority_address),
+        INITIAL_BALANCE + Wei::new_u64(10) - gas_fee
     );
 }
 
