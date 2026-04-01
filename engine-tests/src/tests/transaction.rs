@@ -512,7 +512,7 @@ fn test_eip_7702_authority_self_revoke() {
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        contract_code.clone(),
+        contract_code,
     );
 
     // ══════════════════════════════════════════════════════════════
