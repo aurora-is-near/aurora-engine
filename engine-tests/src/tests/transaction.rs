@@ -608,7 +608,7 @@ fn test_eip_7702_authority_self_revoke() {
     // Signer untouched
     assert_eq!(runner.get_nonce(signer_address), 3.into());
 
-    // gas_preice * gas_used
+    // gas_price * gas_used
     let gas_fee = Wei::new_u64(0x0A * result_2.gas_used);
     assert_eq!(
         runner.get_balance(authority_address),
