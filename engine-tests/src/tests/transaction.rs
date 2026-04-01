@@ -250,6 +250,7 @@ fn test_eip_7702_success() {
 /// Step 1: EIP-7702 tx installs delegation on authority address
 /// Step 2: EIP-1559 tx sent FROM that authority address succeeds
 /// Step 3 — Sponsored tx: signer calls authority, triggering delegated code in authority's context
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 #[test]
 fn test_eip_7702_delegated_sender_can_transact() {
     let mut runner = utils::deploy_runner();
@@ -366,7 +367,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
     );
     assert_eq!(
         runner.get_balance(authority_address),
-        (INITIAL_BALANCE - transfer_value).into()
+        INITIAL_BALANCE - transfer_value
     );
     // Storage slot should be empty
     assert_eq!(
@@ -421,7 +422,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
     );
     assert_eq!(
         runner.get_balance(authority_address),
-        (INITIAL_BALANCE - transfer_value).into()
+        INITIAL_BALANCE - transfer_value
     );
     // As sponsored transaction executed - storage slot now changed
     assert_eq!(
@@ -478,7 +479,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
     // Balance unchanged
     assert_eq!(
         runner.get_balance(authority_address),
-        (INITIAL_BALANCE - transfer_value).into()
+        INITIAL_BALANCE - transfer_value
     );
     // Storage slot unchanged
     assert_eq!(

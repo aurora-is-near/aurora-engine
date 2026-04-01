@@ -910,7 +910,7 @@ pub fn sign_eip7702_authorization(
     nonce: u64,
     secret_key: &SecretKey,
 ) -> AuthorizationTuple {
-    /// EIP-7702 authorization magic byte (SET_CODE_TX_TYPE).
+    /// EIP-7702 authorization magic byte (`SET_CODE_TX_TYPE`).
     /// Prefixes the authorization hash: `keccak256(MAGIC || rlp([chain_id, address, nonce]))`.
     const EIP7702_AUTHORIZATION_MAGIC: u8 = 0x05;
 
