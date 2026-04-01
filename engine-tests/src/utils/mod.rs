@@ -1,7 +1,9 @@
 use aurora_engine::engine::{EngineError, EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::{SubmitArgs, ViewCallArgs};
 use aurora_engine_transactions::eip_7702;
-use aurora_engine_transactions::eip_7702::{SignedTransaction7702, Transaction7702};
+use aurora_engine_transactions::eip_7702::{
+    AuthorizationTuple, SignedTransaction7702, Transaction7702,
+};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::connector::{
@@ -886,6 +888,51 @@ pub fn sign_eip_7702_transaction(
     SignedTransaction7702 {
         transaction: tx,
         parity: recovery_id.serialize(),
+        r,
+        s,
+    }
+}
+
+/// Signs an EIP-7702 authorization list, returning a ready-to-use [`AuthorizationTuple`].
+///
+/// The signed message is `keccak256(0x05 || rlp([chain_id, address, nonce]))` per EIP-7702.
+/// The resulting tuple can be included in `Transaction7702.authorization_list`.
+///
+/// ## Arguments
+/// * `chain_id` — target chain id (0 for chain-agnostic authorization)
+/// * `address` — contract address to delegate code execution to
+/// * `nonce` — current nonce of the authority account
+/// * `secret_key` — authority's private key (the account that will receive delegation)
+#[must_use]
+pub fn sign_eip7702_authorization(
+    chain_id: u64,
+    address: Address,
+    nonce: u64,
+    secret_key: &SecretKey,
+) -> AuthorizationTuple {
+    /// EIP-7702 authorization magic byte (SET_CODE_TX_TYPE).
+    /// Prefixes the authorization hash: `keccak256(MAGIC || rlp([chain_id, address, nonce]))`.
+    const EIP7702_AUTHORIZATION_MAGIC: u8 = 0x05;
+
+    let mut rlp_stream = RlpStream::new_list(3);
+    rlp_stream.append(&chain_id);
+    rlp_stream.append(&address.raw());
+    rlp_stream.append(&nonce);
+
+    let mut payload = vec![EIP7702_AUTHORIZATION_MAGIC];
+    payload.extend_from_slice(rlp_stream.as_raw());
+    let message_hash = sdk::keccak(&payload);
+    let message = Message::parse_slice(message_hash.as_bytes()).unwrap();
+
+    let (signature, recovery_id) = libsecp256k1::sign(&message, secret_key);
+    let r = U256::from_big_endian(&signature.r.b32());
+    let s = U256::from_big_endian(&signature.s.b32());
+
+    AuthorizationTuple {
+        chain_id: chain_id.into(),
+        address: address.raw(),
+        nonce,
+        parity: recovery_id.serialize().into(),
         r,
         s,
     }
