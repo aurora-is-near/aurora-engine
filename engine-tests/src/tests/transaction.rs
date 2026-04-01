@@ -454,7 +454,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
         authorization_list: vec![auth_revoke],
     };
 
-    let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &authority_sk.secret_key);
+    let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &signer.secret_key);
     let tx_bytes_4: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
         .chain(rlp::encode(&signed_tx_4))
         .collect();
