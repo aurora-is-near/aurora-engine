@@ -82,7 +82,8 @@ pub fn g1_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
     }
 
-    let output = exports::bls12381_p1_sum(&g1_input[..]);
+    let output =
+        exports::bls12381_p1_sum(&g1_input[..]).map_err(|_| Bls12381Error::ElementNotInG1)?;
     Ok(padding_g1_result(&output))
 }
 
@@ -138,7 +139,8 @@ pub fn g2_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g2_input[2 + 6 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(&p1_y);
     }
 
-    let output = exports::bls12381_p2_sum(&g2_input[..]);
+    let output =
+        exports::bls12381_p2_sum(&g2_input[..]).map_err(|_| Bls12381Error::ElementNotInG2)?;
     Ok(padding_g2_result(&output))
 }
 
@@ -223,12 +225,15 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     }
 
     let output = exports::bls12381_pairing_check(&g_input[..]);
-    let output = if output == 2 {
-        vec![0; 32]
-    } else {
-        let mut res = vec![0; 31];
-        res.push(1);
-        res
+    let output = match output {
+        0 => {
+            let mut res = vec![0; 31];
+            res.push(1);
+            res
+        }
+        2 => vec![0; 32],
+        _ => return Err(Bls12381Error::InvalidFpValue),
     };
+
     Ok(output)
 }
