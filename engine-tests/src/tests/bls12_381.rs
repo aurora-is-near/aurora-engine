@@ -514,3 +514,62 @@ fn test_bls12_381_vector_fail_add_g2() {
     ))
     .run_bls12_381_vectors(&bls12_381::BlsG2Add, bls12_381::BlsG2Add::ADDRESS);
 }
+
+#[test]
+fn test_bls12_381_vector_fail_mul_g1() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-mul_G1_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsG1Msm, bls12_381::BlsG1Msm::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_mul_g2() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-mul_G2_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsG2Msm, bls12_381::BlsG2Msm::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_msm_g1() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-msm_G1_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsG1Msm, bls12_381::BlsG1Msm::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_msm_g2() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-msm_G2_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsG2Msm, bls12_381::BlsG2Msm::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_map_fp_to_g1() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-map_fp_to_G1_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsMapFpToG1, bls12_381::BlsMapFpToG1::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_map_fp2_to_g2() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-map_fp2_to_G2_bls.json"
+    ))
+    .run_bls12_381_vectors(&bls12_381::BlsMapFp2ToG2, bls12_381::BlsMapFp2ToG2::ADDRESS);
+}
+
+#[test]
+fn test_bls12_381_vector_fail_pairing_check() {
+    vectors::Bls12381TestVectorCases::new(include_str!(
+        "res/bls/eels-vectors/fail-pairing_check_bls.json"
+    ))
+    .run_bls12_381_vectors(
+        &bls12_381::BlsPairingCheck,
+        bls12_381::BlsPairingCheck::ADDRESS,
+    );
+}
