@@ -229,6 +229,10 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     }
 
     let output = exports::bls12381_pairing_check(&g_input[..]);
+    // NEAR bls12381_pairing_check returns:
+    // 0 = pairing product equals identity (check passed)
+    // 2 = pairing product not equal to identity (check failed)
+    // 1 = error (invalid input)
     let output = match output {
         0 => {
             let mut res = vec![0; 31];

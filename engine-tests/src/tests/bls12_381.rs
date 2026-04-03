@@ -225,11 +225,6 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
         })
         .unwrap();
 
-    match wasm_result.0.status {
-        TransactionStatus::Succeed(_) => println!("STATUS: SUCCESS"),
-        _ => println!("STATUS: {:?}", wasm_result.0.status),
-    }
-    println!();
     if !expected_output.is_empty() {
         assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result.0));
     }
@@ -399,6 +394,10 @@ mod vectors {
 
         /// Run precompile with specific input data from the file.
         pub fn run_bls12_381_vectors(&self, precompile: &impl Precompile, address: Address) {
+            // Maximum input size for BlsG2Msm before NEAR gas limits are exceeded.
+            // G2 MSM has higher gas costs due to the larger point size.
+            const BLS_G2_MSM_MAX_INPUT_SIZE: usize = 41000;
+
             for data in &self.0 {
                 let ctx = aurora_evm::Context {
                     address: H160::default(),
@@ -413,8 +412,9 @@ mod vectors {
                             data.expected.clone().expect("no expected result")
                         );
                         // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
-                        if !(data.input.len() > 41000 && address == BlsG2Msm::ADDRESS) {
-                            println!("Run count: {}: {address:?}", data.input.len());
+                        if !(data.input.len() > BLS_G2_MSM_MAX_INPUT_SIZE
+                            && address == BlsG2Msm::ADDRESS)
+                        {
                             check_wasm_submit(
                                 address,
                                 data.input.clone(),
@@ -423,11 +423,9 @@ mod vectors {
                         }
                     }
                     Err(err) => {
-                        let err_res = data.expected_error.clone().expect("no expected result");
-                        println!("{err:?}: EXPECTED {err_res:?}");
+                        let _ = data.expected_error.clone().expect("no expected result");
 
                         // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
-                        println!("Run count: {}: {address:?}", data.input.len());
                         check_wasm_submit(address, data.input.clone(), &[]);
                     }
                 }
