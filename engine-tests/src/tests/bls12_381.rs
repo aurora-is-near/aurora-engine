@@ -24,7 +24,7 @@ use aurora_engine_precompiles::bls12_381;
 use aurora_engine_transactions::eip_2930;
 use aurora_engine_transactions::eip_2930::{AccessTuple, Transaction2930};
 use aurora_engine_types::borsh::BorshDeserialize;
-use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
+use aurora_engine_types::parameters::engine::SubmitResult;
 use aurora_evm::backend::MemoryAccount;
 use libsecp256k1::SecretKey;
 use near_primitives_core::types::Gas;
@@ -225,7 +225,10 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8]) {
         })
         .unwrap();
 
-    if !expected_output.is_empty() {
+    // If `expected_output` is empty, the transaction is expected to fail.
+    if expected_output.is_empty() {
+        assert!(wasm_result.0.status.is_fail());
+    } else {
         assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result.0));
     }
 }
@@ -405,29 +408,26 @@ mod vectors {
                     apparent_value: U256::zero(),
                 };
                 // Run precompile directly with specific input and validate output result
-                match precompile.run(&data.input, None, &ctx, false) {
-                    Ok(standalone_result) => {
-                        assert_eq!(
-                            standalone_result.output,
-                            data.expected.clone().expect("no expected result")
+                if let Ok(standalone_result) = precompile.run(&data.input, None, &ctx, false) {
+                    assert_eq!(
+                        standalone_result.output,
+                        data.expected.clone().expect("no expected result")
+                    );
+                    // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
+                    if !(data.input.len() > BLS_G2_MSM_MAX_INPUT_SIZE
+                        && address == BlsG2Msm::ADDRESS)
+                    {
+                        check_wasm_submit(
+                            address,
+                            data.input.clone(),
+                            &data.expected.clone().unwrap(),
                         );
-                        // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
-                        if !(data.input.len() > BLS_G2_MSM_MAX_INPUT_SIZE
-                            && address == BlsG2Msm::ADDRESS)
-                        {
-                            check_wasm_submit(
-                                address,
-                                data.input.clone(),
-                                &data.expected.clone().unwrap(),
-                            );
-                        }
                     }
-                    Err(err) => {
-                        let _ = data.expected_error.clone().expect("no expected result");
+                } else {
+                    let _ = data.expected_error.clone().expect("no expected result");
 
-                        // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
-                        check_wasm_submit(address, data.input.clone(), &[]);
-                    }
+                    // To avoid NEAR gas error "GasLimit" it makes sense to limit input size.
+                    check_wasm_submit(address, data.input.clone(), &[]);
                 }
             }
         }
@@ -490,7 +490,7 @@ fn test_bls12_381_vector_map_fp_to_g1() {
 }
 
 #[test]
-fn test_bls12_381_vector_map_fp2_to_g12() {
+fn test_bls12_381_vector_map_fp2_to_g2() {
     vectors::Bls12381TestVectorCases::new(include_str!(
         "res/bls/eels-vectors/map_fp2_to_G2_bls.json"
     ))
