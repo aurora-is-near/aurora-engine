@@ -377,7 +377,7 @@ dependencies = [
  "hex",
  "num",
  "p256",
- "rand 0.9.1",
+ "rand 0.9.4",
  "serde",
  "serde_json",
 ]
@@ -440,7 +440,7 @@ dependencies = [
  "near-primitives-core 0.34.0",
  "near-sdk",
  "near-vm-runner",
- "rand 0.9.1",
+ "rand 0.9.4",
  "rlp",
  "serde",
  "serde_json",
@@ -483,7 +483,7 @@ dependencies = [
  "bs58 0.5.1",
  "hex",
  "primitive-types 0.13.1",
- "rand 0.9.1",
+ "rand 0.9.4",
  "rlp",
  "serde",
  "serde_json",
@@ -4419,7 +4419,7 @@ dependencies = [
  "futures-util",
  "opentelemetry",
  "percent-encoding",
- "rand 0.9.1",
+ "rand 0.9.4",
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
@@ -4701,7 +4701,7 @@ dependencies = [
  "hmac 0.12.1",
  "md-5",
  "memchr",
- "rand 0.9.1",
+ "rand 0.9.4",
  "sha2 0.10.9",
  "stringprep",
 ]
@@ -4983,9 +4983,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.1"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
+checksum = "44c5af06bb1b7d3216d91932aed5265164bf384dc89cd6ba05cf59a35f5f76ea"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.3",
@@ -6312,7 +6312,7 @@ dependencies = [
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
- "rand 0.9.1",
+ "rand 0.9.4",
  "socket2",
  "tokio",
  "tokio-util",
