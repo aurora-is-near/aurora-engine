@@ -205,6 +205,6 @@ pub fn legacy_into_normalized_tx(tx: TransactionLegacy) -> NormalizedEthTransact
         value: tx.value,
         data: tx.data,
         access_list: Vec::new(),
-        authorization_list: Vec::new(),
+        authorization_list_len: 0,
     }
 }

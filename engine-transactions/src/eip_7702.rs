@@ -154,12 +154,40 @@ impl SignedTransaction7702 {
         .map_err(|_e| Error::EcRecover)
     }
 
-    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
+    /// Returns the number of authorization tuples in the transaction.
+    ///
+    /// Used for gas calculation: each entry in the authorization list must be
+    /// charged regardless of validity (per EIP-7702).
+    ///
+    /// ### Errors
+    /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.
+    pub fn authorization_list_len(&self) -> Result<usize, Error> {
         if self.transaction.authorization_list.is_empty() {
             return Err(Error::EmptyAuthorizationList);
         }
+        Ok(self.transaction.authorization_list.len())
+    }
+
+    /// Validates and converts the raw authorization list into [`Authorization`] entries.
+    ///
+    /// For each [`AuthorizationTuple`] performs the following checks (EIP-7702):
+    /// 1. `s <= secp256k1n/2` - low-S signature constraint.
+    /// 2. `chain_id == 0 || chain_id == tx.chain_id` — chain binding.
+    /// 3. `parity ∈ {0, 1}` - valid recovery bit.
+    /// 4. `authority = ecrecover(keccak(0x05 || rlp([chain_id, address, nonce])), parity, r, s)`
+    /// 5. `authority != 0x0` — zero address is reserved as a system address.
+    ///
+    /// Invalid entries are **not** skipped — they are included with `is_valid = false`
+    /// because each entry must still be charged for gas.
+    /// Steps 2, 4–9 of EIP-7702 are delegated to the EVM itself.
+    ///
+    /// ### Errors
+    /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.
+    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
+        let authorization_list_len = self.authorization_list_len()?;
+
         let current_tx_chain_id = U256::from(self.transaction.chain_id);
-        let mut authorization_list = Vec::with_capacity(self.transaction.authorization_list.len());
+        let mut authorization_list = Vec::with_capacity(authorization_list_len);
         let mut rlp_stream = RlpStream::new();
         let mut message_bytes = vec![MAGIC; 1];
         // According to EIP-7702, we should validate each authorization. We shouldn't skip any of them.
@@ -206,6 +234,11 @@ impl SignedTransaction7702 {
             } else {
                 Address::default()
             };
+
+            // 0x0 (Zero address) is Ethereum system address. So we mark it as `valid = false`.
+            if auth_address.raw().is_zero() {
+                is_valid = false;
+            }
 
             // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {

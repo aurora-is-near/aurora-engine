@@ -93,8 +93,8 @@ pub struct NormalizedEthTransaction {
     pub value: Wei,
     pub data: Vec<u8>,
     pub access_list: Vec<AccessTuple>,
-    // Contains additional information - `chain_id` for each authorization item
-    pub authorization_list: Vec<Authorization>,
+    // Length of `authorization_list` for EIP-7702. Used for gas calculations.
+    pub authorization_list_len: usize,
 }
 
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
@@ -114,7 +114,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: vec![],
-                authorization_list: vec![],
+                authorization_list_len: 0,
             },
             Eip2930(tx) => Self {
                 address: tx.sender()?,
@@ -127,7 +127,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
-                authorization_list: vec![],
+                authorization_list_len: 0,
             },
             Eip1559(tx) => Self {
                 address: tx.sender()?,
@@ -140,7 +140,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
-                authorization_list: vec![],
+                authorization_list_len: 0,
             },
             Eip7702(tx) => Self {
                 address: tx.sender()?,
@@ -153,7 +153,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data.clone(),
                 access_list: tx.transaction.access_list.clone(),
-                authorization_list: tx.authorization_list()?,
+                authorization_list_len: tx.authorization_list_len()?,
             },
         })
     }
@@ -208,7 +208,7 @@ impl NormalizedEthTransaction {
             config
                 .gas_per_auth_base_cost
                 .checked_mul(
-                    u64::try_from(self.authorization_list.len())
+                    u64::try_from(self.authorization_list_len)
                         .map_err(|_e| Error::IntegerConversion)?,
                 )
                 .ok_or(Error::GasOverflow)?
@@ -223,6 +223,20 @@ impl NormalizedEthTransaction {
             .and_then(|gas| gas.checked_add(gas_access_list_storage))
             .and_then(|gas| gas.checked_add(gas_authorization_list))
             .ok_or(Error::GasOverflow)
+    }
+
+    /// Returns the authorization list for the given transaction.
+    ///
+    /// Unlike [`NormalizedEthTransaction::authorization_list_len`], this function
+    /// does not require the caller to check whether the transaction is EIP-7702:
+    /// non-EIP-7702 transactions simply yield an empty list, while EIP-7702
+    /// transactions yield their parsed and validated [`Authorization`] entries,
+    /// or an [`Error`] if validation fails.
+    pub fn get_authorization_list(tx: &EthTransactionKind) -> Result<Vec<Authorization>, Error> {
+        match tx {
+            EthTransactionKind::Eip7702(signed_tx) => signed_tx.authorization_list(),
+            _ => Ok(vec![]),
+        }
     }
 
     #[allow(clippy::naive_bytecount)]
@@ -344,8 +358,7 @@ mod tests {
     use super::{Error, EthTransactionKind, INITCODE_WORD_COST};
     use crate::{eip_1559, eip_2930, eip_7702};
     use aurora_engine_types::types::{Address, Wei};
-    use aurora_engine_types::{H160, H256, U256};
-    use aurora_evm::executor::stack::Authorization;
+    use aurora_engine_types::{H256, U256};
 
     #[test]
     fn test_try_parse_empty_input() {
@@ -414,7 +427,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -432,7 +445,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![0u8; 10],
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -453,7 +466,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![1u8; 10],
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -474,7 +487,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![0, 1, 0, 1, 0],
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call
@@ -495,7 +508,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![1u8; 32],
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_create
@@ -519,7 +532,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![access_tuple],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call
@@ -528,13 +541,7 @@ mod tests {
 
         assert_eq!(gas, expected);
 
-        // Test transaction with an authorization list
-        let authorization = Authorization {
-            authority: H160::default(),
-            address: Address::default().raw(),
-            nonce: 0,
-            is_valid: false,
-        };
+        // Test transaction with an authorization list length
         let tx = NormalizedEthTransaction {
             address: Address::default(),
             chain_id: Some(1),
@@ -546,7 +553,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![],
-            authorization_list: vec![authorization],
+            authorization_list_len: 1,
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call + config.gas_per_auth_base_cost;
@@ -565,7 +572,7 @@ mod tests {
             value: Wei::zero(),
             data,
             access_list: vec![],
-            authorization_list: vec![],
+            authorization_list_len: 0,
         }
     }
 

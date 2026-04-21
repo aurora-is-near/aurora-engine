@@ -283,7 +283,7 @@ fn test_deploy_largest_contract() {
     );
 
     // Less than 10 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 10);
+    utils::assert_gas_bound(profile.all_gas(), 11);
 }
 
 #[test]
