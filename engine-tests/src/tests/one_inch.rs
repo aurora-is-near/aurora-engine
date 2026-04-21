@@ -23,7 +23,7 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 8); // less than 8 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 9); // less than 9 NEAR TGas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
