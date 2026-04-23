@@ -293,6 +293,7 @@ pub enum Error {
     RlpDecodeError(DecoderError),
     UnsupportedTransactionEip4844,
     EmptyAuthorizationList,
+    AuthorizationListTooLarge,
 }
 
 #[cfg(feature = "serde")]
@@ -314,6 +315,7 @@ impl Error {
             Self::RlpDecodeError(_) => "ERR_TX_RLP_DECODE",
             Self::UnsupportedTransactionEip4844 => "ERR_UNSUPPORTED_TX_EIP4844",
             Self::EmptyAuthorizationList => "ERR_EMPTY_AUTHORIZATION_LIST",
+            Self::AuthorizationListTooLarge => "ERR_AUTHORIZATION_LIST_TOO_LARGE",
         }
     }
 }

@@ -12,8 +12,10 @@ use crate::eip_2930::AccessTuple;
 /// Type indicator (per EIP-7702)
 pub const TYPE_BYTE: u8 = 0x04;
 
-// EIP-7702 `MAGIC` number
+/// EIP-7702 `MAGIC` number
 pub const MAGIC: u8 = 0x5;
+/// Limitation for authorization list length. It's strictly related to NEAR gas limits.
+pub const AUTHORIZATION_LIST_LENGTH: usize = 300;
 
 /// The order of the secp256k1 curve, divided by two. Signatures that should be checked according
 /// to EIP-2 should have an S value less than or equal to this.
@@ -154,7 +156,7 @@ impl SignedTransaction7702 {
         .map_err(|_e| Error::EcRecover)
     }
 
-    /// Returns the number of authorization tuples in the transaction.
+    /// Returns the number of authorization tuples in the transaction limited by [AUTHORIZATION_LIST_LENGTH].
     ///
     /// Used for gas calculation: each entry in the authorization list must be
     /// charged regardless of validity (per EIP-7702).
@@ -165,7 +167,11 @@ impl SignedTransaction7702 {
         if self.transaction.authorization_list.is_empty() {
             return Err(Error::EmptyAuthorizationList);
         }
-        Ok(self.transaction.authorization_list.len())
+        let authorization_list_len = self.transaction.authorization_list.len();
+        if authorization_list_len > AUTHORIZATION_LIST_LENGTH {
+            return Err(Error::AuthorizationListTooLarge);
+        }
+        Ok(authorization_list_len)
     }
 
     /// Validates and converts the raw authorization list into [`Authorization`] entries.
