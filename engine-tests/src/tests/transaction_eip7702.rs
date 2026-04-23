@@ -574,7 +574,7 @@ fn test_eip_7702_auth_list_max_length_succeeds() {
     let near_gas_used = outcome.used_gas.as_gas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
-    assert_eq!(result.gas_used, 6020645);
+    assert_eq!(result.gas_used, 2_020_645);
     assert!(
         result.status.is_ok(),
         "tx must succeed at max auth list length; status = {:?}",
@@ -586,14 +586,14 @@ fn test_eip_7702_auth_list_max_length_succeeds() {
         "sender nonce must advance on success"
     );
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(1134)); // 113.4 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(407)); // 40.7 Tgas
 }
 
 /// Length cap — list size overruns the constant.
-/// `authorization_list_len()` returns `Error::AuthorizationListTooLarge`,
-/// which the engine maps to `EngineErrorKind::InvalidSignature`
-/// (panic `ERR_INVALID_ECDSA_SIGNATURE`). Rejected before any ecrecover
-/// work - NEAR gas stays minimal.
+/// Rejected inside `SignedTransaction7702::decode` via `item_count()` guard,
+/// BEFORE per-item `as_list()` decoding. Surfaced as `ERR_TX_RLP_DECODE`
+/// (the `DecoderError::Custom` string is not propagated through the error
+/// chain — only the generic code is shown to the host).
 #[test]
 fn test_eip_7702_auth_list_exceeds_limit_rejected() {
     let mut runner = utils::deploy_runner();
@@ -625,8 +625,8 @@ fn test_eip_7702_auth_list_exceeds_limit_rejected() {
 
     assert_eq!(
         err.kind.as_bytes(),
-        b"ERR_INVALID_ECDSA_SIGNATURE",
-        "oversized auth list must fail parsing (AuthorizationListTooLarge -> InvalidSignature)"
+        b"ERR_TX_RLP_DECODE",
+        "oversized auth list must be rejected in Decodable -> RlpDecodeError"
     );
     assert_eq!(
         runner.get_nonce(signer_address),
@@ -634,7 +634,7 @@ fn test_eip_7702_auth_list_exceeds_limit_rejected() {
         "sender nonce must NOT advance when tx is rejected"
     );
 
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(94)); // 9.4 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(16)); // 1.6 Tgas
 }
 
 /// Length cap — max auth list + wrong tx-level `chain_id`.
@@ -682,7 +682,7 @@ fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
         "sender nonce must NOT advance when tx is rejected at chain_id check"
     );
 
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(95)); //  9.5 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(45)); // 4.5 Tgas
 }
 
 /// Length cap — max auth list + wrong tx-level nonce.
@@ -729,7 +729,7 @@ fn test_eip_7702_max_auth_list_wrong_tx_nonce_early_exit() {
         "sender nonce must NOT advance when tx is rejected at nonce check"
     );
 
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(97)); //  9.7 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(46)); // 4.6 Tgas
 }
 
 /// Length cap — max auth list + sender cannot afford `gas_limit * max_fee_per_gas`.
@@ -774,7 +774,7 @@ fn test_eip_7702_max_auth_list_insufficient_balance_early_exit() {
         "sender nonce must NOT advance when tx is rejected at charge_gas"
     );
 
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(98)); //  9.8 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(47)); // 4.7 Tgas
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an

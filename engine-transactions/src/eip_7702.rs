@@ -15,7 +15,7 @@ pub const TYPE_BYTE: u8 = 0x04;
 /// EIP-7702 `MAGIC` number
 pub const MAGIC: u8 = 0x5;
 /// Limitation for authorization list length. It's strictly related to NEAR gas limits.
-pub const AUTHORIZATION_LIST_LENGTH: usize = 300;
+pub const AUTHORIZATION_LIST_LENGTH: usize = 100;
 
 /// The order of the secp256k1 curve, divided by two. Signatures that should be checked according
 /// to EIP-2 should have an S value less than or equal to this.
@@ -287,7 +287,7 @@ impl Decodable for SignedTransaction7702 {
         // in `authorization_list_len()` only fires after ~6 Tgas of decode work.
         let auth_list_rlp = rlp.at(9)?;
         if auth_list_rlp.item_count()? > AUTHORIZATION_LIST_LENGTH {
-            return Err(DecoderError::Custom("authorization_list exceeds cap"));
+            return Err(DecoderError::Custom("ERR_AUTH_LIST_TOO_LARGE"));
         }
         let authorization_list: Vec<AuthorizationTuple> = auth_list_rlp.as_list()?;
 
