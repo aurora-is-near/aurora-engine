@@ -281,7 +281,16 @@ impl Decodable for SignedTransaction7702 {
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
         let access_list = rlp.list_at(8)?;
-        let authorization_list = rlp.list_at(9)?;
+
+        // Gate authorization_list length BEFORE the expensive per-item decode.
+        // Protects NEAR gas from an oversized RLP payload — without this, the cap
+        // in `authorization_list_len()` only fires after ~6 Tgas of decode work.
+        let auth_list_rlp = rlp.at(9)?;
+        if auth_list_rlp.item_count()? > AUTHORIZATION_LIST_LENGTH {
+            return Err(DecoderError::Custom("authorization_list exceeds cap"));
+        }
+        let authorization_list: Vec<AuthorizationTuple> = auth_list_rlp.as_list()?;
+
         let parity = rlp.val_at(10)?;
         let r = rlp.val_at(11)?;
         let s = rlp.val_at(12)?;

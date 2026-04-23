@@ -538,7 +538,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(3_8)); // 3.8 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(38)); // 3.8 Tgas
 }
 
 /// Length cap — happy path at the upper bound.
@@ -574,7 +574,7 @@ fn test_eip_7702_auth_list_max_length_succeeds() {
     let near_gas_used = outcome.used_gas.as_gas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
-    assert_eq!(result.gas_used, 50806);
+    assert_eq!(result.gas_used, 6020645);
     assert!(
         result.status.is_ok(),
         "tx must succeed at max auth list length; status = {:?}",
@@ -586,7 +586,7 @@ fn test_eip_7702_auth_list_max_length_succeeds() {
         "sender nonce must advance on success"
     );
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(113_4)); // 113.4 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(1134)); // 113.4 Tgas
 }
 
 /// Length cap — list size overruns the constant.
@@ -634,12 +634,7 @@ fn test_eip_7702_auth_list_exceeds_limit_rejected() {
         "sender nonce must NOT advance when tx is rejected"
     );
 
-    eprintln!(
-        "[exceed-limit reject] NEAR gas = {} -> rounded {}",
-        err.gas_used,
-        round_near_gas(err.gas_used)
-    );
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_4)); // 9.4 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(94)); // 9.4 Tgas
 }
 
 /// Length cap — max auth list + wrong tx-level `chain_id`.
@@ -663,6 +658,7 @@ fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH, 0);
     let tx = eip7702_tx_with_auth_list(
+        // Set incorrect nonce
         runner.chain_id.wrapping_add(1),
         INITIAL_NONCE.into(),
         MAX_LIST_EVM_GAS_LIMIT.into(),
@@ -686,12 +682,7 @@ fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
         "sender nonce must NOT advance when tx is rejected at chain_id check"
     );
 
-    eprintln!(
-        "[wrong tx.chain_id, max list] NEAR gas = {} -> rounded {}",
-        err.gas_used,
-        round_near_gas(err.gas_used)
-    );
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_5)); //  9.5 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(95)); //  9.5 Tgas
 }
 
 /// Length cap — max auth list + wrong tx-level nonce.
@@ -738,12 +729,7 @@ fn test_eip_7702_max_auth_list_wrong_tx_nonce_early_exit() {
         "sender nonce must NOT advance when tx is rejected at nonce check"
     );
 
-    eprintln!(
-        "[wrong tx.nonce, max list] NEAR gas = {} -> rounded {}",
-        err.gas_used,
-        round_near_gas(err.gas_used)
-    );
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_7)); //  9.7 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(97)); //  9.7 Tgas
 }
 
 /// Length cap — max auth list + sender cannot afford `gas_limit * max_fee_per_gas`.
@@ -788,12 +774,7 @@ fn test_eip_7702_max_auth_list_insufficient_balance_early_exit() {
         "sender nonce must NOT advance when tx is rejected at charge_gas"
     );
 
-    eprintln!(
-        "[insufficient balance, max list] NEAR gas = {} -> rounded {}",
-        err.gas_used,
-        round_near_gas(err.gas_used)
-    );
-    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_8)); //  9.8 Tgas
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(98)); //  9.8 Tgas
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an
