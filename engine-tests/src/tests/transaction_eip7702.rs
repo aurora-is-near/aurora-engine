@@ -1,30 +1,26 @@
-//! EIP-7702 authorization list LENGTH-LIMIT tests (NEAR gas limit guard)
+//! Integration tests for EIP-7702 (type 0x04) transactions in the Aurora engine.
 //!
-//! These tests validate the cap introduced on `Transaction7702.authorization_list`
-//! length via `AUTHORIZATION_LIST_LENGTH` in engine-transactions. The cap exists
-//! because each authorization entry adds EVM intrinsic-gas cost AND triggers
-//! `ecrecover` work inside the wasm contract — an uncapped list can exhaust the
-//! per-tx NEAR gas budget even when EVM-level gas is paid for.
+//! Covered scenarios:
+//!   * RLP encoding/decoding round-trip of a signed EIP-7702 tx.
+//!   * Happy-path delegation install and EVM execution in the delegated context.
+//!   * Delegated-authority EOA sending its own EIP-1559 tx (EIP-3607 exception).
+//!   * Sponsored tx: signer invokes delegated code in the authority's context.
+//!   * Delegation revocation by an external signer and by the authority itself.
+//!   * `auth.chain_id` mismatch - the auth entry is marked invalid while the
+//!     outer tx still executes and charges gas.
+//!   * `authorization_list` length cap `AUTHORIZATION_LIST_LENGTH`:
+//!     happy path at the bound + oversized rejection.
+//!   * Early-exit rejection paths (wrong `tx.chain_id`, `tx.nonce`, or insufficient
+//!     balance): prove that `ecrecover` over the auth list is NOT invoked.
 //!
-//! Scenario matrix:
-//!   1. list.len() == AUTHORIZATION_LIST_LENGTH          → success, full flow runs
-//!   2. list.len() == AUTHORIZATION_LIST_LENGTH + 1      → rejected (InvalidSignature)
-//!   3. list.len() == max, wrong tx.chain_id             → rejected at chain_id check,
-//!                                                         auth-list ecrecover SKIPPED
-//!   4. list.len() == max, wrong tx.nonce                → rejected at nonce check, same
-//!   5. list.len() == max, insufficient sender balance   → rejected at charge_gas, same
-//!
-//! For the "early-exit" tests (3, 4, 5) the NEAR gas consumption must be strictly
-//! less than test 1 — proving `authorization_list()` / ecrecover is NOT invoked
-//! on the rejection path (this is the H-2 DoS fix contract).
-//!
-//! NEAR gas values in asserts are captured from a successful local run; they serve
-//! as regression watchdogs (not tight bounds).
+//! NEAR-gas asserts are floor-rounded to 0.1 Tgas (100 Ggas) via
+//! [`round_near_gas`] so sub-percent cost drift doesn't flake the suite
+//! while any meaningful cost-model regression still fails loudly.
 
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_transactions::eip_7702;
 use aurora_engine_transactions::eip_7702::{
-    AUTHORIZATION_LIST_LENGTH, AuthorizationTuple, Transaction7702,
+    AUTHORIZATION_LIST_LENGTH, AuthorizationTuple, SignedTransaction7702, Transaction7702,
 };
 use aurora_engine_types::H160;
 use aurora_engine_types::borsh::BorshDeserialize;
@@ -34,7 +30,7 @@ use std::iter;
 
 use crate::prelude::Wei;
 use crate::prelude::transactions::EthTransactionKind;
-use crate::prelude::transactions::eip_1559::{self, Transaction1559};
+use crate::prelude::transactions::eip_1559::{self, SignedTransaction1559, Transaction1559};
 use crate::prelude::{H256, U256};
 use crate::utils;
 use crate::utils::{sign_eip_1559_transaction, sign_eip7702_authorization};
@@ -45,39 +41,43 @@ const INITIAL_BALANCE: Wei = Wei::new_u64(0x0de0b6b3a7640000);
 
 const CONTRACT_ADDRESS: &str = "0xcccccccccccccccccccccccccccccccccccccccc";
 const CONTRACT_NONCE: u64 = 1;
-const CONTRACT_CODE: &str = "3a6000554860015500";
 const CONTRACT_BALANCE: Wei = Wei::new_u64(0x0de0b6b3a7640000);
 
-const EXAMPLE_TX_HEX: &str = "02f8c101010a8207d0833d090094cccccccccccccccccccccccccccccccccccccccc8000f85bf85994ccccccccccccccccccccccccccccccccccccccccf842a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000180a0d671815898b8dd34321adbba4cb6a57baa7017323c26946f3719b00e70c755c2a03528b9efe3be57ea65a933d1e6bbf3b7d0c78830138883c1201e0c641fee6464";
+/// Contract that stores `EXTCODESIZE(authority)` into slot 0 - used by
+/// length-cap tests as the tx's `to` target.
+const AUTHORITY_EXTCODESIZE_PROBE_HEX: &str =
+    "73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500";
 
-// ────────────────────────────────────────────────────────────────────────────────────────
-/// Upper bound on NEAR gas for "early-exit" scenarios (tests 3, 4, 5).
-/// Picked well above the actual measured values but far below test 1 to prove
-/// that auth-list processing is skipped on the rejection path.
-const EARLY_EXIT_NEAR_GAS_UPPER_BOUND: u64 = 50_000_000_000_000; // 50 Tgas
+/// Default EVM `gas_limit` for single-auth EIP-7702 tests.
+const DEFAULT_EVM_GAS_LIMIT: u64 = 0x3d_0900;
+/// EVM `gas_limit` generous enough to cover intrinsic cost of a max-size
+/// authorization list.
+const MAX_LIST_EVM_GAS_LIMIT: u64 = 30_000_000;
 
-// ── Measured NEAR-gas baselines (local run on branch fix/mrlsd/eip7702-tx-ecrecovery) ──
-// Any drift ≥ a few % here usually means cost-model changes in engine-sdk/NEAR-host;
-// review deliberately before updating.
-const NEAR_GAS_MAX_LIST_SUCCESS: u64 = 368_143_190_389_604;
-const NEAR_GAS_EXCEED_LIMIT: u64 = 27_100_861_750_224;
-const NEAR_GAS_WRONG_CHAIN_ID: u64 = 27_268_766_436_894;
-const NEAR_GAS_WRONG_NONCE: u64 = 27_388_106_692_341;
-const NEAR_GAS_INSUFFICIENT_BALANCE: u64 = 27_513_282_948_872;
+const RELAY_ACCOUNT: &str = "relay.aurora";
 
-/// Production NEAR per-tx gas limit (for comparison in asserts).
-/// See <https://github.com/near/nearcore/blob/master/core/parameters/res/runtime_configs/parameters.yaml>
-const NEAR_PROTOCOL_PER_TX_GAS_LIMIT_TGAS: u64 = 300;
+/// Quantization step for NEAR-gas assertions: 0.1 Tgas = 100 Ggas.
+const NEAR_GAS_STEP: u64 = 100_000_000_000;
 
+/// Floor-round NEAR gas to the nearest 0.1 Tgas step.
+const fn round_near_gas(gas: u64) -> u64 {
+    (gas / NEAR_GAS_STEP) * NEAR_GAS_STEP
+}
+
+/// Convert raw NEAR gas to the nearest 0.1 Tgas step, for more stable assertions.
+const fn near_ggas(gas: u64) -> u64 {
+    gas * NEAR_GAS_STEP
+}
+
+/// Round-trips a single-auth EIP-7702 tx through RLP and verifies that the
+/// recovered sender matches the signer.
 #[test]
 fn test_eip_7702_tx_encoding_decoding() {
     let secret_key = example_signer().secret_key;
-    let transaction = eip7702_transaction(0);
+    let transaction = eip7702_single_auth_tx(1, 0);
 
     let signed_tx = utils::sign_eip_7702_transaction(transaction, &secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx))
-        .collect();
+    let tx_bytes = encode_signed_7702(&signed_tx);
 
     let decoded_tx = match EthTransactionKind::try_from(tx_bytes.as_slice()) {
         Ok(EthTransactionKind::Eip7702(tx)) => tx,
@@ -92,19 +92,18 @@ fn test_eip_7702_tx_encoding_decoding() {
     );
 }
 
+/// Happy-path: signer submits an EIP-7702 tx that installs delegation on
+/// the authority. Verifies EVM gas, nonces, balances and that the authority
+/// now holds the `ef0100 || <target>` delegation designator code.
 #[test]
 fn test_eip_7702_success() {
     let mut runner = utils::deploy_runner();
-
-    // Signer data
     let signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
 
-    // ── Authority: gets delegation, then sends a tx ──
     let authority_sk = example_authority_signer();
     let authority_address = utils::address_from_secret_key(&authority_sk.secret_key);
 
-    // Contract data
     let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
     let contract_code = sample_code_for_contract_eip7702(authority_address);
 
@@ -116,16 +115,12 @@ fn test_eip_7702_success() {
         contract_code.clone(),
     );
 
-    let mut transaction = eip7702_transaction(0);
-    transaction.chain_id = runner.chain_id;
+    let transaction = eip7702_single_auth_tx(runner.chain_id, 0);
     let signed_tx = utils::sign_eip_7702_transaction(transaction, &signer.secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx))
-        .collect();
+    let tx_bytes = encode_signed_7702(&signed_tx);
 
-    let relay = "relay.aurora";
-    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
-    // Unwrapping execution results validates outcome
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     assert_eq!(result.gas_used, 68206);
@@ -133,19 +128,18 @@ fn test_eip_7702_success() {
     assert_eq!(runner.get_balance(contract_address), CONTRACT_BALANCE);
     assert_eq!(runner.get_nonce(contract_address), CONTRACT_NONCE.into());
     assert_eq!(runner.get_code(contract_address), contract_code);
-    // `EXTCODESIZE` should return size of `EF0100`+20 = 23 for delegated designator
     assert_eq!(
         runner.get_storage(contract_address, H256::zero()),
         H256::from(H160::from_low_u64_be(23))
     );
 
-    // Authority address should increase Nonce
     assert_eq!(runner.get_nonce(authority_address), 1.into());
-    // Get delegated designator address
     assert_eq!(
         hex::encode(runner.get_code(authority_address)),
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
+
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(4_6)); // 4.6 Tgas
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions
@@ -190,15 +184,11 @@ fn test_eip_7702_delegated_sender_can_transact() {
     // ══════════════════════════════════════════════════════════════
     // Step 1: EIP-7702 tx — install delegation on authority
     // ══════════════════════════════════════════════════════════════
-    let mut transaction = eip7702_transaction(0);
-    transaction.chain_id = runner.chain_id;
+    let transaction = eip7702_single_auth_tx(runner.chain_id, 0);
     let signed_tx = utils::sign_eip_7702_transaction(transaction, &signer.secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx))
-        .collect();
+    let tx_bytes = encode_signed_7702(&signed_tx);
 
-    let relay = "relay.aurora";
-    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -243,11 +233,11 @@ fn test_eip_7702_delegated_sender_can_transact() {
     };
 
     let signed_tx_2 = sign_eip_1559_transaction(eip1559_tx, &authority_sk.secret_key);
-    let tx_bytes_2: Vec<u8> = iter::once(eip_1559::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx_2))
-        .collect();
+    let tx_bytes_2 = encode_signed_1559(&signed_tx_2);
 
-    let outcome_2 = runner.call(utils::SUBMIT, relay, tx_bytes_2).unwrap();
+    let outcome_2 = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes_2)
+        .unwrap();
     let result_2 =
         SubmitResult::try_from_slice(&outcome_2.return_data.as_value().unwrap()).unwrap();
 
@@ -294,7 +284,7 @@ fn test_eip_7702_delegated_sender_can_transact() {
         nonce: 2.into(),
         max_priority_fee_per_gas: U256::zero(),
         max_fee_per_gas: U256::zero(),
-        gas_limit: 0x3d0900.into(),
+        gas_limit: DEFAULT_EVM_GAS_LIMIT.into(),
         to: Some(authority_address),
         value: Wei::new_u64(0),
         data: Vec::new(),
@@ -302,11 +292,11 @@ fn test_eip_7702_delegated_sender_can_transact() {
     };
 
     let signed_tx_3 = sign_eip_1559_transaction(eip1559_tx2, &signer.secret_key);
-    let tx_bytes_3: Vec<u8> = iter::once(eip_1559::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx_3))
-        .collect();
+    let tx_bytes_3 = encode_signed_1559(&signed_tx_3);
 
-    let outcome_3 = runner.call(utils::SUBMIT, relay, tx_bytes_3).unwrap();
+    let outcome_3 = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes_3)
+        .unwrap();
     let result_3 =
         SubmitResult::try_from_slice(&outcome_3.return_data.as_value().unwrap()).unwrap();
     assert!(result_3.status.is_ok());
@@ -344,25 +334,19 @@ fn test_eip_7702_delegated_sender_can_transact() {
         &authority_sk.secret_key,
     );
 
-    let revoke_tx = Transaction7702 {
-        chain_id: runner.chain_id,
-        nonce: 3.into(), // signer nonce
-        gas_limit: U256::from(0x3d0900),
-        max_fee_per_gas: U256::from(0x07d0),
-        max_priority_fee_per_gas: U256::from(0x0a),
-        to: contract_address,
-        value: Wei::zero(),
-        data: vec![],
-        access_list: vec![],
-        authorization_list: vec![auth_revoke],
-    };
+    let revoke_tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        3.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        vec![auth_revoke],
+    );
 
     let signed_tx_4 = utils::sign_eip_7702_transaction(revoke_tx, &signer.secret_key);
-    let tx_bytes_4: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx_4))
-        .collect();
+    let tx_bytes_4 = encode_signed_7702(&signed_tx_4);
 
-    let outcome_4 = runner.call(utils::SUBMIT, relay, tx_bytes_4).unwrap();
+    let outcome_4 = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes_4)
+        .unwrap();
     let result_4 =
         SubmitResult::try_from_slice(&outcome_4.return_data.as_value().unwrap()).unwrap();
     assert!(result_4.status.is_ok());
@@ -421,14 +405,10 @@ fn test_eip_7702_authority_self_revoke() {
     // ══════════════════════════════════════════════════════════════
     // Step 1: signer installs delegation on authority
     // ══════════════════════════════════════════════════════════════
-    let mut transaction = eip7702_transaction(0);
-    transaction.chain_id = runner.chain_id;
+    let transaction = eip7702_single_auth_tx(runner.chain_id, 0);
     let signed_tx = utils::sign_eip_7702_transaction(transaction, &signer.secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx))
-        .collect();
-    let relay = "relay.aurora";
-    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
+    let tx_bytes = encode_signed_7702(&signed_tx);
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -436,7 +416,7 @@ fn test_eip_7702_authority_self_revoke() {
     let tx_transfer = Transaction1559 {
         chain_id: runner.chain_id,
         nonce: U256::from(2),
-        gas_limit: U256::from(0x3d0900),
+        gas_limit: DEFAULT_EVM_GAS_LIMIT.into(),
         max_fee_per_gas: U256::from(0x07d0),
         max_priority_fee_per_gas: U256::from(0x0a),
         to: Some(authority_address),
@@ -445,10 +425,8 @@ fn test_eip_7702_authority_self_revoke() {
         access_list: vec![],
     };
     let signed_tx_transfer = sign_eip_1559_transaction(tx_transfer, &signer.secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_1559::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx_transfer))
-        .collect();
-    let outcome = runner.call(utils::SUBMIT, relay, tx_bytes).unwrap();
+    let tx_bytes = encode_signed_1559(&signed_tx_transfer);
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -474,25 +452,19 @@ fn test_eip_7702_authority_self_revoke() {
         &authority_sk.secret_key,
     );
 
-    let revoke_tx = Transaction7702 {
-        chain_id: runner.chain_id,
-        nonce: 1.into(), // authority's current nonce as tx sender
-        gas_limit: U256::from(0x3d0900),
-        max_fee_per_gas: U256::from(0x07d0),
-        max_priority_fee_per_gas: U256::from(0x0a),
-        to: contract_address,
-        value: Wei::zero(),
-        data: vec![],
-        access_list: vec![],
-        authorization_list: vec![auth_revoke],
-    };
+    let revoke_tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        1.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        vec![auth_revoke],
+    );
 
     let signed_tx_2 = utils::sign_eip_7702_transaction(revoke_tx, &authority_sk.secret_key);
-    let tx_bytes_2: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx_2))
-        .collect();
+    let tx_bytes_2 = encode_signed_7702(&signed_tx_2);
 
-    let outcome_2 = runner.call(utils::SUBMIT, relay, tx_bytes_2).unwrap();
+    let outcome_2 = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes_2)
+        .unwrap();
     let result_2 =
         SubmitResult::try_from_slice(&outcome_2.return_data.as_value().unwrap()).unwrap();
     assert!(result_2.status.is_ok());
@@ -519,15 +491,17 @@ fn test_eip_7702_authority_self_revoke() {
     );
 }
 
+/// `auth.chain_id` is set to a value that matches neither 0 nor the tx
+/// `chain_id`: the authorization entry must be marked invalid by the engine
+/// (authority nonce and code unchanged), while the outer tx itself still
+/// executes, advances the signer's nonce and bills EVM gas.
 #[test]
 fn test_eip_7702_wrong_auth_chain_id() {
     let mut runner = utils::deploy_runner();
     let signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
-    // Contract for auth address: 0xa52a8a2229e3c512d6ed27b6e6e7d39958ca9fb3
-    let contract_code =
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap();
+    let contract_code = hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap();
 
     runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
     runner.create_address_with_code(
@@ -537,16 +511,13 @@ fn test_eip_7702_wrong_auth_chain_id() {
         contract_code.clone(),
     );
 
-    let mut transaction = eip7702_transaction(10);
-    transaction.chain_id = runner.chain_id;
+    // Set wrong `chain_id = 10`
+    let transaction = eip7702_single_auth_tx(runner.chain_id, 10);
     let signed_tx = utils::sign_eip_7702_transaction(transaction, &signer.secret_key);
-    let tx_bytes: Vec<u8> = iter::once(eip_7702::TYPE_BYTE)
-        .chain(rlp::encode(&signed_tx))
-        .collect();
+    let tx_bytes = encode_signed_7702(&signed_tx);
 
-    let sender = "relay.aurora";
-    let outcome = runner.call(utils::SUBMIT, sender, tx_bytes).unwrap();
-    // Unwrapping execution results validates outcome
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     let delegated_designator = Address::decode("a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb3").unwrap();
@@ -566,56 +537,44 @@ fn test_eip_7702_wrong_auth_chain_id() {
     assert_eq!(runner.get_nonce(delegated_designator), 0.into());
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
+
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(3_8)); // 3.8 Tgas
 }
 
-/// Test 1 — happy path at the upper bound.
-/// `auth_list.len() == AUTHORIZATION_LIST_LENGTH`: tx must be accepted and executed.
-/// Captures the baseline NEAR gas cost so tests 3–5 can prove early-exit cheapness.
-///
-/// NOTE: `max_gas_burnt` is lifted above the NEAR protocol per-tx cap (300 Tgas)
-/// to let the full auth-list flow complete for measurement. The lifted cap does
-/// NOT disable gas accounting — `outcome.used_gas` is still the real consumption.
-/// If the measured value exceeds 300 Tgas, `AUTHORIZATION_LIST_LENGTH` is set too
-/// high for production: the intended DoS guard actually lets txs that mainnet
-/// would reject with `GasLimitExceeded` through the engine's own validation.
+/// Length cap — happy path at the upper bound.
+/// `auth_list.len() == AUTHORIZATION_LIST_LENGTH`: tx must be accepted and
+/// fully executed (including per-entry ecrecover). Captures the baseline
+/// NEAR gas so the early-exit tests can prove they're dramatically cheaper.
 #[test]
 fn test_eip_7702_auth_list_max_length_succeeds() {
     let mut runner = utils::deploy_runner();
-    // Let the runner execute past the default 300 Tgas cap so we can observe
-    // the real consumption of AUTHORIZATION_LIST_LENGTH authorizations.
-    runner.max_gas_burnt(u64::MAX);
-
     let signer = example_signer();
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
-    let contract_code =
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap();
 
     runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
     runner.create_address_with_code(
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        contract_code,
+        hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap(),
     );
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH, 0);
     let tx = eip7702_tx_with_auth_list(
         runner.chain_id,
         INITIAL_NONCE.into(),
-        // Intrinsic gas = 21_000 + 1000 * 12_500 ≈ 12.5 M. Give headroom for EVM exec.
-        U256::from(30_000_000u64),
+        MAX_LIST_EVM_GAS_LIMIT.into(),
         auth_list,
     );
     let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
     let tx_bytes = encode_signed_7702(&signed_tx);
 
-    let outcome = runner
-        .call(utils::SUBMIT, "relay.aurora", tx_bytes)
-        .unwrap();
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
     let near_gas_used = outcome.used_gas.as_gas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
+    assert_eq!(result.gas_used, 50806);
     assert!(
         result.status.is_ok(),
         "tx must succeed at max auth list length; status = {:?}",
@@ -627,45 +586,14 @@ fn test_eip_7702_auth_list_max_length_succeeds() {
         "sender nonce must advance on success"
     );
 
-    eprintln!(
-        "[max-list success] NEAR gas used = {near_gas_used} ({} Tgas)",
-        near_gas_used / 1_000_000_000_000
-    );
-    // Max-list path MUST cost more NEAR gas than the early-exit bound — the 1000-entry
-    // ecrecover is the expensive part that the length cap is designed to keep within
-    // the NEAR per-tx gas envelope.
-    assert!(
-        near_gas_used > EARLY_EXIT_NEAR_GAS_UPPER_BOUND,
-        "max-list happy-path must be MORE expensive than early-exit bound, \
-         otherwise tests 3-5 can't prove ecrecover is skipped; \
-         got {near_gas_used} <= {EARLY_EXIT_NEAR_GAS_UPPER_BOUND}"
-    );
-
-    // Exact-value regression assert. Captured on a clean local run.
-    // Update this constant deliberately if a cost-model change drifts it.
-    assert_eq!(
-        near_gas_used, NEAR_GAS_MAX_LIST_SUCCESS,
-        "NEAR gas for max-list happy path drifted from recorded baseline"
-    );
-
-    // ⚠ Observation (not a pass/fail assert): the current value of
-    // `AUTHORIZATION_LIST_LENGTH` pushes the real consumption ABOVE the NEAR
-    // protocol per-tx gas limit (300 Tgas). In production a tx with
-    // 1000 authorizations would be rejected by NEAR itself with
-    // `GasLimitExceeded` BEFORE the engine could apply its own length cap —
-    // i.e. the cap as configured is practically unreachable and serves only
-    // as a memory/compute bound inside the wasm contract. Consider lowering
-    // the constant below ~700 if the cap is meant to track the NEAR limit.
-    assert!(
-        near_gas_used / 1_000_000_000_000 > NEAR_PROTOCOL_PER_TX_GAS_LIMIT_TGAS,
-        "Expected AUTHORIZATION_LIST_LENGTH=1000 to exceed NEAR 300 Tgas cap; \
-         if this assert starts failing, the cap and production limit are aligned."
-    );
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(113_4)); // 113.4 Tgas
 }
 
-/// Test 2 — list size overruns the constant.
-/// `authorization_list_len()` returns `Error::AuthorizationListTooLarge`, which the
-/// engine maps to `EngineErrorKind::InvalidSignature` (panic "ERR_INVALID_ECDSA_SIGNATURE").
+/// Length cap — list size overruns the constant.
+/// `authorization_list_len()` returns `Error::AuthorizationListTooLarge`,
+/// which the engine maps to `EngineErrorKind::InvalidSignature`
+/// (panic `ERR_INVALID_ECDSA_SIGNATURE`). Rejected before any ecrecover
+/// work - NEAR gas stays minimal.
 #[test]
 fn test_eip_7702_auth_list_exceeds_limit_rejected() {
     let mut runner = utils::deploy_runner();
@@ -678,27 +606,27 @@ fn test_eip_7702_auth_list_exceeds_limit_rejected() {
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap(),
+        hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap(),
     );
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH + 1, 0);
     let tx = eip7702_tx_with_auth_list(
         runner.chain_id,
         INITIAL_NONCE.into(),
-        U256::from(30_000_000u64),
+        MAX_LIST_EVM_GAS_LIMIT.into(),
         auth_list,
     );
     let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let err = runner
-        .call(utils::SUBMIT, "relay.aurora", tx_bytes)
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
         .unwrap_err();
 
     assert_eq!(
         err.kind.as_bytes(),
         b"ERR_INVALID_ECDSA_SIGNATURE",
-        "oversized auth list must fail parsing (AuthorizationListTooLarge → InvalidSignature)"
+        "oversized auth list must fail parsing (AuthorizationListTooLarge -> InvalidSignature)"
     );
     assert_eq!(
         runner.get_nonce(signer_address),
@@ -707,23 +635,17 @@ fn test_eip_7702_auth_list_exceeds_limit_rejected() {
     );
 
     eprintln!(
-        "[exceed-limit reject] NEAR gas used = {} ({} Tgas)",
+        "[exceed-limit reject] NEAR gas = {} -> rounded {}",
         err.gas_used,
-        err.gas_used / 1_000_000_000_000
+        round_near_gas(err.gas_used)
     );
-    assert!(
-        err.gas_used < EARLY_EXIT_NEAR_GAS_UPPER_BOUND,
-        "oversized list rejection must be cheap (no ecrecover work); got {} > {}",
-        err.gas_used,
-        EARLY_EXIT_NEAR_GAS_UPPER_BOUND
-    );
-    assert_eq!(err.gas_used, NEAR_GAS_EXCEED_LIMIT);
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_4)); // 9.4 Tgas
 }
 
-/// Test 3 — max auth list + wrong tx-level chain_id.
+/// Length cap — max auth list + wrong tx-level `chain_id`.
 /// Rejected at `chain_id` validation in `submit_with_alt_modexp`, BEFORE
 /// `get_authorization_list()` (the real ecrecover call) is invoked.
-/// NEAR gas must be dramatically below test 1's baseline.
+/// NEAR gas must be dramatically below the happy-path baseline.
 #[test]
 fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
     let mut runner = utils::deploy_runner();
@@ -736,22 +658,21 @@ fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap(),
+        hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap(),
     );
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH, 0);
-    // tx chain_id deliberately != runner.chain_id
     let tx = eip7702_tx_with_auth_list(
         runner.chain_id.wrapping_add(1),
         INITIAL_NONCE.into(),
-        U256::from(30_000_000u64),
+        MAX_LIST_EVM_GAS_LIMIT.into(),
         auth_list,
     );
     let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let err = runner
-        .call(utils::SUBMIT, "relay.aurora", tx_bytes)
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
         .unwrap_err();
 
     assert_eq!(
@@ -766,21 +687,15 @@ fn test_eip_7702_max_auth_list_wrong_tx_chain_id_early_exit() {
     );
 
     eprintln!(
-        "[wrong tx.chain_id, max list] NEAR gas used = {} ({} Tgas)",
+        "[wrong tx.chain_id, max list] NEAR gas = {} -> rounded {}",
         err.gas_used,
-        err.gas_used / 1_000_000_000_000
+        round_near_gas(err.gas_used)
     );
-    assert!(
-        err.gas_used < EARLY_EXIT_NEAR_GAS_UPPER_BOUND,
-        "wrong-chain_id rejection must skip ecrecover; got {} > {}",
-        err.gas_used,
-        EARLY_EXIT_NEAR_GAS_UPPER_BOUND
-    );
-    assert_eq!(err.gas_used, NEAR_GAS_WRONG_CHAIN_ID);
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_5)); //  9.5 Tgas
 }
 
-/// Test 4 — max auth list + wrong tx-level nonce.
-/// Rejected at `check_nonce` (after chain_id, before intrinsic-gas).
+/// Length cap — max auth list + wrong tx-level nonce.
+/// Rejected at `check_nonce` (after `chain_id`, before intrinsic-gas).
 /// `get_authorization_list()` is NOT called → NEAR gas stays low.
 #[test]
 fn test_eip_7702_max_auth_list_wrong_tx_nonce_early_exit() {
@@ -794,23 +709,22 @@ fn test_eip_7702_max_auth_list_wrong_tx_nonce_early_exit() {
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap(),
+        hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap(),
     );
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH, 0);
-    // tx.nonce deliberately does NOT match signer.nonce (expected INITIAL_NONCE == 1)
     let bogus_nonce = U256::from(9999u64);
     let tx = eip7702_tx_with_auth_list(
         runner.chain_id,
         bogus_nonce,
-        U256::from(30_000_000u64),
+        MAX_LIST_EVM_GAS_LIMIT.into(),
         auth_list,
     );
     let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let err = runner
-        .call(utils::SUBMIT, "relay.aurora", tx_bytes)
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
         .unwrap_err();
 
     assert!(
@@ -825,21 +739,15 @@ fn test_eip_7702_max_auth_list_wrong_tx_nonce_early_exit() {
     );
 
     eprintln!(
-        "[wrong tx.nonce, max list] NEAR gas used = {} ({} Tgas)",
+        "[wrong tx.nonce, max list] NEAR gas = {} -> rounded {}",
         err.gas_used,
-        err.gas_used / 1_000_000_000_000
+        round_near_gas(err.gas_used)
     );
-    assert!(
-        err.gas_used < EARLY_EXIT_NEAR_GAS_UPPER_BOUND,
-        "wrong-nonce rejection must skip ecrecover; got {} > {}",
-        err.gas_used,
-        EARLY_EXIT_NEAR_GAS_UPPER_BOUND
-    );
-    assert_eq!(err.gas_used, NEAR_GAS_WRONG_NONCE);
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_7)); //  9.7 Tgas
 }
 
-/// Test 5 — max auth list + sender cannot afford gas_limit * max_fee_per_gas.
-/// Rejected at `charge_gas` (OutOfFund). Still BEFORE `get_authorization_list()`.
+/// Length cap — max auth list + sender cannot afford `gas_limit * max_fee_per_gas`.
+/// Rejected at `charge_gas` (`OutOfFund`). Still BEFORE `get_authorization_list()`.
 #[test]
 fn test_eip_7702_max_auth_list_insufficient_balance_early_exit() {
     let mut runner = utils::deploy_runner();
@@ -847,27 +755,26 @@ fn test_eip_7702_max_auth_list_insufficient_balance_early_exit() {
     let signer_address = utils::address_from_secret_key(&signer.secret_key);
     let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
 
-    // Balance far below required (gas_limit * max_fee_per_gas = 30M * 2000 = 6·10^10 wei).
     runner.create_address(signer_address, Wei::new_u64(100), signer.nonce.into());
     runner.create_address_with_code(
         contract_address,
         CONTRACT_BALANCE,
         CONTRACT_NONCE.into(),
-        hex::decode("73a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb33B60005500").unwrap(),
+        hex::decode(AUTHORITY_EXTCODESIZE_PROBE_HEX).unwrap(),
     );
 
     let auth_list = make_auth_list(AUTHORIZATION_LIST_LENGTH, 0);
     let tx = eip7702_tx_with_auth_list(
         runner.chain_id,
         INITIAL_NONCE.into(),
-        U256::from(30_000_000u64),
+        MAX_LIST_EVM_GAS_LIMIT.into(),
         auth_list,
     );
     let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let err = runner
-        .call(utils::SUBMIT, "relay.aurora", tx_bytes)
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
         .unwrap_err();
 
     assert_eq!(
@@ -882,40 +789,41 @@ fn test_eip_7702_max_auth_list_insufficient_balance_early_exit() {
     );
 
     eprintln!(
-        "[insufficient balance, max list] NEAR gas used = {} ({} Tgas)",
+        "[insufficient balance, max list] NEAR gas = {} -> rounded {}",
         err.gas_used,
-        err.gas_used / 1_000_000_000_000
+        round_near_gas(err.gas_used)
     );
-    assert!(
-        err.gas_used < EARLY_EXIT_NEAR_GAS_UPPER_BOUND,
-        "out-of-fund rejection must skip ecrecover; got {} > {}",
-        err.gas_used,
-        EARLY_EXIT_NEAR_GAS_UPPER_BOUND
-    );
-    assert_eq!(err.gas_used, NEAR_GAS_INSUFFICIENT_BALANCE);
+    assert_eq!(round_near_gas(err.gas_used), near_ggas(9_8)); //  9.8 Tgas
 }
 
-/// Build `n` authorization tuples signed by the same authority with nonces `0..n`.
-/// For length-limit tests the *content* of the list is secondary — only its size
-/// matters (plus valid RLP encoding).
-fn make_auth_list(n: usize, auth_chain_id: u64) -> Vec<AuthorizationTuple> {
-    let authority_sk = example_authority_signer();
-    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
-    (0..n)
-        .map(|i| {
-            sign_eip7702_authorization(
-                auth_chain_id,
-                contract_address,
-                i as u64,
-                &authority_sk.secret_key,
-            )
-        })
-        .collect()
+/// Signer for the *transaction sender* role — the EOA that submits an
+/// EIP-7702 tx to the engine. Distinct key / nonce from the authority.
+fn example_signer() -> utils::Signer {
+    let secret_key =
+        libsecp256k1::SecretKey::parse_slice(&hex::decode(SECRET_KEY).unwrap()).unwrap();
+
+    utils::Signer {
+        nonce: INITIAL_NONCE,
+        secret_key,
+    }
 }
 
-/// Build a standard EIP-7702 tx with a pre-built authorization list.
-/// `gas_limit` is parameterised because max-size lists need headroom above
-/// the default `0x3d0900` (4 M) to pass the intrinsic-gas check.
+/// Signer for the *authority* role — the EOA whose code is being set via the
+/// `authorization_list`. Its private key signs each `AuthorizationTuple`.
+fn example_authority_signer() -> utils::Signer {
+    const AUTHORITY_SECRET_KEY: &str =
+        "b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291";
+
+    let secret_key =
+        libsecp256k1::SecretKey::parse_slice(&hex::decode(AUTHORITY_SECRET_KEY).unwrap()).unwrap();
+
+    utils::Signer {
+        nonce: 0,
+        secret_key,
+    }
+}
+
+/// Build an EIP-7702 tx with a pre-built authorization list.
 fn eip7702_tx_with_auth_list(
     chain_id: u64,
     nonce: U256,
@@ -936,52 +844,57 @@ fn eip7702_tx_with_auth_list(
     }
 }
 
+/// Convenience: EIP-7702 tx with a single authorization (`authority ⇒ CONTRACT_ADDRESS`).
+/// `chain_id` is the *tx-level* `chain_id`; `auth_chain_id` goes into the
+/// authorization tuple (use 0 to accept any chain, or a specific id to pin).
+fn eip7702_single_auth_tx(chain_id: u64, auth_chain_id: u64) -> Transaction7702 {
+    let auth = sign_eip7702_authorization(
+        auth_chain_id,
+        utils::address_from_hex(CONTRACT_ADDRESS),
+        0,
+        &example_authority_signer().secret_key,
+    );
+    eip7702_tx_with_auth_list(
+        chain_id,
+        INITIAL_NONCE.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        vec![auth],
+    )
+}
+
+/// Build `n` authorization tuples signed by the same authority with nonces `0..n`.
+/// For length-cap tests the list *content* is secondary — only its size
+/// matters (plus valid RLP).
+#[allow(clippy::as_conversions)]
+fn make_auth_list(n: usize, auth_chain_id: u64) -> Vec<AuthorizationTuple> {
+    let authority_sk = example_authority_signer();
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let n = u64::try_from(n).unwrap();
+    (0..n)
+        .map(|i| {
+            sign_eip7702_authorization(auth_chain_id, contract_address, i, &authority_sk.secret_key)
+        })
+        .collect()
+}
+
 /// Serialise a signed EIP-7702 tx to the byte-stream the contract expects.
-fn encode_signed_7702(signed: &eip_7702::SignedTransaction7702) -> Vec<u8> {
+fn encode_signed_7702(signed: &SignedTransaction7702) -> Vec<u8> {
     iter::once(eip_7702::TYPE_BYTE)
         .chain(rlp::encode(signed))
         .collect()
 }
 
-fn eip7702_transaction(auth_chain_id: u64) -> Transaction7702 {
-    let authority_sk_1 = example_authority_signer();
-    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
-    let auth1 = sign_eip7702_authorization(
-        auth_chain_id,
-        contract_address,
-        0,
-        &authority_sk_1.secret_key,
-    );
-
-    Transaction7702 {
-        chain_id: 1,
-        nonce: INITIAL_NONCE.into(),
-        gas_limit: U256::from(0x3d0900),
-        max_fee_per_gas: U256::from(0x07d0),
-        max_priority_fee_per_gas: U256::from(0x0a),
-        to: contract_address,
-        value: Wei::zero(),
-        data: vec![],
-        access_list: vec![],
-        authorization_list: vec![auth1],
-    }
+/// Serialise a signed EIP-1559 tx to the byte-stream the contract expects.
+fn encode_signed_1559(signed: &SignedTransaction1559) -> Vec<u8> {
+    iter::once(eip_1559::TYPE_BYTE)
+        .chain(rlp::encode(signed))
+        .collect()
 }
 
-/// Used for authorization list signer in EIP-7702 tests.
-fn example_authority_signer() -> utils::Signer {
-    const AUTHORITY_SECRET_KEY: &str =
-        "b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291";
-
-    let secret_key =
-        libsecp256k1::SecretKey::parse_slice(&hex::decode(AUTHORITY_SECRET_KEY).unwrap()).unwrap();
-
-    utils::Signer {
-        nonce: 0,
-        secret_key,
-    }
-}
-
-/// Build contract code: PUSH20 <authority> | EXTCODESIZE | PUSH1 0 | SSTORE | STOP
+/// Contract code for the delegation target:
+/// `PUSH20 <authority> | EXTCODESIZE | PUSH1 0 | SSTORE | STOP`.
+/// Used to witness that the authority's code is the `0xEF0100 || target`
+/// designator (size 23) after a successful EIP-7702 delegation.
 #[must_use]
 fn sample_code_for_contract_eip7702(authority_address: Address) -> Vec<u8> {
     let mut code = Vec::with_capacity(26);

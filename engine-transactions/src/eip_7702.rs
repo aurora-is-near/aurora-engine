@@ -156,7 +156,7 @@ impl SignedTransaction7702 {
         .map_err(|_e| Error::EcRecover)
     }
 
-    /// Returns the number of authorization tuples in the transaction limited by [AUTHORIZATION_LIST_LENGTH].
+    /// Returns the number of authorization tuples in the transaction limited by [`AUTHORIZATION_LIST_LENGTH`].
     ///
     /// Used for gas calculation: each entry in the authorization list must be
     /// charged regardless of validity (per EIP-7702).
