@@ -353,8 +353,8 @@ fn test_eip_1559_access_list_max_length_succeeds() {
     );
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
-    assert_eq!(result.gas_used, 1_965_310);
-    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(160)); // 16.0 Tgas
+    assert_eq!(result.gas_used, 1_274_110);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(112)); // 11.2 Tgas
 }
 
 /// Length cap — list size overruns the constant.
@@ -390,7 +390,7 @@ fn test_eip_1559_access_list_exceeds_limit_rejected() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(17)); // 1.7 Tgas
 }
 
 /// Length cap — max access list + wrong tx-level `chain_id` → rejected early.
@@ -424,7 +424,7 @@ fn test_eip_1559_max_access_list_wrong_tx_chain_id_early_exit() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_INVALID_CHAIN_ID");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(71)); // 7.1 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(52)); // 5.2 Tgas
 }
 
 /// Length cap — max access list + wrong tx-level nonce → rejected early.
@@ -458,7 +458,7 @@ fn test_eip_1559_max_access_list_wrong_tx_nonce_early_exit() {
 
     assert!(err.kind.as_bytes().starts_with(b"ERR_INCORRECT_NONCE"));
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(72)); // 7.2 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(53)); // 5.3 Tgas
 }
 
 /// Length cap — max access list + sender cannot afford `gas_limit * max_fee_per_gas`.
@@ -492,7 +492,7 @@ fn test_eip_1559_max_access_list_insufficient_balance_early_exit() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_OUT_OF_FUND");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(73)); // 7.3 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(55)); // 5.5 Tgas
 }
 
 /// Length cap — happy path for EIP-2930. Same contract as EIP-1559.
@@ -528,8 +528,8 @@ fn test_eip_2930_access_list_max_length_succeeds() {
     assert!(result.status.is_ok());
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
-    assert_eq!(result.gas_used, 1_965_310);
-    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(160)); // 16.0 Tgas
+    assert_eq!(result.gas_used, 1_274_110);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(112)); // 11.2 Tgas
 }
 
 /// Length cap — list size overruns the constant (EIP-2930).
@@ -563,7 +563,7 @@ fn test_eip_2930_access_list_exceeds_limit_rejected() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(17)); // 1.7 Tgas
 }
 
 /// Length cap — max access list + wrong tx-level `chain_id` (EIP-2930).
@@ -597,7 +597,7 @@ fn test_eip_2930_max_access_list_wrong_tx_chain_id_early_exit() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_INVALID_CHAIN_ID");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(71)); // 7.1 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(52)); // 5.2 Tgas
 }
 
 /// Length cap — max access list + wrong tx-level nonce (EIP-2930).
@@ -631,7 +631,7 @@ fn test_eip_2930_max_access_list_wrong_tx_nonce_early_exit() {
 
     assert!(err.kind.as_bytes().starts_with(b"ERR_INCORRECT_NONCE"));
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(72)); // 7.2 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(53)); // 5.3 Tgas
 }
 
 /// Length cap — max access list + insufficient balance (EIP-2930).
@@ -665,7 +665,7 @@ fn test_eip_2930_max_access_list_insufficient_balance_early_exit() {
 
     assert_eq!(err.kind.as_bytes(), b"ERR_OUT_OF_FUND");
     assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
-    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(73)); // 7.3 Tgas
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(55)); // 5.5 Tgas
 }
 
 /// Storage-keys cap — happy path at the upper bound.
@@ -709,12 +709,11 @@ fn test_eip_1559_single_tuple_max_storage_keys_succeeds() {
 
     assert!(result.status.is_ok());
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
-    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(result.gas_used, 78_110);
     assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
 }
 
 /// Combined worst case — `ACCESS_LIST_LENGTH × ACCESS_LIST_STORAGE_KEY_LENGTH` slots.
-///
 #[test]
 fn test_eip_1559_access_list_combined_max_success() {
     let mut runner = utils::deploy_runner();
@@ -752,8 +751,8 @@ fn test_eip_1559_access_list_combined_max_success() {
 
     assert!(result.status.is_ok());
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
-    assert_eq!(result.gas_used, 85_710);
-    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
+    assert_eq!(result.gas_used, 16_838_910);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(2043)); // 204.3 Tgas
 }
 
 /// Storage-keys cap — rejection at decoder level.
@@ -834,7 +833,7 @@ fn test_eip_2930_single_tuple_max_storage_keys_succeeds() {
 
     assert!(result.status.is_ok());
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
-    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(result.gas_used, 78_110);
     assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
 }
 
@@ -876,8 +875,8 @@ fn test_eip_2930_access_list_combined_max_success() {
 
     assert!(result.status.is_ok());
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
-    assert_eq!(result.gas_used, 85_710);
-    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas≠
+    assert_eq!(result.gas_used, 16_838_910);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(2043)); // 204.3 Tgas
 }
 
 /// EIP-2930 mirror of [`test_eip_1559_storage_keys_exceeds_limit_rejected`].
