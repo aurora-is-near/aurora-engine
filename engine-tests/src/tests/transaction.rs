@@ -1,3 +1,4 @@
+#![allow(clippy::as_conversions)]
 use aurora_engine::parameters::SubmitResult;
 
 use aurora_engine_transactions::eip_2930;
@@ -235,14 +236,14 @@ const ACCESS_MAX_LIST_EVM_GAS_LIMIT: u64 = 21_000 + (ACCESS_LIST_LENGTH as u64) 
 
 const RELAY_ACCOUNT: &str = "relay.aurora";
 
-/// Build `n` AccessTuple entries with unique addresses and zero storage-keys.
+/// Build `n` `AccessTuple` entries with unique addresses and zero storage-keys.
 /// Storage-keys are left empty — this suite only exercises the list-length cap,
 /// not the per-tuple storage-keys length.
 fn make_access_list(n: usize) -> Vec<AccessTuple> {
     make_access_list_with_keys(n, 0)
 }
 
-/// Build `n` AccessTuple entries, each carrying `keys_per` storage keys.
+/// Build `n` `AccessTuple` entries, each carrying `keys_per` storage keys.
 /// Keys are unique H256 values derived from the tuple index (avoids collisions
 /// that might get deduped inside EVM warm-slot tracking).
 fn make_access_list_with_keys(n: usize, keys_per: usize) -> Vec<AccessTuple> {
@@ -392,7 +393,7 @@ fn test_eip_1559_access_list_exceeds_limit_rejected() {
     assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
 }
 
-/// Length cap — max access list + wrong tx-level chain_id → rejected early.
+/// Length cap — max access list + wrong tx-level `chain_id` → rejected early.
 #[test]
 fn test_eip_1559_max_access_list_wrong_tx_chain_id_early_exit() {
     let mut runner = utils::deploy_runner();
@@ -565,7 +566,7 @@ fn test_eip_2930_access_list_exceeds_limit_rejected() {
     assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
 }
 
-/// Length cap — max access list + wrong tx-level chain_id (EIP-2930).
+/// Length cap — max access list + wrong tx-level `chain_id` (EIP-2930).
 #[test]
 fn test_eip_2930_max_access_list_wrong_tx_chain_id_early_exit() {
     let mut runner = utils::deploy_runner();
@@ -668,7 +669,7 @@ fn test_eip_2930_max_access_list_insufficient_balance_early_exit() {
 }
 
 /// Storage-keys cap — happy path at the upper bound.
-/// 1 AccessTuple carrying `ACCESS_LIST_STORAGE_KEY_LENGTH` storage keys.
+/// 1 `AccessTuple` carrying `ACCESS_LIST_STORAGE_KEY_LENGTH` storage keys.
 /// Exercises the per-tuple cap from the "minimum tuples × max keys" direction.
 /// Validates that such a tx is accepted and executed; captures NEAR + EVM gas.
 #[test]
@@ -714,12 +715,6 @@ fn test_eip_1559_single_tuple_max_storage_keys_succeeds() {
 
 /// Combined worst case — `ACCESS_LIST_LENGTH × ACCESS_LIST_STORAGE_KEY_LENGTH` slots.
 ///
-/// At the current caps (800 × 20 = 16_000 slots) this payload **does NOT fit**
-/// the NEAR 300 Tgas per-tx cap — the engine's decoder-level caps enforce only
-/// an upper bound on ACCEPTED payload, they are NOT a guarantee that every
-/// combination within the caps fits the NEAR gas budget. This test documents
-/// and asserts that behaviour: tx passes decoding, but wasm panics with
-/// `HostError(GasLimitExceeded)` inside `runner.call`.
 #[test]
 fn test_eip_1559_access_list_combined_max_success() {
     let mut runner = utils::deploy_runner();
@@ -762,7 +757,7 @@ fn test_eip_1559_access_list_combined_max_success() {
 }
 
 /// Storage-keys cap — rejection at decoder level.
-/// 1 AccessTuple with `(ACCESS_LIST_STORAGE_KEY_LENGTH + 1)` storage keys.
+/// 1 `AccessTuple` with `(ACCESS_LIST_STORAGE_KEY_LENGTH + 1)` storage keys.
 /// `AccessTuple::decode` returns `DecoderError::Custom("ERR_STORAGE_KEYS_TOO_LARGE")`,
 /// surfaced as `ERR_TX_RLP_DECODE` through the error chain. NEAR gas stays minimal.
 #[test]
@@ -843,7 +838,6 @@ fn test_eip_2930_single_tuple_max_storage_keys_succeeds() {
     assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
 }
 
-/// EIP-2930 mirror of [`test_eip_1559_combined_max_exceeds_near_gas_cap`].
 #[test]
 fn test_eip_2930_access_list_combined_max_success() {
     let mut runner = utils::deploy_runner();
