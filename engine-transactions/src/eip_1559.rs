@@ -118,7 +118,21 @@ impl Decodable for SignedTransaction1559 {
         let to = super::rlp_extract_to(rlp, 5)?;
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
-        let access_list = rlp.list_at(8)?;
+
+        // Gate access_list length BEFORE the expensive per-item decode.
+        // `take(MAX + 1).count()` bounds iteration regardless of attacker-supplied
+        // list size, so the check cost is O(MAX) instead of O(N_actual) worst-case.
+        let access_list_rlp = rlp.at(8)?;
+        if access_list_rlp
+            .iter()
+            .take(crate::eip_2930::ACCESS_LIST_LENGTH + 1)
+            .count()
+            > crate::eip_2930::ACCESS_LIST_LENGTH
+        {
+            return Err(DecoderError::Custom("ERR_ACCESS_LIST_TOO_LARGE"));
+        }
+        let access_list: Vec<AccessTuple> = access_list_rlp.as_list()?;
+
         let parity = rlp.val_at(9)?;
         let r = rlp.val_at(10)?;
         let s = rlp.val_at(11)?;

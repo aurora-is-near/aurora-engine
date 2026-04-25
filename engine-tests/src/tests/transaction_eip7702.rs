@@ -139,7 +139,7 @@ fn test_eip_7702_success() {
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(4_6)); // 4.6 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(46)); // 4.6 Tgas
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions

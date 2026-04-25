@@ -10,6 +10,18 @@ use crate::Error;
 /// Type indicator (per EIP-2718) for access list transactions
 pub const TYPE_BYTE: u8 = 0x01;
 
+/// Hard cap on the number of entries in a transaction's `access_list`.
+/// Enforced during RLP decoding to bound NEAR-gas cost against malicious
+/// payloads. Applied uniformly to EIP-2930, EIP-1559 and EIP-7702 since
+/// they all share `AccessTuple`.
+pub const ACCESS_LIST_LENGTH: usize = 512;
+
+/// Hard cap on the number of `storage_keys` inside a single `AccessTuple`.
+/// Enforced during RLP decoding of each tuple (`AccessTuple::decode`).
+/// Combined with `ACCESS_LIST_LENGTH`, the total number of storage slots
+/// warmed from a single tx is bounded by `ACCESS_LIST_LENGTH * ACCESS_LIST_STORAGE_KEY_LENGTH`.
+pub const ACCESS_LIST_STORAGE_KEY_LENGTH: usize = 16;
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AccessTuple {
@@ -20,7 +32,20 @@ pub struct AccessTuple {
 impl Decodable for AccessTuple {
     fn decode(rlp: &Rlp<'_>) -> Result<Self, DecoderError> {
         let address = rlp.val_at(0)?;
-        let storage_keys = rlp.list_at(1)?;
+
+        // Gate storage_keys length BEFORE per-item decode (each key is 32 bytes
+        // + RLP overhead). `take(MAX + 1).count()` bounds iteration cost to O(MAX)
+        // regardless of attacker-supplied list size.
+        let keys_rlp = rlp.at(1)?;
+        if keys_rlp
+            .iter()
+            .take(ACCESS_LIST_STORAGE_KEY_LENGTH + 1)
+            .count()
+            > ACCESS_LIST_STORAGE_KEY_LENGTH
+        {
+            return Err(DecoderError::Custom("ERR_STORAGE_KEYS_TOO_LARGE"));
+        }
+        let storage_keys: Vec<H256> = keys_rlp.as_list()?;
 
         Ok(Self {
             address,
@@ -130,7 +155,16 @@ impl Decodable for SignedTransaction2930 {
         let to = super::rlp_extract_to(rlp, 4)?;
         let value = Wei::new(rlp.val_at(5)?);
         let data = rlp.val_at(6)?;
-        let access_list = rlp.list_at(7)?;
+
+        // Gate access_list length BEFORE the expensive per-item decode.
+        // `take(MAX + 1).count()` bounds iteration regardless of attacker-supplied
+        // list size, so the check cost is O(MAX) instead of O(N_actual) worst-case.
+        let access_list_rlp = rlp.at(7)?;
+        if access_list_rlp.iter().take(ACCESS_LIST_LENGTH + 1).count() > ACCESS_LIST_LENGTH {
+            return Err(DecoderError::Custom("ERR_ACCESS_LIST_TOO_LARGE"));
+        }
+        let access_list: Vec<AccessTuple> = access_list_rlp.as_list()?;
+
         let parity = rlp.val_at(8)?;
         let r = rlp.val_at(9)?;
         let s = rlp.val_at(10)?;

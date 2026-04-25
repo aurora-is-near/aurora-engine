@@ -1,7 +1,10 @@
 use aurora_engine::parameters::SubmitResult;
 
 use aurora_engine_transactions::eip_2930;
-use aurora_engine_transactions::eip_2930::Transaction2930;
+use aurora_engine_transactions::eip_2930::{
+    ACCESS_LIST_LENGTH, ACCESS_LIST_STORAGE_KEY_LENGTH, SignedTransaction2930, Transaction2930,
+};
+use aurora_engine_types::H160;
 use aurora_engine_types::borsh::BorshDeserialize;
 use std::convert::TryFrom;
 use std::iter;
@@ -207,4 +210,716 @@ const fn one() -> H256 {
     let mut x = [0u8; 32];
     x[31] = 1;
     H256(x)
+}
+
+/// Quantization step for NEAR-gas asserts: 0.1 Tgas = 100 Ggas.
+const ACCESS_NEAR_GAS_STEP: u64 = 100_000_000_000;
+
+/// Floor-round NEAR gas to nearest 0.1 Tgas step.
+const fn access_round_near_gas(gas: u64) -> u64 {
+    gas / ACCESS_NEAR_GAS_STEP * ACCESS_NEAR_GAS_STEP
+}
+
+/// Convert raw NEAR gas to the nearest 0.1 Tgas step, for more stable assertions.
+const fn near_ggas(gas: u64) -> u64 {
+    gas * ACCESS_NEAR_GAS_STEP
+}
+
+/// EVM `gas_limit` scaled to fit the intrinsic cost of a max-size `access_list`:
+///   `gas_transaction_call (21_000) + ACCESS_LIST_LENGTH × gas_access_list_address (2_400)`
+/// plus a 1 M headroom for EVM execution + refund.
+///
+/// This scales automatically when `ACCESS_LIST_LENGTH` is changed in
+/// `engine-transactions` — no test-side tweak needed.
+const ACCESS_MAX_LIST_EVM_GAS_LIMIT: u64 = 21_000 + (ACCESS_LIST_LENGTH as u64) * 2_400 + 1_000_000;
+
+const RELAY_ACCOUNT: &str = "relay.aurora";
+
+/// Build `n` AccessTuple entries with unique addresses and zero storage-keys.
+/// Storage-keys are left empty — this suite only exercises the list-length cap,
+/// not the per-tuple storage-keys length.
+fn make_access_list(n: usize) -> Vec<AccessTuple> {
+    make_access_list_with_keys(n, 0)
+}
+
+/// Build `n` AccessTuple entries, each carrying `keys_per` storage keys.
+/// Keys are unique H256 values derived from the tuple index (avoids collisions
+/// that might get deduped inside EVM warm-slot tracking).
+fn make_access_list_with_keys(n: usize, keys_per: usize) -> Vec<AccessTuple> {
+    (0..n)
+        .map(|i| AccessTuple {
+            address: H160::from_low_u64_be(i as u64 + 1),
+            storage_keys: (0..keys_per)
+                .map(|k| {
+                    let mut b = [0u8; 32];
+                    b[0..8].copy_from_slice(&(i as u64).to_be_bytes());
+                    b[8..16].copy_from_slice(&(k as u64).to_be_bytes());
+                    H256(b)
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+/// Build an EIP-1559 tx with a pre-built access list.
+fn eip1559_tx_with_access_list(
+    chain_id: u64,
+    nonce: U256,
+    gas_limit: U256,
+    access_list: Vec<AccessTuple>,
+) -> Transaction1559 {
+    Transaction1559 {
+        chain_id,
+        nonce,
+        max_fee_per_gas: U256::from(0x07d0),
+        max_priority_fee_per_gas: U256::from(0x0a),
+        gas_limit,
+        to: Some(utils::address_from_hex(CONTRACT_ADDRESS)),
+        value: Wei::zero(),
+        data: vec![],
+        access_list,
+    }
+}
+
+/// Build an EIP-2930 tx with a pre-built access list.
+fn eip2930_tx_with_access_list(
+    chain_id: u64,
+    nonce: U256,
+    gas_limit: U256,
+    access_list: Vec<AccessTuple>,
+) -> Transaction2930 {
+    Transaction2930 {
+        chain_id,
+        nonce,
+        gas_price: U256::from(0x07d0),
+        gas_limit,
+        to: Some(utils::address_from_hex(CONTRACT_ADDRESS)),
+        value: Wei::zero(),
+        data: vec![],
+        access_list,
+    }
+}
+
+/// Serialise a signed EIP-1559 tx to the byte-stream the contract expects.
+fn encode_signed_1559(signed: &SignedTransaction1559) -> Vec<u8> {
+    iter::once(eip_1559::TYPE_BYTE)
+        .chain(rlp::encode(signed))
+        .collect()
+}
+
+/// Serialise a signed EIP-2930 tx to the byte-stream the contract expects.
+fn encode_signed_2930(signed: &SignedTransaction2930) -> Vec<u8> {
+    iter::once(eip_2930::TYPE_BYTE)
+        .chain(rlp::encode(signed))
+        .collect()
+}
+
+/// Length cap — happy path. `access_list.len() == ACCESS_LIST_LENGTH` tx
+/// must be accepted and executed. Captures the baseline NEAR gas for EIP-1559.
+#[test]
+fn test_eip_1559_access_list_max_length_succeeds() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(
+        result.status.is_ok(),
+        "tx must succeed at max access list length; status = {:?}",
+        result.status
+    );
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+
+    assert_eq!(result.gas_used, 1_965_310);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(160)); // 16.0 Tgas
+}
+
+/// Length cap — list size overruns the constant.
+/// Rejected inside `SignedTransaction1559::decode` via `take(MAX+1).count()`,
+/// BEFORE per-item `as_list()` decoding. Surfaced as `ERR_TX_RLP_DECODE`.
+#[test]
+fn test_eip_1559_access_list_exceeds_limit_rejected() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH + 1),
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
+}
+
+/// Length cap — max access list + wrong tx-level chain_id → rejected early.
+#[test]
+fn test_eip_1559_max_access_list_wrong_tx_chain_id_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id.wrapping_add(1),
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_INVALID_CHAIN_ID");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(71)); // 7.1 Tgas
+}
+
+/// Length cap — max access list + wrong tx-level nonce → rejected early.
+#[test]
+fn test_eip_1559_max_access_list_wrong_tx_nonce_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        U256::from(9999u64),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert!(err.kind.as_bytes().starts_with(b"ERR_INCORRECT_NONCE"));
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(72)); // 7.2 Tgas
+}
+
+/// Length cap — max access list + sender cannot afford `gas_limit * max_fee_per_gas`.
+#[test]
+fn test_eip_1559_max_access_list_insufficient_balance_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, Wei::new_u64(100), signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_OUT_OF_FUND");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(73)); // 7.3 Tgas
+}
+
+/// Length cap — happy path for EIP-2930. Same contract as EIP-1559.
+#[test]
+fn test_eip_2930_access_list_max_length_succeeds() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(result.status.is_ok());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+
+    assert_eq!(result.gas_used, 1_965_310);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(160)); // 16.0 Tgas
+}
+
+/// Length cap — list size overruns the constant (EIP-2930).
+#[test]
+fn test_eip_2930_access_list_exceeds_limit_rejected() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH + 1),
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(19)); // 1.9 Tgas
+}
+
+/// Length cap — max access list + wrong tx-level chain_id (EIP-2930).
+#[test]
+fn test_eip_2930_max_access_list_wrong_tx_chain_id_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id.wrapping_add(1),
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_INVALID_CHAIN_ID");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(71)); // 7.1 Tgas
+}
+
+/// Length cap — max access list + wrong tx-level nonce (EIP-2930).
+#[test]
+fn test_eip_2930_max_access_list_wrong_tx_nonce_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        U256::from(9999u64),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert!(err.kind.as_bytes().starts_with(b"ERR_INCORRECT_NONCE"));
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(72)); // 7.2 Tgas
+}
+
+/// Length cap — max access list + insufficient balance (EIP-2930).
+#[test]
+fn test_eip_2930_max_access_list_insufficient_balance_early_exit() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, Wei::new_u64(100), signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        ACCESS_MAX_LIST_EVM_GAS_LIMIT.into(),
+        make_access_list(ACCESS_LIST_LENGTH),
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_OUT_OF_FUND");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(73)); // 7.3 Tgas
+}
+
+/// Storage-keys cap — happy path at the upper bound.
+/// 1 AccessTuple carrying `ACCESS_LIST_STORAGE_KEY_LENGTH` storage keys.
+/// Exercises the per-tuple cap from the "minimum tuples × max keys" direction.
+/// Validates that such a tx is accepted and executed; captures NEAR + EVM gas.
+#[test]
+fn test_eip_1559_single_tuple_max_storage_keys_succeeds() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    // 1 tuple × ACCESS_LIST_STORAGE_KEY_LENGTH storage keys.
+    let access_list = make_access_list_with_keys(1, ACCESS_LIST_STORAGE_KEY_LENGTH);
+    // intrinsic: 21_000 + 1 × 2_400 + 20 × 1_900 = 61_400, plus EVM exec.
+    let evm_gas_limit: u64 =
+        21_000 + 2_400 + (ACCESS_LIST_STORAGE_KEY_LENGTH as u64) * 1_900 + 1_000_000;
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(result.status.is_ok());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
+}
+
+/// Combined worst case — `ACCESS_LIST_LENGTH × ACCESS_LIST_STORAGE_KEY_LENGTH` slots.
+///
+/// At the current caps (800 × 20 = 16_000 slots) this payload **does NOT fit**
+/// the NEAR 300 Tgas per-tx cap — the engine's decoder-level caps enforce only
+/// an upper bound on ACCEPTED payload, they are NOT a guarantee that every
+/// combination within the caps fits the NEAR gas budget. This test documents
+/// and asserts that behaviour: tx passes decoding, but wasm panics with
+/// `HostError(GasLimitExceeded)` inside `runner.call`.
+#[test]
+fn test_eip_1559_access_list_combined_max_success() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let access_list =
+        make_access_list_with_keys(ACCESS_LIST_LENGTH, ACCESS_LIST_STORAGE_KEY_LENGTH);
+    let evm_gas_limit: u64 = 21_000
+        + (ACCESS_LIST_LENGTH as u64) * 2_400
+        + (ACCESS_LIST_LENGTH as u64) * (ACCESS_LIST_STORAGE_KEY_LENGTH as u64) * 1_900
+        + 1_000_000;
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(result.status.is_ok());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
+}
+
+/// Storage-keys cap — rejection at decoder level.
+/// 1 AccessTuple with `(ACCESS_LIST_STORAGE_KEY_LENGTH + 1)` storage keys.
+/// `AccessTuple::decode` returns `DecoderError::Custom("ERR_STORAGE_KEYS_TOO_LARGE")`,
+/// surfaced as `ERR_TX_RLP_DECODE` through the error chain. NEAR gas stays minimal.
+#[test]
+fn test_eip_1559_storage_keys_exceeds_limit_rejected() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    // 1 tuple × (MAX_K + 1) keys — over the per-tuple cap.
+    let access_list = make_access_list_with_keys(1, ACCESS_LIST_STORAGE_KEY_LENGTH + 1);
+    let evm_gas_limit: u64 =
+        21_000 + 2_400 + (ACCESS_LIST_STORAGE_KEY_LENGTH as u64 + 1) * 1_900 + 1_000_000;
+
+    let tx = eip1559_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_eip_1559_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_1559(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(14)); // 1.4 Tgas
+}
+
+/// EIP-2930 mirror of [`test_eip_1559_single_tuple_max_storage_keys_succeeds`].
+#[test]
+fn test_eip_2930_single_tuple_max_storage_keys_succeeds() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let access_list = make_access_list_with_keys(1, ACCESS_LIST_STORAGE_KEY_LENGTH);
+    let evm_gas_limit: u64 =
+        21_000 + 2_400 + (ACCESS_LIST_STORAGE_KEY_LENGTH as u64) * 1_900 + 1_000_000;
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(result.status.is_ok());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas
+}
+
+/// EIP-2930 mirror of [`test_eip_1559_combined_max_exceeds_near_gas_cap`].
+#[test]
+fn test_eip_2930_access_list_combined_max_success() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = hex::decode(CONTRACT_CODE).unwrap();
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let access_list =
+        make_access_list_with_keys(ACCESS_LIST_LENGTH, ACCESS_LIST_STORAGE_KEY_LENGTH);
+    let evm_gas_limit: u64 = 21_000
+        + (ACCESS_LIST_LENGTH as u64) * 2_400
+        + (ACCESS_LIST_LENGTH as u64) * (ACCESS_LIST_STORAGE_KEY_LENGTH as u64) * 1_900
+        + 1_000_000;
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+
+    assert!(result.status.is_ok());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(result.gas_used, 85_710);
+    assert_eq!(access_round_near_gas(near_gas_used), near_ggas(41)); // 4.1 Tgas≠
+}
+
+/// EIP-2930 mirror of [`test_eip_1559_storage_keys_exceeds_limit_rejected`].
+#[test]
+fn test_eip_2930_storage_keys_exceeds_limit_rejected() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        hex::decode(CONTRACT_CODE).unwrap(),
+    );
+
+    let access_list = make_access_list_with_keys(1, ACCESS_LIST_STORAGE_KEY_LENGTH + 1);
+    let evm_gas_limit: u64 =
+        21_000 + 2_400 + (ACCESS_LIST_STORAGE_KEY_LENGTH as u64 + 1) * 1_900 + 1_000_000;
+
+    let tx = eip2930_tx_with_access_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        evm_gas_limit.into(),
+        access_list,
+    );
+    let signed_tx = utils::sign_access_list_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_2930(&signed_tx);
+
+    let err = runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes)
+        .unwrap_err();
+
+    assert_eq!(err.kind.as_bytes(), b"ERR_TX_RLP_DECODE");
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(access_round_near_gas(err.gas_used), near_ggas(14)); // 1.4 Tgas
 }

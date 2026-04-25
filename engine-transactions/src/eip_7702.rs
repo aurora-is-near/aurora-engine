@@ -280,13 +280,30 @@ impl Decodable for SignedTransaction7702 {
         let to = Address::new(rlp.val_at(5)?);
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
-        let access_list = rlp.list_at(8)?;
+
+        // Gate access_list length BEFORE the expensive per-item decode.
+        // Shared `ACCESS_LIST_LENGTH` cap with EIP-2930 and EIP-1559.
+        let access_list_rlp = rlp.at(8)?;
+        if access_list_rlp
+            .iter()
+            .take(crate::eip_2930::ACCESS_LIST_LENGTH + 1)
+            .count()
+            > crate::eip_2930::ACCESS_LIST_LENGTH
+        {
+            return Err(DecoderError::Custom("ERR_ACCESS_LIST_TOO_LARGE"));
+        }
+        let access_list: Vec<AccessTuple> = access_list_rlp.as_list()?;
 
         // Gate authorization_list length BEFORE the expensive per-item decode.
-        // Protects NEAR gas from an oversized RLP payload — without this, the cap
-        // in `authorization_list_len()` only fires after ~6 Tgas of decode work.
+        // `take(MAX + 1).count()` bounds iteration cost to O(MAX) regardless of
+        // attacker-supplied list size.
         let auth_list_rlp = rlp.at(9)?;
-        if auth_list_rlp.item_count()? > AUTHORIZATION_LIST_LENGTH {
+        if auth_list_rlp
+            .iter()
+            .take(AUTHORIZATION_LIST_LENGTH + 1)
+            .count()
+            > AUTHORIZATION_LIST_LENGTH
+        {
             return Err(DecoderError::Custom("ERR_AUTH_LIST_TOO_LARGE"));
         }
         let authorization_list: Vec<AuthorizationTuple> = auth_list_rlp.as_list()?;
