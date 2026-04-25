@@ -14,13 +14,13 @@ pub const TYPE_BYTE: u8 = 0x01;
 /// Enforced during RLP decoding to bound NEAR-gas cost against malicious
 /// payloads. Applied uniformly to EIP-2930, EIP-1559 and EIP-7702 since
 /// they all share `AccessTuple`.
-pub const ACCESS_LIST_LENGTH: usize = 512;
+pub const ACCESS_LIST_LENGTH: usize = 96;
 
 /// Hard cap on the number of `storage_keys` inside a single `AccessTuple`.
 /// Enforced during RLP decoding of each tuple (`AccessTuple::decode`).
 /// Combined with `ACCESS_LIST_LENGTH`, the total number of storage slots
 /// warmed from a single tx is bounded by `ACCESS_LIST_LENGTH * ACCESS_LIST_STORAGE_KEY_LENGTH`.
-pub const ACCESS_LIST_STORAGE_KEY_LENGTH: usize = 16;
+pub const ACCESS_LIST_STORAGE_KEY_LENGTH: usize = 8;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
