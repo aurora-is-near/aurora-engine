@@ -216,7 +216,7 @@ impl SignedTransaction7702 {
                     && auth.parity <= U256::one()
             };
 
-            let auth_address = if is_valid {
+            let authority = if is_valid {
                 rlp_stream.begin_list(3);
                 rlp_stream.append(&auth.chain_id);
                 rlp_stream.append(&auth.address);
@@ -227,7 +227,7 @@ impl SignedTransaction7702 {
                 let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
                 // U256::as_u32() is safe because here we're sure that the parity <= 1.
                 let v = u8::try_from(auth.parity.as_u32()).unwrap_or(u8::MAX);
-                let auth_address = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
+                let authority = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
                     .unwrap_or_else(|_| {
                         is_valid = false;
                         Address::default()
@@ -236,24 +236,29 @@ impl SignedTransaction7702 {
                 message_bytes.truncate(1);
                 rlp_stream.clear();
 
-                auth_address
+                authority.raw()
             } else {
-                Address::default()
+                H160::zero()
             };
 
-            // 0x0 (Zero address) is Ethereum system address. So we mark it as `valid = false`.
-            if auth_address.raw().is_zero() {
+            // `ecrecover` returns 0x0 as the convention for failed recovery (yellow paper,
+            // precompile 0x01). Treating it as a valid authority would let degenerate
+            // signatures install delegation on address(0), breaking the EVM invariant
+            // that the zero address holds no code and corrupting state assumptions
+            // downstream. Matches OpenZeppelin ECDSA / go-ethereum / reth behavior.
+            if authority.is_zero() {
                 is_valid = false;
             }
 
-            // Validations steps 2,4-9 0f EIP-7702 provided by EVM itself.
+            // Validations steps 2,4-9 from EIP-7702 provided by EVM itself.
             authorization_list.push(Authorization {
-                authority: auth_address.raw(),
+                authority,
                 address: auth.address,
                 nonce: auth.nonce,
                 is_valid,
             });
         }
+
         Ok(authorization_list)
     }
 }
