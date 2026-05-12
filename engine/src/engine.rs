@@ -1021,21 +1021,17 @@ pub fn submit_with_alt_modexp<
     handler: &mut P,
 ) -> EngineResult<SubmitResult> {
     #[cfg(feature = "contract")]
-    let (transaction, transaction_kind) = {
-        let transaction_kind = EthTransactionKind::try_from(args.tx_data.as_slice())
-            .map_err(EngineErrorKind::FailedTransactionParse)?;
-        (
-            NormalizedEthTransaction::try_from(transaction_kind.clone())
-                .map_err(|_e| EngineErrorKind::InvalidSignature)?,
-            transaction_kind,
-        )
-    };
+    let transaction = NormalizedEthTransaction::try_from(
+        EthTransactionKind::try_from(args.tx_data.as_slice())
+            .map_err(EngineErrorKind::FailedTransactionParse)?,
+    )
+    .map_err(|_e| EngineErrorKind::InvalidSignature)?;
 
     #[cfg(not(feature = "contract"))]
     // The standalone engine must use the backwards compatible parser to reproduce the NEAR state,
     // but the contract itself does not need to make such checks because it never executes historical
     // transactions.
-    let (transaction, transaction_kind): (NormalizedEthTransaction, EthTransactionKind) = {
+    let transaction: NormalizedEthTransaction = {
         let adapter =
             aurora_engine_transactions::backwards_compatibility::EthTransactionKindAdapter::new(
                 ZERO_ADDRESS_FIX_HEIGHT,
@@ -1044,13 +1040,10 @@ pub fn submit_with_alt_modexp<
         let tx_kind: EthTransactionKind = adapter
             .try_parse_bytes(args.tx_data.as_slice(), block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
-        (
-            tx_kind
-                .clone()
-                .try_into()
-                .map_err(|_e| EngineErrorKind::InvalidSignature)?,
-            tx_kind,
-        )
+
+        tx_kind
+            .try_into()
+            .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
@@ -1117,13 +1110,14 @@ pub fn submit_with_alt_modexp<
         .gas_limit
         .try_into()
         .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let authorization_list = transaction
+        .authorization_list()
+        .map_err(EngineErrorKind::FailedTransactionParse)?;
     let access_list = transaction
         .access_list
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
-    let authorization_list = NormalizedEthTransaction::get_authorization_list(&transaction_kind)
-        .map_err(EngineErrorKind::FailedTransactionParse)?;
 
     let result = if let Some(receiver) = transaction.to {
         engine.call(
@@ -2510,7 +2504,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
-            authorization_list_len: 0,
+            authorization_list: None,
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
@@ -2547,7 +2541,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
-            authorization_list_len: 0,
+            authorization_list: None,
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)

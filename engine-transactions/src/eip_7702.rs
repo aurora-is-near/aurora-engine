@@ -1,7 +1,6 @@
 use aurora_engine_sdk::ecrecover;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{H160, U256, Vec, vec};
-use aurora_evm::executor::stack::Authorization;
+use aurora_engine_types::{H160, U256, Vec};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -155,112 +154,6 @@ impl SignedTransaction7702 {
         )
         .map_err(|_e| Error::EcRecover)
     }
-
-    /// Returns the number of authorization tuples in the transaction limited by [`AUTHORIZATION_LIST_LENGTH`].
-    ///
-    /// Used for gas calculation: each entry in the authorization list must be
-    /// charged regardless of validity (per EIP-7702).
-    ///
-    /// ### Errors
-    /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.
-    pub fn authorization_list_len(&self) -> Result<usize, Error> {
-        if self.transaction.authorization_list.is_empty() {
-            return Err(Error::EmptyAuthorizationList);
-        }
-        let authorization_list_len = self.transaction.authorization_list.len();
-        if authorization_list_len > AUTHORIZATION_LIST_LENGTH {
-            return Err(Error::AuthorizationListTooLarge);
-        }
-        Ok(authorization_list_len)
-    }
-
-    /// Validates and converts the raw authorization list into [`Authorization`] entries.
-    ///
-    /// For each [`AuthorizationTuple`] performs the following checks (EIP-7702):
-    /// 1. `s <= secp256k1n/2` - low-S signature constraint.
-    /// 2. `chain_id == 0 || chain_id == tx.chain_id` — chain binding.
-    /// 3. `parity ∈ {0, 1}` - valid recovery bit.
-    /// 4. `authority = ecrecover(keccak(0x05 || rlp([chain_id, address, nonce])), parity, r, s)`
-    /// 5. `authority != 0x0` — zero address is reserved as a system address.
-    ///
-    /// Invalid entries are **not** skipped — they are included with `is_valid = false`
-    /// because each entry must still be charged for gas.
-    /// Steps 2, 4–9 of EIP-7702 are delegated to the EVM itself.
-    ///
-    /// ### Errors
-    /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.
-    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
-        let authorization_list_len = self.authorization_list_len()?;
-
-        let current_tx_chain_id = U256::from(self.transaction.chain_id);
-        let mut authorization_list = Vec::with_capacity(authorization_list_len);
-        let mut rlp_stream = RlpStream::new();
-        let mut message_bytes = vec![MAGIC; 1];
-        // According to EIP-7702, we should validate each authorization. We shouldn't skip any of them.
-        // And just put the `is_valid` flag to `false` if any of them is invalid. It's related to
-        // gas calculation, as each `authorization_list` must be charged, even if it's invalid.
-        for auth in &self.transaction.authorization_list {
-            // According to EIP-7702 step 1. validation, we should verify it as
-            // `chain_id = 0 || current_chain_id`.
-            // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
-            // Engine `submit_transaction` method.
-
-            // Step 2 - validation logic inside EVM itself.
-            // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
-            // Validate the signature, as in tests it is possible to have invalid signature values.
-            // Value `v` shouldn't be greater than 1
-            let mut is_valid = if auth.s > SECP256K1N_HALF {
-                false
-            } else {
-                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id)
-                    && auth.parity <= U256::one()
-            };
-
-            let authority = if is_valid {
-                rlp_stream.begin_list(3);
-                rlp_stream.append(&auth.chain_id);
-                rlp_stream.append(&auth.address);
-                rlp_stream.append(&auth.nonce);
-
-                message_bytes.extend_from_slice(rlp_stream.as_raw());
-
-                let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
-                // U256::as_u32() is safe because here we're sure that the parity <= 1.
-                let v = u8::try_from(auth.parity.as_u32()).unwrap_or(u8::MAX);
-                let authority = ecrecover(signature_hash, &super::vrs_to_arr(v, auth.r, auth.s))
-                    .unwrap_or_else(|_| {
-                        is_valid = false;
-                        Address::default()
-                    });
-
-                message_bytes.truncate(1);
-                rlp_stream.clear();
-
-                authority.raw()
-            } else {
-                H160::zero()
-            };
-
-            // `ecrecover` returns 0x0 as the convention for failed recovery (yellow paper,
-            // precompile 0x01). Treating it as a valid authority would let degenerate
-            // signatures install delegation on address(0), breaking the EVM invariant
-            // that the zero address holds no code and corrupting state assumptions
-            // downstream. Matches OpenZeppelin ECDSA / go-ethereum / reth behavior.
-            if authority.is_zero() {
-                is_valid = false;
-            }
-
-            // Validations steps 2,4-9 from EIP-7702 provided by EVM itself.
-            authorization_list.push(Authorization {
-                authority,
-                address: auth.address,
-                nonce: auth.nonce,
-                is_valid,
-            });
-        }
-
-        Ok(authorization_list)
-    }
 }
 
 impl Encodable for SignedTransaction7702 {
@@ -286,16 +179,7 @@ impl Decodable for SignedTransaction7702 {
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
         let access_list = rlp.list_at(8)?;
-
-        // Gate authorization_list length BEFORE the expensive per-item decode.
-        // Protects NEAR gas from an oversized RLP payload — without this, the cap
-        // in `authorization_list_len()` only fires after ~6 Tgas of decode work.
-        let auth_list_rlp = rlp.at(9)?;
-        if auth_list_rlp.item_count()? > AUTHORIZATION_LIST_LENGTH {
-            return Err(DecoderError::Custom("ERR_AUTH_LIST_TOO_LARGE"));
-        }
-        let authorization_list: Vec<AuthorizationTuple> = auth_list_rlp.as_list()?;
-
+        let authorization_list: Vec<AuthorizationTuple> = rlp.list_at(9)?;
         let parity = rlp.val_at(10)?;
         let r = rlp.val_at(11)?;
         let s = rlp.val_at(12)?;
@@ -322,8 +206,12 @@ impl Decodable for SignedTransaction7702 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vec;
+    use crate::{EthTransactionKind, NormalizedEthTransaction, vec};
     use rlp::RlpStream;
+
+    fn into_normalized(tx: SignedTransaction7702) -> NormalizedEthTransaction {
+        NormalizedEthTransaction::try_from(EthTransactionKind::Eip7702(tx)).unwrap()
+    }
 
     #[test]
     fn test_authorization_tuple_decode() {
@@ -453,7 +341,7 @@ mod tests {
         };
 
         // Fail
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert_eq!(auth_list.len(), 1);
         assert!(!auth_list[0].is_valid);
 
@@ -465,7 +353,7 @@ mod tests {
             r: 2.into(),
             s: 3.into(),
         };
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert!(auth_list[0].is_valid);
 
         // Success
@@ -483,7 +371,7 @@ mod tests {
             r: 2.into(),
             s: 3.into(),
         };
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert!(auth_list[0].is_valid);
     }
 
@@ -509,7 +397,7 @@ mod tests {
             s: 3.into(),
         };
 
-        if let Err(err) = signed_tx.authorization_list() {
+        if let Err(err) = into_normalized(signed_tx).authorization_list() {
             assert_eq!(err, Error::EmptyAuthorizationList);
         }
     }
@@ -543,7 +431,7 @@ mod tests {
             s: 3.into(),
         };
 
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert_eq!(auth_list.len(), 1);
         assert!(!auth_list[0].is_valid);
 
@@ -561,7 +449,7 @@ mod tests {
             r: 2.into(),
             s: 3.into(),
         };
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert!(!auth_list[0].is_valid);
 
         // Success
@@ -579,7 +467,7 @@ mod tests {
             r: 2.into(),
             s: 3.into(),
         };
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert!(auth_list[0].is_valid);
     }
 
@@ -613,7 +501,7 @@ mod tests {
         };
 
         // Success
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert_eq!(auth_list.len(), 1);
         assert!(auth_list[0].is_valid);
 
@@ -632,7 +520,7 @@ mod tests {
             r: 2.into(),
             s: 3.into(),
         };
-        let auth_list = signed_tx.authorization_list().unwrap();
+        let auth_list = into_normalized(signed_tx).authorization_list().unwrap();
         assert!(!auth_list[0].is_valid);
     }
 }
