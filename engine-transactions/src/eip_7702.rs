@@ -13,8 +13,6 @@ pub const TYPE_BYTE: u8 = 0x04;
 
 /// EIP-7702 `MAGIC` number
 pub const MAGIC: u8 = 0x5;
-/// Limitation for authorization list length. It's strictly related to NEAR gas limits.
-pub const AUTHORIZATION_LIST_LENGTH: usize = 100;
 
 /// The order of the secp256k1 curve, divided by two. Signatures that should be checked according
 /// to EIP-2 should have an S value less than or equal to this.
