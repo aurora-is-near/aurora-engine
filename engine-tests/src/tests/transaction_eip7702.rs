@@ -535,6 +535,252 @@ fn test_eip_7702_wrong_auth_chain_id() {
     assert_eq!(round_near_gas(near_gas_used), near_ggas(38)); // 3.8 Tgas
 }
 
+/// Multi-auth happy path: 3 distinct authorities each delegate to `CONTRACT_ADDRESS`
+/// in one tx — all three codes set, all three nonces incremented.
+#[test]
+fn test_eip_7702_multiple_distinct_authorities_succeed() {
+    const AUTHORITY_SECRET_KEY_1: &str =
+        "1111111111111111111111111111111111111111111111111111111111111111";
+    const AUTHORITY_SECRET_KEY_2: &str =
+        "2222222222222222222222222222222222222222222222222222222222222222";
+
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
+    let auth1 = example_authority_signer();
+    let auth2 = example_authority_signer_with_key(AUTHORITY_SECRET_KEY_1);
+    let auth3 = example_authority_signer_with_key(AUTHORITY_SECRET_KEY_2);
+    let auth1_addr = utils::address_from_secret_key(&auth1.secret_key);
+    let auth2_addr = utils::address_from_secret_key(&auth2.secret_key);
+    let auth3_addr = utils::address_from_secret_key(&auth3.secret_key);
+
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = sample_code_for_contract_eip7702(auth1_addr);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let auth_list = vec![
+        sign_eip7702_authorization(0, contract_address, 0, &auth1.secret_key),
+        sign_eip7702_authorization(0, contract_address, 0, &auth2.secret_key),
+        sign_eip7702_authorization(0, contract_address, 0, &auth3.secret_key),
+    ];
+    let tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        auth_list,
+    );
+    let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_7702(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
+
+    let expected_code = format!("ef0100{}", hex::encode(contract_address.as_bytes()));
+    assert_eq!(hex::encode(runner.get_code(auth1_addr)), expected_code);
+    assert_eq!(hex::encode(runner.get_code(auth2_addr)), expected_code);
+    assert_eq!(hex::encode(runner.get_code(auth3_addr)), expected_code);
+    assert_eq!(runner.get_nonce(auth1_addr), 1.into());
+    assert_eq!(runner.get_nonce(auth2_addr), 1.into());
+    assert_eq!(runner.get_nonce(auth3_addr), 1.into());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+
+    assert_eq!(result.gas_used, 118_206);
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(65));
+}
+
+/// Same authority twice with same nonce: first auth applies and increments nonce,
+/// second fails (nonce-match) - only first target survives in authority.code.
+#[test]
+fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
+    let authority = example_authority_signer();
+    let authority_addr = utils::address_from_secret_key(&authority.secret_key);
+
+    let target_b = utils::address_from_hex(CONTRACT_ADDRESS);
+    let target_c = utils::address_from_hex("0xdddddddddddddddddddddddddddddddddddddddd");
+    let contract_code = sample_code_for_contract_eip7702(authority_addr);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        target_b,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let auth_list = vec![
+        sign_eip7702_authorization(0, target_b, 0, &authority.secret_key),
+        sign_eip7702_authorization(0, target_c, 0, &authority.secret_key),
+    ];
+    let tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        auth_list,
+    );
+    let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_7702(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
+
+    let expected_first = format!("ef0100{}", hex::encode(target_b.as_bytes()));
+    assert_eq!(hex::encode(runner.get_code(authority_addr)), expected_first);
+    assert_eq!(runner.get_nonce(authority_addr), 1.into());
+
+    assert_eq!(result.gas_used, 93_206);
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(50));
+}
+
+/// Authority pre-funded with non-delegated contract code: check skips the auth,
+/// authority bytecode and nonce stay unchanged while tx itself executes and is billed.
+#[test]
+fn test_eip_7702_authority_with_contract_code_is_skipped() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
+    let authority = example_authority_signer();
+    let authority_addr = utils::address_from_secret_key(&authority.secret_key);
+    let original_code = hex::decode("6001600101").unwrap();
+
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+    let contract_code = sample_code_for_contract_eip7702(authority_addr);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        authority_addr,
+        INITIAL_BALANCE,
+        0.into(),
+        original_code.clone(),
+    );
+    runner.create_address_with_code(
+        contract_address,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        contract_code,
+    );
+
+    let auth_list = vec![sign_eip7702_authorization(
+        0,
+        contract_address,
+        0,
+        &authority.secret_key,
+    )];
+    let tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        INITIAL_NONCE.into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        auth_list,
+    );
+    let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
+    let tx_bytes = encode_signed_7702(&signed_tx);
+
+    let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
+    let near_gas_used = outcome.used_gas.as_gas();
+    let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
+    assert!(result.status.is_ok());
+
+    assert_eq!(runner.get_code(authority_addr), original_code);
+    assert_eq!(runner.get_nonce(authority_addr), 0.into());
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+
+    assert_eq!(result.gas_used, 68_206);
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(42));
+}
+
+/// Re-delegation: authority already points to `target_B`; a second tx swaps the
+/// designator to `target_C`.
+#[test]
+fn test_eip_7702_redelegate_existing_delegation() {
+    let mut runner = utils::deploy_runner();
+    let mut signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+
+    let authority = example_authority_signer();
+    let authority_addr = utils::address_from_secret_key(&authority.secret_key);
+
+    let target_b = utils::address_from_hex(CONTRACT_ADDRESS);
+    let target_c = utils::address_from_hex("0xdddddddddddddddddddddddddddddddddddddddd");
+    let target_b_code = sample_code_for_contract_eip7702(authority_addr);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    runner.create_address_with_code(
+        target_b,
+        CONTRACT_BALANCE,
+        CONTRACT_NONCE.into(),
+        target_b_code,
+    );
+
+    // Tx #1: install delegation A -> target_b.
+    let auth_b = sign_eip7702_authorization(0, target_b, 0, &authority.secret_key);
+    let tx1 = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        signer.use_nonce().into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        vec![auth_b],
+    );
+    let signed_tx1 = utils::sign_eip_7702_transaction(tx1, &signer.secret_key);
+    let outcome1 = runner
+        .call(
+            utils::SUBMIT,
+            RELAY_ACCOUNT,
+            encode_signed_7702(&signed_tx1),
+        )
+        .unwrap();
+    let result1 = SubmitResult::try_from_slice(&outcome1.return_data.as_value().unwrap()).unwrap();
+    assert!(result1.status.is_ok());
+    assert_eq!(
+        hex::encode(runner.get_code(authority_addr)),
+        format!("ef0100{}", hex::encode(target_b.as_bytes()))
+    );
+    assert_eq!(runner.get_nonce(authority_addr), 1.into());
+
+    // Tx #2: re-delegate A -> target_c (auth.nonce = 1 because of tx#1).
+    let auth_c = sign_eip7702_authorization(0, target_c, 1, &authority.secret_key);
+    let tx2 = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        signer.use_nonce().into(),
+        DEFAULT_EVM_GAS_LIMIT.into(),
+        vec![auth_c],
+    );
+    let signed_tx2 = utils::sign_eip_7702_transaction(tx2, &signer.secret_key);
+    let outcome2 = runner
+        .call(
+            utils::SUBMIT,
+            RELAY_ACCOUNT,
+            encode_signed_7702(&signed_tx2),
+        )
+        .unwrap();
+    let near_gas_used = outcome2.used_gas.as_gas();
+    let result2 = SubmitResult::try_from_slice(&outcome2.return_data.as_value().unwrap()).unwrap();
+    assert!(result2.status.is_ok());
+
+    assert_eq!(
+        hex::encode(runner.get_code(authority_addr)),
+        format!("ef0100{}", hex::encode(target_c.as_bytes()))
+    );
+    assert_eq!(runner.get_nonce(authority_addr), 2.into());
+
+    assert_eq!(result2.gas_used, 38_645);
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(46));
+}
+
 /// Signer for the *transaction sender* role — the EOA that submits an
 /// EIP-7702 tx to the engine. Distinct key / nonce from the authority.
 fn example_signer() -> utils::Signer {
@@ -556,6 +802,15 @@ fn example_authority_signer() -> utils::Signer {
     let secret_key =
         libsecp256k1::SecretKey::parse_slice(&hex::decode(AUTHORITY_SECRET_KEY).unwrap()).unwrap();
 
+    utils::Signer {
+        nonce: 0,
+        secret_key,
+    }
+}
+
+fn example_authority_signer_with_key(auth_secret_key: &str) -> utils::Signer {
+    let secret_key =
+        libsecp256k1::SecretKey::parse_slice(&hex::decode(auth_secret_key).unwrap()).unwrap();
     utils::Signer {
         nonce: 0,
         secret_key,
