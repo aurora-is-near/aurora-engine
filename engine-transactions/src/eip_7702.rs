@@ -177,7 +177,7 @@ impl Decodable for SignedTransaction7702 {
         let value = Wei::new(rlp.val_at(6)?);
         let data = rlp.val_at(7)?;
         let access_list = rlp.list_at(8)?;
-        let authorization_list: Vec<AuthorizationTuple> = rlp.list_at(9)?;
+        let authorization_list = rlp.list_at(9)?;
         let parity = rlp.val_at(10)?;
         let r = rlp.val_at(11)?;
         let s = rlp.val_at(12)?;
