@@ -1037,12 +1037,10 @@ pub fn submit_with_alt_modexp<
                 ZERO_ADDRESS_FIX_HEIGHT,
             );
         let block_height = env.block_height();
-        let tx_kind: EthTransactionKind = adapter
+        let tx: EthTransactionKind = adapter
             .try_parse_bytes(args.tx_data.as_slice(), block_height)
             .map_err(EngineErrorKind::FailedTransactionParse)?;
-
-        tx_kind
-            .try_into()
+        tx.try_into()
             .map_err(|_e| EngineErrorKind::InvalidSignature)?
     };
     // Retrieve the signer of the transaction:
