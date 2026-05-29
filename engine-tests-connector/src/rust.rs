@@ -12,6 +12,9 @@ pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
             )
             .unwrap(),
         ),
+        // nearcore VM rejects wasm produced by rustc >= 1.87, so pin the
+        // contract build to the older toolchain.
+        override_toolchain: Some("1.86".to_string()),
         ..Default::default()
     };
 

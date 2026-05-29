@@ -39,17 +39,17 @@ pub fn g1_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
     let mut b = blst_p1::default();
     // SAFETY: b and b_aff are blst values.
-    unsafe { blst_p1_from_affine(&mut b, b_aff) };
+    unsafe { blst_p1_from_affine(&raw mut b, b_aff) };
 
     let mut p = blst_p1::default();
     // SAFETY: p, b and a_aff are blst values.
-    unsafe { blst_p1_add_or_double_affine(&mut p, &b, a_aff) };
+    unsafe { blst_p1_add_or_double_affine(&raw mut p, &raw const b, a_aff) };
 
     let mut p_aff = blst_p1_affine::default();
     // SAFETY: p_aff and p are blst values.
-    unsafe { blst_p1_to_affine(&mut p_aff, &p) };
+    unsafe { blst_p1_to_affine(&raw mut p_aff, &raw const p) };
 
-    Ok(g1::encode_g1_point(&p_aff))
+    Ok(g1::encode_g1_point(&raw const p_aff))
 }
 
 pub fn g1_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
@@ -72,7 +72,7 @@ pub fn g1_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
         let mut p0 = blst_p1::default();
         // SAFETY: p0 and p0_aff are blst values.
-        unsafe { blst_p1_from_affine(&mut p0, p0_aff) };
+        unsafe { blst_p1_from_affine(&raw mut p0, p0_aff) };
         g1_points.push(p0);
 
         scalars.extend_from_slice(
@@ -94,9 +94,9 @@ pub fn g1_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
     let mut multiexp_aff = blst_p1_affine::default();
     // SAFETY: multiexp_aff and multiexp are blst values.
-    unsafe { blst_p1_to_affine(&mut multiexp_aff, &multiexp) };
+    unsafe { blst_p1_to_affine(&raw mut multiexp_aff, &raw const multiexp) };
 
-    Ok(g1::encode_g1_point(&multiexp_aff))
+    Ok(g1::encode_g1_point(&raw const multiexp_aff))
 }
 
 pub fn g2_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
@@ -108,15 +108,15 @@ pub fn g2_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
     let mut b = blst_p2::default();
     // SAFETY: b and b_aff are blst values.
-    unsafe { blst_p2_from_affine(&mut b, b_aff) };
+    unsafe { blst_p2_from_affine(&raw mut b, b_aff) };
 
     let mut p = blst_p2::default();
     // SAFETY: p, b and a_aff are blst values.
-    unsafe { blst_p2_add_or_double_affine(&mut p, &b, a_aff) };
+    unsafe { blst_p2_add_or_double_affine(&raw mut p, &raw const b, a_aff) };
 
     let mut p_aff = blst_p2_affine::default();
     // SAFETY: p_aff and p are blst values.
-    unsafe { blst_p2_to_affine(&mut p_aff, &p) };
+    unsafe { blst_p2_to_affine(&raw mut p_aff, &raw const p) };
 
     Ok(g2::encode_g2_point(&p_aff))
 }
@@ -140,7 +140,7 @@ pub fn g2_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
         let mut p0 = blst_p2::default();
         // SAFETY: p0 and p0_aff are blst values.
-        unsafe { blst_p2_from_affine(&mut p0, p0_aff) };
+        unsafe { blst_p2_from_affine(&raw mut p0, p0_aff) };
 
         g2_points.push(p0);
 
@@ -163,7 +163,7 @@ pub fn g2_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
 
     let mut multiexp_aff = blst_p2_affine::default();
     // SAFETY: multiexp_aff and multiexp are blst values.
-    unsafe { blst_p2_to_affine(&mut multiexp_aff, &multiexp) };
+    unsafe { blst_p2_to_affine(&raw mut multiexp_aff, &raw const multiexp) };
 
     Ok(g2::encode_g2_point(&multiexp_aff))
 }
@@ -176,11 +176,11 @@ pub fn map_fp2_to_g2(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     let mut p = blst_p2::default();
     // SAFETY: p and fp2 are blst values.
     // third argument is unused if null.
-    unsafe { blst_map_to_g2(&mut p, &fp2, core::ptr::null()) };
+    unsafe { blst_map_to_g2(&raw mut p, &raw const fp2, core::ptr::null()) };
 
     let mut p_aff = blst_p2_affine::default();
     // SAFETY: p_aff and p are blst values.
-    unsafe { blst_p2_to_affine(&mut p_aff, &p) };
+    unsafe { blst_p2_to_affine(&raw mut p_aff, &raw const p) };
 
     Ok(g2::encode_g2_point(&p_aff))
 }
@@ -192,13 +192,13 @@ pub fn map_fp_to_g1(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     let mut p = blst_p1::default();
     // SAFETY: p and fp are blst values.
     // third argument is unused if null.
-    unsafe { blst_map_to_g1(&mut p, &fp, core::ptr::null()) };
+    unsafe { blst_map_to_g1(&raw mut p, &raw const fp, core::ptr::null()) };
 
     let mut p_aff = blst_p1_affine::default();
     // SAFETY: p_aff and p are blst values.
-    unsafe { blst_p1_to_affine(&mut p_aff, &p) };
+    unsafe { blst_p1_to_affine(&raw mut p_aff, &raw const p) };
 
-    Ok(g1::encode_g1_point(&p_aff))
+    Ok(g1::encode_g1_point(&raw const p_aff))
 }
 
 pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
@@ -231,8 +231,8 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
             let mut res = blst_fp12::default();
             // SAFETY: res, acc, cur_ml, p1_aff and p2_aff are blst values.
             unsafe {
-                blst_miller_loop(&mut cur_ml, p2_aff, p1_aff);
-                blst_fp12_mul(&mut res, &acc, &cur_ml);
+                blst_miller_loop(&raw mut cur_ml, p2_aff, p1_aff);
+                blst_fp12_mul(&raw mut res, &raw const acc, &raw const cur_ml);
             }
             acc = res;
         } else {
@@ -240,7 +240,7 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
             // to accumulate.
             // SAFETY: acc, p1_aff and p2_aff are blst values.
             unsafe {
-                blst_miller_loop(&mut acc, p2_aff, p1_aff);
+                blst_miller_loop(&raw mut acc, p2_aff, p1_aff);
             }
         }
     }
@@ -248,13 +248,13 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     // SAFETY: ret and acc are blst values.
     let mut ret = blst_fp12::default();
     unsafe {
-        blst_final_exp(&mut ret, &acc);
+        blst_final_exp(&raw mut ret, &raw const acc);
     }
 
     let mut result: u8 = 0;
     // SAFETY: ret is a blst value.
     unsafe {
-        if blst_fp12_is_one(&ret) {
+        if blst_fp12_is_one(&raw const ret) {
             result = 1;
         }
     }

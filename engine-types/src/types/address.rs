@@ -84,6 +84,8 @@ impl BorshDeserialize for Address {
         let mut buf = [0u8; 20];
         let maybe_read = reader.read_exact(&mut buf);
         if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
+            // `borsh::io::Error` (used in no-std builds) does not have `Error::other`, so stick with `new`.
+            #[allow(clippy::io_other_error)]
             return Err(io::Error::new(
                 io::ErrorKind::Other,
                 format!("{}", error::AddressError::IncorrectLength),

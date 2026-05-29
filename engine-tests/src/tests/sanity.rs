@@ -16,7 +16,7 @@ const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
-#[ignore]
+#[ignore = "benchmark; allocates large amounts of memory, run with --ignored locally"]
 #[test]
 fn bench_memory_get_standalone() {
     let (mut runner, mut signer, _) = initialize_transfer();

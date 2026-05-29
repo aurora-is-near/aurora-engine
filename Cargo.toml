@@ -43,13 +43,13 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 ibig = { version = "0.3", default-features = false, features = ["num-traits"] }
 impl-serde = { version = "0.5", default-features = false }
 libsecp256k1 = { version = "0.7", default-features = false }
-near-crypto = "0.34"
+near-crypto = "0.35"
 near-gas = "0.3"
-near-parameters = "0.34"
-near-primitives = "0.34"
-near-primitives-core = "0.34"
+near-parameters = "0.35"
+near-primitives = "0.35"
+near-primitives-core = "0.35"
 near-sdk = "5"
-near-vm-runner = { version = "0.34", features = ["wasmtime_vm", "near_vm"] }
+near-vm-runner = { version = "0.35", features = ["wasmtime_vm", "near_vm"] }
 near-workspaces = "0.21"
 num = { version = "0.4", default-features = false, features = ["alloc"] }
 postgres = "0.19"
@@ -69,6 +69,11 @@ test-case = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 walrus = "0.25"
 wee_alloc = { version = "0.4", default-features = false }
+
+[workspace.lints.rust]
+# `fixed_hash::construct_fixed_hash!` expands to `#[cfg(feature = "dev")]`, which is no longer
+# a known feature. Declare it so rustc does not warn about it (used in engine-hashchain).
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("dev"))'] }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

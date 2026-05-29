@@ -777,7 +777,11 @@ pub mod workspace {
         super::change_router_version(current_xcc_version);
     }
 
-    #[allow(clippy::too_many_lines, clippy::future_not_send)]
+    #[allow(
+        clippy::too_many_lines,
+        clippy::future_not_send,
+        clippy::cognitive_complexity
+    )]
     async fn test_xcc_precompile_common(is_scheduled: bool) {
         let XccTestContext {
             aurora,

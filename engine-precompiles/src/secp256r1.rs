@@ -122,10 +122,10 @@ impl Precompile for Secp256r1 {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         // Return empty output on failure according to EIP-7951

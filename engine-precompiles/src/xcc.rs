@@ -114,12 +114,12 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
         let mut cost =
             costs::CROSS_CONTRACT_CALL_BASE + costs::CROSS_CONTRACT_CALL_BYTE * input_len;
         let check_cost = |cost: EthGas| -> Result<(), PrecompileFailure> {
-            if let Some(target_gas) = target_gas {
-                if cost > target_gas {
-                    return Err(PrecompileFailure::Error {
-                        exit_status: ExitError::OutOfGas,
-                    });
-                }
+            if let Some(target_gas) = target_gas
+                && cost > target_gas
+            {
+                return Err(PrecompileFailure::Error {
+                    exit_status: ExitError::OutOfGas,
+                });
             }
             Ok(())
         };

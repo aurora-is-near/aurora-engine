@@ -1,3 +1,5 @@
+#![allow(clippy::owned_cow)]
+
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -80,7 +82,7 @@ impl TransactionMessage {
         };
         Self::try_from(borshable).map_err(|e| {
             let message = e.as_str();
-            std::io::Error::new(std::io::ErrorKind::Other, message)
+            std::io::Error::other(message)
         })
     }
 }

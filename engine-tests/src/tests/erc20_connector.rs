@@ -288,7 +288,7 @@ fn test_ft_on_transfer_fail() {
     assert_eq!(res, format!("\"{amount}\""));
 }
 
-#[ignore]
+#[ignore = "standalone runner does not yet support ft_on_transfer"]
 #[test]
 fn test_relayer_charge_fee() {
     let mut runner = AuroraRunner::new();

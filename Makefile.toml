@@ -281,7 +281,12 @@ run_task = "build-engine-flow"
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
-  wasm-opt -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  # Rust 1.87 stabilised `bulk-memory` for `wasm32-unknown-unknown` and turned
+  # it on by default; rustc emits `memory.fill`/`memory.copy` even with
+  # `-C target-cpu=mvp` or `-C target-feature=-bulk-memory`. NEAR's `near_vm`
+  # (singlepass) cannot deserialise those opcodes, so we let wasm-opt's
+  # `--llvm-memory-copy-fill-lowering` pass rewrite them back to MVP-only loops.
+  wasm-opt --enable-bulk-memory --llvm-memory-copy-fill-lowering -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
   filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''

@@ -13,8 +13,8 @@ pub fn encode_g1_point(input: *const blst_p1_affine) -> Vec<u8> {
     let mut out = vec![0u8; G1_INPUT_ITEM_LENGTH];
     // SAFETY: outcomes from fixed length array, input is a blst value.
     unsafe {
-        fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &(*input).x);
-        fp_to_bytes(&mut out[PADDED_FP_LENGTH..], &(*input).y);
+        fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &raw const (*input).x);
+        fp_to_bytes(&mut out[PADDED_FP_LENGTH..], &raw const (*input).y);
     }
     out
 }
@@ -65,7 +65,7 @@ pub fn extract_g1_input(
         //
         // As endomorphism acceleration requires input on the correct subgroup, implementers MAY
         // use endomorphism acceleration.
-        if unsafe { !blst_p1_affine_in_g1(&out) } {
+        if unsafe { !blst_p1_affine_in_g1(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG1);
         }
     } else {
@@ -81,7 +81,7 @@ pub fn extract_g1_input(
         // the subgroup check.
         //
         // SAFETY: out is a blst value.
-        if unsafe { !blst_p1_affine_on_curve(&out) } {
+        if unsafe { !blst_p1_affine_on_curve(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG1);
         }
     }
