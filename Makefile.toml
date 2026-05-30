@@ -351,6 +351,13 @@ yarn test
 category = "Test"
 command = "${CARGO}"
 dependencies = ["build-test", "clone-aurora-eth-connector"]
+# `*::workspace::*` tests spawn a neard sandbox (near-workspaces). On startup
+# neard logs ERROR-level advisories about host kernel network sysctls
+# (net.core.rmem_max etc.) that do not match its expectations — harmless, but
+# they spam the test console. near-workspaces only suppresses `near=error,...`
+# (not the `neard` target), so we opt out of its forced filter
+# (NEAR_ENABLE_SANDBOX_LOG=1) and add `neard=off` to silence them.
+env = { "NEAR_ENABLE_SANDBOX_LOG" = "1", "NEAR_SANDBOX_LOG" = "near=error,stats=error,network=error,neard=off" }
 args = [
     "test",
     "--workspace",

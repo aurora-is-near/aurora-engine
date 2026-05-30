@@ -130,7 +130,11 @@ fn bench_modexp_standalone() {
             .unwrap();
         let duration = start.elapsed().as_millis();
 
-        assert!(duration < 1000, "{path} failed to run in under 1 second");
+        // Wall-clock guard against a pathologically slow modexp (a naive impl on
+        // these inputs takes many seconds). Runs in ~15ms / ~630ms locally in
+        // release, but the bound must tolerate slower/containerized CI runners,
+        // so it is set generously (cf. the 8s bound of bench_memory_get_standalone).
+        assert!(duration < 3000, "{path} failed to run in under 3 seconds ({duration}ms)");
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting
