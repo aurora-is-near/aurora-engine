@@ -7,8 +7,9 @@ use alloc::format;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+// `#[no_mangle]` on a `#[panic_handler]` is rejected by rustc >= 1.93
+// ("cannot be used on internal language items"); the attribute is unnecessary.
 #[panic_handler]
-#[no_mangle]
 pub unsafe fn panic(_info: &::core::panic::PanicInfo) -> ! {
     core::arch::wasm32::unreachable();
 }

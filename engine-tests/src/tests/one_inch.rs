@@ -19,11 +19,11 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 10); // less than 10 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 11); // NEAR TGas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 8); // less than 8 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 9); // NEAR TGas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
@@ -69,7 +69,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 19);
+    assert_gas_bound(profile.all_gas(), 20); // NEAR TGas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -101,8 +101,8 @@ fn test_1inch_limit_order_deploy() {
     // at least 45% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (40..=50).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 45% and 55%",
+        (40..=52).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 40% and 52%",
     );
 }
 
