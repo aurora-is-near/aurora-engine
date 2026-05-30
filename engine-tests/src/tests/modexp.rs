@@ -134,7 +134,10 @@ fn bench_modexp_standalone() {
         // these inputs takes many seconds). Runs in ~15ms / ~630ms locally in
         // release, but the bound must tolerate slower/containerized CI runners,
         // so it is set generously (cf. the 8s bound of bench_memory_get_standalone).
-        assert!(duration < 3000, "{path} failed to run in under 3 seconds ({duration}ms)");
+        assert!(
+            duration < 3000,
+            "{path} failed to run in under 3 seconds ({duration}ms)"
+        );
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting
