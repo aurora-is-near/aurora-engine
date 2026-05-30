@@ -42,7 +42,7 @@ static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
         features: Some("integration-test,migration".to_owned()),
         // nearcore VM rejects wasm produced by rustc >= 1.87, so pin the
         // contract build to the older toolchain.
-        override_toolchain: Some("1.86".to_string()),
+        override_toolchain: Some("1.86.0".to_string()),
         ..Default::default()
     })
     .unwrap();

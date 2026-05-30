@@ -4,7 +4,7 @@ skip_core_tasks = true
 
 [env]
 CARGO = "cargo"
-ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
+ENGINE_CARGO_TARGET = "wasm32v1-none"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
@@ -186,7 +186,7 @@ echo "    Extra build args:     ${RELEASE} ${@}"
 category = "Post"
 command = "cp"
 args = [
-    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine.wasm",
+    "target/wasm32v1-none/${TARGET_DIR}/aurora_engine.wasm",
     "bin/${WASM_FILE}",
 ]
 
@@ -194,7 +194,7 @@ args = [
 category = "Post"
 command = "cp"
 args = [
-    "etc/xcc-router/target/wasm32-unknown-unknown/${TARGET_DIR}/xcc_router.wasm",
+    "etc/xcc-router/target/wasm32v1-none/${TARGET_DIR}/xcc_router.wasm",
     "bin/${XCC_ROUTER_WASM_FILE}",
 ]
 
@@ -281,12 +281,7 @@ run_task = "build-engine-flow"
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
-  # Rust 1.87 stabilised `bulk-memory` for `wasm32-unknown-unknown` and turned
-  # it on by default; rustc emits `memory.fill`/`memory.copy` even with
-  # `-C target-cpu=mvp` or `-C target-feature=-bulk-memory`. NEAR's `near_vm`
-  # (singlepass) cannot deserialise those opcodes, so we let wasm-opt's
-  # `--llvm-memory-copy-fill-lowering` pass rewrite them back to MVP-only loops.
-  wasm-opt --enable-bulk-memory --llvm-memory-copy-fill-lowering -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  wasm-opt -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
   filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''
