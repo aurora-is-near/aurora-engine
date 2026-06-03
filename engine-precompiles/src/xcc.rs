@@ -324,7 +324,6 @@ mod tests {
     use crate::prelude::sdk::types::near_account_to_evm_address;
     use crate::xcc::cross_contract_call;
     use aurora_engine_types::vec;
-    use rand::Rng;
 
     #[test]
     fn test_precompile_id() {
@@ -336,11 +335,9 @@ mod tests {
 
     #[test]
     fn test_transfer_from_encoding() {
-        let mut rng = rand::rng();
-
-        let from = rng.random::<[u8; 20]>().into();
-        let to = rng.random::<[u8; 20]>().into();
-        let amount = rng.random::<[u8; 32]>().into();
+        let from = rand::random::<[u8; 20]>().into();
+        let to = rand::random::<[u8; 20]>().into();
+        let amount = rand::random::<[u8; 32]>().into();
 
         #[allow(deprecated)]
         let transfer_from_function = ethabi::Function {

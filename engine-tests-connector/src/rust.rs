@@ -1,80 +1,22 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::Mutex;
-
-// See `engine-tests/src/utils/rust.rs` for the full rationale. Serializes
-// helper builds to avoid a race on the shared wasm-opt output file.
-static BUILD_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
-    build_contract_1_93(&manifest_path.as_ref().join("Cargo.toml"), None)
-}
+    let opts = cargo_near_build::BuildOpts {
+        no_locked: false,
+        no_abi: true,
+        no_embed_abi: true,
+        no_doc: true,
+        manifest_path: Some(
+            cargo_near_build::camino::Utf8PathBuf::from_path_buf(
+                manifest_path.as_ref().join("Cargo.toml"),
+            )
+            .unwrap(),
+        ),
+        skip_rust_version_check: true,
+        ..Default::default()
+    };
 
-/// Build a NEAR helper contract with the workspace toolchain (rust 1.93): bare
-/// `no_std` contracts use the MVP `wasm32v1-none` target (no bulk-memory →
-/// baseline gas); `near-sdk` contracts fall back to `wasm32-unknown-unknown`
-/// with bulk-memory lowered to MVP via `wasm-opt`.
-pub fn build_contract_1_93(manifest_path: &Path, features: Option<&str>) -> PathBuf {
-    let _guard = BUILD_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    let dir = std::fs::canonicalize(manifest_path.parent().unwrap())
-        .unwrap_or_else(|e| panic!("cannot canonicalize {manifest_path:?}: {e}"));
-
-    try_build(&dir, "wasm32v1-none", features, false)
-        .or_else(|| try_build(&dir, "wasm32-unknown-unknown", features, true))
-        .unwrap_or_else(|| panic!("contract build failed for {manifest_path:?}"))
-}
-
-fn try_build(dir: &Path, target: &str, features: Option<&str>, lower: bool) -> Option<PathBuf> {
-    let mut cmd = Command::new("cargo");
-    cmd.current_dir(dir)
-        .env_remove("CARGO_ENCODED_RUSTFLAGS")
-        .env("RUSTFLAGS", "-C link-arg=-s")
-        .args(["build", "--release", "--target", target]);
-    if let Some(f) = features {
-        cmd.args(["--features", f]);
-    }
-    if target == "wasm32v1-none" {
-        // wasm32v1-none is a probe: `near-sdk` contracts fail here (they pull
-        // `std`-only crates) before falling back to wasm32-unknown-unknown.
-        // Silence the thousands of expected `can't find crate for std` errors.
-        cmd.stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-    }
-    if !cmd.status().ok()?.success() {
-        return None;
-    }
-
-    let release_dir = dir.join(format!("target/{target}/release"));
-    let lowered = release_dir.join("contract-mvp.wasm");
-    let raw = std::fs::read_dir(&release_dir)
-        .ok()?
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.extension().is_some_and(|e| e == "wasm")
-                && !p
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.starts_with("contract-mvp"))
-        })
-        .max_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok())?;
-
-    let mut args = vec![
-        "--enable-sign-ext",
-        "--enable-nontrapping-float-to-int",
-        "-O4",
-    ];
-    if lower {
-        args.push("--enable-bulk-memory");
-        args.push("--llvm-memory-copy-fill-lowering");
-    }
-    args.extend([raw.to_str().unwrap(), "-o", lowered.to_str().unwrap()]);
-    Command::new("wasm-opt")
-        .args(&args)
-        .status()
-        .ok()?
-        .success()
-        .then_some(lowered)
+    cargo_near_build::build(opts)
+        .map(|a| a.path.into_std_path_buf())
+        .unwrap()
 }

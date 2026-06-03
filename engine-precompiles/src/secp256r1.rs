@@ -67,6 +67,7 @@ impl Secp256r1 {
         // 3. Signature Component Validation
         // Spec: "Both r and s MUST satisfy 0 < r < n and 0 < s < n"
         // `Signature::from_scalars` returns an Error if scalars are zero or >= group order (n).
+        #[allow(deprecated)]
         let signature = Signature::from_scalars(
             *p256::FieldBytes::from_slice(r_bytes),
             *p256::FieldBytes::from_slice(s_bytes),

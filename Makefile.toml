@@ -4,13 +4,7 @@ skip_core_tasks = true
 
 [env]
 CARGO = "cargo"
-# The engine is `no_std` and builds for the MVP `wasm32v1-none` target, which
-# emits no bulk-memory opcodes (near-vm singlepass cannot deserialize those).
-ENGINE_CARGO_TARGET = "wasm32v1-none"
-# The XCC router depends on `near-sdk`, which pulls `std`-only crates that do
-# NOT compile for `wasm32v1-none`. It must build for `wasm32-unknown-unknown`;
-# its bulk-memory opcodes are lowered to MVP by `wasm-opt` (see wasm-opt-common).
-XCC_ROUTER_CARGO_TARGET = "wasm32-unknown-unknown"
+CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
@@ -192,7 +186,7 @@ echo "    Extra build args:     ${RELEASE} ${@}"
 category = "Post"
 command = "cp"
 args = [
-    "target/wasm32v1-none/${TARGET_DIR}/aurora_engine.wasm",
+    "target/${CARGO_TARGET}/${TARGET_DIR}/aurora_engine.wasm",
     "bin/${WASM_FILE}",
 ]
 
@@ -200,7 +194,7 @@ args = [
 category = "Post"
 command = "cp"
 args = [
-    "etc/xcc-router/target/${XCC_ROUTER_CARGO_TARGET}/${TARGET_DIR}/xcc_router.wasm",
+    "etc/xcc-router/target/${CARGO_TARGET}/${TARGET_DIR}/xcc_router.wasm",
     "bin/${XCC_ROUTER_WASM_FILE}",
 ]
 
@@ -226,7 +220,7 @@ command = "${CARGO}"
 args = [
     "build",
     "--target",
-    "${ENGINE_CARGO_TARGET}",
+    "${CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
     "--no-default-features",
     "--features=${CARGO_FEATURES}",
@@ -260,7 +254,7 @@ category = "Build"
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 script = '''
 cd etc/xcc-router
-cargo build --target ${XCC_ROUTER_CARGO_TARGET} --release
+cargo build --target ${CARGO_TARGET} --release
 cd ../..
 '''
 
@@ -287,7 +281,7 @@ run_task = "build-engine-flow"
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
-  wasm-opt -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  wasm-opt -O4 --enable-bulk-memory bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
   filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''
@@ -298,18 +292,9 @@ category = "Build"
 run_task = "wasm-opt-common"
 
 [tasks.wasm-opt-xcc-router]
+env = { "CONTRACT_FILE" = "${XCC_ROUTER_WASM_FILE}" }
 category = "Build"
-script = '''
-  filesize_before=$(wc -c bin/${XCC_ROUTER_WASM_FILE} | awk '{print $1}')
-  # The XCC router is built for wasm32-unknown-unknown (near-sdk pulls std-only
-  # crates that do not compile for wasm32v1-none), so rustc >= 1.87 emits
-  # bulk-memory opcodes that near-vm singlepass cannot deserialize. near-vm
-  # accepts sign-extension and nontrapping-float-to-int, so enable those for
-  # wasm-opt validation and lower only bulk-memory (memory.copy/fill) to MVP loops.
-  wasm-opt -O4 --enable-sign-ext --enable-nontrapping-float-to-int --enable-bulk-memory --llvm-memory-copy-fill-lowering bin/${XCC_ROUTER_WASM_FILE} -o bin/${XCC_ROUTER_WASM_FILE} --strip-debug --vacuum
-  filesize_after=$(wc -c bin/${XCC_ROUTER_WASM_FILE} | awk '{print $1}')
-  echo "File size before: [$filesize_before] and after: [$filesize_after]"
-'''
+run_task = "wasm-opt-common"
 
 [tasks.build]
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
@@ -350,7 +335,7 @@ yarn test
 [tasks.test-workspace]
 category = "Test"
 command = "${CARGO}"
-dependencies = ["build-test", "clone-aurora-eth-connector"]
+dependencies = ["build-test"]
 # `*::workspace::*` tests spawn a neard sandbox (near-workspaces). On startup
 # neard logs ERROR-level advisories about host kernel network sysctls
 # (net.core.rmem_max etc.) that do not match its expectations — harmless, but
@@ -374,25 +359,6 @@ args = [
     "--",
     "--ignored",
 ]
-
-[tasks.clone-aurora-eth-connector]
-category = "Build"
-script = '''
-AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
-AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
-AURORA_ETH_CONNECTOR_REPO_NAME="aurora-eth-connector"
-AURORA_ETH_CONNECTOR_REPO="https://github.com/Near-One/$AURORA_ETH_CONNECTOR_REPO_NAME"
-if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
-  cd $AURORA_ETH_CONNECTOR_DIR
-  echo "Pull Aurora Eth-Connector repo"
-  git pull origin master
-else
-  mkdir $AURORA_ETH_CONNECTOR_ETC || true
-  cd $AURORA_ETH_CONNECTOR_ETC
-  echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
-  git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
-fi
-'''
 
 [tasks.test-flow]
 category = "Test"

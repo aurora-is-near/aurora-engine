@@ -1,7 +1,7 @@
 use aurora_engine::engine::EngineError;
 use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
@@ -26,12 +26,7 @@ fn bench_modexp() {
     let result = context.bench(&input);
     assert_eq!(
         result.least(),
-        // FIXME: Should be Aurora. The near-sdk bench helper is built for
-        // wasm32-unknown-unknown with bulk-memory lowered to MVP loops (rustc
-        // >= 1.87), penalising Aurora's memory-heavy mpnat by ~0.8% vs ibig.
-        // In production the engine is built for wasm32v1-none (no lowering),
-        // where Aurora stays least.
-        Implementation::IBig,
+        Implementation::Aurora,
         "Aurora not least:\n{result:?}"
     );
 
@@ -130,14 +125,7 @@ fn bench_modexp_standalone() {
             .unwrap();
         let duration = start.elapsed().as_millis();
 
-        // Wall-clock guard against a pathologically slow modexp (a naive impl on
-        // these inputs takes many seconds). Runs in ~15ms / ~630ms locally in
-        // release, but the bound must tolerate slower/containerized CI runners,
-        // so it is set generously (cf. the 8s bound of bench_memory_get_standalone).
-        assert!(
-            duration < 3000,
-            "{path} failed to run in under 3 seconds ({duration}ms)"
-        );
+        assert!(duration < 1000, "{path} failed to run in under 1 second");
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting

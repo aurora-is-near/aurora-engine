@@ -22,10 +22,6 @@ jobs:
       - name: Install dependencies
         run: scripts/ci-deps.sh
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install Rust 1.86 for the eth-connector contract
-        # The external aurora-eth-connector (near-plugins v0.4.1) does not compile
-        # under rustc >= 1.87, so it is built with 1.86 via cargo-near-build.
-        run: rustup toolchain install 1.86.0 --target wasm32-unknown-unknown --profile minimal
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
