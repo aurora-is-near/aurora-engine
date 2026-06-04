@@ -281,7 +281,7 @@ run_task = "build-engine-flow"
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
-  wasm-opt -O4 --enable-bulk-memory bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  wasm-opt -O4 --enable-bulk-memory --enable-nontrapping-float-to-int bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
   filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''
