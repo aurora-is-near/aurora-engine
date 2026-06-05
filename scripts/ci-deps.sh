@@ -1,10 +1,10 @@
 #!/bin/bash
 
 export DEBIAN_FRONTEND=noninteractive
-BINARYEN_VERSION=125
+BINARYEN_VERSION=130
 
 apt update
-apt install -y build-essential pkg-config libclang-dev libssl-dev gnupg curl git gpg
+apt install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
 
 
 if [[ ! -f wasm-opt ]]; then

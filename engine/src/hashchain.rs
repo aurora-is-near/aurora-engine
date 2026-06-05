@@ -87,10 +87,10 @@ where
 
 fn load_hashchain<I: IO>(io: &I, block_height: u64) -> Result<Option<Hashchain>, ContractError> {
     let mut maybe_hashchain = read_current_hashchain(io)?;
-    if let Some(hashchain) = maybe_hashchain.as_mut() {
-        if block_height > hashchain.get_current_block_height() {
-            hashchain.move_to_block(block_height)?;
-        }
+    if let Some(hashchain) = maybe_hashchain.as_mut()
+        && block_height > hashchain.get_current_block_height()
+    {
+        hashchain.move_to_block(block_height)?;
     }
     Ok(maybe_hashchain)
 }
