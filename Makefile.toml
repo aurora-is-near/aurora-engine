@@ -4,7 +4,7 @@ skip_core_tasks = true
 
 [env]
 CARGO = "cargo"
-ENGINE_CARGO_TARGET = "wasm32-unknown-unknown"
+CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
 RUSTC_FLAGS_BUILD = "-C link-arg=-s"
@@ -186,7 +186,7 @@ echo "    Extra build args:     ${RELEASE} ${@}"
 category = "Post"
 command = "cp"
 args = [
-    "target/wasm32-unknown-unknown/${TARGET_DIR}/aurora_engine.wasm",
+    "target/${CARGO_TARGET}/${TARGET_DIR}/aurora_engine.wasm",
     "bin/${WASM_FILE}",
 ]
 
@@ -194,7 +194,7 @@ args = [
 category = "Post"
 command = "cp"
 args = [
-    "etc/xcc-router/target/wasm32-unknown-unknown/${TARGET_DIR}/xcc_router.wasm",
+    "etc/xcc-router/target/${CARGO_TARGET}/${TARGET_DIR}/xcc_router.wasm",
     "bin/${XCC_ROUTER_WASM_FILE}",
 ]
 
@@ -220,7 +220,7 @@ command = "${CARGO}"
 args = [
     "build",
     "--target",
-    "${ENGINE_CARGO_TARGET}",
+    "${CARGO_TARGET}",
     "@@remove-empty(RELEASE)",
     "--no-default-features",
     "--features=${CARGO_FEATURES}",
@@ -254,7 +254,7 @@ category = "Build"
 env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 script = '''
 cd etc/xcc-router
-cargo build --target ${ENGINE_CARGO_TARGET} --release
+cargo build --target ${CARGO_TARGET} --release
 cd ../..
 '''
 
@@ -281,7 +281,7 @@ run_task = "build-engine-flow"
 category = "Build"
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
-  wasm-opt -O4 bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
+  wasm-opt -O4 --enable-bulk-memory --enable-nontrapping-float-to-int bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
   filesize_after=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   echo "File size before: [$filesize_before] and after: [$filesize_after]"
 '''
@@ -335,7 +335,14 @@ yarn test
 [tasks.test-workspace]
 category = "Test"
 command = "${CARGO}"
-dependencies = ["build-test", "clone-aurora-eth-connector"]
+dependencies = ["build-test"]
+# `*::workspace::*` tests spawn a neard sandbox (near-workspaces). On startup
+# neard logs ERROR-level advisories about host kernel network sysctls
+# (net.core.rmem_max etc.) that do not match its expectations — harmless, but
+# they spam the test console. near-workspaces only suppresses `near=error,...`
+# (not the `neard` target), so we opt out of its forced filter
+# (NEAR_ENABLE_SANDBOX_LOG=1) and add `neard=off` to silence them.
+env = { "NEAR_ENABLE_SANDBOX_LOG" = "1", "NEAR_SANDBOX_LOG" = "near=error,stats=error,network=error,neard=off" }
 args = [
     "test",
     "--workspace",
@@ -352,25 +359,6 @@ args = [
     "--",
     "--ignored",
 ]
-
-[tasks.clone-aurora-eth-connector]
-category = "Build"
-script = '''
-AURORA_ETH_CONNECTOR_DIR="engine-tests-connector/etc/aurora-eth-connector/"
-AURORA_ETH_CONNECTOR_ETC="engine-tests-connector/etc/"
-AURORA_ETH_CONNECTOR_REPO_NAME="aurora-eth-connector"
-AURORA_ETH_CONNECTOR_REPO="https://github.com/Near-One/$AURORA_ETH_CONNECTOR_REPO_NAME"
-if [ -d $AURORA_ETH_CONNECTOR_DIR ]; then
-  cd $AURORA_ETH_CONNECTOR_DIR
-  echo "Pull Aurora Eth-Connector repo"
-  git pull origin master
-else
-  mkdir $AURORA_ETH_CONNECTOR_ETC || true
-  cd $AURORA_ETH_CONNECTOR_ETC
-  echo "Clone Aurora Eth-Connector repo: "$AURORA_ETH_CONNECTOR_REPO
-  git clone --depth 1 $AURORA_ETH_CONNECTOR_REPO
-fi
-'''
 
 [tasks.test-flow]
 category = "Test"

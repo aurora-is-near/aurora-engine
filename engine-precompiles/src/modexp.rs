@@ -162,10 +162,10 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Byzantium, M> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input);
@@ -214,10 +214,10 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Berlin, M> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input);
@@ -297,10 +297,10 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
 
         let cost = Self::required_gas(input)?;
 
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input);

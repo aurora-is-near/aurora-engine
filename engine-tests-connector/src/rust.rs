@@ -12,6 +12,7 @@ pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
             )
             .unwrap(),
         ),
+        skip_rust_version_check: true,
         ..Default::default()
     };
 
