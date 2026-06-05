@@ -122,7 +122,7 @@ impl Tester {
         let output = ethabi::decode(output_type, &output_bytes).unwrap();
 
         match &output[..] {
-            [ethabi::Token::String(string)] => string.to_string(),
+            [ethabi::Token::String(string)] => string.clone(),
             _ => unreachable!(),
         }
     }

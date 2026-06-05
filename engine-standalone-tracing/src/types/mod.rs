@@ -41,14 +41,14 @@ pub struct LogMemory(Vec<[u8; 32]>);
 impl LogMemory {
     /// Returns the number of elements in the memory buffer.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no elements in the memory buffer.
     #[allow(dead_code)]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
@@ -83,14 +83,14 @@ pub struct LogStack(Vec<[u8; 32]>);
 impl LogStack {
     /// Returns the number of elements in the stack buffer.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no elements in the stack buffer.
     #[allow(dead_code)]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
@@ -217,14 +217,14 @@ impl Logs {
     /// Returns the number of logs.
     #[allow(dead_code)]
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if there are no logs.
     #[allow(dead_code)]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }
@@ -280,7 +280,7 @@ impl TransactionTrace {
 
     /// Returns the output bytes of the transaction as a slice.
     #[must_use]
-    pub fn result(&self) -> &[u8] {
+    pub const fn result(&self) -> &[u8] {
         self.return_value.as_slice()
     }
 

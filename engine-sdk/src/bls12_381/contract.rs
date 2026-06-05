@@ -82,7 +82,8 @@ pub fn g1_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g1_input[2 + 3 * FP_LENGTH..2 + 4 * FP_LENGTH].copy_from_slice(p1_y);
     }
 
-    let output = exports::bls12381_p1_sum(&g1_input[..]);
+    let output =
+        exports::bls12381_p1_sum(&g1_input[..]).map_err(|_| Bls12381Error::ElementNotInG1)?;
     Ok(padding_g1_result(&output))
 }
 
@@ -112,7 +113,8 @@ pub fn g1_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g1_input[g1_range].reverse();
     }
 
-    let output = exports::bls12381_g1_multiexp(&g1_input[..]);
+    let output =
+        exports::bls12381_g1_multiexp(&g1_input[..]).map_err(|_| Bls12381Error::ElementNotInG1)?;
     Ok(padding_g1_result(&output))
 }
 
@@ -138,7 +140,8 @@ pub fn g2_add(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g2_input[2 + 6 * FP_LENGTH..2 + 8 * FP_LENGTH].copy_from_slice(&p1_y);
     }
 
-    let output = exports::bls12381_p2_sum(&g2_input[..]);
+    let output =
+        exports::bls12381_p2_sum(&g2_input[..]).map_err(|_| Bls12381Error::ElementNotInG2)?;
     Ok(padding_g2_result(&output))
 }
 
@@ -169,13 +172,15 @@ pub fn g2_msm(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
         g2_input[g2_range].reverse();
     }
 
-    let output = exports::bls12381_g2_multiexp(&g2_input[..]);
+    let output =
+        exports::bls12381_g2_multiexp(&g2_input[..]).map_err(|_| Bls12381Error::ElementNotInG2)?;
     Ok(padding_g2_result(&output))
 }
 
 pub fn map_fp_to_g1(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     let p = remove_padding(input)?;
-    let output = exports::bls12381_map_fp_to_g1(&p[..]);
+    let output =
+        exports::bls12381_map_fp_to_g1(&p[..]).map_err(|_| Bls12381Error::InvalidFpValue)?;
     Ok(padding_g1_result(&output))
 }
 
@@ -186,7 +191,8 @@ pub fn map_fp2_to_g2(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     p[..FP_LENGTH].copy_from_slice(p2);
     p[FP_LENGTH..].copy_from_slice(p1);
 
-    let output = exports::bls12381_map_fp2_to_g2(&p[..]);
+    let output =
+        exports::bls12381_map_fp2_to_g2(&p[..]).map_err(|_| Bls12381Error::InvalidFpValue)?;
     Ok(padding_g2_result(&output))
 }
 
@@ -223,12 +229,19 @@ pub fn pairing_check(input: &[u8]) -> Result<Vec<u8>, Bls12381Error> {
     }
 
     let output = exports::bls12381_pairing_check(&g_input[..]);
-    let output = if output == 2 {
-        vec![0; 32]
-    } else {
-        let mut res = vec![0; 31];
-        res.push(1);
-        res
+    // NEAR bls12381_pairing_check returns:
+    // 0 = pairing product equals identity (check passed)
+    // 2 = pairing product not equal to identity (check failed)
+    // 1 = error (invalid input)
+    let output = match output {
+        0 => {
+            let mut res = vec![0; 31];
+            res.push(1);
+            res
+        }
+        2 => vec![0; 32],
+        _ => return Err(Bls12381Error::InvalidFpValue),
     };
+
     Ok(output)
 }
