@@ -115,7 +115,7 @@ fn test_alt_bn128_mul() {
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        10400, // 10.400 TGas - +/- 100 GGas
+        10380, // 10.380 GGas
     );
 }
 

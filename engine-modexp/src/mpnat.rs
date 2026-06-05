@@ -185,12 +185,12 @@ impl MPNat {
                 tmp
             };
 
-            if let Some(max_output_digits) = self.digits.len().checked_mul(exp_as_number) {
-                if modulus.digits.len() > max_output_digits {
-                    // Special case: modulus is larger than `base ^ exp`, so division is not relevant
-                    let mut scratch_space = vec![0; max_output_digits];
-                    return big_wrapping_pow(self, exp, &mut scratch_space);
-                }
+            if let Some(max_output_digits) = self.digits.len().checked_mul(exp_as_number)
+                && modulus.digits.len() > max_output_digits
+            {
+                // Special case: modulus is larger than `base ^ exp`, so division is not relevant
+                let mut scratch_space = vec![0; max_output_digits];
+                return big_wrapping_pow(self, exp, &mut scratch_space);
             }
         }
 

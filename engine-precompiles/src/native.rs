@@ -403,10 +403,10 @@ impl<I: IO> Precompile for ExitToNear<I> {
         //  - `:unwrap` suffix in a case of wNEAR (7 bytes)
         let required_gas = Self::required_gas(input)?;
 
-        if let Some(target_gas) = target_gas {
-            if required_gas > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && required_gas > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         // It's not allowed to call exit precompiles in static mode
@@ -865,10 +865,10 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
         let required_gas = Self::required_gas(input)?;
 
-        if let Some(target_gas) = target_gas {
-            if required_gas > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && required_gas > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         // It's not allowed to call exit precompiles in static mode
