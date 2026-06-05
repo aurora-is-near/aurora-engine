@@ -8,7 +8,6 @@ use alloc::format;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[panic_handler]
-#[no_mangle]
 pub unsafe fn panic(_info: &::core::panic::PanicInfo) -> ! {
     core::arch::wasm32::unreachable();
 }

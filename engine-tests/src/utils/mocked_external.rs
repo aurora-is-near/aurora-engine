@@ -4,7 +4,7 @@ use near_primitives_core::types::GasWeight;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::{
     AccountId, ActionIndex, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier,
-    ReceiptIndex,
+    NonceIndex, ReceiptIndex,
 };
 use near_vm_runner::logic::{StorageAccessTracker, VMLogicError};
 use std::cell::Cell;
@@ -131,20 +131,13 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         self.underlying.submit_promise_resume_data(data_id, data)
     }
 
-    fn append_action_create_account(
-        &mut self,
-        receipt_index: ReceiptIndex,
-    ) -> Result<(), VMLogicError> {
-        self.underlying.append_action_create_account(receipt_index)
+    fn append_action_create_account(&mut self, receipt_index: ReceiptIndex) {
+        self.underlying.append_action_create_account(receipt_index);
     }
 
-    fn append_action_deploy_contract(
-        &mut self,
-        receipt_index: ReceiptIndex,
-        code: Vec<u8>,
-    ) -> Result<(), VMLogicError> {
+    fn append_action_deploy_contract(&mut self, receipt_index: ReceiptIndex, code: Vec<u8>) {
         self.underlying
-            .append_action_deploy_contract(receipt_index, code)
+            .append_action_deploy_contract(receipt_index, code);
     }
 
     fn append_action_deploy_global_contract(
@@ -152,18 +145,18 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         receipt_index: ReceiptIndex,
         code: Vec<u8>,
         mode: GlobalContractDeployMode,
-    ) -> Result<(), VMLogicError> {
+    ) {
         self.underlying
-            .append_action_deploy_global_contract(receipt_index, code, mode)
+            .append_action_deploy_global_contract(receipt_index, code, mode);
     }
 
     fn append_action_use_global_contract(
         &mut self,
         receipt_index: ReceiptIndex,
         contract_id: GlobalContractIdentifier,
-    ) -> Result<(), VMLogicError> {
+    ) {
         self.underlying
-            .append_action_use_global_contract(receipt_index, contract_id)
+            .append_action_use_global_contract(receipt_index, contract_id);
     }
 
     fn append_action_deterministic_state_init(
@@ -171,7 +164,7 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         receipt_index: ReceiptIndex,
         contract_id: GlobalContractIdentifier,
         amount: Balance,
-    ) -> Result<ActionIndex, VMLogicError> {
+    ) -> ActionIndex {
         self.underlying
             .append_action_deterministic_state_init(receipt_index, contract_id, amount)
     }
@@ -210,13 +203,52 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         )
     }
 
-    fn append_action_transfer(
+    fn append_action_transfer(&mut self, receipt_index: ReceiptIndex, deposit: Balance) {
+        self.underlying
+            .append_action_transfer(receipt_index, deposit);
+    }
+
+    fn append_action_transfer_to_gas_key(
         &mut self,
         receipt_index: ReceiptIndex,
-        amount: Balance,
+        public_key: PublicKey,
+        deposit: Balance,
+    ) {
+        self.underlying
+            .append_action_transfer_to_gas_key(receipt_index, public_key, deposit);
+    }
+
+    fn append_action_add_gas_key_with_full_access(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        num_nonces: NonceIndex,
+    ) {
+        self.underlying.append_action_add_gas_key_with_full_access(
+            receipt_index,
+            public_key,
+            num_nonces,
+        );
+    }
+
+    fn append_action_add_gas_key_with_function_call(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        public_key: PublicKey,
+        num_nonces: NonceIndex,
+        allowance: Option<Balance>,
+        receiver_id: AccountId,
+        method_names: Vec<Vec<u8>>,
     ) -> Result<(), VMLogicError> {
         self.underlying
-            .append_action_transfer(receipt_index, amount)
+            .append_action_add_gas_key_with_function_call(
+                receipt_index,
+                public_key,
+                num_nonces,
+                allowance,
+                receiver_id,
+                method_names,
+            )
     }
 
     fn append_action_stake(
@@ -267,9 +299,9 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         &mut self,
         receipt_index: ReceiptIndex,
         beneficiary_id: AccountId,
-    ) -> Result<(), VMLogicError> {
+    ) {
         self.underlying
-            .append_action_delete_account(receipt_index, beneficiary_id)
+            .append_action_delete_account(receipt_index, beneficiary_id);
     }
 
     fn get_receipt_receiver(&self, receipt_index: ReceiptIndex) -> &AccountId {

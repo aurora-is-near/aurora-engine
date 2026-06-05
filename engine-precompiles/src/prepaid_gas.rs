@@ -43,10 +43,10 @@ impl<E: Env> Precompile for PrepaidGas<'_, E> {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let prepaid_gas = self.env.prepaid_gas();

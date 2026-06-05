@@ -9,7 +9,7 @@ use aurora_engine_types::parameters::silo::{
 };
 use aurora_engine_types::types::EthGas;
 use libsecp256k1::SecretKey;
-use rand::{Rng, RngCore, rngs::ThreadRng};
+use rand::{Rng, rngs::ThreadRng};
 use std::fmt::Debug;
 
 use crate::{
@@ -708,7 +708,7 @@ fn test_deploy_access_rights() {
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
         let mut rng = rand::rng();
-        let len = rng.random_range(512..=1024);
+        let len = rand::random_range(512..=1024);
         let mut buf = vec![0u8; len];
         rng.fill_bytes(&mut buf);
         buf
@@ -766,7 +766,7 @@ fn test_deploy_with_disabled_whitelist() {
     let sender = utils::address_from_secret_key(&signer.secret_key);
     let code: Vec<u8> = {
         let mut rng = rand::rng();
-        let len = rng.random_range(512..=1024);
+        let len = rand::random_range(512..=1024);
         let mut buf = vec![0u8; len];
         rng.fill_bytes(&mut buf);
         buf

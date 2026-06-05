@@ -815,10 +815,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Address::from_array(address_bytes)
         };
 
-        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
-            if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
-                recipient = fallback_address;
-            }
+        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io)
+            && !silo::is_allow_receive_erc20_tokens(&self.io, &recipient)
+        {
+            recipient = fallback_address;
         }
 
         let erc20_token = get_erc20_from_nep141(&self.io, token)?;
@@ -1052,10 +1052,10 @@ pub fn submit_with_alt_modexp<
     assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
-    if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
-            return Err(EngineErrorKind::InvalidChainId.into());
-        }
+    if let Some(chain_id) = transaction.chain_id
+        && U256::from(chain_id) != U256::from_big_endian(&state.chain_id)
+    {
+        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     sdk::log!("signer_address {:?}", sender);
@@ -1894,15 +1894,14 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns basic account information.
     fn basic(&self, address: H160) -> Basic {
         let address = Address::new(address);
-        let result = self
-            .account_info_cache
+
+        self.account_info_cache
             .borrow_mut()
             .get_or_insert_with(address, || Basic {
                 nonce: get_nonce(&self.io, &address),
                 balance: get_balance(&self.io, &address).raw(),
             })
-            .clone();
-        result
+            .clone()
     }
 
     /// Returns the code of the contract from an address.
@@ -1922,13 +1921,13 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        let result = *self
+
+        *self
             .contract_storage_cache
             .borrow_mut()
             .get_or_insert_with((address, index), || {
                 get_storage(&self.io, &address, &index, generation)
-            });
-        result
+            })
     }
 
     /// Check if the storage of the address is empty.

@@ -341,7 +341,7 @@ where
 }
 
 /// Read the current wasm bytecode for the router contracts
-pub fn get_router_code<I: IO>(io: &I) -> RouterCode {
+pub fn get_router_code<I: IO>(io: &I) -> RouterCode<'_> {
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, CODE_KEY);
     let bytes = io.read_storage(&key).expect(ERR_NO_ROUTER_CODE).to_vec();
     RouterCode::new(bytes)

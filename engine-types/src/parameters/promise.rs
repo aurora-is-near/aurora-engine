@@ -103,12 +103,12 @@ impl SimpleNearPromise {
 pub enum NearPromise {
     Simple(SimpleNearPromise),
     Then {
-        base: Box<NearPromise>,
+        base: Box<Self>,
         // Near doesn't allow arbitrary promises in the callback,
         // only simple calls to contracts or batches of actions.
         callback: SimpleNearPromise,
     },
-    And(Vec<NearPromise>),
+    And(Vec<Self>),
 }
 
 impl NearPromise {

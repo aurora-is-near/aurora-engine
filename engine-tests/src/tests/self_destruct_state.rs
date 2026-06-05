@@ -6,7 +6,7 @@ use crate::utils::solidity::self_destruct::{
 /// Check that account state should be properly removed after calling selfdestruct
 #[test]
 // For CANCUN hard fork SELFDESCTRUCT disabled
-#[ignore]
+#[ignore = "SELFDESTRUCT disabled since the Cancun hard fork"]
 fn test_self_destruct_reset_state() {
     let mut signer = utils::Signer::random();
     let mut runner = utils::deploy_runner();

@@ -60,15 +60,15 @@ impl Precompile for BlsG2Msm {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let input_len = input.len();
-        if input_len == 0 || input_len % G2_MUL_INPUT_LENGTH != 0 {
+        if input_len == 0 || !input_len.is_multiple_of(G2_MUL_INPUT_LENGTH) {
             return Err(ExitError::Other(Borrowed("ERR_BLS_G2MSM_INPUT_LEN")));
         }
 
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::execute(input)?;

@@ -1,7 +1,7 @@
 use aurora_engine::engine::EngineError;
 use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
@@ -86,7 +86,7 @@ fn bench_modexp() {
 // This test is marked as ignored because it should only be run with `--release`
 // specified (it requires the standalone engine to be compiled with an optimized build).
 // This test can be run with the command: `cargo make bench-modexp`
-#[ignore]
+#[ignore = "benchmark; run with `cargo make bench-modexp` (requires --release)"]
 #[test]
 fn bench_modexp_standalone() {
     const GAS_LIMIT: u64 = 30_000_000;

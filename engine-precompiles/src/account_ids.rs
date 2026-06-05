@@ -50,10 +50,10 @@ impl<E: Env> Precompile for PredecessorAccount<'_, E> {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let predecessor_account_id = self.env.predecessor_account_id();
@@ -95,10 +95,10 @@ impl Precompile for CurrentAccount {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         Ok(PrecompileOutput::without_logs(

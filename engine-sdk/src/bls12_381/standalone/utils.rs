@@ -47,7 +47,7 @@ pub fn fp_from_bendian(input: &[u8; 48]) -> Result<blst_fp, Bls12381Error> {
     // SAFETY: input has a fixed length, and fp is a blst value.
     unsafe {
         // This performs the check for canonical field elements
-        blst_fp_from_bendian(&mut fp, input.as_ptr());
+        blst_fp_from_bendian(&raw mut fp, input.as_ptr());
     }
     Ok(fp)
 }
@@ -74,7 +74,7 @@ pub fn extract_scalar_input(input: &[u8]) -> Result<blst_scalar, Bls12381Error> 
         //
         // * The corresponding integer is not required to be less than or equal than main subgroup
         // order `q`.
-        blst_scalar_from_bendian(&mut out, input.as_ptr());
+        blst_scalar_from_bendian(&raw mut out, input.as_ptr());
     };
 
     Ok(out)

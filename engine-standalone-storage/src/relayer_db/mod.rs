@@ -214,7 +214,7 @@ mod test {
     /// The postgres DB can be started in Docker using the following command:
     /// docker run --name mainnet_database -p '127.0.0.1:15432:5432' -v $PATH_TO_DB:/var/lib/postgresql/data auroraisnear/relayer-database:latest
     #[test]
-    #[ignore]
+    #[ignore = "requires a running Postgres relayer DB; see comment above"]
     fn test_fill_db() {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
         let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();

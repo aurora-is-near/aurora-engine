@@ -15,7 +15,7 @@ pub enum DiffValue {
 
 impl DiffValue {
     #[must_use]
-    pub fn value(&self) -> Option<&[u8]> {
+    pub const fn value(&self) -> Option<&[u8]> {
         match self {
             Self::Deleted => None,
             Self::Modified(new_value) => Some(new_value.as_slice()),
@@ -68,7 +68,7 @@ impl Diff {
         self.0.remove(key)
     }
 
-    pub fn iter(&self) -> btree_map::Iter<Vec<u8>, DiffValue> {
+    pub fn iter(&self) -> btree_map::Iter<'_, Vec<u8>, DiffValue> {
         self.0.iter()
     }
 

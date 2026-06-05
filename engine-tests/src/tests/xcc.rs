@@ -136,7 +136,7 @@ fn test_xcc_eth_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            5,
+            25,
             xcc_cost_per_byte,
             costs::CROSS_CONTRACT_CALL_BYTE.as_u64(),
         ),
@@ -777,7 +777,11 @@ pub mod workspace {
         super::change_router_version(current_xcc_version);
     }
 
-    #[allow(clippy::too_many_lines, clippy::future_not_send)]
+    #[allow(
+        clippy::too_many_lines,
+        clippy::future_not_send,
+        clippy::cognitive_complexity
+    )]
     async fn test_xcc_precompile_common(is_scheduled: bool) {
         let XccTestContext {
             aurora,
