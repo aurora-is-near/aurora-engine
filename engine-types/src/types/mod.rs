@@ -83,7 +83,7 @@ pub enum PromiseResult {
 
 impl PromiseResult {
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         match self {
             Self::Failed | Self::NotReady => 1,
             Self::Successful(bytes) => bytes.len(),

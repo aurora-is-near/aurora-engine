@@ -33,7 +33,7 @@ engine-standalone-storage.workspace = true
 engine-standalone-tracing.workspace = true
 ethabi = { workspace = true, features = ["full-serde"] }
 aurora-evm = { workspace = true, features = ["std", "tracing"] }
-git2.workspace = true
+git2 = { workspace = true, features = ["https"] }
 hex.workspace = true
 libsecp256k1.workspace = true
 near-crypto.workspace = true
@@ -43,6 +43,7 @@ near-primitives.workspace = true
 near-sdk = { workspace = true, features = ["non-contract-usage"] }
 near-vm-runner.workspace = true
 rand.workspace = true
+reqwest.workspace = true
 rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -50,6 +51,7 @@ sha3.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 walrus.workspace = true
+zip.workspace = true
 
 [lints]
 workspace = true
