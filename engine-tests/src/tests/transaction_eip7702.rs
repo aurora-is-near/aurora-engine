@@ -133,7 +133,7 @@ fn test_eip_7702_success() {
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(4_6)); // 4.6 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(45)); // 45 GGas
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions
@@ -532,7 +532,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(38)); // 3.8 Tgas
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(36)); // 36 GGas
 }
 
 /// Multi-auth happy path: 3 distinct authorities each delegate to `CONTRACT_ADDRESS`
@@ -595,7 +595,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 118_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(65));
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(63));
 }
 
 /// Same authority twice with same nonce: first auth applies and increments nonce,
@@ -644,7 +644,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     assert_eq!(runner.get_nonce(authority_addr), 1.into());
 
     assert_eq!(result.gas_used, 93_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(50));
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(49));
 }
 
 /// Authority pre-funded with non-delegated contract code: check skips the auth,
@@ -701,7 +701,7 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 68_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(42));
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(40));
 }
 
 /// Re-delegation: authority already points to `target_B`; a second tx swaps the
@@ -778,7 +778,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
     assert_eq!(runner.get_nonce(authority_addr), 2.into());
 
     assert_eq!(result2.gas_used, 38_645);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(46));
+    assert_eq!(round_near_gas(near_gas_used), near_ggas(45));
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an
