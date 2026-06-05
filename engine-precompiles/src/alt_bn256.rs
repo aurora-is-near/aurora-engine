@@ -75,10 +75,10 @@ impl Precompile for Bn256Add<Byzantium> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input, context)?;
@@ -104,10 +104,10 @@ impl Precompile for Bn256Add<Istanbul> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
         let output = Self::run_inner(input, context)?;
         Ok(PrecompileOutput::without_logs(cost, output))
@@ -152,10 +152,10 @@ impl Precompile for Bn256Mul<Byzantium> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input, context)?;
@@ -180,10 +180,10 @@ impl Precompile for Bn256Mul<Istanbul> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input, context)?;
@@ -242,10 +242,10 @@ impl Precompile for Bn256Pair<Byzantium> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input, context)?;
@@ -277,10 +277,10 @@ impl Precompile for Bn256Pair<Istanbul> {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::run_inner(input, context)?;

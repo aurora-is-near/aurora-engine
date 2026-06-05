@@ -11,18 +11,18 @@ const G2_OUTPUT_LENGTH: usize = 256;
 /// Encodes a G2 point in affine format into byte slice with padded elements.
 pub fn encode_g2_point(input: &blst_p2_affine) -> Vec<u8> {
     let mut out = vec![0u8; G2_OUTPUT_LENGTH];
-    fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &input.x.fp[0]);
+    fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &raw const input.x.fp[0]);
     fp_to_bytes(
         &mut out[PADDED_FP_LENGTH..2 * PADDED_FP_LENGTH],
-        &input.x.fp[1],
+        &raw const input.x.fp[1],
     );
     fp_to_bytes(
         &mut out[2 * PADDED_FP_LENGTH..3 * PADDED_FP_LENGTH],
-        &input.y.fp[0],
+        &raw const input.y.fp[0],
     );
     fp_to_bytes(
         &mut out[3 * PADDED_FP_LENGTH..4 * PADDED_FP_LENGTH],
-        &input.y.fp[1],
+        &raw const input.y.fp[1],
     );
     out
 }
@@ -84,7 +84,7 @@ pub fn extract_g2_input(
         //
         // As endomorphism acceleration requires input on the correct subgroup, implementers MAY
         // use endomorphism acceleration.
-        if unsafe { !blst_p2_affine_in_g2(&out) } {
+        if unsafe { !blst_p2_affine_in_g2(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG2);
         }
     } else {
@@ -100,7 +100,7 @@ pub fn extract_g2_input(
         // the subgroup check.
         //
         // SAFETY: out is a blst value.
-        if unsafe { !blst_p2_affine_on_curve(&out) } {
+        if unsafe { !blst_p2_affine_on_curve(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG2);
         }
     }

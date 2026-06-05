@@ -423,6 +423,7 @@ pub mod errors {
     pub const ERR_REVERT: &[u8] = b"ERR_REVERT";
     pub const ERR_NOT_ALLOWED: &[u8] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUND: &[u8] = b"ERR_OUT_OF_FUND";
+    pub const ERR_MAX_FEE_PER_GAS_LESS_THAN_BASE_FEE: &[u8] = b"ERR_MAX_FEE_LESS_BASE_FEE";
     pub const ERR_CALL_TOO_DEEP: &[u8] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8] = b"ERR_OUT_OF_GAS";

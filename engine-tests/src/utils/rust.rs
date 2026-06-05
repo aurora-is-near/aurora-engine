@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
     let opts = cargo_near_build::BuildOpts {
-        no_locked: true,
+        no_locked: false,
         no_abi: true,
         no_embed_abi: true,
         no_doc: true,
@@ -12,6 +12,7 @@ pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
             )
             .unwrap(),
         ),
+        skip_rust_version_check: true,
         ..Default::default()
     };
 

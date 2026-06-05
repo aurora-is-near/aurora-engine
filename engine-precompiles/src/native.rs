@@ -401,10 +401,12 @@ impl<I: IO> Precompile for ExitToNear<I> {
         //  - amount (32 bytes)
         //  - recipient_account_id (max MAX_INPUT_SIZE - 1 - (20) - 32 bytes)
         //  - `:unwrap` suffix in a case of wNEAR (7 bytes)
-        if let Some(target_gas) = target_gas {
-            if Self::required_gas(input)? > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        let required_gas = Self::required_gas(input)?;
+
+        if let Some(target_gas) = target_gas
+            && required_gas > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         // It's not allowed to call exit precompiles in static mode
@@ -423,7 +425,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 // Input slice format:
                 //  recipient_account_id (bytes) - the NEAR recipient account which will receive
                 //  NEP-141 (base) tokens, or also can contain the `:unwrap` suffix in case of
-                //  withdrawing wNEAR, or other message of JSON in case of OMNI, or address of
+                //  withdrawing wNEAR, or another message of JSON in case of OMNI, or address of
                 //  receiver in case of transfer tokens to another engine contract.
                 ExitToNearParams::BaseToken(ref exit_params) => {
                     let eth_connector_account_id = self.get_eth_connector_contract_account()?;
@@ -437,7 +439,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
                 //  amount (U256 big-endian bytes) - the amount that was burned
                 //  recipient_account_id (bytes) - the NEAR recipient account which will receive
                 //  NEP-141 tokens, or also can contain the `:unwrap` suffix in case of withdrawing
-                //  wNEAR, or other message of JSON in case of OMNI, or address of receiver in case
+                //  wNEAR, or another message of JSON in case of OMNI, or address of receiver in case
                 //  of transfer tokens to another engine contract.
                 ExitToNearParams::Erc20TokenParams(ref exit_params) => {
                     exit_erc20_token_to_near(context, exit_params, &self.io)?
@@ -493,7 +495,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            cost: Self::required_gas(input)?,
+            cost: required_gas,
             output: Vec::new(),
         })
     }
@@ -860,10 +862,13 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
         //  - amount (32 bytes)
         //  - eth_recipient (20 bytes)
         validate_input_size(input, 21, 53)?;
-        if let Some(target_gas) = target_gas {
-            if Self::required_gas(input)? > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+
+        let required_gas = Self::required_gas(input)?;
+
+        if let Some(target_gas) = target_gas
+            && required_gas > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         // It's not allowed to call exit precompiles in static mode
@@ -873,7 +878,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
             return Err(ExitError::Other(Cow::from("ERR_INVALID_IN_DELEGATE")));
         }
 
-        // First byte of the input is a flag, selecting the behavior to be triggered:
+        // The first byte of the input is a flag, selecting the behavior to be triggered:
         //  0x00 -> ETH (Base token) token transfer
         //  0x01 -> ERC-20 transfer
         let mut input = input;
@@ -992,7 +997,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
 
         Ok(PrecompileOutput {
             logs: vec![promise_log, exit_event_log],
-            cost: Self::required_gas(input)?,
+            cost: required_gas,
             output: Vec::new(),
         })
     }

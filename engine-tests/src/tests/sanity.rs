@@ -4,7 +4,7 @@ use aurora_engine_sdk as sdk;
 use aurora_engine_types::H160;
 use aurora_engine_types::borsh::BorshDeserialize;
 use near_vm_runner::ContractCode;
-use rand::RngCore;
+use rand::Rng;
 use std::path::{Path, PathBuf};
 
 use crate::prelude::{Address, U256};
@@ -16,7 +16,7 @@ const INITIAL_NONCE: u64 = 0;
 const TRANSFER_AMOUNT: Wei = Wei::new_u64(123);
 const GAS_PRICE: u64 = 10;
 
-#[ignore]
+#[ignore = "benchmark; allocates large amounts of memory, run with --ignored locally"]
 #[test]
 fn bench_memory_get_standalone() {
     let (mut runner, mut signer, _) = initialize_transfer();
@@ -282,8 +282,8 @@ fn test_deploy_largest_contract() {
         result.gas_used,
     );
 
-    // Less than 10 NEAR Tgas
-    utils::assert_gas_bound(profile.all_gas(), 10);
+    // Less than 8 NEAR TGas
+    utils::assert_gas_bound(profile.all_gas(), 8);
 }
 
 #[test]
