@@ -433,7 +433,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
     }
 
     // Validate input length
-    if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
+    if !input_bytes.len().is_multiple_of(PAIR_ELEMENT_LEN) {
         return Err(Bn254Error::InvalidPairLength);
     }
 
@@ -475,7 +475,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
     }
 
     // Validate input length
-    if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
+    if !input_bytes.len().is_multiple_of(PAIR_ELEMENT_LEN) {
         return Err(Bn254Error::InvalidPairLength);
     }
 

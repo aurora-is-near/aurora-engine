@@ -239,6 +239,8 @@ pub enum GasPaymentError {
     EthAmountOverflow,
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
+    /// `max_fee_per_gas` is less than `base_fee_per_gas`
+    MaxFeePerGasLessThanBaseFee,
 }
 
 impl AsRef<[u8]> for GasPaymentError {
@@ -247,6 +249,7 @@ impl AsRef<[u8]> for GasPaymentError {
             Self::BalanceOverflow(overflow) => overflow.as_ref(),
             Self::EthAmountOverflow => errors::ERR_GAS_ETH_AMOUNT_OVERFLOW,
             Self::OutOfFund => errors::ERR_OUT_OF_FUND,
+            Self::MaxFeePerGasLessThanBaseFee => errors::ERR_MAX_FEE_PER_GAS_LESS_THAN_BASE_FEE,
         }
     }
 }
@@ -469,17 +472,25 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         max_gas_price: Option<U256>,
         fixed_gas: Option<EthGas>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() && fixed_gas.is_none() {
+        let block_base_fee_per_gas = self.block_base_fee_per_gas();
+        if transaction.max_fee_per_gas.is_zero()
+            && fixed_gas.is_none()
+            && block_base_fee_per_gas.is_zero()
+        {
             return Ok(GasPaymentResult::default());
+        }
+
+        if transaction.max_fee_per_gas < block_base_fee_per_gas {
+            return Err(GasPaymentError::MaxFeePerGasLessThanBaseFee);
         }
 
         let priority_fee_per_gas = transaction
             .max_priority_fee_per_gas
-            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+            .min(transaction.max_fee_per_gas - block_base_fee_per_gas);
         let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
             price.min(priority_fee_per_gas)
         });
-        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
+        let effective_gas_price = priority_fee_per_gas + block_base_fee_per_gas;
         // First, we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
         // less than the `gas_limit`. It allows avoiding refunding unused gas to the sender later.
         let prepaid_amount = fixed_gas
@@ -804,10 +815,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Address::from_array(address_bytes)
         };
 
-        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
-            if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
-                recipient = fallback_address;
-            }
+        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io)
+            && !silo::is_allow_receive_erc20_tokens(&self.io, &recipient)
+        {
+            recipient = fallback_address;
         }
 
         let erc20_token = get_erc20_from_nep141(&self.io, token)?;
@@ -1041,10 +1052,10 @@ pub fn submit_with_alt_modexp<
     assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
-    if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
-            return Err(EngineErrorKind::InvalidChainId.into());
-        }
+    if let Some(chain_id) = transaction.chain_id
+        && U256::from(chain_id) != U256::from_big_endian(&state.chain_id)
+    {
+        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     sdk::log!("signer_address {:?}", sender);
@@ -1075,8 +1086,15 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
-    // EIP-3607
-    if !engine.code(sender.raw()).is_empty() {
+
+    let sender_code = engine.code(sender.raw());
+    // EIP-7702 - check if it's delegated designation. If it's a delegation designation, then,
+    // even if `caller_code` is non-empty, the transaction should be executed.
+    let is_delegated = Authorization::is_delegated(&sender_code);
+
+    // EIP-3607: Reject transactions from senders with deployed code
+    // EIP-7702: Accept transaction even if the caller has code.
+    if !(sender_code.is_empty() || is_delegated) {
         return Err(EngineErrorKind::RejectCallerWithCode.into());
     }
     let max_gas_price = args.max_gas_price.map(Into::into);
@@ -1876,15 +1894,14 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns basic account information.
     fn basic(&self, address: H160) -> Basic {
         let address = Address::new(address);
-        let result = self
-            .account_info_cache
+
+        self.account_info_cache
             .borrow_mut()
             .get_or_insert_with(address, || Basic {
                 nonce: get_nonce(&self.io, &address),
                 balance: get_balance(&self.io, &address).raw(),
             })
-            .clone();
-        result
+            .clone()
     }
 
     /// Returns the code of the contract from an address.
@@ -1904,13 +1921,13 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        let result = *self
+
+        *self
             .contract_storage_cache
             .borrow_mut()
             .get_or_insert_with((address, index), || {
                 get_storage(&self.io, &address, &index, generation)
-            });
-        result
+            })
     }
 
     /// Check if the storage of the address is empty.

@@ -12,6 +12,7 @@ use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompact
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_field_names)]
 pub struct Hashchain {
     chain_id: [u8; 32],
     contract_account_id: AccountId,
@@ -104,7 +105,7 @@ impl Hashchain {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.block_hashchain_computer.is_empty()
     }
 
@@ -294,7 +295,7 @@ impl BlockHashchainComputer {
     }
 
     /// Checks no transactions have been added.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.txs_merkle_tree.is_empty()
     }
 }
