@@ -1,7 +1,7 @@
 use aurora_engine_transactions::NormalizedEthTransaction;
 use aurora_engine_types::types::Wei;
 use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::LazyLock;
 
 use crate::prelude::{Address, U256, transactions::legacy::TransactionLegacy};
 use crate::utils::solidity;
@@ -16,12 +16,13 @@ impl From<ERC20Constructor> for solidity::ContractConstructor {
     }
 }
 
-static DOWNLOAD_ONCE: Once = Once::new();
+static SOLIDITY_SOURCES: LazyLock<PathBuf> =
+    LazyLock::new(ERC20Constructor::download_solidity_sources);
 
 impl ERC20Constructor {
     pub fn load() -> Self {
         Self(solidity::ContractConstructor::compile_from_source(
-            Self::download_solidity_sources(),
+            SOLIDITY_SOURCES.as_path(),
             Self::solidity_artifacts_path(),
             "token/ERC20/presets/ERC20PresetMinterPauser.sol",
             "ERC20PresetMinterPauser",
@@ -59,18 +60,16 @@ impl ERC20Constructor {
         if !contracts_dir.exists() {
             // Contracts not already present, so download them (but only once, even
             // if multiple tests running in parallel saw `contracts_dir` does not exist).
-            DOWNLOAD_ONCE.call_once(|| {
-                let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
-                let repo = git2::Repository::clone(url, sources_dir).unwrap();
-                // We need to checkout a specific commit hash because the preset contract we use
-                // was removed from the repo later
-                // (https://github.com/OpenZeppelin/openzeppelin-contracts/pull/3637).
-                let commit_hash =
-                    git2::Oid::from_str("dfef6a68ee18dbd2e1f5a099061a3b8a0e404485").unwrap();
-                repo.set_head_detached(commit_hash).unwrap();
-                let mut opts = git2::build::CheckoutBuilder::new();
-                repo.checkout_head(Some(opts.force())).unwrap();
-            });
+            let url = "https://github.com/OpenZeppelin/openzeppelin-contracts";
+            let repo = git2::Repository::clone(url, sources_dir).unwrap();
+            // We need to checkout a specific commit hash because the preset contract we use
+            // was removed from the repo later
+            // (https://github.com/OpenZeppelin/openzeppelin-contracts/pull/3637).
+            let commit_hash =
+                git2::Oid::from_str("dfef6a68ee18dbd2e1f5a099061a3b8a0e404485").unwrap();
+            repo.set_head_detached(commit_hash).unwrap();
+            let mut opts = git2::build::CheckoutBuilder::new();
+            repo.checkout_head(Some(opts.force())).unwrap();
         }
 
         contracts_dir
