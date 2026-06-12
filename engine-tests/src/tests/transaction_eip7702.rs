@@ -38,8 +38,8 @@ const INITIAL_NONCE: u64 = 1;
 const INITIAL_BALANCE: Wei = Wei::new_u64(0x0de0b6b3a7640000);
 
 const CONTRACT_ADDRESS: &str = "0xcccccccccccccccccccccccccccccccccccccccc";
-const CONTRACT_NONCE: u64 = 1;
-const CONTRACT_BALANCE: Wei = Wei::new_u64(0x0de0b6b3a7640000);
+const CONTRACT_NONCE: u64 = INITIAL_NONCE;
+const CONTRACT_BALANCE: Wei = INITIAL_BALANCE;
 
 /// Contract that stores `EXTCODESIZE(authority)` into slot 0 - used by
 /// length-cap tests as the tx's `to` target.
@@ -49,19 +49,6 @@ const AUTHORITY_EXTCODESIZE_PROBE_HEX: &str =
 /// Default EVM `gas_limit` for single-auth EIP-7702 tests.
 const DEFAULT_EVM_GAS_LIMIT: u64 = 0x3d_0900;
 const RELAY_ACCOUNT: &str = "relay.aurora";
-
-/// Quantization step for NEAR-gas assertions: 0.1 Tgas = 100 Ggas.
-const NEAR_GAS_STEP: u64 = 100_000_000_000;
-
-/// Floor-round NEAR gas to the nearest 0.1 Tgas step.
-const fn round_near_gas(gas: u64) -> u64 {
-    (gas / NEAR_GAS_STEP) * NEAR_GAS_STEP
-}
-
-/// Convert raw NEAR gas to the nearest 0.1 Tgas step, for more stable assertions.
-const fn near_ggas(gas: u64) -> u64 {
-    gas * NEAR_GAS_STEP
-}
 
 /// Round-trips a single-auth EIP-7702 tx through RLP and verifies that the
 /// recovered sender matches the signer.
@@ -114,7 +101,7 @@ fn test_eip_7702_success() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_gas_used = outcome.used_gas.as_gas();
+    let actual_ggas_used = outcome.used_gas.as_gigagas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     assert_eq!(result.gas_used, 68206);
@@ -133,7 +120,13 @@ fn test_eip_7702_success() {
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(45)); // 45 GGas
+    let expected_ggas_used = if cfg!(target_os = "macos") {
+        4552
+    } else {
+        4551
+    };
+
+    assert_eq!(actual_ggas_used, expected_ggas_used);
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions
@@ -511,7 +504,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_gas_used = outcome.used_gas.as_gas();
+    let actual_ggas_used = outcome.used_gas.as_gigagas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     let delegated_designator = Address::decode("a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb3").unwrap();
@@ -532,7 +525,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
 
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(36)); // 36 GGas
+    assert_eq!(actual_ggas_used, 3695);
 }
 
 /// Multi-auth happy path: 3 distinct authorities each delegate to `CONTRACT_ADDRESS`
@@ -581,7 +574,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_gas_used = outcome.used_gas.as_gas();
+    let actual_ggas_used = outcome.used_gas.as_gigagas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -595,7 +588,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 118_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(63));
+    assert_eq!(actual_ggas_used, 6386);
 }
 
 /// Same authority twice with same nonce: first auth applies and increments nonce,
@@ -635,7 +628,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_gas_used = outcome.used_gas.as_gas();
+    let actual_ggas_used = outcome.used_gas.as_gigagas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -644,7 +637,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     assert_eq!(runner.get_nonce(authority_addr), 1.into());
 
     assert_eq!(result.gas_used, 93_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(49));
+    assert_eq!(actual_ggas_used, 4899);
 }
 
 /// Authority pre-funded with non-delegated contract code: check skips the auth,
@@ -692,7 +685,7 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_gas_used = outcome.used_gas.as_gas();
+    let actual_ggas_used = outcome.used_gas.as_gigagas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -701,7 +694,14 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 68_206);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(40));
+
+    let expected_ggas_used = if cfg!(target_os = "macos") {
+        4079
+    } else {
+        4078
+    };
+
+    assert_eq!(actual_ggas_used, expected_ggas_used);
 }
 
 /// Re-delegation: authority already points to `target_B`; a second tx swaps the
@@ -767,7 +767,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
             encode_signed_7702(&signed_tx2),
         )
         .unwrap();
-    let near_gas_used = outcome2.used_gas.as_gas();
+    let actual_ggas_used = outcome2.used_gas.as_gigagas();
     let result2 = SubmitResult::try_from_slice(&outcome2.return_data.as_value().unwrap()).unwrap();
     assert!(result2.status.is_ok());
 
@@ -778,7 +778,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
     assert_eq!(runner.get_nonce(authority_addr), 2.into());
 
     assert_eq!(result2.gas_used, 38_645);
-    assert_eq!(round_near_gas(near_gas_used), near_ggas(45));
+    assert_eq!(actual_ggas_used, 4542);
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an

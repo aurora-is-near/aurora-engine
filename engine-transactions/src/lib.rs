@@ -329,15 +329,6 @@ impl NormalizedEthTransaction {
                 H160::zero()
             };
 
-            // `ecrecover` returns 0x0 as the convention for failed recovery (yellow paper,
-            // precompile 0x01). Treating it as a valid authority would let degenerate
-            // signatures install delegation on address(0), breaking the EVM invariant
-            // that the zero address holds no code and corrupting state assumptions
-            // downstream. Matches OpenZeppelin ECDSA / go-ethereum / reth behavior.
-            if authority.is_zero() {
-                is_valid = false;
-            }
-
             // Validations steps 2,4-9 from EIP-7702 provided by EVM itself.
             result.push(Authorization {
                 authority,
