@@ -67,11 +67,17 @@ args = [
     "--all",
 ]
 
+[tasks.install_nightly]
+description = "Install the specific pinned nightly toolchain if missing"
+command = "rustup"
+args = ["toolchain", "install", "nightly-2026-05-20"]
+
 [tasks.udeps]
 category = "Check"
+dependencies = ["install_nightly"]
 env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
-toolchain = "nightly"
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.55", test_arg = ["udeps", "-h"], force = true }
+toolchain = "nightly-2026-05-20" # We can't use the latest nightly because of the issue with the ambiguous name `splat` in the finite-wasm 0.5.0 crate.
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.61", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
