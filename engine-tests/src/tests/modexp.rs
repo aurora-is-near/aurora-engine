@@ -125,7 +125,7 @@ fn bench_modexp_standalone() {
             .unwrap();
         let duration = start.elapsed().as_millis();
 
-        assert!(duration < 2000, "{path} failed to run in under 2 second");
+        assert!(duration < 2000, "{path} failed to run in under 2 seconds");
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting

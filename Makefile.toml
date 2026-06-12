@@ -69,6 +69,7 @@ args = [
 ]
 
 [tasks.install_udeps_nightly]
+category = "Tools"
 description = "Install the specific pinned nightly toolchain if missing"
 command = "rustup"
 args = ["toolchain", "install", "${UDEPS_NIGHTLY_TOOLCHAIN}"]
