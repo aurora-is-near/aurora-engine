@@ -13,6 +13,7 @@ WASM_FILE_TEST = "aurora-engine-test.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
 SWEEP_DAYS = 30
 BUILDER_HASH_COMMIT = "13430592a7be246dd5a29439791f4081e0107ff3" # https://hub.docker.com/r/nearprotocol/contract-builder/tags
+UDEPS_NIGHTLY_TOOLCHAIN = "nightly-2026-05-20" # We can't use the latest nightly because of the issue with the ambiguous name `splat` in the finite-wasm 0.5.0 crate.
 
 [tasks.sweep]
 category = "Cleanup"
@@ -67,11 +68,18 @@ args = [
     "--all",
 ]
 
+[tasks.install_udeps_nightly]
+category = "Tools"
+description = "Install the specific pinned nightly toolchain if missing"
+command = "rustup"
+args = ["toolchain", "install", "${UDEPS_NIGHTLY_TOOLCHAIN}"]
+
 [tasks.udeps]
 category = "Check"
+dependencies = ["install_udeps_nightly"]
 env = { "CARGO_MAKE_CRATE_INSTALLATION_LOCKED" = "true" }
-toolchain = "nightly"
-install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.55", test_arg = ["udeps", "-h"], force = true }
+toolchain = "${UDEPS_NIGHTLY_TOOLCHAIN}"
+install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0.1.61", test_arg = ["udeps", "-h"], force = true }
 command = "${CARGO}"
 args = [
     "udeps",
