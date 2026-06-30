@@ -116,11 +116,7 @@ async fn test_submit_by_relayer() {
         .unwrap();
     assert!(result.is_success());
 
-    let result = relayer
-        .call(&aurora.id(), "submit")
-        .max_gas()
-        .transact()
-        .await;
+    let result = relayer.call(&aurora.id(), "submit").transact().await;
     assert!(result.is_ok());
 }
 
@@ -156,11 +152,7 @@ async fn test_delete_relayer_key() {
         .unwrap();
     assert!(result.is_success());
 
-    let result = relayer
-        .call(&aurora.id(), "submit")
-        .max_gas()
-        .transact()
-        .await;
+    let result = relayer.call(&aurora.id(), "submit").transact().await;
     assert!(result.is_ok());
 
     let result = manager
