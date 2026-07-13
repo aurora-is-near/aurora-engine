@@ -13,6 +13,7 @@ pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
             .unwrap(),
         ),
         skip_rust_version_check: true,
+        env: vec![("CARGO_NET_OFFLINE".to_string(), "true".to_string())],
         ..Default::default()
     };
 
