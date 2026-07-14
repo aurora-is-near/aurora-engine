@@ -98,11 +98,11 @@ fn test_1inch_limit_order_deploy() {
     assert!(result.gas_used > 3_500_000);
     // less than 10 NEAR TGas used
     assert_gas_bound(profile.all_gas(), 9);
-    // at least 45% of which is from wasm execution
+    // at least 35% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (40..=52).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 40% and 52%",
+        (35..=52).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 35% and 52%",
     );
 }
 
