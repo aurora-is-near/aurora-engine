@@ -1,5 +1,5 @@
 use near_crypto::PublicKey;
-use near_primitives_core::hash::CryptoHash;
+use near_primitives_core::hash::{CryptoHash, YieldId};
 use near_primitives_core::types::GasWeight;
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::{
@@ -99,12 +99,20 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         self.underlying.get_recorded_storage_size()
     }
 
+    fn storage_proof_size_before_receipt(&self) -> usize {
+        self.underlying.storage_proof_size_before_receipt()
+    }
+
     fn validator_stake(&self, account_id: &AccountId) -> Result<Option<Balance>, VMLogicError> {
         self.underlying.validator_stake(account_id)
     }
 
     fn validator_total_stake(&self) -> Result<Balance, VMLogicError> {
         self.underlying.validator_total_stake()
+    }
+
+    fn chain_id(&self) -> String {
+        self.underlying.chain_id()
     }
 
     fn create_action_receipt(
@@ -123,12 +131,30 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
         self.underlying.create_promise_yield_receipt(receiver_id)
     }
 
+    fn create_promise_yield_receipt_with_id(
+        &mut self,
+        receiver_id: AccountId,
+        user_yield_id: YieldId,
+    ) -> Result<Option<(ReceiptIndex, CryptoHash)>, VMLogicError> {
+        self.underlying
+            .create_promise_yield_receipt_with_id(receiver_id, user_yield_id)
+    }
+
     fn submit_promise_resume_data(
         &mut self,
         data_id: CryptoHash,
         data: Vec<u8>,
     ) -> Result<bool, VMLogicError> {
         self.underlying.submit_promise_resume_data(data_id, data)
+    }
+
+    fn submit_promise_resume_data_with_yield_id(
+        &mut self,
+        user_yield_id: YieldId,
+        data: Vec<u8>,
+    ) -> Result<bool, VMLogicError> {
+        self.underlying
+            .submit_promise_resume_data_with_yield_id(user_yield_id, data)
     }
 
     fn append_action_create_account(&mut self, receipt_index: ReceiptIndex) {
@@ -310,5 +336,9 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
 
     fn set_refund_to(&mut self, receipt_index: ReceiptIndex, refund_to: AccountId) {
         self.underlying.set_refund_to(receipt_index, refund_to);
+    }
+
+    fn post_quantum_keys_enabled(&self) -> bool {
+        todo!()
     }
 }
