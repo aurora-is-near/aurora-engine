@@ -3,10 +3,8 @@
 //! <https://eips.ethereum.org/EIPS/eip-7951>
 
 use aurora_evm::{Context, ExitError};
-use p256::{
-    EncodedPoint,
-    ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier},
-};
+use p256::ecdsa::{Signature, VerifyingKey, signature::hazmat::PrehashVerifier};
+use p256::{FieldBytes, Sec1Point};
 
 use crate::prelude::types::{Address, EthGas, make_address};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
@@ -44,8 +42,8 @@ impl Secp256r1 {
     /// # Returns
     ///
     /// * `Vec<u8>` - 32-byte success result (`0x00...01`) if verification passes.
-    /// * `None` - If any validation fails or signature is invalid. This results in empty output
-    ///   but consumes the full gas cost, as per "Gas Burning on Error" section.
+    /// * `None` - If any validation fails or the signature is invalid. This results in empty output
+    ///   but consumes the full gas cost, as per the "Gas Burning on Error" section.
     fn execute(input: &[u8]) -> Option<Vec<u8>> {
         // 1. Input length check
         if input.len() != INPUT_LENGTH {
@@ -55,24 +53,17 @@ impl Secp256r1 {
         // 2. Parse Inputs
         // Message hash (h)
         let h_bytes = &input[0..32];
-        // Signature component (r)
-        let r_bytes = &input[32..64];
-        // Signature component (s)
-        let s_bytes = &input[64..96];
+        // Signature
+        let sig_bytes = &input[32..96];
         // Public key x-coordinate (qx)
         let qx_bytes = &input[96..128];
         // Public key y-coordinate (qy)
         let qy_bytes = &input[128..160];
 
         // 3. Signature Component Validation
-        // Spec: "Both r and s MUST satisfy 0 < r < n and 0 < s < n"
-        // `Signature::from_scalars` returns an Error if scalars are zero or >= group order (n).
-        #[allow(deprecated)]
-        let signature = Signature::from_scalars(
-            *p256::FieldBytes::from_slice(r_bytes),
-            *p256::FieldBytes::from_slice(s_bytes),
-        )
-        .ok()?;
+        // `Signature::from_slice` returns an Error if in the event the signature is not
+        // the expected size, i.e., 2 * the size of 32 for a particular curve.
+        let signature = Signature::from_slice(sig_bytes).ok()?;
 
         // 4. Public Key Validation
         // Spec: "Both qx and qy MUST satisfy 0 <= qx < p and 0 <= qy < p"
@@ -80,12 +71,15 @@ impl Secp256r1 {
         // Spec: "The point (qx, qy) MUST NOT be the point at infinity"
         //
         // We reconstruct the point from raw coordinates (0x04 || x || y implicit format).
-        // `VerifyingKey::from_encoded_point` validates that the point satisfies y^2 = x^3 + ax + b.
+        // `VerifyingKey::from_sec1_point` validates that the point satisfies y^2 = x^3 + ax + b.
         // Since secp256r1 coefficient b != 0, the point at infinity (0, 0) does not satisfy
         // the curve equation and will be rejected here.
-        let encoded_point =
-            EncodedPoint::from_affine_coordinates(qx_bytes.into(), qy_bytes.into(), false);
-        let public_key = VerifyingKey::from_encoded_point(&encoded_point).ok()?;
+        let sec1_point = Sec1Point::from_affine_coordinates(
+            &FieldBytes::try_from(qx_bytes).ok()?,
+            &FieldBytes::try_from(qy_bytes).ok()?,
+            false,
+        );
+        let public_key = VerifyingKey::from_sec1_point(&sec1_point).ok()?;
 
         // 5. Signature Verification
         // Spec: "s1 = s^(-1) (mod n)"
