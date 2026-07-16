@@ -18,8 +18,7 @@ const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
 
 /// Return SILO parameters.
 pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
-    let params = get_fixed_gas(io)
-        .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
+    let params = get_fixed_gas(io).zip(get_erc20_fallback_address(io));
 
     params.map(|(cost, address)| SiloParamsArgs {
         fixed_gas: cost,

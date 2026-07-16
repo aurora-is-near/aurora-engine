@@ -990,7 +990,7 @@ mod tests_osaka {
         let res = run_modexp(&input, 10_000_000);
         match res {
             Err(ExitError::Other(msg)) => assert_eq!(msg, "ERR_MODEXP_SIZE_LIMIT"),
-            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {res:?}",),
+            _ => panic!("Expected ERR_MODEXP_SIZE_LIMIT for huge base length, got {res:?}"),
         }
     }
 
