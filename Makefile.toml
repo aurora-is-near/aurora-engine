@@ -7,7 +7,7 @@ CARGO = "cargo"
 CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
-RUSTC_FLAGS_BUILD = "-C link-arg=-s"
+RUSTC_FLAGS_BUILD = "-C link-arg=-s -C link-arg=--import-undefined"
 WASM_FILE = "aurora-engine.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
 XCC_ROUTER_WASM_FILE = "aurora-xcc-router.wasm"
@@ -259,7 +259,7 @@ dependencies = [
 
 [tasks.build-xcc-router-inner]
 category = "Build"
-env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/ -C link-arg=--import-undefined", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 script = '''
 cd etc/xcc-router
 cargo build --target ${CARGO_TARGET} --release
@@ -281,7 +281,7 @@ category = "Build"
 alias = "build-xcc-router"
 
 [tasks.build-test]
-env = { "RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_FLAGS_BUILD}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
@@ -305,12 +305,12 @@ category = "Build"
 run_task = "wasm-opt-common"
 
 [tasks.build]
-env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/ -C link-arg=--import-undefined", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.build-docker-inner]
-env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/ -C link-arg=--import-undefined", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow-docker"
 
@@ -321,7 +321,7 @@ docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:ma
 '''
 
 [tasks.build-xcc-router-docker-inner]
-env = { "RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "-C strip=symbols --remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/ -C link-arg=--import-undefined", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-xcc-router-flow-docker"
 

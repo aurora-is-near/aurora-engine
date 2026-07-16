@@ -317,7 +317,7 @@ pub fn in_place_shr(a: &mut [Word], shift: u32) -> Word {
 
 // Performs a += b, returning if there was overflow
 pub fn in_place_add(a: &mut [Word], b: &[Word]) -> bool {
-    debug_assert!(a.len() == b.len());
+    debug_assert_eq!(a.len(), b.len());
 
     let mut c = false;
     for (a_digit, b_digit) in a.iter_mut().zip(b) {
@@ -331,7 +331,7 @@ pub fn in_place_add(a: &mut [Word], b: &[Word]) -> bool {
 
 // Performs `a -= xy`, returning the "borrow".
 pub fn in_place_mul_sub(a: &mut [Word], x: &[Word], y: Word) -> Word {
-    debug_assert!(a.len() == x.len());
+    debug_assert_eq!(a.len(), x.len());
 
     // a -= x*0 leaves a unchanged, so return early
     if y == 0 {
