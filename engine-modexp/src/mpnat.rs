@@ -16,9 +16,43 @@ pub const BASE: DoubleWord = (Word::MAX as DoubleWord) + 1;
 /// Multi-precision natural number, represented in base `Word::MAX + 1 = 2^WORD_BITS`.
 /// The digits are stored in little-endian order, i.e. digits[0] is the least
 /// significant digit.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MPNat {
     pub digits: Vec<Word>,
+}
+
+/// Selects the window width `w` (in bits) for `2^w`-ary Montgomery
+/// exponentiation, based on the number of significant bits in the exponent.
+/// Chosen to roughly minimize the total multiplications, i.e. `2^w` for the
+/// precomputed table plus `bits / w` in the main loop. `w = 1` reproduces the
+/// plain binary method and is used for tiny exponents where a table would not
+/// pay for itself.
+const fn montgomery_window_width(bits: usize) -> usize {
+    match bits {
+        0..=16 => 1,
+        17..=64 => 3,
+        65..=256 => 4,
+        257..=768 => 5,
+        _ => 6,
+    }
+}
+
+/// Reads `w` bits of `exp` (big-endian bytes) as an integer, starting at bit
+/// index `start_bit` counted from the least-significant bit. Bits past the
+/// most-significant end of `exp` read as zero.
+fn nth_window(exp: &[u8], start_bit: usize, w: usize) -> usize {
+    let len = exp.len();
+    let mut d = 0usize;
+    for j in 0..w {
+        let bit = start_bit + j;
+        let byte_from_end = bit / 8;
+        if byte_from_end >= len {
+            break;
+        }
+        let b = (exp[len - 1 - byte_from_end] >> (bit % 8)) & 1;
+        d |= (b as usize) << j;
+    }
+    d
 }
 
 impl MPNat {
@@ -328,37 +362,81 @@ impl MPNat {
             tmp
         };
 
-        // scratch space for monpro algorithm
+        // scratch space for monpro / monsq
         let mut scratch = vec![0; 2 * s + 1];
         let monpro_len = s + 2;
 
-        // Use binary method for computing exp, but with monpro as the multiplication
-        for &b in exp {
-            let mut mask: u8 = 1 << 7;
-            while mask > 0 {
+        // Windowed (`2^w`-ary) exponentiation. Rather than one square plus one
+        // multiply per set exponent bit (the binary method), consume the
+        // exponent `w` bits at a time: `w` squarings plus at most one multiply
+        // per window, against a precomputed table of the base's small powers.
+        // This trades a handful of setup multiplications for a large reduction
+        // in the number of multiplications in the main loop.
+        //
+        // `exp` has already been stripped of leading zero bytes, so `exp[0]` is
+        // non-zero and its significant bit length is exact. Using the exact bit
+        // length (rather than iterating whole bytes) also avoids squaring over
+        // the leading zero bits of the most significant byte.
+        let total_bits = (exp.len() - 1) * 8 + (8 - exp[0].leading_zeros() as usize);
+        let w = montgomery_window_width(total_bits);
+
+        // `table[i]` holds `base^i` in Montgomery form, for `i` in `0..2^w`.
+        // Each entry is stored with exactly `s` digits so it can be used
+        // directly by `monsq`/`monpro` and copied without length juggling.
+        // `x_bar` currently holds `base^0` = Montgomery form of 1.
+        let table_len = 1_usize << w;
+        let mut table: Vec<Self> = Vec::with_capacity(table_len);
+        table.push(x_bar.clone());
+        {
+            // `base^1` = `a_bar`, padded to `s` digits.
+            let mut digits = vec![0; s];
+            digits[..a_bar.digits.len()].copy_from_slice(&a_bar.digits);
+            table.push(Self { digits });
+        }
+        for i in 2..table_len {
+            monpro(
+                &table[i - 1],
+                &a_bar,
+                modulus,
+                n_prime,
+                &mut scratch[0..monpro_len],
+            );
+            let mut digits = vec![0; s];
+            digits.copy_from_slice(&scratch[0..s]);
+            table.push(Self { digits });
+            scratch.fill(0);
+        }
+
+        // Scan the exponent's base-`2^w` digits from most to least significant.
+        // Seed the accumulator with the top window, which avoids `w` squarings
+        // of Montgomery(1).
+        let num_windows = total_bits.div_ceil(w);
+        let top = nth_window(exp, (num_windows - 1) * w, w);
+        x_bar.digits.copy_from_slice(&table[top].digits);
+
+        for wi in (0..num_windows - 1).rev() {
+            for _ in 0..w {
                 monsq(&x_bar, modulus, n_prime, &mut scratch);
                 x_bar.digits.copy_from_slice(&scratch[0..s]);
                 scratch.fill(0);
-                if b & mask != 0 {
-                    monpro(
-                        &x_bar,
-                        &a_bar,
-                        modulus,
-                        n_prime,
-                        &mut scratch[0..monpro_len],
-                    );
-                    x_bar.digits.copy_from_slice(&scratch[0..s]);
-                    scratch.fill(0);
-                }
-                mask >>= 1;
+            }
+            let d = nth_window(exp, wi * w, w);
+            if d != 0 {
+                monpro(
+                    &x_bar,
+                    &table[d],
+                    modulus,
+                    n_prime,
+                    &mut scratch[0..monpro_len],
+                );
+                x_bar.digits.copy_from_slice(&scratch[0..s]);
+                scratch.fill(0);
             }
         }
 
         // Convert out of Montgomery form by computing monpro with 1
         let one = {
-            // We'll reuse the memory space from a_bar for efficiency.
-            let mut digits = a_bar.digits;
-            digits.fill(0);
+            let mut digits = vec![0; s];
             digits[0] = 1;
             Self { digits }
         };
@@ -702,6 +780,104 @@ fn test_modpow_montgomery() {
         0x52e104dc72423b534d8e49d878f29e3b,
         0x2aa756846258d5cfa6a3f8b9b181a11c,
     );
+}
+
+// Randomized property test: check `modexp` against an independent oracle
+// (`num::BigUint::modpow`) across many shapes. This exercises the windowed
+// Montgomery path together with the even-modulus (CRT) and power-of-two paths,
+// and deliberately sweeps exponent bit-lengths that straddle the window-width
+// thresholds in `montgomery_window_width`. Uses a fixed-seed xorshift PRNG so
+// runs are deterministic and no test-only dependency is required.
+#[test]
+fn test_modexp_random_against_biguint() {
+    struct XorShift(u64);
+    impl XorShift {
+        fn next(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+        fn byte(&mut self) -> u8 {
+            (self.next() >> 33) as u8
+        }
+        fn bytes(&mut self, n: usize) -> Vec<u8> {
+            (0..n).map(|_| self.byte()).collect()
+        }
+        fn range(&mut self, lo: usize, hi: usize) -> usize {
+            lo + (self.next() as usize) % (hi - lo + 1)
+        }
+    }
+
+    // `num::BigUint::modpow` panics on a zero modulus, so mirror `modexp`'s
+    // convention (empty output) there. Returns big-endian bytes.
+    fn oracle(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
+        let m = num::BigUint::from_bytes_be(modulus);
+        if m == num::BigUint::from(0u8) {
+            return Vec::new();
+        }
+        let b = num::BigUint::from_bytes_be(base);
+        let e = num::BigUint::from_bytes_be(exp);
+        b.modpow(&e, &m).to_bytes_be()
+    }
+
+    fn strip(v: &[u8]) -> &[u8] {
+        let i = v.iter().position(|&b| b != 0).unwrap_or(v.len());
+        &v[i..]
+    }
+
+    let mut rng = XorShift(0x9e37_79b9_7f4a_7c15);
+
+    // Broad random sweep over small/medium sizes and all modulus structures.
+    for _ in 0..10_000 {
+        let blen = rng.range(0, 40);
+        let base = rng.bytes(blen);
+        let elen = rng.range(0, 20);
+        let exp = rng.bytes(elen);
+        let mlen = rng.range(1, 40);
+        let mut modulus = rng.bytes(mlen);
+        let last = modulus.len() - 1;
+        match rng.range(0, 3) {
+            0 => modulus[last] |= 1,    // odd  -> Montgomery path
+            1 => modulus[last] &= 0xfe, // even -> CRT path
+            2 => {
+                // power of two -> dedicated path
+                modulus.fill(0);
+                modulus[last] = 1 << rng.range(0, 7);
+            }
+            _ => {} // arbitrary
+        }
+        let got = crate::modexp(&base, &exp, &modulus);
+        let want = oracle(&base, &exp, &modulus);
+        assert_eq!(
+            strip(&got),
+            strip(&want),
+            "modexp mismatch: base={base:02x?} exp={exp:02x?} mod={modulus:02x?}"
+        );
+    }
+
+    // Large full-width odd moduli with exponent byte-lengths that straddle the
+    // window-width thresholds, to hit every `w` branch and the partial top
+    // window.
+    for n in [8usize, 16, 32, 64, 96, 128, 200, 256] {
+        let mut modulus = rng.bytes(n);
+        modulus[0] |= 0x80;
+        let last = modulus.len() - 1;
+        modulus[last] |= 1;
+        let base = rng.bytes(n);
+        for ebytes in [1usize, 2, 3, 8, 9, 32, 33, 96, 97, n] {
+            let exp = rng.bytes(ebytes);
+            let got = crate::modexp(&base, &exp, &modulus);
+            let want = oracle(&base, &exp, &modulus);
+            assert_eq!(
+                strip(&got),
+                strip(&want),
+                "wide modexp mismatch: n={n} ebytes={ebytes}"
+            );
+        }
+    }
 }
 
 #[test]
