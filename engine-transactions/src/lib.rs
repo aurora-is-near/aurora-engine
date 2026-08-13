@@ -142,19 +142,22 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
                 authorization_list: vec![],
             },
-            Eip7702(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: Some(tx.transaction.to),
-                value: tx.transaction.value,
-                data: tx.transaction.data.clone(),
-                access_list: tx.transaction.access_list.clone(),
-                authorization_list: tx.authorization_list()?,
-            },
+            Eip7702(tx) => {
+                let authorization_list = tx.authorization_list()?;
+                Self {
+                    address: tx.sender()?,
+                    chain_id: Some(tx.transaction.chain_id),
+                    nonce: tx.transaction.nonce,
+                    gas_limit: tx.transaction.gas_limit,
+                    max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                    max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                    to: Some(tx.transaction.to),
+                    value: tx.transaction.value,
+                    data: tx.transaction.data,
+                    access_list: tx.transaction.access_list,
+                    authorization_list,
+                }
+            }
         })
     }
 }
