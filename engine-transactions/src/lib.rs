@@ -143,7 +143,6 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 authorization_list: vec![],
             },
             Eip7702(tx) => {
-                let authorization_list = tx.authorization_list()?;
                 Self {
                     address: tx.sender()?,
                     chain_id: Some(tx.transaction.chain_id),
@@ -155,7 +154,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                     value: tx.transaction.value,
                     data: tx.transaction.data,
                     access_list: tx.transaction.access_list,
-                    authorization_list,
+                    authorization_list: tx.authorization_list()?,
                 }
             }
         })
