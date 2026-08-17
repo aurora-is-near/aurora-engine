@@ -373,64 +373,75 @@ impl MPNat {
         // This trades a handful of setup multiplications for a large reduction
         // in the number of multiplications in the main loop.
         //
-        // `exp` has already been stripped of leading zero bytes, so `exp[0]` is
-        // non-zero and its significant bit length is exact. Using the exact bit
-        // length (rather than iterating whole bytes) also avoids squaring over
-        // the leading zero bits of the most significant byte.
-        let total_bits = (exp.len() - 1) * 8 + (8 - exp[0].leading_zeros() as usize);
-        let w = montgomery_window_width(total_bits);
+        // Exact significant bit length of `exp`. `modpow` strips leading zero
+        // bytes and returns early on a zero exponent, so `exp[0]` is already
+        // non-zero at both call sites; scanning for the first non-zero byte keeps
+        // this correct rather than merely unreachable, and costs one comparison
+        // in the stripped case. Using the exact bit length rather than iterating
+        // whole bytes also avoids squaring over the leading zero bits of the
+        // most significant byte.
+        let total_bits = exp.iter().position(|&b| b != 0).map_or(0, |i| {
+            (exp.len() - i - 1) * 8 + (8 - exp[i].leading_zeros() as usize)
+        });
 
-        // `table[i]` holds `base^i` in Montgomery form, for `i` in `0..2^w`.
-        // Each entry is stored with exactly `s` digits so it can be used
-        // directly by `monsq`/`monpro` and copied without length juggling.
-        // `x_bar` currently holds `base^0` = Montgomery form of 1.
-        let table_len = 1_usize << w;
-        let mut table: Vec<Self> = Vec::with_capacity(table_len);
-        table.push(x_bar.clone());
-        {
-            // `base^1` = `a_bar`, padded to `s` digits.
-            let mut digits = vec![0; s];
-            digits[..a_bar.digits.len()].copy_from_slice(&a_bar.digits);
-            table.push(Self { digits });
-        }
-        for i in 2..table_len {
-            monpro(
-                &table[i - 1],
-                &a_bar,
-                modulus,
-                n_prime,
-                &mut scratch[0..monpro_len],
-            );
-            let mut digits = vec![0; s];
-            digits.copy_from_slice(&scratch[0..s]);
-            table.push(Self { digits });
-            scratch.fill(0);
-        }
+        // A zero exponent leaves `x_bar` at the Montgomery form of 1, which is
+        // already the correct `base^0`. Guarding here keeps `total_bits >= 1`
+        // below, so `num_windows >= 1` and `num_windows - 1` cannot underflow.
+        if total_bits > 0 {
+            let w = montgomery_window_width(total_bits);
 
-        // Scan the exponent's base-`2^w` digits from most to least significant.
-        // Seed the accumulator with the top window, which avoids `w` squarings
-        // of Montgomery(1).
-        let num_windows = total_bits.div_ceil(w);
-        let top = nth_window(exp, (num_windows - 1) * w, w);
-        x_bar.digits.copy_from_slice(&table[top].digits);
-
-        for wi in (0..num_windows - 1).rev() {
-            for _ in 0..w {
-                monsq(&x_bar, modulus, n_prime, &mut scratch);
-                x_bar.digits.copy_from_slice(&scratch[0..s]);
-                scratch.fill(0);
+            // `table[i]` holds `base^i` in Montgomery form, for `i` in `0..2^w`.
+            // Each entry is stored with exactly `s` digits so it can be used
+            // directly by `monsq`/`monpro` and copied without length juggling.
+            // `x_bar` currently holds `base^0` = Montgomery form of 1.
+            let table_len = 1_usize << w;
+            let mut table: Vec<Self> = Vec::with_capacity(table_len);
+            table.push(x_bar.clone());
+            {
+                // `base^1` = `a_bar`, padded to `s` digits.
+                let mut digits = vec![0; s];
+                digits[..a_bar.digits.len()].copy_from_slice(&a_bar.digits);
+                table.push(Self { digits });
             }
-            let d = nth_window(exp, wi * w, w);
-            if d != 0 {
+            for i in 2..table_len {
                 monpro(
-                    &x_bar,
-                    &table[d],
+                    &table[i - 1],
+                    &a_bar,
                     modulus,
                     n_prime,
                     &mut scratch[0..monpro_len],
                 );
-                x_bar.digits.copy_from_slice(&scratch[0..s]);
+                let mut digits = vec![0; s];
+                digits.copy_from_slice(&scratch[0..s]);
+                table.push(Self { digits });
                 scratch.fill(0);
+            }
+
+            // Scan the exponent's base-`2^w` digits from most to least significant.
+            // Seed the accumulator with the top window, which avoids `w` squarings
+            // of Montgomery(1).
+            let num_windows = total_bits.div_ceil(w);
+            let top = nth_window(exp, (num_windows - 1) * w, w);
+            x_bar.digits.copy_from_slice(&table[top].digits);
+
+            for wi in (0..num_windows - 1).rev() {
+                for _ in 0..w {
+                    monsq(&x_bar, modulus, n_prime, &mut scratch);
+                    x_bar.digits.copy_from_slice(&scratch[0..s]);
+                    scratch.fill(0);
+                }
+                let d = nth_window(exp, wi * w, w);
+                if d != 0 {
+                    monpro(
+                        &x_bar,
+                        &table[d],
+                        modulus,
+                        n_prime,
+                        &mut scratch[0..monpro_len],
+                    );
+                    x_bar.digits.copy_from_slice(&scratch[0..s]);
+                    scratch.fill(0);
+                }
             }
         }
 
