@@ -447,7 +447,12 @@ impl MPNat {
 
         // Convert out of Montgomery form by computing monpro with 1
         let one = {
-            let mut digits = vec![0; s];
+            // Reuse `a_bar`'s allocation, which is dead once the windowed loop
+            // above is done with the table. `monpro` reads operand digits with
+            // `.get(i).unwrap_or(0)`, so this buffer being shorter than `s` is
+            // fine; `sub_to_same_size` leaves it at least one digit long.
+            let mut digits = a_bar.digits;
+            digits.fill(0);
             digits[0] = 1;
             Self { digits }
         };
