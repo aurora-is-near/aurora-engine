@@ -839,6 +839,20 @@ fn test_modexp_random_against_biguint() {
         &v[i..]
     }
 
+    // Builds an exponent with exactly `bits` significant bits by pinning the
+    // highest set bit of the top byte. Whole-byte generation can only produce
+    // bit lengths that are multiples of 8, which reaches the low end of each
+    // `montgomery_window_width` bracket but never the high end: 17, 65, 257 and
+    // 769 each need a top byte of exactly `0x01`. This is what lets a case name
+    // the bracket it means to exercise.
+    fn exp_with_bits(rng: &mut XorShift, bits: usize) -> Vec<u8> {
+        assert!(bits > 0);
+        let mut e = rng.bytes(bits.div_ceil(8));
+        let top_bit = (bits - 1) % 8;
+        e[0] = (e[0] & ((1u8 << top_bit) - 1)) | (1u8 << top_bit);
+        e
+    }
+
     let mut rng = XorShift(0x9e37_79b9_7f4a_7c15);
 
     // Broad random sweep over small/medium sizes and all modulus structures.
@@ -879,13 +893,34 @@ fn test_modexp_random_against_biguint() {
         modulus[last] |= 1;
         let base = rng.bytes(n);
         for ebytes in [1usize, 2, 3, 8, 9, 32, 33, 96, 97, n] {
-            let exp = rng.bytes(ebytes);
+            // Force the top byte non-zero so `ebytes` is the exponent's real
+            // significant byte count rather than an upper bound, anchoring these
+            // cases to their bracket independently of the seed.
+            let mut exp = rng.bytes(ebytes);
+            exp[0] |= 0x80;
             let got = crate::modexp(&base, &exp, &modulus);
             let want = oracle(&base, &exp, &modulus);
             assert_eq!(
                 strip(&got),
                 strip(&want),
                 "wide modexp mismatch: n={n} ebytes={ebytes}"
+            );
+        }
+
+        // Exact significant-bit lengths on both sides of every
+        // `montgomery_window_width` boundary, so each `w` branch is entered
+        // deterministically rather than by chance. The set mixes exact
+        // multiples of `w` (1, 16, 256) with lengths that leave a partial top
+        // window (17, 64, 65, 257, 768, 769), which is the case `nth_window`
+        // has to zero-fill past the most-significant end of `exp`.
+        for bits in [1usize, 16, 17, 64, 65, 256, 257, 768, 769] {
+            let exp = exp_with_bits(&mut rng, bits);
+            let got = crate::modexp(&base, &exp, &modulus);
+            let want = oracle(&base, &exp, &modulus);
+            assert_eq!(
+                strip(&got),
+                strip(&want),
+                "wide modexp mismatch: n={n} bits={bits}"
             );
         }
     }
