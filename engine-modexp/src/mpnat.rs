@@ -390,11 +390,26 @@ impl MPNat {
         if total_bits > 0 {
             let w = montgomery_window_width(total_bits);
 
-            // `table[i]` holds `base^i` in Montgomery form, for `i` in `0..2^w`.
-            // Each entry is stored with exactly `s` digits so it can be used
-            // directly by `monsq`/`monpro` and copied without length juggling.
-            // `x_bar` currently holds `base^0` = Montgomery form of 1.
-            let table_len = 1_usize << w;
+            // `table[i]` holds `base^i` in Montgomery form. Each entry is stored
+            // with exactly `s` digits so it can be used directly by
+            // `monsq`/`monpro` and copied without length juggling. `x_bar`
+            // currently holds `base^0` = Montgomery form of 1.
+            //
+            // The table is a chain: each entry costs one `monpro` over the one
+            // below it, so reaching digit `d` requires building every entry up
+            // to `d`. Only the digits the exponent actually uses need to be
+            // reachable, so stop the chain at the largest one that occurs rather
+            // than filling all `2^w` slots. A sparse exponent such as `65537`
+            // (base-8 digits `2,0,0,0,0,1` at `w = 3`) then builds one entry
+            // instead of six. The scan costs `total_bits` bit reads, negligible
+            // against even a single `monsq`, and a dense exponent reaches
+            // `2^w - 1` anyway and so is unaffected.
+            let num_windows = total_bits.div_ceil(w);
+            let mut max_digit = 1;
+            for wi in 0..num_windows {
+                max_digit = max_digit.max(nth_window(exp, wi * w, w));
+            }
+            let table_len = max_digit + 1;
             let mut table: Vec<Self> = Vec::with_capacity(table_len);
             table.push(x_bar.clone());
             {
@@ -419,8 +434,8 @@ impl MPNat {
 
             // Scan the exponent's base-`2^w` digits from most to least significant.
             // Seed the accumulator with the top window, which avoids `w` squarings
-            // of Montgomery(1).
-            let num_windows = total_bits.div_ceil(w);
+            // of Montgomery(1). `total_bits` is exact, so the most significant bit
+            // falls inside the top window and `top` is non-zero, hence in range.
             let top = nth_window(exp, (num_windows - 1) * w, w);
             x_bar.digits.copy_from_slice(&table[top].digits);
 
