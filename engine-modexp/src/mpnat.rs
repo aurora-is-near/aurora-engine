@@ -1000,10 +1000,15 @@ fn test_modexp_sparse_exponents() {
         }
 
         // Every window holding the same digit `d`, which walks the largest digit
-        // the exponent reaches through each value it can take for that `w`.
-        for bits in [16usize, 64, 256, 768, 1024] {
+        // the exponent reaches through each value it can take for that `w`. Each
+        // width here is an exact multiple of its own window width and sits inside
+        // its `montgomery_window_width` bracket, so the topmost window cannot run
+        // past `bits` and carry the exponent into the next bracket up. Widths that
+        // do not divide evenly sweep `d` against one `w` while `modpow_montgomery`
+        // picks another, and the digits it sees are then not the ones being swept.
+        for bits in [16usize, 63, 256, 765, 1020] {
             let w = montgomery_window_width(bits);
-            let nbytes = bits.div_ceil(8) + 1;
+            let nbytes = bits.div_ceil(8);
             for d in 1..(1usize << w) {
                 let mut exp = vec![0u8; nbytes];
                 for wi in 0..bits.div_ceil(w) {
