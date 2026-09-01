@@ -9,9 +9,10 @@ use aurora_engine_sdk::{
     io::{self, IO},
     near_runtime,
 };
+use aurora_engine_types::parameters::engine::SubmitArgs;
 use aurora_engine_types::types::gas::NearGas;
 use aurora_engine_types::{BTreeMap, Cow, Vec, H256};
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshDeserialize;
 
 const STATE: &[u8; 52072] = include_bytes!("../state.bin");
 const INPUT: &[u8] = &[
@@ -23,7 +24,7 @@ const INPUT: &[u8] = &[
     5, 237, 53, 68, 18, 30, 90,
 ];
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn run() {
     let local_env = env::Fixed {
         signer_account_id: "relay.aurora".parse().unwrap(),
@@ -34,6 +35,7 @@ pub extern "C" fn run() {
         attached_deposit: 0,
         random_seed: H256([0u8; 32]),
         prepaid_gas: NearGas::new(300_000_000_000_000),
+        used_gas: NearGas::new(300_000_000_000_000),
     };
 
     let state = BTreeMap::try_from_slice(STATE).unwrap();
@@ -47,7 +49,10 @@ pub extern "C" fn run() {
     let result = aurora_engine::engine::submit(
         in_mem_io,
         &local_env,
-        INPUT,
+        &SubmitArgs {
+            tx_data: INPUT.to_vec(),
+            ..Default::default()
+        },
         engine_state,
         local_env.current_account_id.clone(),
         relayer_address,
