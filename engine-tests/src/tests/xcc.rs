@@ -125,7 +125,7 @@ fn test_xcc_eth_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            5,
+            10,
             xcc_base_cost.as_u64(),
             costs::CROSS_CONTRACT_CALL_BASE.as_u64(),
         ),

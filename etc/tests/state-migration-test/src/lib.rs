@@ -15,7 +15,7 @@ struct NewFancyState<'a> {
     some_other_numbers: [u32; 7],
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn state_migration() {
     let mut io = Runtime;
     let old_state = match state::get_state(&io) {
@@ -32,7 +32,7 @@ pub extern "C" fn state_migration() {
     io.write_storage(&state_key(), &borsh::to_vec(&new_state).expect("ERR_SER"));
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn some_new_fancy_function() {
     let mut io = Runtime;
     let state = io
