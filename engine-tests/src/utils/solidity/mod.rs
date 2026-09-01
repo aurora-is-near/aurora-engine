@@ -16,6 +16,12 @@ pub mod standard_precompiles;
 pub mod uniswap;
 pub mod weth;
 
+/// One lock per Solidity output directory. A single `solc` invocation can emit files
+/// for multiple contracts, so the directory is the narrowest safe synchronization
+/// boundary unless every compilation receives an isolated output directory.
+static ARTIFACT_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 pub struct ContractConstructor {
     pub abi: ethabi::Contract,
     pub code: Vec<u8>,
@@ -45,15 +51,16 @@ impl ContractConstructor {
         P2: AsRef<Path>,
         P3: AsRef<Path>,
     {
-        let artifacts_base_path = artifacts_base_path.as_ref();
-        let lock = artifact_lock(artifacts_base_path, contract_name);
-        let guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
-
-        compile(&sources_root, &contract_file, artifacts_base_path);
-        let constructor = Self::load_artifacts(artifacts_base_path, contract_name);
-
-        drop(guard);
-        constructor
+        Self::compile_or_load(
+            sources_root.as_ref(),
+            artifacts_base_path.as_ref(),
+            contract_file.as_ref(),
+            contract_name,
+            true,
+            |source_path, contract_file, output_path| {
+                compile(source_path, contract_file, output_path);
+            },
+        )
     }
 
     // Note: `contract_file` must be relative to `sources_root`
@@ -68,33 +75,64 @@ impl ContractConstructor {
         P2: AsRef<Path>,
         P3: AsRef<Path>,
     {
-        let artifacts_base_path = artifacts_base_path.as_ref();
-        // Tests run in parallel and many of them want the same contract, so several
-        // threads reach this point at once with the artifacts not yet built. Deciding
-        // whether to compile and then reading the result has to be atomic with respect
-        // to those other threads: `solc` writes the `.bin` before the `.abi`, so a
-        // thread that checked the artifacts while another thread's compile was
-        // in-flight could find the bytecode present, skip compiling, and then fail to
-        // open an `.abi` that does not exist yet. Reading a half-written `.bin` is the
-        // quieter version of the same bug, since a truncated hex string still decodes
-        // and only shows up later as an inexplicable EVM failure.
-        let lock = artifact_lock(artifacts_base_path, contract_name);
-        let guard = lock.lock().unwrap_or_else(PoisonError::into_inner);
+        Self::compile_or_load(
+            sources_root.as_ref(),
+            artifacts_base_path.as_ref(),
+            contract_file.as_ref(),
+            contract_name,
+            false,
+            |source_path, contract_file, output_path| {
+                compile(source_path, contract_file, output_path);
+            },
+        )
+    }
 
-        // Both artifacts are needed, so the presence of one says nothing useful about
-        // whether this contract can be loaded without compiling it first.
+    fn compile_or_load<C>(
+        sources_root: &Path,
+        artifacts_base_path: &Path,
+        contract_file: &Path,
+        contract_name: &str,
+        force_compile: bool,
+        compiler: C,
+    ) -> Self
+    where
+        C: FnOnce(&Path, &Path, &Path),
+    {
+        fs::create_dir_all(artifacts_base_path).unwrap_or_else(|e| {
+            panic!(
+                "Could not create Solidity artifact directory {}: {e}",
+                artifacts_base_path.display()
+            )
+        });
+
+        // `solc` writes artifacts for every contract in the source and import graph,
+        // not only `contract_name`. Lock the complete output directory so concurrent
+        // compilations cannot overwrite files outside a narrower per-contract lock.
+        // The lock also covers the cache check and reads, preventing readers from
+        // observing one artifact while another is still being written.
+        let lock = artifact_lock(artifacts_base_path);
+        let (_guard, recovered_from_poison) = match lock.lock() {
+            Ok(guard) => (guard, false),
+            Err(error) => (error.into_inner(), true),
+        };
+
         let (bin_path, abi_path) = artifact_paths(artifacts_base_path, contract_name);
-        if !bin_path.exists() || !abi_path.exists() {
-            compile(sources_root, contract_file, artifacts_base_path);
+        if force_compile || recovered_from_poison || !bin_path.exists() || !abi_path.exists() {
+            compiler(sources_root, contract_file, artifacts_base_path);
         }
-        let constructor = Self::load_artifacts(artifacts_base_path, contract_name);
 
-        drop(guard);
+        let constructor = Self::load_artifacts(artifacts_base_path, contract_name);
+        if recovered_from_poison {
+            // A successful compile/read cycle restores the invariant guarded by this
+            // lock, so later cache hits do not needlessly recompile forever.
+            lock.clear_poison();
+        }
+
         constructor
     }
 
     /// Reads an already compiled contract's artifacts. Callers must hold the
-    /// contract's `artifact_lock` so that no compile can be writing them.
+    /// output directory's `artifact_lock` so that no compile can be writing them.
     fn load_artifacts(artifacts_base_path: &Path, contract_name: &str) -> Self {
         let (bin_path, abi_path) = artifact_paths(artifacts_base_path, contract_name);
 
@@ -193,21 +231,14 @@ impl DeployedContract {
     }
 }
 
-/// One lock per compiled contract, so that two threads wanting different contracts do
-/// not wait on each other. Keyed by artifact path rather than by contract name because
-/// the same name can be built into more than one directory.
-static ARTIFACT_LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// Returns the lock guarding `contract_name`'s artifacts in `artifacts_base_path`.
-/// The lock must be held across the whole compile-then-read sequence, not just the
-/// compile, so that no thread reads artifacts another thread is part way through
-/// writing.
-fn artifact_lock(artifacts_base_path: &Path, contract_name: &str) -> Arc<Mutex<()>> {
-    let key = artifacts_base_path.join(contract_name);
-    // These locks guard files rather than data, so a panicking test leaves nothing here
-    // to be corrupted. Recovering from the poison keeps that original panic visible
-    // instead of burying it under a `PoisonError` in every test that follows.
+/// Returns the lock guarding all files in `artifacts_base_path`.
+fn artifact_lock(artifacts_base_path: &Path) -> Arc<Mutex<()>> {
+    let key = fs::canonicalize(artifacts_base_path).unwrap_or_else(|e| {
+        panic!(
+            "Could not resolve Solidity artifact directory {}: {e}",
+            artifacts_base_path.display()
+        )
+    });
     let mut locks = ARTIFACT_LOCKS
         .lock()
         .unwrap_or_else(PoisonError::into_inner);
@@ -234,7 +265,6 @@ where
     P3: AsRef<Path>,
 {
     let source_path = fs::canonicalize(source_path).unwrap();
-    fs::create_dir_all(&output_path).unwrap();
     let output_path = fs::canonicalize(output_path).unwrap();
     let source_mount_arg = format!("{}:/contracts", source_path.to_str().unwrap());
     let output_mount_arg = format!("{}:/output", output_path.to_str().unwrap());
@@ -270,34 +300,41 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{artifact_lock, artifact_paths};
+    use super::{ContractConstructor, artifact_lock, artifact_paths};
+    use std::fs;
     use std::path::Path;
-    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
-    fn one_lock_per_contract() {
-        let first = artifact_lock(Path::new("target/solidity_build"), "Foo");
-        let second = artifact_lock(Path::new("target/solidity_build"), "Foo");
+    fn one_lock_per_output_directory() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let artifacts = temp_dir.path().join("artifacts");
+        fs::create_dir(&artifacts).unwrap();
+        let first = artifact_lock(&artifacts);
+        let second = artifact_lock(&artifacts);
 
         assert!(
             Arc::ptr_eq(&first, &second),
-            "threads wanting the same contract must wait on the same lock"
+            "all writes to one output directory must use the same lock"
         );
     }
 
     #[test]
-    fn unrelated_contracts_do_not_share_a_lock() {
-        let foo = artifact_lock(Path::new("target/solidity_build"), "Foo");
-        let bar = artifact_lock(Path::new("target/solidity_build"), "Bar");
-        let foo_elsewhere = artifact_lock(Path::new("src/tests/res"), "Foo");
+    fn separate_output_directories_do_not_share_a_lock() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let first_path = temp_dir.path().join("first");
+        let second_path = temp_dir.path().join("second");
+        fs::create_dir(&first_path).unwrap();
+        fs::create_dir(&second_path).unwrap();
+        let first = artifact_lock(&first_path);
+        let second = artifact_lock(&second_path);
 
         assert!(
-            !Arc::ptr_eq(&foo, &bar),
-            "different contracts should compile concurrently"
-        );
-        assert!(
-            !Arc::ptr_eq(&foo, &foo_elsewhere),
-            "the same name in another directory is another artifact"
+            !Arc::ptr_eq(&first, &second),
+            "isolated output directories should compile concurrently"
         );
     }
 
@@ -307,5 +344,95 @@ mod tests {
 
         assert_eq!(bin, Path::new("target/solidity_build/Foo.bin"));
         assert_eq!(abi, Path::new("target/solidity_build/Foo.abi"));
+    }
+
+    #[test]
+    fn concurrent_loads_compile_once_and_read_complete_artifacts() {
+        const THREADS: usize = 8;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let artifacts = Arc::new(temp_dir.path().join("artifacts"));
+        let start = Arc::new(Barrier::new(THREADS));
+        let compile_count = Arc::new(AtomicUsize::new(0));
+
+        let handles: Vec<_> = (0..THREADS)
+            .map(|_| {
+                let artifacts = Arc::clone(&artifacts);
+                let start = Arc::clone(&start);
+                let compile_count = Arc::clone(&compile_count);
+                thread::spawn(move || {
+                    start.wait();
+                    ContractConstructor::compile_or_load(
+                        Path::new("unused-sources"),
+                        &artifacts,
+                        Path::new("Foo.sol"),
+                        "Foo",
+                        false,
+                        |_, _, output_path| {
+                            compile_count.fetch_add(1, Ordering::SeqCst);
+                            fs::write(output_path.join("Foo.bin"), "6000").unwrap();
+                            thread::sleep(Duration::from_millis(20));
+                            fs::write(output_path.join("Foo.abi"), "[]").unwrap();
+                        },
+                    )
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            let constructor = handle.join().unwrap();
+            assert_eq!(constructor.code, [0x60, 0x00]);
+        }
+        assert_eq!(compile_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn poisoned_artifacts_are_recompiled_once() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let artifacts = temp_dir.path().join("artifacts");
+
+        let failed_compile = std::panic::catch_unwind(|| {
+            ContractConstructor::compile_or_load(
+                Path::new("unused-sources"),
+                &artifacts,
+                Path::new("Foo.sol"),
+                "Foo",
+                true,
+                |_, _, output_path| {
+                    fs::write(output_path.join("Foo.bin"), "60").unwrap();
+                    fs::write(output_path.join("Foo.abi"), "[]").unwrap();
+                    panic!("simulated compiler failure");
+                },
+            );
+        });
+        assert!(failed_compile.is_err());
+
+        let compile_count = AtomicUsize::new(0);
+        let constructor = ContractConstructor::compile_or_load(
+            Path::new("unused-sources"),
+            &artifacts,
+            Path::new("Foo.sol"),
+            "Foo",
+            false,
+            |_, _, output_path| {
+                compile_count.fetch_add(1, Ordering::SeqCst);
+                fs::write(output_path.join("Foo.bin"), "6000").unwrap();
+                fs::write(output_path.join("Foo.abi"), "[]").unwrap();
+            },
+        );
+        assert_eq!(constructor.code, [0x60, 0x00]);
+        assert_eq!(compile_count.load(Ordering::SeqCst), 1);
+
+        ContractConstructor::compile_or_load(
+            Path::new("unused-sources"),
+            &artifacts,
+            Path::new("Foo.sol"),
+            "Foo",
+            false,
+            |_, _, _| {
+                compile_count.fetch_add(1, Ordering::SeqCst);
+            },
+        );
+        assert_eq!(compile_count.load(Ordering::SeqCst), 1);
     }
 }
