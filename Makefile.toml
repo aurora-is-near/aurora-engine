@@ -33,20 +33,18 @@ args = ["clean"]
 [tasks.clean-contracts]
 category = "Cleanup"
 script = '''
-rm -Rf etc/eth-contracts/.pnp
-rm -Rf etc/eth-contracts/artifacts
-rm -Rf etc/eth-contracts/cache
-rm -Rf etc/tests/benchmark-contract/target
-rm -Rf etc/tests/ft-receiver/target
-rm -Rf etc/tests/self-contained-5bEgfRQ/target
-rm -Rf etc/xcc-router/target
-rm -Rf engine-tests/target
+rm -rf etc/eth-contracts/.pnp
+rm -rf etc/eth-contracts/artifacts
+rm -rf etc/eth-contracts/cache
+rm -rf etc/tests/*/target
+rm -rf etc/xcc-router/target
+rm -rf engine-tests/target
 '''
 
 [tasks.clean-bin]
 category = "Cleanup"
 script = '''
-rm -Rf bin
+rm -rf bin
 '''
 
 [tasks.clean-flow]

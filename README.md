@@ -151,9 +151,9 @@ cargo make wasm-opt
 
 The following tasks are available to clean up the workspace:
 
-- `clean`: cleans all built binaries and solidity contracts.
+- `clean`: cleans Cargo outputs, generated contract files, standalone test-contract targets, and built binaries.
 - `clean-cargo`: cleans with cargo.
-- `clean-contracts`: cleans the solidity contracts.
+- `clean-contracts`: cleans generated Solidity files and standalone test-contract build outputs.
 - `clean-bin`: cleans the binaries.
 
 Additionally, there is also but not included in the `clean` task:
