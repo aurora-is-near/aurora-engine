@@ -2,7 +2,7 @@
 name = "xcc_router"
 version = "1.0.0"
 authors = ["Aurora <hello@aurora.dev>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]
@@ -19,7 +19,7 @@ aurora-engine-types = { path = "../../engine-types", default-features = false }
 near-sdk = { version = "5", default-features = false, features = ["legacy", "unit-testing"] }
 
 [dev-dependencies]
-near-primitives = "0.36"
+near-primitives = "0.37"
 
 [features]
 default = []
