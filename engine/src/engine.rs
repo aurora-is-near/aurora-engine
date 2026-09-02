@@ -1108,15 +1108,11 @@ pub fn submit_with_alt_modexp<
         .gas_limit
         .try_into()
         .map_err(|_| EngineErrorKind::GasOverflow)?;
-    let authorization_list = transaction
-        .authorization_list()
-        .map_err(EngineErrorKind::FailedTransactionParse)?;
     let access_list = transaction
         .access_list
         .into_iter()
         .map(|a| (a.address, a.storage_keys))
         .collect();
-
     let result = if let Some(receiver) = transaction.to {
         engine.call(
             &sender,
@@ -1125,7 +1121,7 @@ pub fn submit_with_alt_modexp<
             transaction.data,
             gas_limit,
             access_list,
-            authorization_list,
+            transaction.authorization_list,
             handler,
         )
         // TODO: charge for storage
@@ -2501,7 +2497,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)
@@ -2538,7 +2534,7 @@ mod tests {
             value: Wei::default(),
             data: vec![],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let actual_result = engine
             .charge_gas(&origin, &transaction, None, None)

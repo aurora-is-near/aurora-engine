@@ -5,9 +5,7 @@ use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H160, U256, Vec, vec};
 use aurora_evm::executor::stack::Authorization;
 use eip_2930::AccessTuple;
-use rlp::{Decodable, DecoderError, Rlp, RlpStream};
-
-use crate::eip_7702::{AuthorizationTuple, MAGIC, SECP256K1N_HALF};
+use rlp::{Decodable, DecoderError, Rlp};
 
 pub mod backwards_compatibility;
 pub mod eip_1559;
@@ -84,18 +82,35 @@ impl From<&EthTransactionKind> for Vec<u8> {
 
 /// A normalized Ethereum transaction that can be created from older transactions.
 pub struct NormalizedEthTransaction {
+    /// The Ethereum address of the transaction sender, recovered from the signature.
     pub address: Address,
+    /// EIP-155 chain ID to prevent replay attacks across different networks.
+    /// None for legacy transactions that don't specify a chain ID.
     pub chain_id: Option<u64>,
+    /// Transaction sequence number from the sender's account, used to ensure transaction ordering.
     pub nonce: U256,
+    /// Maximum amount of gas units that can be consumed by this transaction.
     pub gas_limit: U256,
+    /// Maximum priority fee (tip) per gas unit that the sender is willing to pay to the miner.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_priority_fee_per_gas: U256,
+    /// Maximum total fee per gas unit (base fee + priority fee) that the sender is willing to pay.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_fee_per_gas: U256,
+    /// Recipient address for the transaction.
+    /// None indicates a contract creation transaction.
     pub to: Option<Address>,
+    /// Amount of Wei (the smallest denomination of Ether) to transfer to the recipient.
     pub value: Wei,
+    /// Input data for the transaction containing either contract bytecode (for creation)
+    /// or encoded function call data (for contract interaction).
     pub data: Vec<u8>,
+    /// EIP-2930 access list containing addresses and storage keys that the transaction
+    /// plans to access, allowing for reduced gas costs on subsequent accesses.
     pub access_list: Vec<AccessTuple>,
-    /// EIP-7702 authorization list. If `None`, then the transaction is not EIP-7702.
-    pub authorization_list: Option<Vec<AuthorizationTuple>>,
+    /// EIP-7702 authorization list containing signed authorizations that allow the transaction
+    /// to temporarily set code for externally owned accounts (EOAs) during execution.
+    pub authorization_list: Vec<Authorization>,
 }
 
 impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
@@ -115,7 +130,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: vec![],
-                authorization_list: None,
+                authorization_list: vec![],
             },
             Eip2930(tx) => Self {
                 address: tx.sender()?,
@@ -128,7 +143,7 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
-                authorization_list: None,
+                authorization_list: vec![],
             },
             Eip1559(tx) => Self {
                 address: tx.sender()?,
@@ -141,21 +156,25 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 value: tx.transaction.value,
                 data: tx.transaction.data,
                 access_list: tx.transaction.access_list,
-                authorization_list: None,
+                authorization_list: vec![],
             },
-            Eip7702(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: Some(tx.transaction.to),
-                value: tx.transaction.value,
-                data: tx.transaction.data.clone(),
-                access_list: tx.transaction.access_list.clone(),
-                authorization_list: Some(tx.transaction.authorization_list),
-            },
+            Eip7702(tx) => {
+                let address = tx.sender()?;
+                let authorization_list = tx.authorization_list()?;
+                Self {
+                    address,
+                    chain_id: Some(tx.transaction.chain_id),
+                    nonce: tx.transaction.nonce,
+                    gas_limit: tx.transaction.gas_limit,
+                    max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                    max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                    to: Some(tx.transaction.to),
+                    value: tx.transaction.value,
+                    data: tx.transaction.data,
+                    access_list: tx.transaction.access_list,
+                    authorization_list,
+                }
+            }
         })
     }
 }
@@ -206,12 +225,11 @@ impl NormalizedEthTransaction {
             .ok_or(Error::GasOverflow)?;
 
         let gas_authorization_list = if config.has_authorization_list {
-            let authorization_list_len = self.authorization_list.as_ref().map_or(0, Vec::len);
-
             config
                 .gas_per_auth_base_cost
                 .checked_mul(
-                    u64::try_from(authorization_list_len).map_err(|_e| Error::IntegerConversion)?,
+                    u64::try_from(self.authorization_list.len())
+                        .map_err(|_e| Error::IntegerConversion)?,
                 )
                 .ok_or(Error::GasOverflow)?
         } else {
@@ -250,95 +268,6 @@ impl NormalizedEthTransaction {
         } else {
             Ok(0)
         }
-    }
-
-    /// Validates and converts the raw authorization list into [`Authorization`] entries.
-    ///
-    /// For each [`AuthorizationTuple`] performs the following checks (EIP-7702):
-    /// 1. `s <= secp256k1n/2` - low-S signature constraint.
-    /// 2. `chain_id == 0 || chain_id == tx.chain_id` — chain binding.
-    /// 3. `parity ∈ {0, 1}` - valid recovery bit.
-    /// 4. `authority = ecrecover(keccak(0x05 || rlp([chain_id, address, nonce])), parity, r, s)`
-    /// 5. `authority != 0x0` — zero address is reserved as a system address.
-    ///
-    /// Invalid entries are **not** skipped — they are included with `is_valid = false`
-    /// because each entry must still be charged for gas.
-    /// Steps 2, 4–9 of EIP-7702 are delegated to the EVM itself.
-    ///
-    /// ### Errors
-    /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.
-    pub fn authorization_list(&self) -> Result<Vec<Authorization>, Error> {
-        // If the authorization list is None, then it's not 7702 transactions. Return an empty list.
-        let Some(authorization_list) = &self.authorization_list else {
-            return Ok(vec![]);
-        };
-
-        let authorization_list_len = authorization_list.len();
-
-        if authorization_list_len == 0 {
-            return Err(Error::EmptyAuthorizationList);
-        }
-
-        let current_tx_chain_id = U256::from(self.chain_id.unwrap_or_default());
-        let mut result = Vec::with_capacity(authorization_list_len);
-        let mut rlp_stream = RlpStream::new();
-        let mut message_bytes = vec![MAGIC; 1];
-        // According to EIP-7702, we should validate each authorization. We shouldn't skip any of them.
-        // And just put the `is_valid` flag to `false` if any of them is invalid. It's related to
-        // gas calculation, as each `authorization_list` must be charged, even if it's invalid.
-        for auth in authorization_list {
-            // According to EIP-7702 step 1. validation, we should verify it as
-            // `chain_id = 0 || current_chain_id`.
-            // AS `current_chain_id` we used `transaction.chain_id` as we will validate `chain_id` in
-            // Engine `submit_transaction` method.
-
-            // Step 2 - validation logic inside EVM itself.
-            // Step 3. Checking: authority = ecrecover(keccak(MAGIC || rlp([chain_id, address, nonce])), y_parity, r, s])
-            // Validate the signature, as in tests it is possible to have invalid signature values.
-            // Value `v` shouldn't be greater than 1
-            let mut is_valid = if auth.s > SECP256K1N_HALF {
-                false
-            } else {
-                (auth.chain_id.is_zero() || auth.chain_id == current_tx_chain_id)
-                    && auth.parity <= U256::one()
-            };
-
-            let authority = if is_valid {
-                rlp_stream.begin_list(3);
-                rlp_stream.append(&auth.chain_id);
-                rlp_stream.append(&auth.address);
-                rlp_stream.append(&auth.nonce);
-
-                message_bytes.extend_from_slice(rlp_stream.as_raw());
-
-                let signature_hash = aurora_engine_sdk::keccak(&message_bytes);
-                // U256::as_u32() is safe because here we're sure that the parity <= 1.
-                let v = u8::try_from(auth.parity.as_u32()).unwrap_or(u8::MAX);
-                let authority =
-                    aurora_engine_sdk::ecrecover(signature_hash, &vrs_to_arr(v, auth.r, auth.s))
-                        .unwrap_or_else(|_| {
-                            is_valid = false;
-                            Address::default()
-                        });
-
-                message_bytes.truncate(1);
-                rlp_stream.clear();
-
-                authority.raw()
-            } else {
-                H160::zero()
-            };
-
-            // Validations steps 2,4-9 from EIP-7702 provided by EVM itself.
-            result.push(Authorization {
-                authority,
-                address: auth.address,
-                nonce: auth.nonce,
-                is_valid,
-            });
-        }
-
-        Ok(result)
     }
 }
 
@@ -433,10 +362,10 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 #[cfg(test)]
 mod tests {
     use super::{Error, EthTransactionKind, INITCODE_WORD_COST};
-    use crate::eip_7702::AuthorizationTuple;
     use crate::{eip_1559, eip_2930, eip_7702};
     use aurora_engine_types::types::{Address, Wei};
     use aurora_engine_types::{H160, H256, U256};
+    use aurora_evm::executor::stack::Authorization;
 
     #[test]
     fn test_try_parse_empty_input() {
@@ -505,7 +434,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -523,7 +452,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![0u8; 10],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -544,7 +473,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![1u8; 10],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
 
@@ -565,7 +494,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![0, 1, 0, 1, 0],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call
@@ -586,7 +515,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![1u8; 32],
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_create
@@ -610,7 +539,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![access_tuple],
-            authorization_list: None,
+            authorization_list: vec![],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call
@@ -620,13 +549,11 @@ mod tests {
         assert_eq!(gas, expected);
 
         // Test transaction with an authorization list
-        let authorization = AuthorizationTuple {
-            chain_id: U256::from(1),
-            address: H160::default(),
+        let authorization = Authorization {
+            authority: H160::default(),
+            address: Address::default().raw(),
             nonce: 0,
-            parity: U256::default(),
-            r: U256::default(),
-            s: U256::default(),
+            is_valid: false,
         };
         // Test transaction with an authorization list length
         let tx = NormalizedEthTransaction {
@@ -640,7 +567,7 @@ mod tests {
             value: Wei::zero(),
             data: vec![],
             access_list: vec![],
-            authorization_list: Some(vec![authorization]),
+            authorization_list: vec![authorization],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
         let expected = config.gas_transaction_call + config.gas_per_auth_base_cost;
@@ -659,7 +586,7 @@ mod tests {
             value: Wei::zero(),
             data,
             access_list: vec![],
-            authorization_list: None,
+            authorization_list: vec![],
         }
     }
 

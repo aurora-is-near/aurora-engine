@@ -227,7 +227,7 @@ impl TransactionKind {
                     value,
                     data,
                     access_list: Vec::new(),
-                    authorization_list: None,
+                    authorization_list: Vec::new(),
                 }
             }
             Self::Deploy(data) => {
@@ -245,7 +245,7 @@ impl TransactionKind {
                     value: Wei::zero(),
                     data,
                     access_list: Vec::new(),
-                    authorization_list: None,
+                    authorization_list: Vec::new(),
                 }
             }
             Self::DeployErc20(_) | Self::DeployErc20Callback(_) => {
@@ -264,7 +264,7 @@ impl TransactionKind {
                     value: Wei::zero(),
                     data,
                     access_list: Vec::new(),
-                    authorization_list: None,
+                    authorization_list: Vec::new(),
                 }
             }
             Self::FtOnTransfer(args) => {
@@ -285,7 +285,7 @@ impl TransactionKind {
                         value,
                         data: Vec::new(),
                         access_list: Vec::new(),
-                        authorization_list: None,
+                        authorization_list: Vec::new(),
                     }
                 } else {
                     let from = Self::get_implicit_address(engine_account);
@@ -320,7 +320,7 @@ impl TransactionKind {
                         value: Wei::zero(),
                         data,
                         access_list: Vec::new(),
-                        authorization_list: None,
+                        authorization_list: Vec::new(),
                     }
                 }
             }
@@ -353,7 +353,7 @@ impl TransactionKind {
                                         value,
                                         data: Vec::new(),
                                         access_list: Vec::new(),
-                                        authorization_list: None,
+                                        authorization_list: Vec::new(),
                                     }
                                 },
                                    |erc20_address| {
@@ -381,7 +381,7 @@ impl TransactionKind {
                                            value: Wei::zero(),
                                            data,
                                            access_list: Vec::new(),
-                                           authorization_list: None,
+                                           authorization_list: Vec::new(),
                                        }
                                    },
                                 )
@@ -491,7 +491,7 @@ impl TransactionKind {
             value: Wei::zero(),
             data: method_name.as_bytes().to_vec(),
             access_list: Vec::new(),
-            authorization_list: None,
+            authorization_list: Vec::new(),
         }
     }
 
