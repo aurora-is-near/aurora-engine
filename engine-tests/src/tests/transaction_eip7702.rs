@@ -11,7 +11,7 @@
 //!   * Early-exit rejection paths (wrong `tx.chain_id`, `tx.nonce`, or insufficient
 //!     balance): prove that `ecrecover` over the auth list is NOT invoked.
 //!
-//! NEAR-gas asserts are floor-rounded to 0.1 TGas (100 GGas) via
+//! NEAR-gas asserts are floor-rounded to 0.1 `TGas` (100 `GGas`) via
 //! [`round_near_gas`] so sub-percent cost drift doesn't flake the suite
 //! while any meaningful cost-model regression still fails loudly.
 

@@ -65,6 +65,7 @@ fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas
 }
 
 /// Submit transaction to precompile address and check result with expected output.
+#[track_caller]
 fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], gas_limit: u64) {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = Gas::MAX;
@@ -87,6 +88,7 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
 }
 
 /// Checks if `total_gas` is within 1 `GGas` of `ggas_bound`.
+#[track_caller]
 fn assert_gas_bound(total_gas: u64, bound_ggas: u64) {
     const GIGA: i128 = 1_000_000_000;
     let total_gas: i128 = total_gas.into();
@@ -105,7 +107,7 @@ fn test_alt_bn128_add() {
         &Bn256Add::<Istanbul>::new(),
         Bn256Add::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_add.json"),
-        3700, // 3.700 TGas
+        3590, // 3.590 TGas
     );
 }
 
@@ -125,6 +127,6 @@ fn test_alt_bn128_pairing() {
         &Bn256Pair::<Istanbul>::new(),
         Bn256Pair::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_pairing.json"),
-        44200, // 44.200 TGas
+        44100, // 44.100 TGas
     );
 }
