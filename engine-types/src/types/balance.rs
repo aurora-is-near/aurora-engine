@@ -1,7 +1,8 @@
-use crate::fmt::Formatter;
-use crate::{format, Add, Display, Sub, ToString};
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::fmt::Formatter;
+use crate::{Add, Display, Sub, ToString, format};
 
 pub const ZERO_BALANCE: Balance = Balance::new(0);
 pub const ZERO_YOCTO: Yocto = Yocto::new(0);
@@ -140,7 +141,7 @@ impl Sub for Yocto {
 }
 
 pub mod error {
-    use crate::{fmt, String};
+    use crate::{String, fmt};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
     pub struct BalanceOverflowError;

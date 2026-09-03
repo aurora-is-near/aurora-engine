@@ -1,4 +1,4 @@
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use std::cell::RefCell;
 use std::collections::HashMap;
 

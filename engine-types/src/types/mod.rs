@@ -1,5 +1,6 @@
-use crate::{str, vec, Vec, U256};
 use borsh::{BorshDeserialize, BorshSerialize};
+
+use crate::{U256, Vec, str, vec};
 
 pub mod address;
 pub mod balance;
@@ -7,7 +8,7 @@ pub mod fee;
 pub mod gas;
 pub mod wei;
 
-pub use address::{make_address, Address};
+pub use address::{Address, make_address};
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
@@ -82,7 +83,7 @@ pub enum PromiseResult {
 
 impl PromiseResult {
     #[must_use]
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         match self {
             Self::Failed | Self::NotReady => 1,
             Self::Successful(bytes) => bytes.len(),

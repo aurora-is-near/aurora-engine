@@ -1,4 +1,3 @@
-use crate::Storage;
 use aurora_engine::xcc::{AddressVersionUpdateArgs, FundXccArgs};
 use aurora_engine_transactions::{EthTransactionKind, NormalizedEthTransaction};
 use aurora_engine_types::account_id::AccountId;
@@ -6,13 +5,15 @@ use aurora_engine_types::parameters::connector::FtTransferMessageData;
 use aurora_engine_types::parameters::xcc::WithdrawWnearToRouterArgs;
 use aurora_engine_types::parameters::{connector, engine, silo};
 use aurora_engine_types::{
+    H256, U256,
     borsh::{self, BorshDeserialize, BorshSerialize},
     types::{self, Address, Wei},
-    H256, U256,
 };
 use serde::Serialize;
 use std::borrow::Cow;
 use strum::EnumString;
+
+use crate::Storage;
 
 /// Type describing the format of messages sent to the storage layer for keeping
 /// it in sync with the blockchain.
@@ -79,7 +80,7 @@ impl TransactionMessage {
         };
         Self::try_from(borshable).map_err(|e| {
             let message = e.as_str();
-            std::io::Error::new(std::io::ErrorKind::Other, message)
+            std::io::Error::other(message)
         })
     }
 }
@@ -790,7 +791,7 @@ struct BorshableTransactionMessageV2<'a> {
     pub caller: Cow<'a, AccountId>,
     pub attached_near: u128,
     pub transaction: BorshableTransactionKind<'a>,
-    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
+    pub promise_data: Cow<'a, [Option<Vec<u8>>]>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -804,8 +805,8 @@ struct BorshableTransactionMessageV3<'a> {
     pub caller: Cow<'a, AccountId>,
     pub attached_near: u128,
     pub transaction: BorshableTransactionKind<'a>,
-    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
-    pub raw_input: Cow<'a, Vec<u8>>,
+    pub promise_data: Cow<'a, [Option<Vec<u8>>]>,
+    pub raw_input: Cow<'a, [u8]>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -819,8 +820,8 @@ struct BorshableTransactionMessageV4<'a> {
     pub caller: Cow<'a, AccountId>,
     pub attached_near: u128,
     pub transaction: BorshableTransactionKind<'a>,
-    pub promise_data: Cow<'a, Vec<Option<Vec<u8>>>>,
-    pub raw_input: Cow<'a, Vec<u8>>,
+    pub promise_data: Cow<'a, [Option<Vec<u8>>]>,
+    pub raw_input: Cow<'a, [u8]>,
     pub action_hash: [u8; 32],
 }
 
@@ -917,12 +918,12 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
 #[derive(BorshDeserialize, BorshSerialize, Clone)]
 #[borsh(crate = "aurora_engine_types::borsh")]
 enum BorshableTransactionKind<'a> {
-    Submit(Cow<'a, Vec<u8>>),
+    Submit(Cow<'a, [u8]>),
     Call(Cow<'a, engine::CallArgs>),
-    Deploy(Cow<'a, Vec<u8>>),
+    Deploy(Cow<'a, [u8]>),
     DeployErc20(Cow<'a, engine::DeployErc20TokenArgs>),
     FtOnTransfer(Cow<'a, connector::FtOnTransferArgs>),
-    Deposit(Cow<'a, Vec<u8>>),
+    Deposit(Cow<'a, [u8]>),
     FtTransferCall(Cow<'a, connector::FtTransferCallArgs>),
     FinishDeposit(Cow<'a, connector::FinishDepositArgs>),
     ResolveTransfer(
@@ -940,7 +941,7 @@ enum BorshableTransactionKind<'a> {
     SetConnectorData(Cow<'a, connector::SetContractDataCallArgs>),
     NewConnector(Cow<'a, connector::InitCallArgs>),
     NewEngine(Cow<'a, engine::NewCallArgs>),
-    FactoryUpdate(Cow<'a, Vec<u8>>),
+    FactoryUpdate(Cow<'a, [u8]>),
     FactoryUpdateAddressVersion(Cow<'a, AddressVersionUpdateArgs>),
     FactorySetWNearAddress(Address),
     PausePrecompiles(Cow<'a, engine::PausePrecompilesCallArgs>),
@@ -960,14 +961,14 @@ enum BorshableTransactionKind<'a> {
     SetFixedGas(Cow<'a, silo::FixedGasArgs>),
     SetSiloParams(Cow<'a, Option<silo::SiloParamsArgs>>),
     AddEntryToWhitelist(Cow<'a, silo::WhitelistArgs>),
-    AddEntryToWhitelistBatch(Cow<'a, Vec<silo::WhitelistArgs>>),
+    AddEntryToWhitelistBatch(Cow<'a, [silo::WhitelistArgs]>),
     RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
     SetEthConnectorContractAccount(Cow<'a, connector::SetEthConnectorContractAccountArgs>),
     MirrorErc20TokenCallback(Cow<'a, connector::MirrorErc20TokenArgs>),
     WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
     StoreRelayerKeyCallback(Cow<'a, engine::RelayerKeyArgs>),
-    SetWhitelistsStatuses(Cow<'a, Vec<silo::WhitelistStatusArgs>>),
+    SetWhitelistsStatuses(Cow<'a, [silo::WhitelistStatusArgs]>),
     SetErc20FallbackAddress(Cow<'a, silo::Erc20FallbackAddressArgs>),
     DeployErc20Callback(Cow<'a, AccountId>),
 }
@@ -1066,7 +1067,7 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
                 // `BorshableTransactionKind` is an internal type, so we will
                 // assume the conversion is infallible. If the conversion were to
                 // fail then something has gone very wrong.
-                let eth_tx = tx_bytes.as_slice().try_into()?;
+                let eth_tx = tx_bytes.as_ref().try_into()?;
                 Ok(Self::Submit(eth_tx))
             }
             BorshableTransactionKind::SubmitWithArgs(x) => Ok(Self::SubmitWithArgs(x.into_owned())),

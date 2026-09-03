@@ -1,8 +1,9 @@
-use crate::Error;
 use aurora_engine_sdk as sdk;
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{Vec, U256};
+use aurora_engine_types::{U256, Vec};
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+
+use crate::Error;
 
 #[derive(Debug, Default, Eq, PartialEq, Clone)]
 pub struct TransactionLegacy {

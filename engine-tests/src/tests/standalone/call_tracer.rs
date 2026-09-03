@@ -1,19 +1,20 @@
-use crate::prelude::{H160, H256};
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-use crate::utils::{self, standalone, Signer};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_types::parameters::engine::TransactionStatus;
 use aurora_engine_types::{
+    U256,
     parameters::{CrossContractCallArgs, PromiseArgs, PromiseCreateArgs},
     storage,
     types::{Address, NearGas, Wei, Yocto},
-    U256,
 };
 use engine_standalone_storage::sync;
 use engine_standalone_tracing::{
     sputnik,
     types::call_tracer::{self, CallTracer},
 };
+
+use crate::prelude::{H160, H256};
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
+use crate::utils::{self, Signer, standalone};
 
 #[test]
 fn test_trace_contract_deploy() {

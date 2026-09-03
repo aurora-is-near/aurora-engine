@@ -1,9 +1,10 @@
-use super::{EvmPrecompileResult, Precompile};
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::{utils, PrecompileOutput};
 use aurora_engine_sdk::env::Env;
 use aurora_engine_types::account_id::AccountId;
 use aurora_evm::{Context, ExitError};
+
+use super::{EvmPrecompileResult, Precompile};
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::{PrecompileOutput, utils};
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -11,7 +12,6 @@ mod costs {
     // TODO(#483): Determine the correct amount of gas
     pub(super) const PREDECESSOR_ACCOUNT_GAS: EthGas = EthGas::new(0);
     // TODO(#483): Determine the correct amount of gas
-    #[allow(dead_code)]
     pub(super) const CURRENT_ACCOUNT_GAS: EthGas = EthGas::new(0);
 }
 
@@ -20,7 +20,7 @@ pub struct PredecessorAccount<'a, E> {
 }
 
 pub mod predecessor_account {
-    use aurora_engine_types::types::{make_address, Address};
+    use aurora_engine_types::types::{Address, make_address};
 
     /// `predecessor_account_id` precompile address
     ///
@@ -49,10 +49,10 @@ impl<E: Env> Precompile for PredecessorAccount<'_, E> {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let predecessor_account_id = self.env.predecessor_account_id();
@@ -82,7 +82,7 @@ impl CurrentAccount {
 
 impl Precompile for CurrentAccount {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
-        Ok(costs::PREDECESSOR_ACCOUNT_GAS)
+        Ok(costs::CURRENT_ACCOUNT_GAS)
     }
 
     fn run(
@@ -94,10 +94,10 @@ impl Precompile for CurrentAccount {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         Ok(PrecompileOutput::without_logs(
@@ -109,7 +109,7 @@ impl Precompile for CurrentAccount {
 
 #[cfg(test)]
 mod tests {
-    use crate::account_ids::{predecessor_account, CurrentAccount};
+    use crate::account_ids::{CurrentAccount, predecessor_account};
     use crate::prelude::sdk::types::near_account_to_evm_address;
 
     #[test]

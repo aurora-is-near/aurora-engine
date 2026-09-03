@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-sdk"
-version = "1.3.0"
-description = "SDK that used in Aurora Engine"
+version = "2.0.1"
+description = "SDK used in Aurora Engine"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -38,9 +38,6 @@ std = [
     "aurora-engine-types/std",
     "base64/std",
     "libsecp256k1/std",
-    "ripemd/std",
-    "sha2/std",
-    "sha3/std",
     "dep:ark-bn254",
     "dep:ark-serialize",
     "dep:ark-ec",

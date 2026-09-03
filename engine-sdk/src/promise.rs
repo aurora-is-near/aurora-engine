@@ -30,16 +30,16 @@ pub trait PromiseHandler {
     /// bridged tokens. Therefore, this function must be used with extreme caution to prevent
     /// security vulnerabilities. In particular, it must not be possible for users to execute
     /// arbitrary calls using the Engine.
-    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId;
+    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId;
 
     /// Combine more than one promise into one.
     /// # Safety
     /// Safe because of use `promise_create_call` function under the hood.
-    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId;
+    fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId;
 
     /// # Safety
     /// See note on `promise_create_call`.
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -49,13 +49,13 @@ pub trait PromiseHandler {
     /// See note on `promise_create_call`. Promise batches in particular must be used very
     /// carefully because they can take destructive actions such as deploying new contract
     /// code or adding/removing access keys.
-    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId;
+    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId;
 
     /// # Safety
     /// See note on `promise_create_call`. Promise batches in particular must be used very
     /// carefully because they can take destructive actions such as deploying new contract
     /// code or adding/removing access keys.
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         base: PromiseId,
         args: &PromiseBatchAction,
@@ -65,7 +65,7 @@ pub trait PromiseHandler {
 
     /// # Safety
     /// See note on `promise_create_call`.
-    unsafe fn promise_create_with_callback(&mut self, args: &PromiseWithCallbackArgs) -> PromiseId {
+    fn promise_create_with_callback(&mut self, args: &PromiseWithCallbackArgs) -> PromiseId {
         let base = self.promise_create_call(&args.base);
         self.promise_attach_callback(base, &args.callback)
     }
@@ -122,15 +122,15 @@ impl PromiseHandler for Noop {
         None
     }
 
-    unsafe fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
+    fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
+    fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         _base: PromiseId,
         _callback: &PromiseCreateArgs,
@@ -138,11 +138,11 @@ impl PromiseHandler for Noop {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+    fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         _base: PromiseId,
         _args: &PromiseBatchAction,

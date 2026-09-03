@@ -64,14 +64,14 @@ impl PromiseHandler for PromiseTracker {
             .cloned()
     }
 
-    unsafe fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
+    fn promise_create_call(&mut self, args: &PromiseCreateArgs) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises
             .insert(id, PromiseArgs::Create(args.clone()));
         PromiseId::new(id)
     }
 
-    unsafe fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
+    fn promise_create_and_combine(&mut self, args: &[PromiseCreateArgs]) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises.insert(
             id,
@@ -84,7 +84,7 @@ impl PromiseHandler for PromiseTracker {
         PromiseId::new(id)
     }
 
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         base: PromiseId,
         callback: &PromiseCreateArgs,
@@ -100,14 +100,14 @@ impl PromiseHandler for PromiseTracker {
         PromiseId::new(id)
     }
 
-    unsafe fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
+    fn promise_create_batch(&mut self, args: &PromiseBatchAction) -> PromiseId {
         let id = self.take_id();
         self.scheduled_promises
             .insert(id, PromiseArgs::Batch(args.clone()));
         PromiseId::new(id)
     }
 
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         base: PromiseId,
         args: &PromiseBatchAction,

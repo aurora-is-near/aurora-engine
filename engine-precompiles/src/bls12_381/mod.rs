@@ -6,8 +6,8 @@ pub use g1_add::BlsG1Add;
 pub use g1_msm::BlsG1Msm;
 pub use g2_add::BlsG2Add;
 pub use g2_msm::BlsG2Msm;
-pub use map_fp2_to_g2::BlsMapFp2ToG2;
 pub use map_fp_to_g1::BlsMapFpToG1;
+pub use map_fp2_to_g2::BlsMapFp2ToG2;
 pub use pairing_check::BlsPairingCheck;
 
 mod g1_add;

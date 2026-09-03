@@ -1,10 +1,11 @@
-use crate::utils::*;
 use aurora_engine_types::types::NEP141Wei;
-use near_sdk::serde_json::{json, Value};
+use near_sdk::serde_json::{Value, json};
 use near_sdk::{json_types::U128, serde};
 use near_workspaces::types::NearToken;
 use near_workspaces::{AccountId, Contract};
 use std::str::FromStr;
+
+use crate::utils::*;
 
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
@@ -827,6 +828,24 @@ async fn test_storage_unregister() -> anyhow::Result<()> {
         .call("storage_unregister")
         .args_json(json!({
             "force": true,
+        }))
+        .deposit(NearToken::from_yoctonear(1))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(res.is_success(), "{res:#?}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_storage_withdraw() -> anyhow::Result<()> {
+    let contract = TestContract::new().await?;
+
+    let res = contract
+        .engine_contract
+        .call("storage_withdraw")
+        .args_json(json!({
+            "amount": None::<U128>,
         }))
         .deposit(NearToken::from_yoctonear(1))
         .max_gas()

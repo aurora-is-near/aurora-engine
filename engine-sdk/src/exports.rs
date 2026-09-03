@@ -1,5 +1,6 @@
 #[allow(unused)]
-extern "C" {
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
     // #############
     // # Registers #
     // #############

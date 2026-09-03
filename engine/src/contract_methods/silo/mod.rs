@@ -1,11 +1,11 @@
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
+use aurora_engine_types::AsBytes;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::silo::{
     SiloParamsArgs, WhitelistArgs, WhitelistKind, WhitelistKindArgs, WhitelistStatusArgs,
 };
-use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
+use aurora_engine_types::storage::{KeyPrefix, bytes_to_key};
 use aurora_engine_types::types::{Address, EthGas};
-use aurora_engine_types::AsBytes;
 
 use crate::prelude::Vec;
 
@@ -18,8 +18,7 @@ const ERC20_FALLBACK_KEY: &[u8] = b"ERC20_FALLBACK_KEY";
 
 /// Return SILO parameters.
 pub fn get_silo_params<I: IO>(io: &I) -> Option<SiloParamsArgs> {
-    let params = get_fixed_gas(io)
-        .and_then(|cost| get_erc20_fallback_address(io).map(|address| (cost, address)));
+    let params = get_fixed_gas(io).zip(get_erc20_fallback_address(io));
 
     params.map(|(cost, address)| SiloParamsArgs {
         fixed_gas: cost,

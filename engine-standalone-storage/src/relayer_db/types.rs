@@ -1,6 +1,6 @@
 use aurora_engine_transactions::{
-    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
     EthTransactionKind,
+    legacy::{LegacyEthSignedTransaction, TransactionLegacy},
 };
 use aurora_engine_types::types::{Address, Wei};
 use aurora_engine_types::{H256, U256};

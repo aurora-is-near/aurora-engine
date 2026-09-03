@@ -3,7 +3,7 @@ use aurora_engine_types::parameters::{PromiseBatchAction, PromiseCreateArgs};
 use aurora_engine_types::types::PromiseResult;
 
 /// Implements `PromiseHandler` so that it can be used in the standalone engine implementation of
-/// methods like `call`, however since the standalone engine cannot schedule promises in a
+/// methods like `call`. However, since the standalone engine cannot schedule promises in a
 /// meaningful way, the mutable implementations are no-ops. Functionally, this is only an implementation
 /// of `ReadOnlyPromiseHandler`, which is needed for the standalone engine to properly serve the
 /// EVM precompile that gives back information on the results of promises (possibly scheduled using
@@ -33,15 +33,15 @@ impl PromiseHandler for NoScheduler<'_> {
         Some(result)
     }
 
-    unsafe fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
+    fn promise_create_call(&mut self, _args: &PromiseCreateArgs) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
+    fn promise_create_and_combine(&mut self, _args: &[PromiseCreateArgs]) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_attach_callback(
+    fn promise_attach_callback(
         &mut self,
         _base: PromiseId,
         _callback: &PromiseCreateArgs,
@@ -49,11 +49,11 @@ impl PromiseHandler for NoScheduler<'_> {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
+    fn promise_create_batch(&mut self, _args: &PromiseBatchAction) -> PromiseId {
         PromiseId::new(0)
     }
 
-    unsafe fn promise_attach_batch_callback(
+    fn promise_attach_batch_callback(
         &mut self,
         _base: PromiseId,
         _args: &PromiseBatchAction,

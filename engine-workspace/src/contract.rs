@@ -418,67 +418,67 @@ impl EngineContract {
 /// View functions
 impl EngineContract {
     #[must_use]
-    pub fn ft_total_supply(&self) -> ViewFtTotalSupply {
+    pub fn ft_total_supply(&self) -> ViewFtTotalSupply<'_> {
         ViewFtTotalSupply::view(&self.contract)
     }
 
     #[must_use]
-    pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf {
+    pub fn ft_balance_of(&self, account_id: &AccountId) -> ViewFtBalanceOf<'_> {
         ViewFtBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
     }
 
     #[must_use]
-    pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf {
+    pub fn storage_balance_of(&self, account_id: &AccountId) -> ViewStorageBalanceOf<'_> {
         ViewStorageBalanceOf::view(&self.contract).args_json(json!({ "account_id": account_id }))
     }
 
     #[must_use]
-    pub fn get_version(&self) -> ViewVersion {
+    pub fn get_version(&self) -> ViewVersion<'_> {
         ViewVersion::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_owner(&self) -> ViewOwner {
+    pub fn get_owner(&self) -> ViewOwner<'_> {
         ViewOwner::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_chain_id(&self) -> ViewChainId {
+    pub fn get_chain_id(&self) -> ViewChainId<'_> {
         ViewChainId::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_upgrade_index(&self) -> ViewUpgradeIndex {
+    pub fn get_upgrade_index(&self) -> ViewUpgradeIndex<'_> {
         ViewUpgradeIndex::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_paused_precompiles(&self) -> ViewPausedPrecompiles {
+    pub fn get_paused_precompiles(&self) -> ViewPausedPrecompiles<'_> {
         ViewPausedPrecompiles::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_block_hash(&self, block_height: u64) -> ViewBlockHash {
+    pub fn get_block_hash(&self, block_height: u64) -> ViewBlockHash<'_> {
         ViewBlockHash::view(&self.contract).args_borsh(block_height)
     }
 
     #[must_use]
-    pub fn get_code(&self, address: Address) -> ViewCode {
+    pub fn get_code(&self, address: Address) -> ViewCode<'_> {
         ViewCode::view(&self.contract).args_borsh(address)
     }
 
     #[must_use]
-    pub fn get_balance(&self, address: Address) -> ViewBalance {
+    pub fn get_balance(&self, address: Address) -> ViewBalance<'_> {
         ViewBalance::view(&self.contract).args(address.as_bytes().to_vec())
     }
 
     #[must_use]
-    pub fn get_nonce(&self, address: Address) -> ViewNonce {
+    pub fn get_nonce(&self, address: Address) -> ViewNonce<'_> {
         ViewNonce::view(&self.contract).args(address.as_bytes().to_vec())
     }
 
     #[must_use]
-    pub fn get_storage_at(&self, address: Address, key: H256) -> ViewStorageAt {
+    pub fn get_storage_at(&self, address: Address, key: H256) -> ViewStorageAt<'_> {
         let raw_key = <H256 as Into<aurora_engine_types::types::RawH256>>::into(key);
         ViewStorageAt::view(&self.contract).args_borsh((address, raw_key))
     }
@@ -490,52 +490,52 @@ impl EngineContract {
         address: Address,
         amount: U256,
         input: Vec<u8>,
-    ) -> ViewView {
+    ) -> ViewView<'_> {
         ViewView::view(&self.contract).args_borsh((sender, address, amount.to_big_endian(), input))
     }
 
     #[must_use]
-    pub fn get_erc20_from_nep141(&self, account: AccountId) -> ViewErc20FromNep141 {
+    pub fn get_erc20_from_nep141(&self, account: AccountId) -> ViewErc20FromNep141<'_> {
         ViewErc20FromNep141::view(&self.contract).args_borsh(account)
     }
 
     #[must_use]
-    pub fn get_nep141_from_erc20(&self, address: Address) -> ViewNep141FromErc20 {
+    pub fn get_nep141_from_erc20(&self, address: Address) -> ViewNep141FromErc20<'_> {
         ViewNep141FromErc20::view(&self.contract).args_borsh(address)
     }
 
     #[must_use]
-    pub fn get_paused_flags(&self) -> ViewPausedFlags {
+    pub fn get_paused_flags(&self) -> ViewPausedFlags<'_> {
         ViewPausedFlags::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_eth_connector_contract_account(&self) -> ViewGetEthConnectorContractAccount {
+    pub fn get_eth_connector_contract_account(&self) -> ViewGetEthConnectorContractAccount<'_> {
         ViewGetEthConnectorContractAccount::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_fixed_gas(&self) -> ViewGetFixedGas {
+    pub fn get_fixed_gas(&self) -> ViewGetFixedGas<'_> {
         ViewGetFixedGas::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_silo_params(&self) -> ViewGetSiloParams {
+    pub fn get_silo_params(&self) -> ViewGetSiloParams<'_> {
         ViewGetSiloParams::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_whitelist_status(&self, args: WhitelistKindArgs) -> ViewGetWhitelistStatus {
+    pub fn get_whitelist_status(&self, args: WhitelistKindArgs) -> ViewGetWhitelistStatus<'_> {
         ViewGetWhitelistStatus::view(&self.contract).args_borsh(args)
     }
 
     #[must_use]
-    pub fn factory_get_wnear_address(&self) -> ViewFactoryWnearAddress {
+    pub fn factory_get_wnear_address(&self) -> ViewFactoryWnearAddress<'_> {
         ViewFactoryWnearAddress::view(&self.contract)
     }
 
     #[must_use]
-    pub fn get_erc20_metadata(&self, identifier: Erc20Identifier) -> ViewGetErc20Metadata {
+    pub fn get_erc20_metadata(&self, identifier: Erc20Identifier) -> ViewGetErc20Metadata<'_> {
         ViewGetErc20Metadata::view(&self.contract).args_json(identifier)
     }
 }
@@ -556,7 +556,7 @@ impl RawContract {
         CallTransaction::new(call_tx)
     }
 
-    pub fn view<F: AsRef<str>>(&self, function: F) -> ViewTransaction {
+    pub fn view<F: AsRef<str>>(&self, function: F) -> ViewTransaction<'_> {
         let view_tx = self.inner.view(function.as_ref());
         ViewTransaction::new(view_tx)
     }

@@ -1,9 +1,10 @@
-use crate::prelude::{
-    parameters::CallArgs, parameters::FunctionCallArgsV2, transactions::legacy::TransactionLegacy,
-    Address, WeiU256, U256,
-};
-use crate::utils::{self, solidity, AuroraRunner, Signer};
 use aurora_engine_types::types::Wei;
+
+use crate::prelude::{
+    Address, U256, WeiU256, parameters::CallArgs, parameters::FunctionCallArgsV2,
+    transactions::legacy::TransactionLegacy,
+};
+use crate::utils::{self, AuroraRunner, Signer, solidity};
 
 pub struct SelfDestructFactoryConstructor(pub solidity::ContractConstructor);
 

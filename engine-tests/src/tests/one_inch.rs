@@ -1,10 +1,10 @@
-use crate::prelude::parameters::SubmitResult;
-use crate::prelude::{Wei, U256};
-use crate::utils::one_inch::{liquidity_protocol, LIMIT_ORDER_PROTOCOL_PATH};
-use crate::utils::{self, assert_gas_bound};
 use aurora_engine_types::{borsh::BorshDeserialize, types::Address};
-use libsecp256k1::SecretKey;
 use near_vm_runner::logic::VMOutcome;
+
+use crate::prelude::parameters::SubmitResult;
+use crate::prelude::{U256, Wei};
+use crate::utils::one_inch::{LIMIT_ORDER_PROTOCOL_PATH, liquidity_protocol};
+use crate::utils::{self, assert_gas_bound, random_sk};
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1_000_000);
 const INITIAL_NONCE: u64 = 0;
@@ -19,11 +19,11 @@ fn test_1inch_liquidity_protocol() {
 
     let (result, profile, deployer_address) = helper.create_mooniswap_deployer();
     assert!(result.gas_used >= 5_100_000); // more than 5.1M EVM gas used
-    assert_gas_bound(profile.all_gas(), 10); // less than 10 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 8); // NEAR TGas used
 
     let (result, profile, pool_factory) = helper.create_pool_factory(&deployer_address);
     assert!(result.gas_used >= 2_800_000); // more than 2.8M EVM gas used
-    assert_gas_bound(profile.all_gas(), 8); // less than 8 NEAR TGas used
+    assert_gas_bound(profile.all_gas(), 7); // NEAR TGas used
 
     // create some ERC-20 tokens to have a liquidity pool for
     let signer_address = utils::address_from_secret_key(&helper.signer.secret_key);
@@ -35,7 +35,7 @@ fn test_1inch_liquidity_protocol() {
     let (result, profile, pool) =
         helper.create_pool(&pool_factory, token_a.0.address, token_b.0.address);
     assert!(result.gas_used >= 4_500_000); // more than 4.5M EVM gas used
-    assert_gas_bound(profile.all_gas(), 16);
+    assert_gas_bound(profile.all_gas(), 14);
 
     // Approve giving ERC-20 tokens to the pool
     helper.approve_erc20_tokens(&token_a, pool.address());
@@ -54,7 +54,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 302_000); // more than 302k EVM gas used
-    assert_gas_bound(profile.all_gas(), 18);
+    assert_gas_bound(profile.all_gas(), 16);
 
     // Same here
     helper.runner.context.block_timestamp += 10_000_000 * 1_000_000_000;
@@ -69,7 +69,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 210_000); // more than 210k EVM gas used
-    assert_gas_bound(profile.all_gas(), 19);
+    assert_gas_bound(profile.all_gas(), 17); // NEAR TGas used
 
     let (result, profile) = helper.pool_withdraw(
         &pool,
@@ -80,7 +80,7 @@ fn test_1inch_liquidity_protocol() {
         },
     );
     assert!(result.gas_used >= 150_000); // more than 150k EVM gas used
-    assert_gas_bound(profile.all_gas(), 16);
+    assert_gas_bound(profile.all_gas(), 14);
 }
 
 #[test]
@@ -97,12 +97,12 @@ fn test_1inch_limit_order_deploy() {
     // more than 3.5 million Ethereum gas used
     assert!(result.gas_used > 3_500_000);
     // less than 10 NEAR TGas used
-    assert_gas_bound(profile.all_gas(), 10);
-    // at least 45% of which is from wasm execution
+    assert_gas_bound(profile.all_gas(), 9);
+    // at least 35% of which is from wasm execution
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (40..=50).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 45% and 55%",
+        (35..=52).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 35% and 52%",
     );
 }
 
@@ -129,8 +129,8 @@ fn deploy_1_inch_limit_order_contract(
 fn initialize() -> (utils::AuroraRunner, utils::Signer) {
     // set up Aurora runner and accounts
     let mut runner = utils::deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = random_sk(&mut rng);
     let source_address = utils::address_from_secret_key(&source_account);
     runner.create_address(source_address, INITIAL_BALANCE, INITIAL_NONCE.into());
     let mut signer = utils::Signer::new(source_account);

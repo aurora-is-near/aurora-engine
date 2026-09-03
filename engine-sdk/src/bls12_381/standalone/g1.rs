@@ -1,16 +1,20 @@
-use super::utils::{fp_from_bendian, fp_to_bytes, remove_padding};
-use super::Bls12381Error;
-use crate::bls12_381::{G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH};
-use crate::prelude::{vec, Vec};
 use blst::{blst_p1_affine, blst_p1_affine_in_g1, blst_p1_affine_on_curve};
 
+use super::Bls12381Error;
+use super::utils::{fp_from_bendian, fp_to_bytes};
+use crate::bls12_381::{G1_INPUT_ITEM_LENGTH, PADDED_FP_LENGTH, remove_padding};
+use crate::prelude::{Vec, vec};
+
 /// Encodes a G1 point in affine format into byte slice with padded elements.
+///
+/// ## SAFETY
+/// The caller must ensure that `input` is a valid, non-null pointer to a `blst_p1_affine`.
 pub fn encode_g1_point(input: *const blst_p1_affine) -> Vec<u8> {
     let mut out = vec![0u8; G1_INPUT_ITEM_LENGTH];
     // SAFETY: outcomes from fixed length array, input is a blst value.
     unsafe {
-        fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &(*input).x);
-        fp_to_bytes(&mut out[PADDED_FP_LENGTH..], &(*input).y);
+        fp_to_bytes(&mut out[..PADDED_FP_LENGTH], &raw const (*input).x);
+        fp_to_bytes(&mut out[PADDED_FP_LENGTH..], &raw const (*input).y);
     }
     out
 }
@@ -61,7 +65,7 @@ pub fn extract_g1_input(
         //
         // As endomorphism acceleration requires input on the correct subgroup, implementers MAY
         // use endomorphism acceleration.
-        if unsafe { !blst_p1_affine_in_g1(&out) } {
+        if unsafe { !blst_p1_affine_in_g1(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG1);
         }
     } else {
@@ -77,7 +81,7 @@ pub fn extract_g1_input(
         // the subgroup check.
         //
         // SAFETY: out is a blst value.
-        if unsafe { !blst_p1_affine_on_curve(&out) } {
+        if unsafe { !blst_p1_affine_on_curve(&raw const out) } {
             return Err(Bls12381Error::ElementNotInG1);
         }
     }

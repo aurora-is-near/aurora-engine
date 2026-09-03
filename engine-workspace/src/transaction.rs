@@ -1,7 +1,7 @@
 use aurora_engine_types::borsh::BorshSerialize;
 use near_workspaces::result::ExecutionFinalResult;
-use near_workspaces::rpc::query::{Query, ViewFunction};
 use near_workspaces::rpc::BoxFuture;
+use near_workspaces::rpc::query::{Query, ViewFunction};
 use near_workspaces::types::NearToken;
 use std::future::IntoFuture;
 

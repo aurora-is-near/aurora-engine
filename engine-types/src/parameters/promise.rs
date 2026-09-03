@@ -1,9 +1,9 @@
+use borsh::{BorshDeserialize, BorshSerialize, io};
+
 use crate::account_id::AccountId;
 use crate::public_key::PublicKey;
 use crate::types::{NearGas, Yocto};
 use crate::{Box, String, Vec};
-
-use borsh::{io, BorshDeserialize, BorshSerialize};
 
 #[must_use]
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
@@ -103,12 +103,12 @@ impl SimpleNearPromise {
 pub enum NearPromise {
     Simple(SimpleNearPromise),
     Then {
-        base: Box<NearPromise>,
+        base: Box<Self>,
         // Near doesn't allow arbitrary promises in the callback,
         // only simple calls to contracts or batches of actions.
         callback: SimpleNearPromise,
     },
-    And(Vec<NearPromise>),
+    And(Vec<Self>),
 }
 
 impl NearPromise {

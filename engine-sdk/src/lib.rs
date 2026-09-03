@@ -186,9 +186,10 @@ impl AsRef<[u8]> for ECRecoverErr {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use aurora_engine_types::types::Address;
     use aurora_engine_types::H256;
+    use aurora_engine_types::types::Address;
+
+    use super::*;
 
     const SIGNATURE_LENGTH: usize = 65;
 

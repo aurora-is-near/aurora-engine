@@ -1,6 +1,7 @@
-use crate::{format, AsBytes, String, H160};
-use borsh::{io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, io};
 use serde::{Deserialize, Serialize};
+
+use crate::{AsBytes, H160, String, ToString};
 
 /// Base Eth Address type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -83,9 +84,8 @@ impl BorshDeserialize for Address {
         let mut buf = [0u8; 20];
         let maybe_read = reader.read_exact(&mut buf);
         if maybe_read.as_ref().err().map(io::Error::kind) == Some(io::ErrorKind::UnexpectedEof) {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("{}", error::AddressError::IncorrectLength),
+            return Err(io::Error::other(
+                error::AddressError::IncorrectLength.to_string(),
             ));
         }
         maybe_read?;
@@ -132,7 +132,7 @@ pub const fn make_address(x: u32, y: u128) -> Address {
 }
 
 pub mod error {
-    use crate::{fmt, String};
+    use crate::{String, fmt};
 
     #[derive(Eq, Hash, Clone, Debug, PartialEq)]
     pub enum AddressError {
@@ -160,7 +160,6 @@ pub mod error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
 
     const fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
@@ -237,9 +236,8 @@ mod tests {
             assert_eq!(make_address(0, i.into()), u8_to_address(i));
         }
 
-        let mut rng = rand::thread_rng();
         for _ in 0..u8::MAX {
-            let address = Address::new(H160(rng.gen()));
+            let address = Address::from_array(rand::random());
             let (x, y) = split_address(address);
             assert_eq!(address, make_address(x, y));
         }

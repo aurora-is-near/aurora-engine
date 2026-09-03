@@ -1,6 +1,7 @@
-pub use crate::prelude::{bytes_to_key, PhantomData, Vec};
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::storage::KeyPrefix;
+
+pub use crate::prelude::{PhantomData, Vec, bytes_to_key};
 
 /// A map storing a 1:1 relation between elements of types L and R.
 /// The map is backed by storage of type I.

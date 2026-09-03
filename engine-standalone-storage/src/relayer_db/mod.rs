@@ -1,10 +1,10 @@
 use aurora_engine::parameters::SubmitArgs;
 use aurora_engine::{engine, state};
-use aurora_engine_sdk::env::{self, Env, DEFAULT_PREPAID_GAS};
+use aurora_engine_sdk::env::{self, DEFAULT_PREPAID_GAS, Env};
 use aurora_engine_transactions::EthTransactionKind;
+use aurora_engine_types::H256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::types::NearGas;
-use aurora_engine_types::H256;
 use postgres::fallible_iterator::FallibleIterator;
 
 use crate::{BlockMetadata, Storage};
@@ -214,7 +214,7 @@ mod test {
     /// The postgres DB can be started in Docker using the following command:
     /// docker run --name mainnet_database -p '127.0.0.1:15432:5432' -v $PATH_TO_DB:/var/lib/postgresql/data auroraisnear/relayer-database:latest
     #[test]
-    #[ignore]
+    #[ignore = "requires a running Postgres relayer DB; see comment above"]
     fn test_fill_db() {
         let mut storage = crate::Storage::open("rocks_tmp/").unwrap();
         let mut connection = super::connect_without_tls(&ConnectionParams::default()).unwrap();

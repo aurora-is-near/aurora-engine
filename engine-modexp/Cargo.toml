@@ -1,7 +1,7 @@
 [package]
 name = "aurora-engine-modexp"
 version = "1.2.0"
-description = "Custom ModExp implementation that used in Aurora Engine"
+description = "Custom ModExp implementation used in Aurora Engine"
 keywords = ["modexp", "aurora", "engine"]
 authors.workspace = true
 edition.workspace = true

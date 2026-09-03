@@ -1,12 +1,13 @@
-use crate::prelude::{Address, U256};
-use crate::utils::solidity::exit_precompile::{Tester, TesterConstructor};
-use crate::utils::{
-    self, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID, PAUSED_PRECOMPILES, PAUSE_PRECOMPILES,
-    RESUME_PRECOMPILES,
-};
 use aurora_engine::engine::EngineErrorKind;
 use aurora_engine::parameters::{PausePrecompilesCallArgs, TransactionStatus};
 use aurora_engine_types::types::Wei;
+
+use crate::prelude::{Address, U256};
+use crate::utils::solidity::exit_precompile::{Tester, TesterConstructor};
+use crate::utils::{
+    self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID, PAUSE_PRECOMPILES, PAUSED_PRECOMPILES,
+    RESUME_PRECOMPILES, Signer,
+};
 
 const EXIT_TO_ETHEREUM_FLAG: u32 = 0b10;
 const CALLED_ACCOUNT_ID: &str = "aurora";

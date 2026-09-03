@@ -1,8 +1,9 @@
+use aurora_engine_sdk::bls12_381;
+use aurora_engine_types::types::{Address, EthGas, make_address};
+use aurora_evm::{Context, ExitError};
+
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381;
-use aurora_engine_types::types::{make_address, Address, EthGas};
-use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_add` operation.
 const BASE_GAS_FEE: u64 = 600;
@@ -43,10 +44,10 @@ impl Precompile for BlsG2Add {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         if input.len() != INPUT_LENGTH {

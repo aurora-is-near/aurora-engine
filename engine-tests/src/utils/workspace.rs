@@ -1,21 +1,26 @@
-use crate::utils;
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-/// Simulation tests for exit to NEAR precompile.
-/// Note: `AuroraRunner` is not suitable for these tests because
-/// it does not execute promises; but `aurora-workspaces` does.
-use crate::utils::AuroraRunner;
+use aurora_engine_types::U256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
 use aurora_engine_types::parameters::engine::DeployErc20TokenArgs;
 use aurora_engine_types::types::Address;
-use aurora_engine_types::U256;
 use aurora_engine_workspace::account::Account;
-use aurora_engine_workspace::{types::NearToken, EngineContract, RawContract};
+use aurora_engine_workspace::{EngineContract, RawContract, types::NearToken};
 use serde_json::json;
+use tokio::sync::OnceCell;
 
+use crate::utils;
+/// Simulation tests for exit to NEAR precompile.
+/// Note: `AuroraRunner` is not suitable for these tests because
+/// it does not execute promises; but `aurora-workspaces` does.
+use crate::utils::AuroraRunner;
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
+
+const CONNECTOR_URL: &str = "https://github.com/Near-One/aurora-eth-connector/releases/download/eth-connector-v0.6.5/eth-connector-v0-6-5.zip";
+const WASM_FILE_NAME: &str = "aurora_eth_connector.wasm";
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
+static ETH_CONNECTOR_WASM: OnceCell<Vec<u8>> = OnceCell::const_new();
 
 /// Deploy Aurora smart contract with external eth-connector.
 pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
@@ -51,7 +56,13 @@ async fn init_eth_connector(aurora: &EngineContract) -> anyhow::Result<()> {
             STORAGE_AMOUNT.checked_mul(15).unwrap(),
         )
         .await?;
-    let contract = contract_account.deploy(&ETH_CONNECTOR_WASM).await?;
+    let contract = contract_account
+        .deploy(
+            ETH_CONNECTOR_WASM
+                .get_or_try_init(|| download_and_extract_wasm(CONNECTOR_URL, WASM_FILE_NAME))
+                .await?,
+        )
+        .await?;
     let metadata = FungibleTokenMetadata::default();
     let init_args = json!({
         "metadata": metadata,
@@ -245,22 +256,29 @@ pub async fn transfer_nep_141(
     Ok(())
 }
 
-static ETH_CONNECTOR_WASM: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
-    let manifest_path = std::env::current_dir()
-        .unwrap()
-        .join("../engine-tests-connector/etc/aurora-eth-connector")
-        .join("eth-connector")
-        .join("Cargo.toml");
-    let artifact = cargo_near_build::build(cargo_near_build::BuildOpts {
-        manifest_path: Some(manifest_path.try_into().unwrap()),
-        no_abi: true,
-        no_locked: true,
-        features: Some("integration-test,migration".to_owned()),
-        ..Default::default()
-    })
-    .unwrap();
+/// Downloads a zip archive from `url`, extracts it into a cache directory under
+/// `target/`, read the contract bytes, and returns the contract bytes.
+/// Re downloads are skipped if the target file already exists.
+async fn download_and_extract_wasm(url: &str, wasm_name: &str) -> anyhow::Result<Vec<u8>> {
+    let cache_dir = std::env::current_dir()?
+        .join("target")
+        .join("downloaded-wasm");
+    let wasm_path = cache_dir.join(wasm_name);
 
-    std::fs::read(artifact.path.into_std_path_buf())
+    if !wasm_path.exists() {
+        std::fs::create_dir_all(&cache_dir)?;
+
+        let bytes = reqwest::get(url).await?.error_for_status()?.bytes().await?;
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))?;
+        archive.extract(&cache_dir)?;
+
+        anyhow::ensure!(
+            wasm_path.exists(),
+            "`{wasm_name}` not found in the archive at {url}"
+        );
+    }
+
+    tokio::fs::read(wasm_path)
+        .await
         .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
-        .unwrap()
-});
+}

@@ -4,9 +4,9 @@ mod contract;
 mod standalone;
 
 #[cfg(feature = "contract")]
-pub use contract::{g1_add, g1_msm, g2_add, g2_msm, map_fp2_to_g2, map_fp_to_g1, pairing_check};
+pub use contract::{g1_add, g1_msm, g2_add, g2_msm, map_fp_to_g1, map_fp2_to_g2, pairing_check};
 #[cfg(not(feature = "contract"))]
-pub use standalone::{g1_add, g1_msm, g2_add, g2_msm, map_fp2_to_g2, map_fp_to_g1, pairing_check};
+pub use standalone::{g1_add, g1_msm, g2_add, g2_msm, map_fp_to_g1, map_fp2_to_g2, pairing_check};
 
 /// Finite field element padded input length.
 pub const PADDED_FP_LENGTH: usize = 64;
@@ -33,6 +33,7 @@ pub enum Bls12381Error {
     Padding,
     UsizeConversion,
     G1InputLength,
+    G2InputLength,
     ElementNotInG1,
     ElementNotInG2,
     InvalidFpValue,
@@ -45,10 +46,27 @@ impl AsRef<&'static str> for Bls12381Error {
             Self::Padding => &"ERR_BLS12_PADDING",
             Self::UsizeConversion => &"ERR_BLS12_USIZE_CONVERSION",
             Self::G1InputLength => &"ERR_BLS12_G1_INPUT_LENGTH",
+            Self::G2InputLength => &"ERR_BLS12_G2_INPUT_LENGTH",
             Self::ElementNotInG1 => &"ERR_BLS12_ELEMENT_NOT_IN_G1",
             Self::ElementNotInG2 => &"ERR_BLS12_ELEMENT_NOT_IN_G2",
             Self::InvalidFpValue => &"ERR_BLS12_FP_VALUE",
             Self::ScalarLength => &"ERR_BLS12_SCALAR_LENGTH",
         }
     }
+}
+
+/// Removes zeros with which the precompile inputs are left padded to 64 bytes.
+pub fn remove_padding(input: &[u8]) -> Result<&[u8; FP_LENGTH], Bls12381Error> {
+    if input.len() != PADDED_FP_LENGTH {
+        return Err(Bls12381Error::Padding);
+    }
+    // Check is prefix contains only zero elements. As it's known size
+    // 16 bytes for efficiency we validate it via slice with zero elements
+    if input[..PADDING_LENGTH] != [0u8; PADDING_LENGTH] {
+        return Err(Bls12381Error::Padding);
+    }
+    // SAFETY: we checked PADDED_FP_LENGTH
+    input[PADDING_LENGTH..]
+        .try_into()
+        .map_err(|_| Bls12381Error::Padding)
 }

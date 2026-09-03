@@ -1,8 +1,9 @@
+use aurora_engine_sdk::bls12_381::{self, PADDED_FP_LENGTH};
+use aurora_engine_types::types::{Address, EthGas, make_address};
+use aurora_evm::{Context, ExitError};
+
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::{self, PADDED_FP_LENGTH};
-use aurora_engine_types::types::{make_address, Address, EthGas};
-use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `map_fp_to_g1` operation.
 const MAP_FP_TO_G1_BASE: u64 = 5500;
@@ -37,10 +38,10 @@ impl Precompile for BlsMapFpToG1 {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
         if input.len() != PADDED_FP_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLS_MAP_FP_TO_G1_LEN")));

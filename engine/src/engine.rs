@@ -3,29 +3,30 @@ use aurora_engine_precompiles::PrecompileConstructorContext;
 use aurora_engine_sdk::{
     caching::FullCache,
     env::Env,
-    io::{StorageIntermediate, IO},
+    io::{IO, StorageIntermediate},
     promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
 };
-use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
 use aurora_engine_types::parameters::connector::FtTransferMessageData;
+use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
 use aurora_engine_types::{
+    PhantomData,
     parameters::{
         connector::{Erc20Identifier, Erc20Metadata, FtOnTransferArgs, MirrorErc20TokenArgs},
         engine::FunctionCallArgsV2,
     },
     public_key::PublicKey,
     types::EthGas,
-    PhantomData,
 };
 use aurora_evm::executor::stack::Authorization;
 use aurora_evm::{
+    Config, CreateScheme, ExitError, ExitFatal, ExitReason, Opcode,
     backend::{Apply, ApplyBackend, Backend, Basic, Log},
-    executor, Config, CreateScheme, ExitError, ExitFatal, ExitReason, Opcode,
+    executor,
 };
 use core::cell::RefCell;
 use core::iter::once;
 
-use crate::contract_methods::{silo, ContractError};
+use crate::contract_methods::{ContractError, silo};
 use crate::map::BijectionMap;
 use crate::parameters::TransactionStatus;
 use crate::parameters::{CallArgs, ResultLog, SubmitArgs, SubmitResult, ViewCallArgs};
@@ -33,15 +34,15 @@ use crate::pausables::{
     EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker, PrecompileFlags,
 };
 use crate::prelude::parameters::connector::RefundCallArgs;
+use crate::prelude::precompiles::Precompiles;
 use crate::prelude::precompiles::native::{exit_to_ethereum, exit_to_near};
 use crate::prelude::precompiles::xcc::cross_contract_call;
-use crate::prelude::precompiles::Precompiles;
 use crate::prelude::transactions::{EthTransactionKind, NormalizedEthTransaction};
 use crate::prelude::{
-    address_to_key, bytes_to_key, format, sdk, storage_to_key, u256_to_arr, vec, AccountId,
-    Address, BTreeMap, BorshDeserialize, KeyPrefix, PromiseArgs, PromiseCreateArgs, String, Vec,
-    Wei, Yocto, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR, ERC20_NAME_SELECTOR,
-    ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, U256,
+    AccountId, Address, BTreeMap, BorshDeserialize, ERC20_DECIMALS_SELECTOR, ERC20_MINT_SELECTOR,
+    ERC20_NAME_SELECTOR, ERC20_SET_METADATA_SELECTOR, ERC20_SYMBOL_SELECTOR, H160, H256, KeyPrefix,
+    PromiseArgs, PromiseCreateArgs, String, U256, Vec, Wei, Yocto, address_to_key, bytes_to_key,
+    format, sdk, storage_to_key, u256_to_arr, vec,
 };
 use crate::state;
 use crate::state::EngineState;
@@ -238,6 +239,8 @@ pub enum GasPaymentError {
     EthAmountOverflow,
     /// Not enough balance for account to cover the gas cost
     OutOfFund,
+    /// `max_fee_per_gas` is less than `base_fee_per_gas`
+    MaxFeePerGasLessThanBaseFee,
 }
 
 impl AsRef<[u8]> for GasPaymentError {
@@ -246,6 +249,7 @@ impl AsRef<[u8]> for GasPaymentError {
             Self::BalanceOverflow(overflow) => overflow.as_ref(),
             Self::EthAmountOverflow => errors::ERR_GAS_ETH_AMOUNT_OVERFLOW,
             Self::OutOfFund => errors::ERR_OUT_OF_FUND,
+            Self::MaxFeePerGasLessThanBaseFee => errors::ERR_MAX_FEE_PER_GAS_LESS_THAN_BASE_FEE,
         }
     }
 }
@@ -468,19 +472,27 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         max_gas_price: Option<U256>,
         fixed_gas: Option<EthGas>,
     ) -> Result<GasPaymentResult, GasPaymentError> {
-        if transaction.max_fee_per_gas.is_zero() && fixed_gas.is_none() {
+        let block_base_fee_per_gas = self.block_base_fee_per_gas();
+        if transaction.max_fee_per_gas.is_zero()
+            && fixed_gas.is_none()
+            && block_base_fee_per_gas.is_zero()
+        {
             return Ok(GasPaymentResult::default());
+        }
+
+        if transaction.max_fee_per_gas < block_base_fee_per_gas {
+            return Err(GasPaymentError::MaxFeePerGasLessThanBaseFee);
         }
 
         let priority_fee_per_gas = transaction
             .max_priority_fee_per_gas
-            .min(transaction.max_fee_per_gas - self.block_base_fee_per_gas());
+            .min(transaction.max_fee_per_gas - block_base_fee_per_gas);
         let priority_fee_per_gas = max_gas_price.map_or(priority_fee_per_gas, |price| {
             price.min(priority_fee_per_gas)
         });
-        let effective_gas_price = priority_fee_per_gas + self.block_base_fee_per_gas();
-        // First we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
-        // less than the `gas_limit`. It allows to avoid refund unused gas to the sender later.
+        let effective_gas_price = priority_fee_per_gas + block_base_fee_per_gas;
+        // First, we try to use `fixed_gas`. At this point we already know that the `fixed_gas` is
+        // less than the `gas_limit`. It allows avoiding refunding unused gas to the sender later.
         let prepaid_amount = fixed_gas
             .map_or(transaction.gas_limit, EthGas::as_u256)
             .checked_mul(effective_gas_price)
@@ -640,6 +652,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
         let (values, logs) = executor.into_state().deconstruct();
         let logs = filter_promises_from_logs(&self.io, handler, logs, &self.current_account_id);
+
         // The logs could be encoded as base64 or hex string.
         self.apply(values, Vec::<Log>::new(), true);
 
@@ -697,8 +710,13 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
 
     pub fn get_relayer(&self, account_id: &[u8]) -> Option<Address> {
         let key = Self::relayer_key(account_id);
-        let raw_addr = self.io.read_storage(&key).map(|v| v.to_vec())?;
-        Address::try_from_slice(&raw_addr[..]).ok()
+
+        self.io.read_storage(&key).map(|v| {
+            let mut buf = [0; 20];
+
+            v.copy_to_slice(&mut buf);
+            Address::from_array(buf)
+        })
     }
 
     pub fn register_token(
@@ -797,10 +815,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
             Address::from_array(address_bytes)
         };
 
-        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io) {
-            if !silo::is_allow_receive_erc20_tokens(&self.io, &recipient) {
-                recipient = fallback_address;
-            }
+        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io)
+            && !silo::is_allow_receive_erc20_tokens(&self.io, &recipient)
+        {
+            recipient = fallback_address;
         }
 
         let erc20_token = get_erc20_from_nep141(&self.io, token)?;
@@ -1034,31 +1052,32 @@ pub fn submit_with_alt_modexp<
     assert_access(&io, env, &transaction)?;
 
     // Validate the chain ID, if provided inside the signature:
-    if let Some(chain_id) = transaction.chain_id {
-        if U256::from(chain_id) != U256::from_big_endian(&state.chain_id) {
-            return Err(EngineErrorKind::InvalidChainId.into());
-        }
+    if let Some(chain_id) = transaction.chain_id
+        && U256::from(chain_id) != U256::from_big_endian(&state.chain_id)
+    {
+        return Err(EngineErrorKind::InvalidChainId.into());
     }
 
     sdk::log!("signer_address {:?}", sender);
 
     check_nonce(&io, &sender, &transaction.nonce)?;
 
-    // Check that fixed gas is not greater than gasLimit from the transaction.
+    // Check that fixed gas is not greater than the gas limit from the transaction.
     if fixed_gas.is_some_and(|gas| gas.as_u256() > transaction.gas_limit) {
         return Err(EngineErrorKind::FixedGasOverflow.into());
     }
 
-    // Check intrinsic gas is covered by transaction gas limit
-    match transaction.intrinsic_gas(CONFIG) {
-        Err(_e) => {
-            return Err(EngineErrorKind::GasOverflow.into());
-        }
-        Ok(intrinsic_gas) => {
-            if transaction.gas_limit < intrinsic_gas.into() {
-                return Err(EngineErrorKind::IntrinsicGasNotMet.into());
-            }
-        }
+    let intrinsic_gas = transaction
+        .intrinsic_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+    let floor_gas = transaction
+        .floor_gas(CONFIG)
+        .map_err(|_| EngineErrorKind::GasOverflow)?;
+
+    // Check that the max value of intrinsic gas and floor gas is covered by the transaction
+    // gas limit, EIP-7623 https://eips.ethereum.org/EIPS/eip-7623
+    if transaction.gas_limit < core::cmp::max(intrinsic_gas, floor_gas).into() {
+        return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
@@ -1067,8 +1086,15 @@ pub fn submit_with_alt_modexp<
 
     let mut engine: Engine<_, _, M> =
         Engine::new_with_state(state, sender, current_account_id, io, env);
-    // EIP-3607
-    if !engine.code(sender.raw()).is_empty() {
+
+    let sender_code = engine.code(sender.raw());
+    // EIP-7702 - check if it's delegated designation. If it's a delegation designation, then,
+    // even if `caller_code` is non-empty, the transaction should be executed.
+    let is_delegated = Authorization::is_delegated(&sender_code);
+
+    // EIP-3607: Reject transactions from senders with deployed code
+    // EIP-7702: Accept transaction even if the caller has code.
+    if !(sender_code.is_empty() || is_delegated) {
         return Err(EngineErrorKind::RejectCallerWithCode.into());
     }
     let max_gas_price = args.max_gas_price.map(Into::into);
@@ -1627,34 +1653,27 @@ where
                         match promise {
                             PromiseArgs::Create(promise) => {
                                 // Safety: this promise creation is safe because it does not come from
-                                // users directly. The exit precompiles only create promises which we
+                                // users directly. The exit precompile only create promises which we
                                 // are able to execute without violating any security invariants.
-                                let id = unsafe {
-                                    match previous_promise {
-                                        Some(base_id) => {
-                                            schedule_promise_callback(handler, base_id, &promise)
-                                        }
-                                        None => schedule_promise(handler, &promise),
+                                let id = match previous_promise {
+                                    Some(base_id) => {
+                                        schedule_promise_callback(handler, base_id, &promise)
                                     }
+                                    None => schedule_promise(handler, &promise),
                                 };
                                 previous_promise = Some(id);
                             }
                             PromiseArgs::Callback(promise) => {
                                 // Safety: This is safe because the promise data comes from our own
                                 // exit precompiles. See note above.
-                                let base_id = unsafe {
-                                    match previous_promise {
-                                        Some(base_id) => schedule_promise_callback(
-                                            handler,
-                                            base_id,
-                                            &promise.base,
-                                        ),
-                                        None => schedule_promise(handler, &promise.base),
+                                let base_id = match previous_promise {
+                                    Some(base_id) => {
+                                        schedule_promise_callback(handler, base_id, &promise.base)
                                     }
+                                    None => schedule_promise(handler, &promise.base),
                                 };
-                                let id = unsafe {
-                                    schedule_promise_callback(handler, base_id, &promise.callback)
-                                };
+                                let id =
+                                    schedule_promise_callback(handler, base_id, &promise.callback);
                                 previous_promise = Some(id);
                             }
                             PromiseArgs::Recursive(_) => {
@@ -1662,10 +1681,10 @@ where
                             }
                         }
                     }
-                    // do not pass on these "internal logs" to caller
+                    // do not pass on these "internal logs" to the caller
                     None
                 } else {
-                    // The exit precompiles do produce externally consumable logs in
+                    // The exit precompile does produce externally consumable logs in
                     // addition to the promises. The external logs have a non-empty
                     // `topics` field.
                     Some(evm_log_to_result_log(log))
@@ -1689,7 +1708,7 @@ where
                         previous_promise = Some(id);
                     }
                 }
-                // do not pass on these "internal logs" to caller
+                // do not pass on these "internal logs" to the caller
                 None
             } else {
                 Some(evm_log_to_result_log(log))
@@ -1711,10 +1730,7 @@ fn evm_log_to_result_log(log: Log) -> ResultLog {
     }
 }
 
-unsafe fn schedule_promise<P: PromiseHandler>(
-    handler: &mut P,
-    promise: &PromiseCreateArgs,
-) -> PromiseId {
+fn schedule_promise<P: PromiseHandler>(handler: &mut P, promise: &PromiseCreateArgs) -> PromiseId {
     sdk::log!(
         "call_contract {}.{}",
         promise.target_account_id,
@@ -1723,7 +1739,7 @@ unsafe fn schedule_promise<P: PromiseHandler>(
     handler.promise_create_call(promise)
 }
 
-unsafe fn schedule_promise_callback<P: PromiseHandler>(
+fn schedule_promise_callback<P: PromiseHandler>(
     handler: &mut P,
     base_id: PromiseId,
     promise: &PromiseCreateArgs,
@@ -1733,6 +1749,7 @@ unsafe fn schedule_promise_callback<P: PromiseHandler>(
         promise.target_account_id,
         promise.method
     );
+
     handler.promise_attach_callback(base_id, promise)
 }
 
@@ -1877,15 +1894,14 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
     /// Returns basic account information.
     fn basic(&self, address: H160) -> Basic {
         let address = Address::new(address);
-        let result = self
-            .account_info_cache
+
+        self.account_info_cache
             .borrow_mut()
             .get_or_insert_with(address, || Basic {
                 nonce: get_nonce(&self.io, &address),
                 balance: get_balance(&self.io, &address).raw(),
             })
-            .clone();
-        result
+            .clone()
     }
 
     /// Returns the code of the contract from an address.
@@ -1905,13 +1921,13 @@ impl<I: IO + Copy, E: Env, M: ModExpAlgorithm> Backend for Engine<'_, I, E, M> {
             .borrow_mut()
             .entry(address)
             .or_insert_with(|| get_generation(&self.io, &address));
-        let result = *self
+
+        *self
             .contract_storage_cache
             .borrow_mut()
             .get_or_insert_with((address, index), || {
                 get_storage(&self.io, &address, &index, generation)
-            });
-        result
+            })
     }
 
     /// Check if the storage of the address is empty.
@@ -2050,7 +2066,7 @@ impl<J: IO + Copy, E: Env, M: ModExpAlgorithm> ApplyBackend for Engine<'_, J, E,
                 }
             }
         }
-        // These variable are only used if logging feature is enabled.
+        // These variables are only used if the logging feature is enabled.
         // In production logging is always enabled, so we can ignore the warnings.
         #[allow(unused_variables)]
         let total_bytes = 32 * writes_counter + code_bytes_written;
@@ -2160,7 +2176,7 @@ mod tests {
     use aurora_engine_test_doubles::promise::PromiseTracker;
     use aurora_engine_types::parameters::connector::FtOnTransferArgs;
     use aurora_engine_types::parameters::engine::RelayerKeyArgs;
-    use aurora_engine_types::types::{make_address, Balance, NearGas, RawU256};
+    use aurora_engine_types::types::{Balance, NearGas, RawU256, make_address};
     use std::cell::RefCell;
 
     #[test]
@@ -2570,8 +2586,7 @@ mod tests {
             attached_balance: Yocto::default(),
             attached_gas: NearGas::default(),
         };
-        // This is safe because it's just a test
-        let actual_id = unsafe { schedule_promise(&mut promise_tracker, &args) };
+        let actual_id = schedule_promise(&mut promise_tracker, &args);
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();
@@ -2596,8 +2611,7 @@ mod tests {
             attached_gas: NearGas::default(),
         };
         let base_id = PromiseId::new(6);
-        // This is safe because it's just a test
-        let actual_id = unsafe { schedule_promise_callback(&mut promise_tracker, base_id, &args) };
+        let actual_id = schedule_promise_callback(&mut promise_tracker, base_id, &args);
         let actual_scheduled_promises = promise_tracker.scheduled_promises;
         let expected_scheduled_promises = {
             let mut map = HashMap::new();

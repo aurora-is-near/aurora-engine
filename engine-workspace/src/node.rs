@@ -1,7 +1,7 @@
 use aurora_engine_types::account_id::AccountId;
+use near_workspaces::Worker;
 use near_workspaces::network::{NetworkClient, Sandbox};
 use near_workspaces::types::{KeyType, NearToken, SecretKey};
-use near_workspaces::Worker;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::Instant;

@@ -1,12 +1,10 @@
 use aurora_engine_sdk::env::Timestamp;
-use aurora_engine_types::{account_id::AccountId, H256};
+use aurora_engine_types::{H256, account_id::AccountId};
 use rocksdb::DB;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::Path;
 use sync::types::TransactionMessage;
-
-const VERSION: u8 = 0;
 
 pub mod diff;
 pub mod engine_state;
@@ -19,6 +17,8 @@ pub mod sync;
 
 pub use diff::{Diff, DiffValue};
 pub use error::Error;
+
+const VERSION: u8 = 0;
 
 /// Length (in bytes) of the suffix appended to Engine keys which specify the
 /// block height and transaction position. 64 bits for the block height,

@@ -1,4 +1,4 @@
-use engine_standalone_storage::{self, sync::TransactionIncludedOutcome, Storage};
+use engine_standalone_storage::{self, Storage, sync::TransactionIncludedOutcome};
 use tempfile::TempDir;
 
 pub fn commit(storage: &mut Storage, outcome: &TransactionIncludedOutcome) {

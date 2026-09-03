@@ -1,8 +1,9 @@
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::Borrowed;
-use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 use aurora_engine_sdk::bls12_381;
 use aurora_evm::{Context, ExitError};
+
+use crate::prelude::Borrowed;
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, Vec};
 
 /// Base gas fee for BLS12-381 `g1_add` operation.
 const BASE_GAS_FEE: u64 = 375;
@@ -46,10 +47,10 @@ impl Precompile for BlsG1Add {
         }
 
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::execute(input)?;

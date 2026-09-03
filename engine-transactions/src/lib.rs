@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 
 use aurora_engine_types::types::{Address, Wei};
-use aurora_engine_types::{vec, Vec, H160, U256};
+use aurora_engine_types::{H160, U256, Vec, vec};
 use aurora_evm::executor::stack::Authorization;
 use eip_2930::AccessTuple;
 use rlp::{Decodable, DecoderError, Rlp};
@@ -80,20 +80,36 @@ impl From<&EthTransactionKind> for Vec<u8> {
     }
 }
 
-/// A normalized Ethereum transaction which can be created from older
-/// transactions.
+/// A normalized Ethereum transaction that can be created from older transactions.
 pub struct NormalizedEthTransaction {
+    /// The Ethereum address of the transaction sender, recovered from the signature.
     pub address: Address,
+    /// EIP-155 chain ID to prevent replay attacks across different networks.
+    /// None for legacy transactions that don't specify a chain ID.
     pub chain_id: Option<u64>,
+    /// Transaction sequence number from the sender's account, used to ensure transaction ordering.
     pub nonce: U256,
+    /// Maximum amount of gas units that can be consumed by this transaction.
     pub gas_limit: U256,
+    /// Maximum priority fee (tip) per gas unit that the sender is willing to pay to the miner.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_priority_fee_per_gas: U256,
+    /// Maximum total fee per gas unit (base fee + priority fee) that the sender is willing to pay.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_fee_per_gas: U256,
+    /// Recipient address for the transaction.
+    /// None indicates a contract creation transaction.
     pub to: Option<Address>,
+    /// Amount of Wei (the smallest denomination of Ether) to transfer to the recipient.
     pub value: Wei,
+    /// Input data for the transaction containing either contract bytecode (for creation)
+    /// or encoded function call data (for contract interaction).
     pub data: Vec<u8>,
+    /// EIP-2930 access list containing addresses and storage keys that the transaction
+    /// plans to access, allowing for reduced gas costs on subsequent accesses.
     pub access_list: Vec<AccessTuple>,
-    // Contains additional information - `chain_id` for each authorization item
+    /// EIP-7702 authorization list containing signed authorizations that allow the transaction
+    /// to temporarily set code for externally owned accounts (EOAs) during execution.
     pub authorization_list: Vec<Authorization>,
 }
 
@@ -142,19 +158,23 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
                 authorization_list: vec![],
             },
-            Eip7702(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: Some(tx.transaction.to),
-                value: tx.transaction.value,
-                data: tx.transaction.data.clone(),
-                access_list: tx.transaction.access_list.clone(),
-                authorization_list: tx.authorization_list()?,
-            },
+            Eip7702(tx) => {
+                let address = tx.sender()?;
+                let authorization_list = tx.authorization_list()?;
+                Self {
+                    address,
+                    chain_id: Some(tx.transaction.chain_id),
+                    nonce: tx.transaction.nonce,
+                    gas_limit: tx.transaction.gas_limit,
+                    max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                    max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                    to: Some(tx.transaction.to),
+                    value: tx.transaction.value,
+                    data: tx.transaction.data,
+                    access_list: tx.transaction.access_list,
+                    authorization_list,
+                }
+            }
         })
     }
 }
@@ -204,12 +224,50 @@ impl NormalizedEthTransaction {
             )
             .ok_or(Error::GasOverflow)?;
 
+        let gas_authorization_list = if config.has_authorization_list {
+            config
+                .gas_per_auth_base_cost
+                .checked_mul(
+                    u64::try_from(self.authorization_list.len())
+                        .map_err(|_e| Error::IntegerConversion)?,
+                )
+                .ok_or(Error::GasOverflow)?
+        } else {
+            0
+        };
+
         base_gas
             .checked_add(gas_zero_bytes)
             .and_then(|gas| gas.checked_add(gas_non_zero_bytes))
             .and_then(|gas| gas.checked_add(gas_access_list_address))
             .and_then(|gas| gas.checked_add(gas_access_list_storage))
+            .and_then(|gas| gas.checked_add(gas_authorization_list))
             .ok_or(Error::GasOverflow)
+    }
+
+    #[allow(clippy::naive_bytecount)]
+    pub fn floor_gas(&self, config: &aurora_evm::Config) -> Result<u64, Error> {
+        if config.has_floor_gas {
+            let num_zero_bytes = u64::try_from(self.data.iter().filter(|b| **b == 0).count())
+                .map_err(|_e| Error::IntegerConversion)?;
+            let data_len = u64::try_from(self.data.len()).map_err(|_e| Error::IntegerConversion)?;
+            let num_non_zero_bytes = data_len
+                .checked_sub(num_zero_bytes)
+                .ok_or(Error::GasOverflow)?;
+
+            let base_gas = config.gas_transaction_call;
+            let tokens_in_calldata = num_non_zero_bytes
+                .checked_mul(4)
+                .and_then(|gas| gas.checked_add(num_zero_bytes))
+                .ok_or(Error::GasOverflow)?;
+
+            tokens_in_calldata
+                .checked_mul(config.total_cost_floor_per_token)
+                .and_then(|gas| gas.checked_add(base_gas))
+                .ok_or(Error::GasOverflow)
+        } else {
+            Ok(0)
+        }
     }
 }
 
@@ -303,8 +361,11 @@ fn vrs_to_arr(v: u8, r: U256, s: U256) -> [u8; 65] {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, EthTransactionKind};
+    use super::{Error, EthTransactionKind, INITCODE_WORD_COST};
     use crate::{eip_1559, eip_2930, eip_7702};
+    use aurora_engine_types::types::{Address, Wei};
+    use aurora_engine_types::{H160, H256, U256};
+    use aurora_evm::executor::stack::Authorization;
 
     #[test]
     fn test_try_parse_empty_input() {
@@ -352,5 +413,281 @@ mod tests {
         let data = [0u8; 1000];
         let cost = super::init_code_cost(&config, &data).unwrap();
         assert_eq!(cost, 64);
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_intrinsic_gas() {
+        use super::NormalizedEthTransaction;
+
+        let config = aurora_evm::Config::prague();
+
+        // Test a simple transaction with no data
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+
+        assert_eq!(gas, config.gas_transaction_call);
+
+        // Test transaction with zero bytes
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![0u8; 10],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+
+        assert_eq!(
+            gas,
+            config.gas_transaction_call + config.gas_transaction_zero_data * 10
+        );
+
+        // Test transaction with non-zero bytes
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![1u8; 10],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+
+        assert_eq!(
+            gas,
+            config.gas_transaction_call + config.gas_transaction_non_zero_data * 10
+        );
+
+        // Test transaction with mixed zero and non-zero bytes
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![0, 1, 0, 1, 0],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+        let expected = config.gas_transaction_call
+            + config.gas_transaction_zero_data * 3
+            + config.gas_transaction_non_zero_data * 2;
+
+        assert_eq!(gas, expected);
+
+        // Test contract creation
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: None,
+            value: Wei::zero(),
+            data: vec![1u8; 32],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+        let expected = config.gas_transaction_create
+            + INITCODE_WORD_COST
+            + config.gas_transaction_non_zero_data * 32;
+        assert_eq!(gas, expected);
+
+        // Test transaction with an access list
+        let access_tuple = eip_2930::AccessTuple {
+            address: Address::default().raw(),
+            storage_keys: vec![H256::zero(), H256::zero()],
+        };
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![],
+            access_list: vec![access_tuple],
+            authorization_list: vec![],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+        let expected = config.gas_transaction_call
+            + config.gas_access_list_address
+            + config.gas_access_list_storage_key * 2;
+
+        assert_eq!(gas, expected);
+
+        // Test transaction with an authorization list
+        let authorization = Authorization {
+            authority: H160::default(),
+            address: Address::default().raw(),
+            nonce: 0,
+            is_valid: false,
+        };
+        // Test transaction with an authorization list length
+        let tx = NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data: vec![],
+            access_list: vec![],
+            authorization_list: vec![authorization],
+        };
+        let gas = tx.intrinsic_gas(&config).unwrap();
+        let expected = config.gas_transaction_call + config.gas_per_auth_base_cost;
+        assert_eq!(gas, expected);
+    }
+
+    fn create_test_transaction(data: Vec<u8>) -> super::NormalizedEthTransaction {
+        super::NormalizedEthTransaction {
+            address: Address::default(),
+            chain_id: Some(1),
+            nonce: U256::zero(),
+            gas_limit: U256::from(21000),
+            max_priority_fee_per_gas: U256::from(1000000000u64),
+            max_fee_per_gas: U256::from(1000000000u64),
+            to: Some(Address::default()),
+            value: Wei::zero(),
+            data,
+            access_list: vec![],
+            authorization_list: vec![],
+        }
+    }
+
+    #[test]
+    fn test_floor_gas_disabled() {
+        let config = aurora_evm::Config::cancun();
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        assert_eq!(gas, 0);
+    }
+
+    #[test]
+    fn test_floor_gas_empty_data() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        assert_eq!(gas, 21000);
+    }
+
+    #[test]
+    fn test_floor_gas_all_zero_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![0u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 0 * 4 + 10 = 10
+        // floor_gas = 10 * 10 + 21000 = 21100
+        assert_eq!(gas, 21100);
+    }
+
+    #[test]
+    fn test_floor_gas_all_non_zero_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 10 * 4 + 0 = 40
+        // floor_gas = 40 * 10 + 21000 = 21400
+        assert_eq!(gas, 21400);
+    }
+
+    #[test]
+    fn test_floor_gas_mixed_bytes() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![0, 1, 0, 1, 0, 1, 1, 1]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // num_zero_bytes = 3
+        // num_non_zero_bytes = 5
+        // tokens_in_calldata = 5 * 4 + 3 = 23
+        // floor_gas = 23 * 10 + 21000 = 21230
+        assert_eq!(gas, 21230);
+    }
+
+    #[test]
+    fn test_floor_gas_large_data() {
+        let config = aurora_evm::Config::prague();
+        let tx = create_test_transaction(vec![1u8; 1000]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 1000 * 4 + 0 = 4000
+        // floor_gas = 4000 * 10 + 21000 = 61000
+        assert_eq!(gas, 61000);
+    }
+
+    #[test]
+    fn test_floor_gas_overflow_on_mul_cost_per_token() {
+        let mut config = aurora_evm::Config::prague();
+        config.total_cost_floor_per_token = u64::MAX;
+
+        let tx = create_test_transaction(vec![1u8; 10]);
+        let result = tx.floor_gas(&config);
+
+        assert!(matches!(result, Err(Error::GasOverflow)));
+    }
+
+    #[test]
+    fn test_floor_gas_overflow_on_add_base() {
+        let mut config = aurora_evm::Config::prague();
+        config.has_floor_gas = true;
+        config.total_cost_floor_per_token = u64::MAX;
+
+        let tx = create_test_transaction(vec![0u8; 1]);
+        let result = tx.floor_gas(&config);
+
+        assert!(matches!(result, Err(Error::GasOverflow)));
+    }
+
+    #[test]
+    fn test_floor_gas_with_different_cost_per_token() {
+        let mut config = aurora_evm::Config::prague();
+        config.has_floor_gas = true;
+        config.total_cost_floor_per_token = 500;
+
+        let tx = create_test_transaction(vec![1u8; 5]);
+        let gas = tx.floor_gas(&config).unwrap();
+
+        // tokens_in_calldata = 5 * 4 + 0 = 20
+        // floor_gas = 20 * 500 + 21000 = 31000
+        assert_eq!(gas, 31000);
     }
 }

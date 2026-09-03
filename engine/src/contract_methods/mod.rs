@@ -6,7 +6,7 @@
 //! The reason to isolate these implementations is so that they can be shared between both
 //! the smart contract and the standalone.
 
-use aurora_engine_types::{account_id::AccountId, fmt, types::Address, Box};
+use aurora_engine_types::{Box, account_id::AccountId, fmt, types::Address};
 
 use crate::{errors, state};
 

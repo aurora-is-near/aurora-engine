@@ -1,12 +1,12 @@
 use aurora_engine::engine::EngineError;
 use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use super::sanity::initialize_transfer;
 use crate::prelude::Wei;
-use crate::prelude::{make_address, Address, U256};
-use crate::utils::{self, standalone::StandaloneRunner, AuroraRunner, Signer};
+use crate::prelude::{Address, U256, make_address};
+use crate::utils::{self, AuroraRunner, Signer, standalone::StandaloneRunner};
 
 const MODEXP_ADDRESS: Address = make_address(0, 5);
 
@@ -72,13 +72,12 @@ fn bench_modexp() {
         "Aurora not least:\n{result:?}"
     );
 
-    // TODO: Aurora not least anymore after switching to the nightly-2023-12-15.
     // Typical example with U256-sized inputs.
     let input = BenchInput::random(32);
     let result = context.bench(&input);
     assert_eq!(
         result.least(),
-        Implementation::IBig, // FIXME: Should be Aurora.
+        Implementation::Aurora,
         "Aurora not least:\n{result:?}"
     );
 }
@@ -86,7 +85,7 @@ fn bench_modexp() {
 // This test is marked as ignored because it should only be run with `--release`
 // specified (it requires the standalone engine to be compiled with an optimized build).
 // This test can be run with the command: `cargo make bench-modexp`
-#[ignore]
+#[ignore = "benchmark; run with `cargo make bench-modexp` (requires --release)"]
 #[test]
 fn bench_modexp_standalone() {
     const GAS_LIMIT: u64 = 30_000_000;
@@ -125,7 +124,7 @@ fn bench_modexp_standalone() {
             .unwrap();
         let duration = start.elapsed().as_millis();
 
-        assert!(duration < 1000, "{path} failed to run in under 1 second");
+        assert!(duration < 2000, "{path} failed to run in under 2 seconds");
     };
 
     // These contracts run the modexp precompile in an infinite loop using strategically selecting

@@ -1,11 +1,10 @@
-use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use libsecp256k1::SecretKey;
 
+use crate::prelude::U256;
 use crate::prelude::Wei;
 use crate::utils::solidity::standard_precompiles::{PrecompilesConstructor, PrecompilesContract};
 use crate::utils::{
-    address_from_secret_key, deploy_runner, parse_eth_gas, sign_transaction, SUBMIT,
+    SUBMIT, address_from_secret_key, deploy_runner, parse_eth_gas, random_sk, sign_transaction,
 };
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
@@ -13,8 +12,8 @@ const INITIAL_NONCE: u64 = 0;
 
 pub fn eth_standard_precompiles_benchmark(c: &mut Criterion) {
     let mut runner = deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = random_sk(&mut rng);
     runner.create_address(
         address_from_secret_key(&source_account),
         INITIAL_BALANCE,

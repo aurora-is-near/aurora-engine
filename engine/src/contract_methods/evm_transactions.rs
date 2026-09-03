@@ -1,5 +1,5 @@
 use crate::{
-    contract_methods::{predecessor_address, require_running, ContractError},
+    contract_methods::{ContractError, predecessor_address, require_running},
     engine::{self, Engine},
     errors,
     hashchain::with_logs_hashchain,
@@ -8,7 +8,7 @@ use crate::{
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::{
     env::Env,
-    io::{StorageIntermediate, IO},
+    io::{IO, StorageIntermediate},
     promise::PromiseHandler,
 };
 use aurora_engine_types::{

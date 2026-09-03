@@ -22,9 +22,9 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install dependencies
-        run: scripts/ci-deps/native.sh
+        run: scripts/ci-deps.sh
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -48,13 +48,17 @@ jobs:
         with:
           metrics: cpu,network,memory,disk,io
       - name: Clone the repository
-        uses: actions/checkout@v4
-      - name: Install dependencies
-        run: scripts/ci-deps/native.sh
-      - name: Setup Node and cache
+        uses: actions/checkout@v6
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Enable Yarn Caching
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
           cache: yarn
           cache-dependency-path: |
             etc/eth-contracts/yarn.lock

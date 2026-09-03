@@ -1,8 +1,8 @@
-use crate::prelude::{parameters::SubmitResult, vec, Address, Wei, U256};
+use crate::prelude::{Address, U256, Wei, parameters::SubmitResult, vec};
 use crate::utils::solidity::exit_precompile::{
-    Tester, TesterConstructor, DEST_ACCOUNT, DEST_ADDRESS,
+    DEST_ACCOUNT, DEST_ADDRESS, Tester, TesterConstructor,
 };
-use crate::utils::{self, deploy_runner, AuroraRunner, Signer, DEFAULT_AURORA_ACCOUNT_ID};
+use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID, Signer, deploy_runner};
 
 fn setup_test() -> (AuroraRunner, Signer, Address, Tester) {
     let mut runner = AuroraRunner::new();
@@ -137,9 +137,11 @@ fn withdraw_and_fail() {
     ];
 
     for (flag, not_expected) in test_data {
-        assert!(tester
-            .withdraw_and_fail(&mut runner, &mut signer, flag)
-            .is_err());
+        assert!(
+            tester
+                .withdraw_and_fail(&mut runner, &mut signer, flag)
+                .is_err()
+        );
 
         // No promise is scheduled
         assert!(!runner.previous_logs.contains(&not_expected.to_string()));
@@ -156,9 +158,11 @@ fn try_withdraw_and_avoid_fail() {
     ];
 
     for (flag, not_expected) in test_data {
-        assert!(tester
-            .try_withdraw_and_avoid_fail(&mut runner, &mut signer, flag)
-            .is_ok());
+        assert!(
+            tester
+                .try_withdraw_and_avoid_fail(&mut runner, &mut signer, flag)
+                .is_ok()
+        );
 
         // No promise is scheduled
         assert!(!runner.previous_logs.contains(&not_expected.to_string()));
@@ -176,9 +180,11 @@ fn try_withdraw_and_avoid_fail_and_succeed() {
 
     for (flag, expected) in test_data {
         println!("{flag}");
-        assert!(tester
-            .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
-            .is_ok());
+        assert!(
+            tester
+                .try_withdraw_and_avoid_fail_and_succeed(&mut runner, &mut signer, flag)
+                .is_ok()
+        );
         // One promise is scheduled
         println!("{:?} {:?}", runner.previous_logs, expected.to_string());
         assert!(runner.previous_logs.contains(&expected.to_string()));

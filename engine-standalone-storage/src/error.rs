@@ -1,6 +1,7 @@
-use crate::{sync::types::TransactionKindTag, TransactionIncluded};
 use aurora_engine_types::H256;
 use std::fmt;
+
+use crate::{TransactionIncluded, sync::types::TransactionKindTag};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Error {
@@ -62,7 +63,10 @@ impl fmt::Display for ParseTransactionKindError {
                 transaction_kind_tag,
                 error_message,
             } => {
-                write!(f, "Error deserializing args for transaction of kind {transaction_kind_tag:?}. Error message: {error_message:?}")
+                write!(
+                    f,
+                    "Error deserializing args for transaction of kind {transaction_kind_tag:?}. Error message: {error_message:?}"
+                )
             }
         }
     }

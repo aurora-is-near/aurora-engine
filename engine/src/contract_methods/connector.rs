@@ -1,13 +1,6 @@
-use crate::contract_methods::{
-    predecessor_address, require_owner_only, require_running, ContractError,
-};
-use crate::engine::Engine;
-use crate::hashchain::with_hashchain;
-use crate::prelude::{sdk, vec, ToString, Vec};
-use crate::{engine, errors, state};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::Env;
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_sdk::promise::PromiseHandler;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::{self, BorshDeserialize};
@@ -26,6 +19,14 @@ use aurora_engine_types::parameters::{
 use aurora_engine_types::storage::{EthConnectorStorageId, KeyPrefix};
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Yocto};
 use function_name::named;
+
+use crate::contract_methods::{
+    ContractError, predecessor_address, require_owner_only, require_running,
+};
+use crate::engine::Engine;
+use crate::hashchain::with_hashchain;
+use crate::prelude::{ToString, Vec, sdk, vec};
+use crate::{engine, errors, state};
 
 const ONE_YOCTO: Yocto = Yocto::new(1);
 /// Indicate zero attached balance for promise call
@@ -116,20 +117,20 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
     with_hashchain(io, env, function_name!(), |mut io| {
         require_running(&state::get_state(&io)?)?;
         let bytes = io.read_input().to_vec();
-        let args = DeployErc20TokenArgs::deserialize(&bytes)
-            .map_err(|_| crate::errors::ERR_BORSH_DESERIALIZE)?;
+        let args =
+            DeployErc20TokenArgs::deserialize(&bytes).map_err(|_| errors::ERR_BORSH_DESERIALIZE)?;
 
         match args {
             DeployErc20TokenArgs::Legacy(nep141) => {
                 let address = engine::deploy_erc20_token(nep141, None, io, env, handler)?;
 
                 io.return_output(
-                    &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
+                    &borsh::to_vec(address.as_bytes()).map_err(|_| errors::ERR_SERIALIZE)?,
                 );
                 Ok(PromiseOrValue::Value(address))
             }
             DeployErc20TokenArgs::WithMetadata(nep141) => {
-                let args = borsh::to_vec(&nep141).map_err(|_| crate::errors::ERR_SERIALIZE)?;
+                let args = borsh::to_vec(&nep141).map_err(|_| errors::ERR_SERIALIZE)?;
                 let base = PromiseCreateArgs {
                     target_account_id: nep141,
                     method: "ft_metadata".to_string(),
@@ -147,7 +148,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, H: PromiseHandler>(
                 // Safe because these promises are read-only calls to the main engine contract
                 // and this transaction could be executed by the owner of the contract only.
                 let promise_args = PromiseWithCallbackArgs { base, callback };
-                let promise_id = unsafe { handler.promise_create_with_callback(&promise_args) };
+                let promise_id = handler.promise_create_with_callback(&promise_args);
 
                 handler.promise_return(promise_id);
 
@@ -168,7 +169,7 @@ pub fn deploy_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
         env.assert_private_call()?;
 
         if handler.promise_results_count() != 1 {
-            return Err(crate::errors::ERR_PROMISE_COUNT.into());
+            return Err(errors::ERR_PROMISE_COUNT.into());
         }
 
         let nep141 = io.read_input_borsh()?;
@@ -182,13 +183,11 @@ pub fn deploy_erc20_token_callback<I: IO + Copy, E: Env, H: PromiseHandler>(
                     })
                     .map_err(Into::<ParseArgsError>::into)?
             } else {
-                return Err(crate::errors::ERR_GETTING_ERC20_FROM_NEP141.into());
+                return Err(errors::ERR_GETTING_ERC20_FROM_NEP141.into());
             };
         let address = engine::deploy_erc20_token(nep141, Some(erc20_metadata), io, env, handler)?;
 
-        io.return_output(
-            &borsh::to_vec(address.as_bytes()).map_err(|_| crate::errors::ERR_SERIALIZE)?,
-        );
+        io.return_output(&borsh::to_vec(address.as_bytes()).map_err(|_| errors::ERR_SERIALIZE)?);
         Ok(address)
     })
 }
@@ -224,7 +223,7 @@ pub fn exit_to_near_precompile_callback<I: IO + Copy, E: Env, H: PromiseHandler>
 
                 // Safety: this call is safe because it comes from the exit to near precompile, not users.
                 // The call is to transfer the unwrapped wNEAR tokens.
-                let promise_id = unsafe { handler.promise_create_batch(&promise) };
+                let promise_id = handler.promise_create_batch(&promise);
                 handler.promise_return(promise_id);
             }
 
@@ -336,7 +335,7 @@ pub fn storage_withdraw<I: IO + PromiseHandler + Copy, E: Env>(
             .map_err(Into::<ParseArgsError>::into)
     })?;
 
-    return_promise(io, env, "engine_storage_withdraw", args, ZERO_YOCTO)
+    return_promise(io, env, "engine_storage_withdraw", args, ONE_YOCTO)
 }
 
 pub fn storage_balance_of<I: IO + Copy + PromiseHandler + Env>(io: I) -> Result<(), ContractError> {
@@ -496,12 +495,10 @@ pub fn mirror_erc20_token<I: IO + Env + Copy, H: PromiseHandler>(
     };
     // Safe because these promises are read-only calls to the main engine contract,
     // and this transaction could be executed by the owner of the contract only.
-    let promise_id = unsafe {
-        let promise_id = handler.promise_create_and_combine(&promises);
-        handler.promise_attach_callback(promise_id, &callback)
-    };
+    let base_id = handler.promise_create_and_combine(&promises);
+    let callback_id = handler.promise_attach_callback(base_id, &callback);
 
-    handler.promise_return(promise_id);
+    handler.promise_return(callback_id);
 
     Ok(())
 }
@@ -587,8 +584,15 @@ where
     aurora_engine_types::parameters::engine::parse_json_args(&bytes)
 }
 
+// TODO: Return `Result` with an error about lacking of gas instead.
 fn calculate_attached_gas<E: Env>(env: &E) -> NearGas {
-    env.prepaid_gas() - env.used_gas() - GAS_FOR_PROMISE_CREATION
+    let required_gas = env.used_gas().saturating_add(GAS_FOR_PROMISE_CREATION);
+
+    if required_gas >= env.prepaid_gas() {
+        NearGas::new(0)
+    } else {
+        env.prepaid_gas() - required_gas
+    }
 }
 
 fn return_promise<I: IO + PromiseHandler, E: Env>(
@@ -605,7 +609,7 @@ fn return_promise<I: IO + PromiseHandler, E: Env>(
         attached_balance: deposit,
         attached_gas: calculate_attached_gas(env),
     };
-    let promise_id = unsafe { io.promise_create_call(&promise_args) };
+    let promise_id = io.promise_create_call(&promise_args);
 
     io.promise_return(promise_id);
 

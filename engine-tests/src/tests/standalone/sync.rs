@@ -2,10 +2,10 @@ use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::env::{Env, Timestamp};
 use aurora_engine_types::parameters::connector;
 use aurora_engine_types::types::{Address, Balance, Wei};
-use aurora_engine_types::{account_id::AccountId, H160, H256, U256};
+use aurora_engine_types::{H160, H256, U256, account_id::AccountId};
 use engine_standalone_storage::sync;
 
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
 use crate::utils::{self, standalone::StandaloneRunner};
 
 #[test]

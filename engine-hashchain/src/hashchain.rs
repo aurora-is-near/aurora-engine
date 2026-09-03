@@ -1,16 +1,18 @@
-use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompactMerkleTree};
 use aurora_engine_sdk::keccak;
 use aurora_engine_types::{
+    Cow, Vec,
     account_id::AccountId,
-    borsh::{self, io, BorshDeserialize, BorshSerialize},
+    borsh::{self, BorshDeserialize, BorshSerialize, io},
     format,
     types::RawH256,
-    Cow, Vec,
 };
+
+use crate::{bloom::Bloom, error::BlockchainHashchainError, merkle::StreamCompactMerkleTree};
 
 /// Blockchain Hashchain.
 /// Continually keeps track of the previous block hashchain through the blocks heights.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_field_names)]
 pub struct Hashchain {
     chain_id: [u8; 32],
     contract_account_id: AccountId,
@@ -103,7 +105,7 @@ impl Hashchain {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.block_hashchain_computer.is_empty()
     }
 
@@ -293,7 +295,7 @@ impl BlockHashchainComputer {
     }
 
     /// Checks no transactions have been added.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.txs_merkle_tree.is_empty()
     }
 }

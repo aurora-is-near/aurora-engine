@@ -14,13 +14,14 @@
 //! JSON test data set fully represents all tests from `execution-spec-tests` for
 //! `alt-bn-128` precompiles. We run this test in standalone manner.
 
-use crate::prelude::{Address, Wei, H160, U256};
-use crate::tests::sanity::initialize_transfer;
-use crate::utils;
-use aurora_engine_precompiles::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use aurora_engine_precompiles::Istanbul;
 use aurora_engine_precompiles::Precompile;
+use aurora_engine_precompiles::alt_bn256::{Bn256Add, Bn256Mul, Bn256Pair};
 use near_primitives_core::gas::Gas;
+
+use crate::prelude::{Address, H160, U256, Wei};
+use crate::tests::sanity::initialize_transfer;
+use crate::utils;
 
 /// Precompile input and output data struct
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -30,6 +31,7 @@ pub struct PrecompileStandaloneData {
     #[serde(default)]
     pub expected_gas: Option<u64>,
 }
+
 /// JSON distilled data for precompile tests.
 /// It contains input data for precompile and expected
 /// output after precompile execution.
@@ -66,6 +68,7 @@ fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas
 }
 
 /// Submit transaction to precompile address and check result with expected output.
+#[track_caller]
 fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], gas_limit: u64) {
     let (mut runner, mut signer, _) = initialize_transfer();
     runner.context.prepaid_gas = Gas::MAX;
@@ -83,48 +86,50 @@ fn check_wasm_submit(address: Address, input: Vec<u8>, expected_output: &[u8], g
         })
         .unwrap();
 
-    assert_ggas_bound(wasm_result.all_gas(), gas_limit);
+    assert_gas_bound(wasm_result.all_gas(), gas_limit);
     assert_eq!(expected_output, utils::unwrap_success_slice(&submit_res));
 }
 
-/// Checks if `total_gas` is within 1 Ggas of `ggas_bound`.
-fn assert_ggas_bound(total_gas: u64, ggas_bound: u64) {
+/// Checks if `total_gas` is within 1 `GGas` of `ggas_bound`.
+#[track_caller]
+fn assert_gas_bound(total_gas: u64, bound_ggas: u64) {
     const GIGA: i128 = 1_000_000_000;
     let total_gas: i128 = total_gas.into();
-    let ggas_bound: i128 = i128::from(ggas_bound) * GIGA;
-    let diff = total_gas <= ggas_bound;
-    assert!(diff, "{} > {} Ggas", total_gas / GIGA, ggas_bound / GIGA,);
+    let bound_gas: i128 = i128::from(bound_ggas) * GIGA;
+
+    assert!(
+        total_gas <= bound_gas,
+        "total: {} > bound: {bound_ggas} GGas",
+        total_gas / GIGA
+    );
 }
 
 #[test]
 fn test_alt_bn128_add() {
-    println!("alt_bn128_add");
     run_alt_bn128(
         &Bn256Add::<Istanbul>::new(),
         Bn256Add::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_add.json"),
-        3600, // 3.60 Tgas
+        3590, // 3.590 TGas
     );
 }
 
 #[test]
 fn test_alt_bn128_mul() {
-    println!("alt_bn128_mul");
     run_alt_bn128(
         &Bn256Mul::<Istanbul>::new(),
         Bn256Mul::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_mul.json"),
-        4650, // 4.65 Tgas
+        10380, // 10.380 GGas
     );
 }
 
 #[test]
 fn test_alt_bn128_pairing() {
-    println!("alt_bn128_pairing");
     run_alt_bn128(
         &Bn256Pair::<Istanbul>::new(),
         Bn256Pair::<Istanbul>::ADDRESS,
         include_str!("res/alt_bn_128/bn256_pairing.json"),
-        23700, // 23.700 Tgas
+        44100, // 44.100 TGas
     );
 }

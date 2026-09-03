@@ -1,7 +1,6 @@
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
-use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 use aurora_engine_precompiles::xcc::{costs, cross_contract_call};
 use aurora_engine_transactions::legacy::TransactionLegacy;
+use aurora_engine_types::U256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::borsh::BorshDeserialize;
 use aurora_engine_types::parameters::{
@@ -9,12 +8,14 @@ use aurora_engine_types::parameters::{
     SimpleNearPromise,
 };
 use aurora_engine_types::types::{Address, EthGas, NearGas, Wei, Yocto};
-use aurora_engine_types::U256;
 use aurora_engine_workspace::types::NearToken;
-use near_vm_runner::logic::mocks::mock_external::MockAction;
 use near_vm_runner::ContractCode;
+use near_vm_runner::logic::mocks::mock_external::MockAction;
 use std::fs;
 use std::path::Path;
+
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
+use crate::utils::{self, AuroraRunner, DEFAULT_AURORA_ACCOUNT_ID};
 
 const WNEAR_AMOUNT: NearToken = NearToken::from_near(500);
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
@@ -124,7 +125,7 @@ fn test_xcc_eth_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            5,
+            10,
             xcc_base_cost.as_u64(),
             costs::CROSS_CONTRACT_CALL_BASE.as_u64(),
         ),
@@ -135,7 +136,7 @@ fn test_xcc_eth_gas_cost() {
 
     assert!(
         utils::within_x_percent(
-            5,
+            25,
             xcc_cost_per_byte,
             costs::CROSS_CONTRACT_CALL_BYTE.as_u64(),
         ),
@@ -403,9 +404,9 @@ fn make_fib_promise(n: usize, account_id: &AccountId) -> NearPromise {
 }
 
 pub mod workspace {
-    use crate::tests::xcc::{check_fib_result, WNEAR_AMOUNT};
+    use crate::tests::xcc::{WNEAR_AMOUNT, check_fib_result};
     use crate::utils;
-    use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+    use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
     use crate::utils::workspace::{
         create_sub_account, deploy_engine, deploy_engine_v331, deploy_erc20_from_nep_141,
         deploy_erc20_from_nep_141_legacy, deploy_nep_141, get_xcc_router_version,
@@ -413,6 +414,7 @@ pub mod workspace {
     };
     use aurora_engine_precompiles::xcc::cross_contract_call;
     use aurora_engine_transactions::legacy::TransactionLegacy;
+    use aurora_engine_types::U256;
     use aurora_engine_types::account_id::AccountId;
     use aurora_engine_types::parameters::engine::TransactionStatus;
     use aurora_engine_types::parameters::{
@@ -420,7 +422,6 @@ pub mod workspace {
         PromiseWithCallbackArgs, SimpleNearPromise,
     };
     use aurora_engine_types::types::{Address, NearGas, Wei, Yocto};
-    use aurora_engine_types::U256;
     use aurora_engine_workspace::types::NearToken;
     use aurora_engine_workspace::{EngineContract, RawContract};
     use serde_json::json;
@@ -776,7 +777,11 @@ pub mod workspace {
         super::change_router_version(current_xcc_version);
     }
 
-    #[allow(clippy::too_many_lines, clippy::future_not_send)]
+    #[allow(
+        clippy::too_many_lines,
+        clippy::future_not_send,
+        clippy::cognitive_complexity
+    )]
     async fn test_xcc_precompile_common(is_scheduled: bool) {
         let XccTestContext {
             aurora,

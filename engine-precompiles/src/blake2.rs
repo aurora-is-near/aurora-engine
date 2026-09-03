@@ -1,12 +1,12 @@
+use aurora_engine_types::Vec;
 use aurora_evm::{Context, ExitError};
 
 use crate::prelude::types::EthGas;
 use crate::prelude::{
-    types::{make_address, Address},
     Borrowed,
+    types::{Address, make_address},
 };
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_types::Vec;
 
 /// Blake2 costs.
 mod costs {
@@ -171,10 +171,10 @@ impl Precompile for Blake2F {
         }
 
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let mut rounds_bytes = [0u8; 4];

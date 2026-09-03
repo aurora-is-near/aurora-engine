@@ -1,9 +1,10 @@
+use aurora_engine_sdk::bls12_381::{self, G2_MUL_INPUT_LENGTH};
+use aurora_engine_types::types::{Address, EthGas, make_address};
+use aurora_evm::{Context, ExitError};
+
 use super::msm_required_gas;
 use crate::prelude::{Borrowed, Vec};
 use crate::{EvmPrecompileResult, Precompile, PrecompileOutput};
-use aurora_engine_sdk::bls12_381::{self, G2_MUL_INPUT_LENGTH};
-use aurora_engine_types::types::{make_address, Address, EthGas};
-use aurora_evm::{Context, ExitError};
 
 /// Base gas fee for BLS12-381 `g2_mul` operation.
 const BASE_GAS_FEE: u64 = 22500;
@@ -59,15 +60,15 @@ impl Precompile for BlsG2Msm {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let input_len = input.len();
-        if input_len == 0 || input_len % G2_MUL_INPUT_LENGTH != 0 {
+        if input_len == 0 || !input_len.is_multiple_of(G2_MUL_INPUT_LENGTH) {
             return Err(ExitError::Other(Borrowed("ERR_BLS_G2MSM_INPUT_LEN")));
         }
 
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = Self::execute(input)?;

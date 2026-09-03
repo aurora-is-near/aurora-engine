@@ -43,12 +43,12 @@ pub const PAIR_ELEMENT_LEN: usize = G1_LEN + G2_LEN;
 
 #[cfg(not(feature = "contract"))]
 mod utils {
-    use super::{Bn254Error, Cow, FQ2_LEN, FQ_LEN, G1_LEN, SCALAR_LEN};
-
     use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine};
-    use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+    use ark_ec::{AffineRepr, CurveGroup, pairing::Pairing};
     use ark_ff::{One, PrimeField, Zero};
     use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+    use super::{Bn254Error, Cow, FQ_LEN, FQ2_LEN, G1_LEN, SCALAR_LEN};
 
     /// Right-pads the given slice with zeroes until `LEN`.
     /// Returns the first `LEN` bytes if it does not need padding.
@@ -433,7 +433,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
     }
 
     // Validate input length
-    if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
+    if !input_bytes.len().is_multiple_of(PAIR_ELEMENT_LEN) {
         return Err(Bn254Error::InvalidPairLength);
     }
 
@@ -475,7 +475,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
     }
 
     // Validate input length
-    if input_bytes.len() % PAIR_ELEMENT_LEN != 0 {
+    if !input_bytes.len().is_multiple_of(PAIR_ELEMENT_LEN) {
         return Err(Bn254Error::InvalidPairLength);
     }
 

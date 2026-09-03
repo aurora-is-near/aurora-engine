@@ -1,14 +1,14 @@
-use crate::prelude::{AccountId, Address, BTreeSet, Vec};
 use aurora_engine_precompiles::native::{exit_to_ethereum, exit_to_near};
-use aurora_engine_sdk::io::{StorageIntermediate, IO};
+use aurora_engine_sdk::io::{IO, StorageIntermediate};
 use aurora_engine_types::borsh::{BorshDeserialize, BorshSerialize};
-use aurora_engine_types::storage::{bytes_to_key, KeyPrefix};
+use aurora_engine_types::storage::{KeyPrefix, bytes_to_key};
 use bitflags::bitflags;
+
+use crate::prelude::{AccountId, Address, BTreeSet, Vec};
 
 bitflags! {
     /// Wraps unsigned integer where each bit identifies a different precompile.
-    #[derive(BorshSerialize, BorshDeserialize, Default)]
-    #[borsh(crate = "aurora_engine_types::borsh")]
+    #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
     pub struct PrecompileFlags: u32 {
         const EXIT_TO_NEAR        = 0b01;
         const EXIT_TO_ETHEREUM    = 0b10;
@@ -31,6 +31,23 @@ impl PrecompileFlags {
     #[must_use]
     pub fn is_paused_by_address(&self, address: &Address) -> bool {
         Self::from_address(address).is_some_and(|precompile_flag| self.contains(precompile_flag))
+    }
+}
+
+impl BorshSerialize for PrecompileFlags {
+    fn serialize<W: aurora_engine_types::borsh::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> aurora_engine_types::borsh::io::Result<()> {
+        self.bits().serialize(writer)
+    }
+}
+
+impl BorshDeserialize for PrecompileFlags {
+    fn deserialize_reader<R: aurora_engine_types::borsh::io::Read>(
+        reader: &mut R,
+    ) -> aurora_engine_types::borsh::io::Result<Self> {
+        u32::deserialize_reader(reader).map(Self::from_bits_retain)
     }
 }
 
@@ -173,6 +190,17 @@ mod tests {
     use std::cell::RefCell;
     use std::iter::once;
     use test_case::test_case;
+
+    #[test]
+    fn test_precompile_flags_borsh_representation() {
+        let flags = PrecompileFlags::EXIT_TO_NEAR | PrecompileFlags::EXIT_TO_ETHEREUM;
+        let encoded = aurora_engine_types::borsh::to_vec(&flags).unwrap();
+
+        assert_eq!(encoded, flags.bits().to_le_bytes());
+
+        let decoded = PrecompileFlags::try_from_slice(&encoded).unwrap();
+        assert_eq!(decoded.bits(), flags.bits());
+    }
 
     #[test_case(PrecompileFlags::EXIT_TO_ETHEREUM, exit_to_ethereum::ADDRESS)]
     #[test_case(PrecompileFlags::EXIT_TO_NEAR, exit_to_near::ADDRESS)]

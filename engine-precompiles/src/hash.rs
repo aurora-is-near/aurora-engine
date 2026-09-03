@@ -1,8 +1,9 @@
-use crate::prelude::sdk;
-use crate::prelude::types::{make_address, Address, EthGas};
-use crate::prelude::vec;
-use crate::{utils, EvmPrecompileResult, Precompile, PrecompileOutput};
 use aurora_evm::{Context, ExitError};
+
+use crate::prelude::sdk;
+use crate::prelude::types::{Address, EthGas, make_address};
+use crate::prelude::vec;
+use crate::{EvmPrecompileResult, Precompile, PrecompileOutput, utils};
 
 mod costs {
     use crate::prelude::types::EthGas;
@@ -49,10 +50,10 @@ impl Precompile for SHA256 {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let output = sdk::sha256(input).as_bytes().to_vec();
@@ -87,10 +88,10 @@ impl Precompile for RIPEMD160 {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let hash = sdk::ripemd160(input);

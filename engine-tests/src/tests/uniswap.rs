@@ -1,18 +1,17 @@
+use aurora_engine_types::H160;
+use aurora_engine_types::types::Wei;
+use rand::SeedableRng;
+use std::sync::Arc;
+
 use crate::prelude::{Address, U256};
 use crate::utils::{
-    self,
-    solidity::erc20::{ERC20Constructor, ERC20},
+    self, AuroraRunner, ExecutionProfile, Signer,
+    solidity::erc20::{ERC20, ERC20Constructor},
     solidity::uniswap::{
         ExactInputParams, ExactOutputSingleParams, Factory, FactoryConstructor, MintParams, Pool,
         PositionManager, PositionManagerConstructor, SwapRouter, SwapRouterConstructor,
     },
-    AuroraRunner, ExecutionProfile, Signer,
 };
-use aurora_engine_types::types::Wei;
-use aurora_engine_types::H160;
-use libsecp256k1::SecretKey;
-use rand::SeedableRng;
-use std::sync::Arc;
 
 const INITIAL_BALANCE: u64 = 1000;
 const INITIAL_NONCE: u64 = 0;
@@ -39,7 +38,7 @@ fn test_uniswap_input_multihop() {
 
     let (_amount_out, _evm_gas, profile) = context.exact_input(&tokens, INPUT_AMOUNT.into());
 
-    assert_eq!(90, profile.all_gas() / 1_000_000_000_000);
+    assert_eq!(72, profile.all_gas() / 1_000_000_000_000);
 }
 
 #[test]
@@ -50,20 +49,20 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    utils::assert_gas_bound(profile.all_gas(), 24);
+    utils::assert_gas_bound(profile.all_gas(), 19);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (50..=60).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 50% and 60%",
+        (40..=55).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 40% and 55%",
     );
 
     let (_amount_in, profile) =
         context.exact_output_single(&token_a, &token_b, OUTPUT_AMOUNT.into());
-    utils::assert_gas_bound(profile.all_gas(), 15);
+    utils::assert_gas_bound(profile.all_gas(), 13);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
-        (50..=60).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 40% and 50%",
+        (40..=55).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 40% and 55%",
     );
 }
 
@@ -88,7 +87,7 @@ impl UniswapTestContext {
     pub fn new(name: &str) -> Self {
         let mut runner = utils::deploy_runner();
         let mut rng = rand::rngs::StdRng::seed_from_u64(414_243);
-        let source_account = SecretKey::random(&mut rng);
+        let source_account = utils::random_sk(&mut rng);
         let source_address = utils::address_from_secret_key(&source_account);
         runner.create_address(
             source_address,

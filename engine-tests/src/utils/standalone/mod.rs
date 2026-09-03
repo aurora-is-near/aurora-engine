@@ -6,11 +6,11 @@ use aurora_engine_transactions::legacy::{LegacyEthSignedTransaction, Transaction
 use aurora_engine_types::types::{Address, NearGas, PromiseResult, Wei};
 use aurora_engine_types::{H256, U256};
 use engine_standalone_storage::{
+    BlockMetadata, Diff, Storage,
     sync::{
         self,
         types::{TransactionKind, TransactionMessage},
     },
-    BlockMetadata, Diff, Storage,
 };
 use libsecp256k1::SecretKey;
 use tempfile::TempDir;

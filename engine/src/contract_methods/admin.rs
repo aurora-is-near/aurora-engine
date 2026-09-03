@@ -6,31 +6,18 @@
 //! The reason to isolate these implementations is so that they can be shared between both
 //! the smart contract and the standalone.
 
-use crate::{
-    contract_methods::{
-        predecessor_address, require_key_manager_only, require_owner_only, require_paused,
-        require_running, ContractError,
-    },
-    engine::{self, Engine},
-    errors,
-    hashchain::with_hashchain,
-    pausables::{
-        Authorizer, EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker,
-        PausedPrecompilesManager, PrecompileFlags,
-    },
-    state::{self, EngineState},
-};
 use aurora_engine_hashchain::{bloom::Bloom, hashchain::Hashchain};
 use aurora_engine_modexp::AuroraModExp;
 use aurora_engine_sdk::{
     env::Env,
     error::ReadU64Error,
-    io::{StorageIntermediate, IO},
+    io::{IO, StorageIntermediate},
     promise::PromiseHandler,
 };
 use aurora_engine_types::parameters::engine::{FullAccessKeyArgs, UpgradeParams};
 use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
+    ToString,
     borsh::BorshDeserialize,
     parameters::{
         engine::{
@@ -41,9 +28,24 @@ use aurora_engine_types::{
     },
     storage::{self, KeyPrefix},
     types::{Address, Yocto},
-    vec, ToString,
+    vec,
 };
 use function_name::named;
+
+use crate::{
+    contract_methods::{
+        ContractError, predecessor_address, require_key_manager_only, require_owner_only,
+        require_paused, require_running,
+    },
+    engine::{self, Engine},
+    errors,
+    hashchain::with_hashchain,
+    pausables::{
+        Authorizer, EngineAuthorizer, EnginePrecompilesPauser, PausedPrecompilesChecker,
+        PausedPrecompilesManager, PrecompileFlags,
+    },
+    state::{self, EngineState},
+};
 
 const CODE_KEY: &[u8; 4] = b"CODE";
 const CODE_STAGE_KEY: &[u8; 10] = b"CODE_STAGE";
@@ -196,7 +198,7 @@ pub fn upgrade<I: IO + Copy, E: Env, H: PromiseHandler>(
             },
         ],
     };
-    let promise_id = unsafe { handler.promise_create_batch(&batch) };
+    let promise_id = handler.promise_create_batch(&batch);
 
     handler.promise_return(promise_id);
 
@@ -335,7 +337,7 @@ pub fn add_relayer_key<I: IO + Copy, E: Env, H: PromiseHandler>(
         ],
     };
 
-    let promise_id = unsafe { handler.promise_create_batch(&promise) };
+    let promise_id = handler.promise_create_batch(&promise);
     handler.promise_return(promise_id);
 
     Ok(())
@@ -389,7 +391,7 @@ pub fn remove_relayer_key<I: IO + Copy, E: Env, H: PromiseHandler>(
             actions: vec![action],
         };
 
-        let promise_id = unsafe { handler.promise_create_batch(&promise) };
+        let promise_id = handler.promise_create_batch(&promise);
         handler.promise_return(promise_id);
 
         Ok(())
@@ -503,7 +505,7 @@ pub fn attach_full_access_key<I: IO + Copy, E: Env, H: PromiseHandler>(
     // SAFETY: This action is dangerous because it adds a new full access key (FAK) to the Engine account.
     // However, it is safe to do so here because of the `require_owner_only` check above; only the
     // (trusted) owner account can add a new FAK.
-    let promise_id = unsafe { handler.promise_create_batch(&promise) };
+    let promise_id = handler.promise_create_batch(&promise);
 
     handler.promise_return(promise_id);
 

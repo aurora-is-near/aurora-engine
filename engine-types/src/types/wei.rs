@@ -1,9 +1,10 @@
+use borsh::{BorshDeserialize, BorshSerialize, io};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::fmt::Formatter;
 use crate::types::balance::error;
 use crate::types::{EthGas, Fee};
-use crate::{format, Add, Display, Mul, Sub, SubAssign, ToString, U256};
-use borsh::{io, BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::{Add, Display, Mul, Sub, SubAssign, ToString, U256, format};
 
 pub const ZERO_NEP141_WEI: NEP141Wei = NEP141Wei::new(0);
 pub const ZERO_WEI: Wei = Wei::zero();

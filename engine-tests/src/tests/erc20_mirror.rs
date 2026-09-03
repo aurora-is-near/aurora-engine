@@ -1,11 +1,4 @@
 #![allow(clippy::too_many_lines)]
-use crate::prelude::U256;
-use crate::tests::erc20_connector::workspace::{erc20_balance, exit_to_near};
-use crate::utils::workspace::{
-    deploy_engine_with_code, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
-    transfer_nep_141_to_erc_20,
-};
-use crate::utils::AuroraRunner;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
     WithdrawSerializeType,
@@ -13,6 +6,14 @@ use aurora_engine_types::parameters::connector::{
 use aurora_engine_workspace::account::Account;
 use aurora_engine_workspace::types::NearToken;
 use aurora_engine_workspace::{EngineContract, RawContract};
+
+use crate::prelude::U256;
+use crate::tests::erc20_connector::workspace::{erc20_balance, exit_to_near};
+use crate::utils::AuroraRunner;
+use crate::utils::workspace::{
+    deploy_engine_with_code, deploy_erc20_from_nep_141, deploy_nep_141, nep_141_balance_of,
+    transfer_nep_141_to_erc_20,
+};
 
 const TRANSFER_AMOUNT: u128 = 1000;
 

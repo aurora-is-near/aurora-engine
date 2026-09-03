@@ -1,11 +1,11 @@
-use borsh::{io, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize, io};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    Vec,
     account_id::AccountId,
     public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
-    Vec,
 };
 
 /// Parameters for the `new` function.
@@ -397,7 +397,7 @@ pub struct UpgradeParams {
 }
 
 mod chain_id_deserialize {
-    use crate::types::{u256_to_arr, RawU256};
+    use crate::types::{RawU256, u256_to_arr};
     use primitive_types::U256;
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -418,11 +418,12 @@ mod chain_id_deserialize {
 }
 
 pub mod errors {
-    use crate::{account_id::ParseAccountError, String, ToString};
+    use crate::{String, ToString, account_id::ParseAccountError};
 
     pub const ERR_REVERT: &[u8] = b"ERR_REVERT";
     pub const ERR_NOT_ALLOWED: &[u8] = b"ERR_NOT_ALLOWED";
     pub const ERR_OUT_OF_FUND: &[u8] = b"ERR_OUT_OF_FUND";
+    pub const ERR_MAX_FEE_PER_GAS_LESS_THAN_BASE_FEE: &[u8] = b"ERR_MAX_FEE_LESS_BASE_FEE";
     pub const ERR_CALL_TOO_DEEP: &[u8] = b"ERR_CALL_TOO_DEEP";
     pub const ERR_OUT_OF_OFFSET: &[u8] = b"ERR_OUT_OF_OFFSET";
     pub const ERR_OUT_OF_GAS: &[u8] = b"ERR_OUT_OF_GAS";

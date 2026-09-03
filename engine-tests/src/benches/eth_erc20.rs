@@ -1,10 +1,9 @@
-use crate::prelude::U256;
 use criterion::{BatchSize, BenchmarkId, Criterion};
-use libsecp256k1::SecretKey;
 
-use crate::utils::solidity::erc20::{ERC20Constructor, ERC20};
+use crate::prelude::U256;
+use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
 use crate::utils::{
-    address_from_secret_key, deploy_runner, parse_eth_gas, sign_transaction, SUBMIT,
+    SUBMIT, address_from_secret_key, deploy_runner, parse_eth_gas, random_sk, sign_transaction,
 };
 
 const INITIAL_BALANCE: u64 = 1000;
@@ -13,8 +12,8 @@ const TRANSFER_AMOUNT: u64 = 67;
 
 pub fn eth_erc20_benchmark(c: &mut Criterion) {
     let mut runner = deploy_runner();
-    let mut rng = rand::thread_rng();
-    let source_account = SecretKey::random(&mut rng);
+    let mut rng = rand::rng();
+    let source_account = random_sk(&mut rng);
     runner.create_address(
         address_from_secret_key(&source_account),
         crate::prelude::Wei::new_u64(INITIAL_BALANCE),
@@ -40,7 +39,7 @@ pub fn eth_erc20_benchmark(c: &mut Criterion) {
     let mint_tx_bytes = rlp::encode(&signed_tx).to_vec();
 
     // create the transaction for transfer
-    let dest_address = address_from_secret_key(&SecretKey::random(&mut rng));
+    let dest_address = address_from_secret_key(&random_sk(&mut rng));
     let tx = contract.transfer(
         dest_address,
         TRANSFER_AMOUNT.into(),

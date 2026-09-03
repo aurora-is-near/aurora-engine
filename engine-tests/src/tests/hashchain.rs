@@ -1,11 +1,12 @@
-use crate::utils;
 use aurora_engine::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use aurora_engine_hashchain::bloom::Bloom;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::{
-    types::{Address, Wei},
     H256, U256,
+    types::{Address, Wei},
 };
+
+use crate::utils;
 
 #[test]
 fn test_hashchain() {

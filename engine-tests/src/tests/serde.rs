@@ -5,7 +5,7 @@ use aurora_engine::{
     parameters::{ResultLog, SubmitResult, TransactionStatus},
 };
 use aurora_engine_transactions::eip_2930::AccessTuple;
-use aurora_engine_types::{types::Address, H160};
+use aurora_engine_types::{H160, types::Address};
 
 #[test]
 fn test_serde_submit_result() {
