@@ -6,6 +6,8 @@ BINARYEN_VERSION=130
 apt update
 apt install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
 
+echo "LLVM_CONFIG_PATH=$(command -v llvm-config)" >> "$GITHUB_ENV"
+echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
 if [[ ! -f wasm-opt ]]; then
   mkdir binaryen
