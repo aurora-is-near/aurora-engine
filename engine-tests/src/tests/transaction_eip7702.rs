@@ -831,9 +831,6 @@ fn eip7702_single_auth_tx(chain_id: u64, auth_chain_id: u64) -> Transaction7702 
 }
 
 /// Build `n` authorization tuples signed by the same authority with nonces `0..n`.
-/// For length-cap tests the list *content* is secondary — only its size
-/// matters (plus valid RLP).
-#[allow(clippy::as_conversions)]
 fn make_auth_list(n: usize, auth_chain_id: u64) -> Vec<AuthorizationTuple> {
     let authority_sk = example_authority_signer();
     let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);

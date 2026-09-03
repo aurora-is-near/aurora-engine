@@ -603,6 +603,15 @@ mod tests {
         let mut rlp_stream = RlpStream::new();
         let chain_ids = [U256::zero(), U256::from(0x7f), U256::from(0x80), U256::MAX];
         let nonces = [0, 0x7f, 0x80, u64::MAX];
+        let signature_hash = |auth: &AuthorizationTuple| {
+            let mut stream = RlpStream::new_list(3);
+            stream.append(&auth.chain_id);
+            stream.append(&auth.address);
+            stream.append(&auth.nonce);
+            let mut payload = vec![MAGIC];
+            payload.extend_from_slice(stream.as_raw());
+            aurora_engine_sdk::keccak(&payload)
+        };
 
         for chain_id in chain_ids {
             for nonce in nonces {
@@ -614,16 +623,9 @@ mod tests {
                     r: U256::zero(),
                     s: U256::zero(),
                 };
-                let mut stream = RlpStream::new();
-                stream.append(&MAGIC);
-                stream.begin_list(3);
-                stream.append(&authorization.chain_id);
-                stream.append(&authorization.address);
-                stream.append(&authorization.nonce);
-
                 assert_eq!(
                     authorization.signature_hash(&mut rlp_stream),
-                    aurora_engine_sdk::keccak(stream.as_raw())
+                    signature_hash(&authorization)
                 );
             }
         }
