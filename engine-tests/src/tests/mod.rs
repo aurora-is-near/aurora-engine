@@ -27,6 +27,7 @@ mod silo;
 mod standalone;
 mod standard_precompiles;
 mod transaction;
+mod transaction_eip7702;
 pub mod uniswap;
 mod upgrade;
 pub mod xcc;
