@@ -3,9 +3,8 @@
 export DEBIAN_FRONTEND=noninteractive
 BINARYEN_VERSION=130
 
-apt update
-apt install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
-
+apt-get update
+apt-get install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
 
 if [[ ! -f wasm-opt ]]; then
   mkdir binaryen
