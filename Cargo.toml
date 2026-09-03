@@ -59,7 +59,7 @@ rand = "0.10"
 reqwest = "0.13"
 ripemd = { version = "0.2", default-features = false }
 rlp = { version = "0.6", default-features = false }
-rocksdb = { version = "0.21", default-features = false }
+rocksdb = { version = "0.24", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
 sha2 = { version = "0.11", default-features = false }
