@@ -171,12 +171,12 @@ impl SignedTransaction7702 {
     /// 1. `s <= secp256k1n/2` - low-S signature constraint.
     /// 2. `chain_id == 0 || chain_id == tx.chain_id` — chain binding.
     /// 3. `parity ∈ {0, 1}` - valid recovery bit.
-    /// 4. `authority = ecrecover(keccak(0x05 || rlp([chain_id, address, nonce])), parity, r, s)`
-    /// 5. `authority != 0x0` — zero address is reserved as a system address.
+    /// 4. `authority = ecrecover(keccak(0x05 || rlp([chain_id, address, nonce])), parity, r, s)`;
+    ///    a recovery failure marks the entry invalid.
     ///
     /// Invalid entries are **not** skipped — they are included with `is_valid = false`
     /// because each entry must still be charged for gas.
-    /// Steps 2, 4–9 of EIP-7702 are delegated to the EVM itself.
+    /// The remaining EIP-7702 validation steps are delegated to the EVM itself.
     ///
     /// ### Errors
     /// Returns [`Error::EmptyAuthorizationList`] if the list is empty.

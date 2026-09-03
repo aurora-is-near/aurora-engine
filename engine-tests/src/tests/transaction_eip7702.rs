@@ -8,12 +8,6 @@
 //!   * Delegation revocation by an external signer and by the authority itself.
 //!   * `auth.chain_id` mismatch - the auth entry is marked invalid while the
 //!     outer tx still executes and charges gas.
-//!   * Early-exit rejection paths (wrong `tx.chain_id`, `tx.nonce`, or insufficient
-//!     balance): prove that `ecrecover` over the auth list is NOT invoked.
-//!
-//! NEAR-gas asserts are floor-rounded to 0.1 `TGas` (100 `GGas`) via
-//! [`round_near_gas`] so sub-percent cost drift doesn't flake the suite
-//! while any meaningful cost-model regression still fails loudly.
 
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_transactions::eip_7702;
