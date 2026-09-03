@@ -130,6 +130,7 @@ fn repro_Emufid2() {
     });
 }
 
+#[track_caller]
 fn repro_common(context: &ReproContext) {
     let ReproContext {
         snapshot_path,

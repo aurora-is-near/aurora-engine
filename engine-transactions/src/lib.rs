@@ -80,20 +80,36 @@ impl From<&EthTransactionKind> for Vec<u8> {
     }
 }
 
-/// A normalized Ethereum transaction which can be created from older
-/// transactions.
+/// A normalized Ethereum transaction that can be created from older transactions.
 pub struct NormalizedEthTransaction {
+    /// The Ethereum address of the transaction sender, recovered from the signature.
     pub address: Address,
+    /// EIP-155 chain ID to prevent replay attacks across different networks.
+    /// None for legacy transactions that don't specify a chain ID.
     pub chain_id: Option<u64>,
+    /// Transaction sequence number from the sender's account, used to ensure transaction ordering.
     pub nonce: U256,
+    /// Maximum amount of gas units that can be consumed by this transaction.
     pub gas_limit: U256,
+    /// Maximum priority fee (tip) per gas unit that the sender is willing to pay to the miner.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_priority_fee_per_gas: U256,
+    /// Maximum total fee per gas unit (base fee + priority fee) that the sender is willing to pay.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_fee_per_gas: U256,
+    /// Recipient address for the transaction.
+    /// None indicates a contract creation transaction.
     pub to: Option<Address>,
+    /// Amount of Wei (the smallest denomination of Ether) to transfer to the recipient.
     pub value: Wei,
+    /// Input data for the transaction containing either contract bytecode (for creation)
+    /// or encoded function call data (for contract interaction).
     pub data: Vec<u8>,
+    /// EIP-2930 access list containing addresses and storage keys that the transaction
+    /// plans to access, allowing for reduced gas costs on subsequent accesses.
     pub access_list: Vec<AccessTuple>,
-    // Contains additional information - `chain_id` for each authorization item
+    /// EIP-7702 authorization list containing signed authorizations that allow the transaction
+    /// to temporarily set code for externally owned accounts (EOAs) during execution.
     pub authorization_list: Vec<Authorization>,
 }
 
@@ -539,6 +555,7 @@ mod tests {
             nonce: 0,
             is_valid: false,
         };
+        // Test transaction with an authorization list length
         let tx = NormalizedEthTransaction {
             address: Address::default(),
             chain_id: Some(1),

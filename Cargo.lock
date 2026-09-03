@@ -467,7 +467,6 @@ dependencies = [
  "hex",
  "primitive-types 0.13.1",
  "rand 0.10.2",
- "rlp",
  "serde",
  "serde_json",
 ]
