@@ -3,15 +3,12 @@
 export DEBIAN_FRONTEND=noninteractive
 BINARYEN_VERSION=130
 
-apt update
-apt install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
-
-echo "LLVM_CONFIG_PATH=$(command -v llvm-config)" >> "$GITHUB_ENV"
-echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config libclang-dev clang libssl-dev gnupg curl git gpg
 
 if [[ ! -f wasm-opt ]]; then
   mkdir binaryen
   curl -sL https://github.com/WebAssembly/binaryen/releases/download/version_$BINARYEN_VERSION/binaryen-version_$BINARYEN_VERSION-x86_64-linux.tar.gz | tar -xz -C binaryen
-  cp binaryen/binaryen-version_$BINARYEN_VERSION/bin/* /usr/local/bin
+  sudo cp binaryen/binaryen-version_$BINARYEN_VERSION/bin/* /usr/local/bin
   rm -rf binaryen
 fi
