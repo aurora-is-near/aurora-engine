@@ -19,8 +19,8 @@
 //! Standalone data set fully represents all tests from `execution-spec-tests` for
 //! BLS12-381 precompiles. We run this test in standalone manner.
 
-use aurora_engine_precompiles::bls12_381;
 use aurora_engine_precompiles::Precompile;
+use aurora_engine_precompiles::bls12_381;
 use aurora_engine_transactions::eip_2930;
 use aurora_engine_transactions::eip_2930::{AccessTuple, Transaction2930};
 use aurora_engine_types::borsh::BorshDeserialize;
