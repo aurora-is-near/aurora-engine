@@ -12,7 +12,6 @@ jobs:
   test:
     name: Test suite
     runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
-    container: rust:latest
     steps:
       - name: Setup RunsOn
         uses: runs-on/action@v2
@@ -21,7 +20,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v6
       - name: Install dependencies
-        run: scripts/ci-deps.sh
+        run: sudo scripts/ci-deps.sh
       - uses: dtolnay/rust-toolchain@stable
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
