@@ -12,6 +12,7 @@ jobs:
   test:
     name: Test suite
     runs-on: runs-on=${{ github.run_id }}/runner=rust-near-integration-special-64cpu-256gb
+    container: rust:latest
     steps:
       - name: Setup RunsOn
         uses: runs-on/action@v2
