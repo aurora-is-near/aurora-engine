@@ -72,7 +72,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 111,
+        near_gas_used: 110,
     });
 }
 

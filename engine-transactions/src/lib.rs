@@ -420,7 +420,7 @@ mod tests {
     fn test_intrinsic_gas() {
         use super::NormalizedEthTransaction;
 
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
 
         // Test a simple transaction with no data
         let tx = NormalizedEthTransaction {
@@ -601,7 +601,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_empty_data() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_all_zero_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![0u8; 10]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_all_non_zero_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![1u8; 10]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_mixed_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![0, 1, 0, 1, 0, 1, 1, 1]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -645,7 +645,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_large_data() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![1u8; 1000]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_overflow_on_mul_cost_per_token() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.total_cost_floor_per_token = u64::MAX;
 
         let tx = create_test_transaction(vec![1u8; 10]);
@@ -667,7 +667,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_overflow_on_add_base() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.has_floor_gas = true;
         config.total_cost_floor_per_token = u64::MAX;
 
@@ -679,7 +679,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_with_different_cost_per_token() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.has_floor_gas = true;
         config.total_cost_floor_per_token = 500;
 
