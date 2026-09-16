@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.11.0] 2026-09-17
+
+### Additions
+
+- Added Osaka hard fork support by upgrading `aurora-evm` to 3.0.0 and switching execution and gas validation to the Osaka rules by [@mrLSD]. ([#1209])
+- Added automated Rust dependency security audits to CI by [@aleksuss]. ([#1069])
+
+### Changes
+
+- Improved EIP-7702 authorization signing and validation, including boundary-value chain IDs and nonces, by [@mrLSD] and [@aleksuss]. ([#1137])
+- Optimized modular exponentiation with windowed Montgomery exponentiation and demand-driven table construction by [@4waan] and [@aleksuss]. ([#1188] [#1200])
+- Updated the Rust toolchain to 1.97 and the NEAR dependencies to 0.37, including the required WASM linker configuration, by [@mrLSD] and [@aleksuss]. ([#1156] [#1176] [#1179] [#1181])
+- Updated RocksDB to 0.24 for standalone storage by [@aleksuss]. ([#1206])
+
+### Fixes
+
+- Fixed storage withdrawals through the external connector by attaching the required one yoctoNEAR deposit by [@aleksuss]. ([#1076])
+- Fixed exit precompile gas accounting to retain the required gas calculated from the original input by [@aleksuss]. ([#1089])
+- Fixed transaction gas charging when `max_fee_per_gas` is lower than the block base fee by [@mrLSD]. ([#1091])
+- Fixed EIP-7702 transaction submission for senders with delegation designations by [@mrLSD] and [@aleksuss]. ([#1112])
+- Fixed BLS12-381 host-function error handling and pairing-check results by [@mrLSD]. ([#1113])
+- Fixed concurrent Solidity artifact compilation in the test suite by [@4waan]. ([#1201])
+
+[#1069]: https://github.com/aurora-is-near/aurora-engine/pull/1069
+[#1076]: https://github.com/aurora-is-near/aurora-engine/pull/1076
+[#1089]: https://github.com/aurora-is-near/aurora-engine/pull/1089
+[#1091]: https://github.com/aurora-is-near/aurora-engine/pull/1091
+[#1112]: https://github.com/aurora-is-near/aurora-engine/pull/1112
+[#1113]: https://github.com/aurora-is-near/aurora-engine/pull/1113
+[#1137]: https://github.com/aurora-is-near/aurora-engine/pull/1137
+[#1156]: https://github.com/aurora-is-near/aurora-engine/pull/1156
+[#1176]: https://github.com/aurora-is-near/aurora-engine/pull/1176
+[#1179]: https://github.com/aurora-is-near/aurora-engine/pull/1179
+[#1181]: https://github.com/aurora-is-near/aurora-engine/pull/1181
+[#1188]: https://github.com/aurora-is-near/aurora-engine/pull/1188
+[#1200]: https://github.com/aurora-is-near/aurora-engine/pull/1200
+[#1201]: https://github.com/aurora-is-near/aurora-engine/pull/1201
+[#1206]: https://github.com/aurora-is-near/aurora-engine/pull/1206
+[#1209]: https://github.com/aurora-is-near/aurora-engine/pull/1209
+
 ## [3.10.1] 2026-01-23
 
 ### Additions
@@ -834,7 +874,9 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.0...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.11.0...develop
+[3.11.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.1...3.11.0
+[3.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.0...3.10.1
 [3.10.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.2...3.10.0
 [3.9.2]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.1...3.9.2
 [3.9.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.9.0...3.9.1
@@ -892,6 +934,7 @@ struct SubmitResult {
 [1.0.0]: https://github.com/aurora-is-near/aurora-engine/tree/1.0.0
 
 [@0x3bfc]: https://github.com/0x3bfc
+[@4waan]: https://github.com/4waan
 [@Casuso]: https://github.com/Casuso
 [@DemoYeti]: https://github.com/DemoYeti
 [@RomanHodulak]: https://github.com/RomanHodulak
