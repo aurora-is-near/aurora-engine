@@ -430,7 +430,7 @@ pub struct Engine<'env, I: IO, E: Env, M = AuroraModExp> {
     modexp_algorithm: PhantomData<M>,
 }
 
-const CONFIG: &Config = &Config::prague();
+const CONFIG: &Config = &Config::osaka();
 
 impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn new(
