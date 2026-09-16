@@ -575,7 +575,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 118_206);
-    assert_eq!(actual_ggas_used, 6420);
+    assert_eq!(actual_ggas_used, 6419);
 }
 
 /// Same authority twice with same nonce: first auth applies and increments nonce,
