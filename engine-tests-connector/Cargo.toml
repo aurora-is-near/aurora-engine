@@ -11,16 +11,17 @@ publish.workspace = true
 autobenches = false
 
 [dev-dependencies]
-aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
 anyhow.workspace = true
-cargo-near-build.workspace = true
-near-sdk.workspace = true
+aurora-engine-types = { workspace = true, features = ["std", "impl-serde"] }
+cargo-near-build = { workspace = true, features = ["build_internal"] }
+near-sdk = { workspace = true, features = ["non-contract-usage"] }
 near-workspaces.workspace = true
-tokio = { workspace = true, features = ["macros"] }
+reqwest.workspace = true
 serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["macros"] }
+zip = { workspace = true }
 
 [lints]
 workspace = true
 
 [features]
-

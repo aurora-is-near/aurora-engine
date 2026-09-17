@@ -155,7 +155,7 @@ where
     let promise_id = handler.promise_create_batch(&batch);
 
     if let AddressVersionStatus::DeployNeeded { .. } = deploy_needed {
-        // If a create and/or deploy was needed then we must attach a callback to update
+        // If a creation and/or deployment were needed, then we must attach a callback to update
         // the Engine's record of the account.
 
         let args = AddressVersionUpdateArgs {
@@ -341,7 +341,7 @@ where
 }
 
 /// Read the current wasm bytecode for the router contracts
-pub fn get_router_code<I: IO>(io: &I) -> RouterCode {
+pub fn get_router_code<I: IO>(io: &I) -> RouterCode<'_> {
     let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, CODE_KEY);
     let bytes = io.read_storage(&key).expect(ERR_NO_ROUTER_CODE).to_vec();
     RouterCode::new(bytes)

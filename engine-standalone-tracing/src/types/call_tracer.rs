@@ -14,7 +14,7 @@ pub struct CallFrame {
     pub input: Vec<u8>,
     pub output: Vec<u8>,
     pub error: Option<String>,
-    pub calls: Vec<CallFrame>,
+    pub calls: Vec<Self>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -119,11 +119,11 @@ impl CallTracer {
 
     #[allow(clippy::missing_const_for_fn)]
     fn update_gas_from_snapshot(&mut self, snapshot: Option<aurora_evm::gasometer::Snapshot>) {
-        if let Some(snapshot) = snapshot {
-            if let Some(frame) = self.call_stack.last_mut() {
-                frame.gas = snapshot.gas_limit;
-                frame.gas_used = snapshot.used_gas + snapshot.memory_gas;
-            }
+        if let Some(snapshot) = snapshot
+            && let Some(frame) = self.call_stack.last_mut()
+        {
+            frame.gas = snapshot.gas_limit;
+            frame.gas_used = snapshot.used_gas + snapshot.memory_gas;
         }
     }
 
@@ -374,7 +374,7 @@ pub struct SerializableCallFrame {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     error: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    calls: Vec<SerializableCallFrame>,
+    calls: Vec<Self>,
 }
 
 #[cfg(feature = "serde")]

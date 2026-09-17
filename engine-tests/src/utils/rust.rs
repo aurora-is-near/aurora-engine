@@ -12,6 +12,15 @@ pub fn compile<P: AsRef<Path>>(manifest_path: P) -> PathBuf {
             )
             .unwrap(),
         ),
+        skip_rust_version_check: true,
+        // The newer wasm linker (rust-lld) no longer auto-imports the undefined NEAR host
+        // functions, so we must pass `--import-undefined` explicitly. This overrides
+        // cargo-near-build's default rustflags (`-C link-arg=-s`), which we keep, and
+        // `--cfg near` is still force-appended by the builder afterwards.
+        env: vec![(
+            "RUSTFLAGS".to_string(),
+            "-C link-arg=-s -C link-arg=--import-undefined".to_string(),
+        )],
         ..Default::default()
     };
 

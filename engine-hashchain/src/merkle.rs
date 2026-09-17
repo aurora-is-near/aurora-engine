@@ -28,7 +28,7 @@ impl StreamCompactMerkleTree {
 
     /// Returns `true` if no data has been added to the tree.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.subtrees.is_empty()
     }
 

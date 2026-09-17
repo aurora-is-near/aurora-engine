@@ -31,7 +31,8 @@ strum.workspace = true
 workspace = true
 
 [features]
-default = ["snappy", "lz4", "zstd", "zlib"]
+default = ["jemalloc", "snappy", "lz4", "zstd", "zlib"]
+jemalloc = ["rocksdb/jemalloc"]
 snappy = ["rocksdb/snappy"]
 lz4 = ["rocksdb/lz4"]
 zstd = ["rocksdb/zstd"]

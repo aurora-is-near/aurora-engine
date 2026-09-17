@@ -58,7 +58,7 @@ pub mod error {
 mod test {
     /// Requires a JSON snapshot to work. This can be obtained from `https://github.com/aurora-is-near/contract-state`
     #[test]
-    #[ignore]
+    #[ignore = "requires external snapshot file; see aurora-is-near/contract-state"]
     fn test_consume_snapshot() {
         let snapshot = crate::json_snapshot::types::JsonSnapshot::load_from_file(
             "contract.aurora.block51077328.json",

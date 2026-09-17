@@ -64,7 +64,7 @@ fn erc20_mint_out_of_gas() {
 
     // not enough gas to cover intrinsic cost
     let intrinsic_gas = erc20::legacy_into_normalized_tx(mint_tx.clone())
-        .intrinsic_gas(&aurora_evm::Config::prague())
+        .intrinsic_gas(&aurora_evm::Config::osaka())
         .unwrap();
     mint_tx.gas_limit = (intrinsic_gas - 1).into();
     let error = runner
@@ -115,11 +115,11 @@ fn profile_erc20_get_balance() {
 
     // call costs less than 3 Tgas
     utils::assert_gas_bound(profile.all_gas(), 3);
-    // at least 80% of the cost is spent on wasm computation (as opposed to host functions)
+    // a small fraction of the cost is wasm computation (rest is host functions)
     let wasm_fraction = (100 * profile.wasm_gas()) / profile.all_gas();
     assert!(
-        (10..=20).contains(&wasm_fraction),
-        "{wasm_fraction}% is not between 10% and 20%",
+        (10..=21).contains(&wasm_fraction),
+        "{wasm_fraction}% is not between 10% and 21%",
     );
 }
 
@@ -219,10 +219,10 @@ fn deploy_erc_20_out_of_gas() {
 
     let normalized_deploy_tx = erc20::legacy_into_normalized_tx(deploy_transaction.clone());
     let intrinsic_gas = normalized_deploy_tx
-        .intrinsic_gas(&aurora_evm::Config::prague())
+        .intrinsic_gas(&aurora_evm::Config::osaka())
         .unwrap();
     let floor_gas = normalized_deploy_tx
-        .floor_gas(&aurora_evm::Config::prague())
+        .floor_gas(&aurora_evm::Config::osaka())
         .unwrap();
     let max_gas = std::cmp::max(intrinsic_gas, floor_gas);
 

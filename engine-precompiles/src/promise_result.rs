@@ -48,10 +48,10 @@ impl<H: ReadOnlyPromiseHandler> Precompile for PromiseResult<H> {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let mut cost = Self::required_gas(input)?;
         let check_cost = |cost: EthGas| -> Result<(), ExitError> {
-            if let Some(target_gas) = target_gas {
-                if cost > target_gas {
-                    return Err(ExitError::OutOfGas);
-                }
+            if let Some(target_gas) = target_gas
+                && cost > target_gas
+            {
+                return Err(ExitError::OutOfGas);
             }
             Ok(())
         };

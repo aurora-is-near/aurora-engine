@@ -2,12 +2,21 @@ use std::{fs, path::Path};
 
 use crate::utils::workspace::deploy_engine;
 
+static CONTRACT_BYTES: std::sync::LazyLock<Vec<u8>> = std::sync::LazyLock::new(|| {
+    let base_path = Path::new("../etc")
+        .join("tests")
+        .join("state-migration-test");
+    let artifact_path = crate::utils::rust::compile(base_path);
+
+    fs::read(artifact_path).unwrap()
+});
+
 #[tokio::test]
 async fn test_code_upgrade() {
     let aurora = deploy_engine().await;
     // do upgrade
     let result = aurora
-        .upgrade(contract_bytes())
+        .upgrade(CONTRACT_BYTES.to_vec())
         .max_gas()
         .transact()
         .await
@@ -30,7 +39,7 @@ async fn test_code_upgrade_with_stage() {
     let aurora = deploy_engine().await;
     // do upgrade
     let result = aurora
-        .stage_upgrade(contract_bytes())
+        .stage_upgrade(CONTRACT_BYTES.to_vec())
         .max_gas()
         .transact()
         .await
@@ -58,7 +67,7 @@ async fn test_repeated_calls_to_upgrade_should_fail() {
     let aurora = deploy_engine().await;
     // First upgrade should succeed
     let result = aurora
-        .stage_upgrade(contract_bytes())
+        .stage_upgrade(CONTRACT_BYTES.to_vec())
         .max_gas()
         .transact()
         .await
@@ -70,18 +79,9 @@ async fn test_repeated_calls_to_upgrade_should_fail() {
 
     // Second upgrade should fail since deployed code doesn't have method `stage_upgrade`.
     let result = aurora
-        .stage_upgrade(contract_bytes())
+        .stage_upgrade(CONTRACT_BYTES.to_vec())
         .max_gas()
         .transact()
         .await;
     assert!(result.is_err());
-}
-
-fn contract_bytes() -> Vec<u8> {
-    let base_path = Path::new("../etc")
-        .join("tests")
-        .join("state-migration-test");
-    let artifact_path = crate::utils::rust::compile(base_path);
-
-    fs::read(artifact_path).unwrap()
 }

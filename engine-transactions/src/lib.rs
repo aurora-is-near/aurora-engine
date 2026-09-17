@@ -80,20 +80,36 @@ impl From<&EthTransactionKind> for Vec<u8> {
     }
 }
 
-/// A normalized Ethereum transaction which can be created from older
-/// transactions.
+/// A normalized Ethereum transaction that can be created from older transactions.
 pub struct NormalizedEthTransaction {
+    /// The Ethereum address of the transaction sender, recovered from the signature.
     pub address: Address,
+    /// EIP-155 chain ID to prevent replay attacks across different networks.
+    /// None for legacy transactions that don't specify a chain ID.
     pub chain_id: Option<u64>,
+    /// Transaction sequence number from the sender's account, used to ensure transaction ordering.
     pub nonce: U256,
+    /// Maximum amount of gas units that can be consumed by this transaction.
     pub gas_limit: U256,
+    /// Maximum priority fee (tip) per gas unit that the sender is willing to pay to the miner.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_priority_fee_per_gas: U256,
+    /// Maximum total fee per gas unit (base fee + priority fee) that the sender is willing to pay.
+    /// Introduced in EIP-1559 for flexible gas pricing.
     pub max_fee_per_gas: U256,
+    /// Recipient address for the transaction.
+    /// None indicates a contract creation transaction.
     pub to: Option<Address>,
+    /// Amount of Wei (the smallest denomination of Ether) to transfer to the recipient.
     pub value: Wei,
+    /// Input data for the transaction containing either contract bytecode (for creation)
+    /// or encoded function call data (for contract interaction).
     pub data: Vec<u8>,
+    /// EIP-2930 access list containing addresses and storage keys that the transaction
+    /// plans to access, allowing for reduced gas costs on subsequent accesses.
     pub access_list: Vec<AccessTuple>,
-    // Contains additional information - `chain_id` for each authorization item
+    /// EIP-7702 authorization list containing signed authorizations that allow the transaction
+    /// to temporarily set code for externally owned accounts (EOAs) during execution.
     pub authorization_list: Vec<Authorization>,
 }
 
@@ -142,19 +158,23 @@ impl TryFrom<EthTransactionKind> for NormalizedEthTransaction {
                 access_list: tx.transaction.access_list,
                 authorization_list: vec![],
             },
-            Eip7702(tx) => Self {
-                address: tx.sender()?,
-                chain_id: Some(tx.transaction.chain_id),
-                nonce: tx.transaction.nonce,
-                gas_limit: tx.transaction.gas_limit,
-                max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
-                max_fee_per_gas: tx.transaction.max_fee_per_gas,
-                to: Some(tx.transaction.to),
-                value: tx.transaction.value,
-                data: tx.transaction.data.clone(),
-                access_list: tx.transaction.access_list.clone(),
-                authorization_list: tx.authorization_list()?,
-            },
+            Eip7702(tx) => {
+                let address = tx.sender()?;
+                let authorization_list = tx.authorization_list()?;
+                Self {
+                    address,
+                    chain_id: Some(tx.transaction.chain_id),
+                    nonce: tx.transaction.nonce,
+                    gas_limit: tx.transaction.gas_limit,
+                    max_priority_fee_per_gas: tx.transaction.max_priority_fee_per_gas,
+                    max_fee_per_gas: tx.transaction.max_fee_per_gas,
+                    to: Some(tx.transaction.to),
+                    value: tx.transaction.value,
+                    data: tx.transaction.data,
+                    access_list: tx.transaction.access_list,
+                    authorization_list,
+                }
+            }
         })
     }
 }
@@ -400,7 +420,7 @@ mod tests {
     fn test_intrinsic_gas() {
         use super::NormalizedEthTransaction;
 
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
 
         // Test a simple transaction with no data
         let tx = NormalizedEthTransaction {
@@ -535,6 +555,7 @@ mod tests {
             nonce: 0,
             is_valid: false,
         };
+        // Test transaction with an authorization list length
         let tx = NormalizedEthTransaction {
             address: Address::default(),
             chain_id: Some(1),
@@ -580,7 +601,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_empty_data() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -589,7 +610,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_all_zero_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![0u8; 10]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -600,7 +621,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_all_non_zero_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![1u8; 10]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -611,7 +632,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_mixed_bytes() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![0, 1, 0, 1, 0, 1, 1, 1]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -624,7 +645,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_large_data() {
-        let config = aurora_evm::Config::prague();
+        let config = aurora_evm::Config::osaka();
         let tx = create_test_transaction(vec![1u8; 1000]);
         let gas = tx.floor_gas(&config).unwrap();
 
@@ -635,7 +656,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_overflow_on_mul_cost_per_token() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.total_cost_floor_per_token = u64::MAX;
 
         let tx = create_test_transaction(vec![1u8; 10]);
@@ -646,7 +667,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_overflow_on_add_base() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.has_floor_gas = true;
         config.total_cost_floor_per_token = u64::MAX;
 
@@ -658,7 +679,7 @@ mod tests {
 
     #[test]
     fn test_floor_gas_with_different_cost_per_token() {
-        let mut config = aurora_evm::Config::prague();
+        let mut config = aurora_evm::Config::osaka();
         config.has_floor_gas = true;
         config.total_cost_floor_per_token = 500;
 

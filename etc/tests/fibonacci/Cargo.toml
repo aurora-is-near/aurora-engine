@@ -2,7 +2,7 @@
 name = "fibonacci_on_near"
 version = "1.0.0"
 authors = ["Aurora <hello@aurora.dev>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 crate-type = ["cdylib"]

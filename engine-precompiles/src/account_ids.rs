@@ -12,7 +12,6 @@ mod costs {
     // TODO(#483): Determine the correct amount of gas
     pub(super) const PREDECESSOR_ACCOUNT_GAS: EthGas = EthGas::new(0);
     // TODO(#483): Determine the correct amount of gas
-    #[allow(dead_code)]
     pub(super) const CURRENT_ACCOUNT_GAS: EthGas = EthGas::new(0);
 }
 
@@ -50,10 +49,10 @@ impl<E: Env> Precompile for PredecessorAccount<'_, E> {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         let predecessor_account_id = self.env.predecessor_account_id();
@@ -83,7 +82,7 @@ impl CurrentAccount {
 
 impl Precompile for CurrentAccount {
     fn required_gas(_input: &[u8]) -> Result<EthGas, ExitError> {
-        Ok(costs::PREDECESSOR_ACCOUNT_GAS)
+        Ok(costs::CURRENT_ACCOUNT_GAS)
     }
 
     fn run(
@@ -95,10 +94,10 @@ impl Precompile for CurrentAccount {
     ) -> EvmPrecompileResult {
         utils::validate_no_value_attached_to_precompile(context.apparent_value)?;
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
 
         Ok(PrecompileOutput::without_logs(

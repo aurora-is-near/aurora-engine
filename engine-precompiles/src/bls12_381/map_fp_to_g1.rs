@@ -38,10 +38,10 @@ impl Precompile for BlsMapFpToG1 {
         _is_static: bool,
     ) -> EvmPrecompileResult {
         let cost = Self::required_gas(input)?;
-        if let Some(target_gas) = target_gas {
-            if cost > target_gas {
-                return Err(ExitError::OutOfGas);
-            }
+        if let Some(target_gas) = target_gas
+            && cost > target_gas
+        {
+            return Err(ExitError::OutOfGas);
         }
         if input.len() != PADDED_FP_LENGTH {
             return Err(ExitError::Other(Borrowed("ERR_BLS_MAP_FP_TO_G1_LEN")));

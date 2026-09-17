@@ -10,7 +10,7 @@ mod uniswap;
 
 // We don't want to run in CI, so ignore. To run locally use `cargo test --release -- --ignored`
 #[test]
-#[ignore]
+#[ignore = "benchmark; run with --ignored locally"]
 fn benches() {
     let mut c = Criterion::default();
 
@@ -23,7 +23,7 @@ fn benches() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark; run with --ignored locally"]
 fn measure_nft_pagination_gas_usage() {
     const TOTAL_TOKENS: usize = 500;
     let data_sizes = [100, 500, 1000, 2000];
@@ -38,7 +38,7 @@ fn measure_nft_pagination_gas_usage() {
 }
 
 #[test]
-#[ignore]
+#[ignore = "benchmark; run with --ignored locally"]
 fn uniswap_benches() {
     let mut c = Criterion::default();
 

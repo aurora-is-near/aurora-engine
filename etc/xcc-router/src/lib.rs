@@ -2,14 +2,13 @@ use aurora_engine_types::parameters::{
     NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
     SimpleNearPromise,
 };
-use near_sdk::borsh::{BorshDeserialize, BorshSerialize};
+use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U64;
 use near_sdk::store::LookupMap;
 use near_sdk::BorshStorageKey;
 use near_sdk::{
-    env, near_bindgen, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex,
-    PromiseResult,
+    env, near, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -40,16 +39,14 @@ const WNEAR_REGISTER_AMOUNT: NearToken = NearToken::from_yoctonear(1_250_000_000
 /// Must match aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT
 const REFUND_AMOUNT: NearToken = NearToken::from_near(2);
 
-#[derive(BorshDeserialize, BorshSerialize)]
-#[borsh(crate = "near_sdk::borsh")]
+#[near(serializers = [borsh])]
 pub struct DeployUpgradeParams {
     pub code: Vec<u8>,
     pub initialize_args: Vec<u8>,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-#[borsh(crate = "near_sdk::borsh")]
+#[derive(PanicOnDefault)]
+#[near(contract_state)]
 pub struct Router {
     /// The account id of the Aurora Engine instance that controls this router.
     parent: LazyOption<AccountId>,
@@ -64,7 +61,7 @@ pub struct Router {
     wnear_account: AccountId,
 }
 
-#[near_bindgen]
+#[near]
 impl Router {
     #[init(ignore_state)]
     #[must_use]
@@ -385,6 +382,10 @@ fn require_caller(caller: &AccountId) -> Result<(), Error> {
 fn require_no_failed_promises() -> Result<(), Error> {
     let num_promises = env::promise_results_count();
     for index in 0..num_promises {
+        // We can use deprecated `promise_result` rather than `promise_result_checked` safely here,
+        // because the promise result could be received from the Aurora Engine itself,
+        // and we can be sure that the len of the promise result is within bounds.
+        #[allow(deprecated)]
         if env::promise_result(index) == PromiseResult::Failed {
             return Err(Error::CallbackOfFailedPromise);
         }

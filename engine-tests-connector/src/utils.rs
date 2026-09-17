@@ -9,6 +9,7 @@ use near_workspaces::types::NearToken;
 use near_workspaces::{Account, AccountId, Contract, Worker, result::ExecutionFinalResult};
 use std::path::Path;
 use std::sync::LazyLock;
+use tokio::sync::OnceCell;
 
 pub const DEPOSITED_RECIPIENT: &str = "eth_recipient.root";
 pub const DEPOSITED_RECIPIENT_NAME: &str = "eth_recipient";
@@ -28,27 +29,10 @@ pub const PAUSE_WITHDRAW: PausedMask = 1 << 1;
 /// Admin control flow flag indicates that ft transfers are paused.
 pub const PAUSE_FT: PausedMask = 1 << 2;
 
-static CONTRACT_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
-    let manifest_path = std::env::current_dir()
-        .unwrap()
-        .join("etc")
-        .join("aurora-eth-connector")
-        .join("eth-connector")
-        .join("Cargo.toml");
-    let artifact = cargo_near_build::build(cargo_near_build::BuildOpts {
-        manifest_path: Some(manifest_path.try_into().unwrap()),
-        no_abi: true,
-        no_locked: true,
-        features: Some("integration-test,migration".to_owned()),
-        ..Default::default()
-    })
-    .unwrap();
+const CONNECTOR_URL: &str = "https://github.com/Near-One/aurora-eth-connector/releases/download/eth-connector-v0.6.5/eth-connector-v0-6-5.zip";
+const WASM_FILE_NAME: &str = "aurora_eth_connector.wasm";
 
-    std::fs::read(artifact.path.into_std_path_buf())
-        .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
-        .unwrap()
-});
-
+static CONTRACT_WASM: OnceCell<Vec<u8>> = OnceCell::const_new();
 static MOCK_CONTROLLER_WASM: LazyLock<Vec<u8>> = LazyLock::new(|| {
     let base_path = Path::new("../etc").join("tests").join("mock-controller");
     let artifact_path = crate::rust::compile(base_path);
@@ -106,7 +90,14 @@ impl TestContract {
             .into_result()?;
         let engine_contract_bytes = get_engine_contract();
         let engine_contract = engine.deploy(&engine_contract_bytes).await?.into_result()?;
-        let eth_connector_contract = eth_connector.deploy(&CONTRACT_WASM).await?.into_result()?;
+        let eth_connector_contract = eth_connector
+            .deploy(
+                CONTRACT_WASM
+                    .get_or_try_init(|| download_and_extract_wasm(CONNECTOR_URL, WASM_FILE_NAME))
+                    .await?,
+            )
+            .await?
+            .into_result()?;
 
         Ok((engine_contract, eth_connector_contract, controller_account))
     }
@@ -332,4 +323,31 @@ pub fn dummy_ft_receiver_bytes() -> Vec<u8> {
     let base_path = Path::new("../etc").join("tests").join("ft-receiver");
     let artifact_path = crate::rust::compile(base_path);
     std::fs::read(artifact_path).unwrap()
+}
+
+/// Downloads a zip archive from `url`, extracts it into a cache directory under
+/// `target/`, read the contract bytes, and returns the contract bytes.
+/// Re downloads are skipped if the target file already exists.
+async fn download_and_extract_wasm(url: &str, wasm_name: &str) -> anyhow::Result<Vec<u8>> {
+    let cache_dir = std::env::current_dir()?
+        .join("target")
+        .join("downloaded-wasm");
+    let wasm_path = cache_dir.join(wasm_name);
+
+    if !wasm_path.exists() {
+        std::fs::create_dir_all(&cache_dir)?;
+
+        let bytes = reqwest::get(url).await?.error_for_status()?.bytes().await?;
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))?;
+        archive.extract(&cache_dir)?;
+
+        anyhow::ensure!(
+            wasm_path.exists(),
+            "`{wasm_name}` not found in the archive at {url}"
+        );
+    }
+
+    tokio::fs::read(wasm_path)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to read the wasm file: {e}"))
 }
