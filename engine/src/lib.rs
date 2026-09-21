@@ -20,10 +20,6 @@ pub mod state;
 pub mod xcc;
 
 #[cfg(target_arch = "wasm32")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[cfg(target_arch = "wasm32")]
 #[panic_handler]
 #[cfg_attr(not(feature = "log"), allow(unused_variables))]
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {

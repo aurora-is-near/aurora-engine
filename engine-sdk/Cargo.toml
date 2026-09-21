@@ -19,7 +19,7 @@ ark-serialize = { workspace = true, optional = true }
 ark-ec = { workspace = true, optional = true }
 ark-ff = { workspace = true, features = ["asm"], optional = true }
 base64.workspace = true
-libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
+secp256k1 = { version = "0.30", default-features = false, features = ["alloc", "recovery"] }
 ripemd.workspace = true
 sha2.workspace = true
 sha3.workspace = true
@@ -37,7 +37,7 @@ workspace = true
 std = [
     "aurora-engine-types/std",
     "base64/std",
-    "libsecp256k1/std",
+    "secp256k1/std",
     "dep:ark-bn254",
     "dep:ark-serialize",
     "dep:ark-ec",

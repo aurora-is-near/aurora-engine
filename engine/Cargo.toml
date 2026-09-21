@@ -29,9 +29,6 @@ rlp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wee_alloc.workspace = true
-
 [dev-dependencies]
 aurora-engine-test-doubles.workspace = true
 test-case.workspace = true

@@ -126,21 +126,21 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     use sha3::Digest;
 
-    let hash = libsecp256k1::Message::parse_slice(hash.as_bytes()).map_err(|_| ECRecoverErr)?;
+    let hash = secp256k1::Message::from_digest_slice(hash.as_bytes()).map_err(|_| ECRecoverErr)?;
     let v = signature[64];
-    let signature = libsecp256k1::Signature::parse_standard_slice(&signature[0..64])
+    let signature = secp256k1::ecdsa::Signature::from_compact(&signature[0..64])
         .map_err(|_| ECRecoverErr)?;
     let bit = match v {
         0..=26 => v,
         _ => v - 27,
     };
-    let recovery_id = libsecp256k1::RecoveryId::parse(bit).map_err(|_| ECRecoverErr)?;
+    let recovery_id = secp256k1::ecdsa::RecoveryId::from_i32(i32::from(bit)).map_err(|_| ECRecoverErr)?;
 
-    libsecp256k1::recover(&hash, &signature, &recovery_id)
+    secp256k1::ecdsa::recover(&hash, &signature, &recovery_id)
         .map_err(|_| ECRecoverErr)
         .and_then(|public_key| {
             // recover returns a 65-byte key, but addresses come from the raw 64-byte key
-            let r = sha3::Keccak256::digest(&public_key.serialize()[1..]);
+            let r = sha3::Keccak256::digest(&public_key.serialize_uncompressed()[1..]);
             Address::try_from_slice(&r[12..]).map_err(|_| ECRecoverErr)
         })
 }
