@@ -125,18 +125,20 @@ pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> 
 #[cfg(not(feature = "contract"))]
 pub fn ecrecover(hash: H256, signature: &[u8]) -> Result<Address, ECRecoverErr> {
     use sha3::Digest;
+    use secp256k1::Secp256k1;
 
     let hash = secp256k1::Message::from_digest_slice(hash.as_bytes()).map_err(|_| ECRecoverErr)?;
     let v = signature[64];
-    let signature = secp256k1::ecdsa::Signature::from_compact(&signature[0..64])
-        .map_err(|_| ECRecoverErr)?;
     let bit = match v {
         0..=26 => v,
         _ => v - 27,
     };
-    let recovery_id = secp256k1::ecdsa::RecoveryId::from_i32(i32::from(bit)).map_err(|_| ECRecoverErr)?;
+    let recovery_id = secp256k1::ecdsa::RecoveryId::try_from(i32::from(bit)).map_err(|_| ECRecoverErr)?;
+    let recoverable_sig = secp256k1::ecdsa::RecoverableSignature::from_compact(&signature[0..64], recovery_id)
+        .map_err(|_| ECRecoverErr)?;
 
-    secp256k1::ecdsa::recover(&hash, &signature, &recovery_id)
+    let secp = Secp256k1::verification_only();
+    secp.recover_ecdsa(&hash, &recoverable_sig)
         .map_err(|_| ECRecoverErr)
         .and_then(|public_key| {
             // recover returns a 65-byte key, but addresses come from the raw 64-byte key

@@ -373,8 +373,8 @@ dependencies = [
  "base64 0.23.1",
  "blst",
  "hex",
- "libsecp256k1",
  "ripemd 0.2.0",
+ "secp256k1",
  "sha2 0.11.0",
  "sha3 0.12.0",
 ]
@@ -412,7 +412,6 @@ dependencies = [
  "ethabi",
  "git2",
  "hex",
- "libsecp256k1",
  "near-crypto",
  "near-parameters",
  "near-primitives",
@@ -3685,53 +3684,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "libsecp256k1"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e79019718125edc905a079a70cfa5f3820bc76139fc91d6f9abc27ea2a887139"
-dependencies = [
- "arrayref",
- "base64 0.22.1",
- "digest 0.9.0",
- "hmac-drbg",
- "libsecp256k1-core",
- "libsecp256k1-gen-ecmult",
- "libsecp256k1-gen-genmult",
- "rand 0.8.8",
- "serde",
- "sha2 0.9.9",
- "typenum",
-]
-
 [[package]]
-name = "libsecp256k1-core"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be9b9bb642d8522a44d533eab56c16c738301965504753b03ad1de3425d5451"
-dependencies = [
- "crunchy",
- "digest 0.9.0",
- "subtle",
-]
-
 [[package]]
-name = "libsecp256k1-gen-ecmult"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3038c808c55c87e8a172643a7d87187fc6c4174468159cb3090659d55bcb4809"
-dependencies = [
- "libsecp256k1-core",
-]
-
 [[package]]
-name = "libsecp256k1-gen-genmult"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3db8d6ba2cec9eacc40e6e8ccc98931840301f1006e95647ceb2dd5c3aa06f7c"
-dependencies = [
- "libsecp256k1-core",
-]
-
 [[package]]
 name = "libz-sys"
 version = "1.1.29"
@@ -6338,19 +6293,19 @@ dependencies = [
 
 [[package]]
 name = "secp256k1"
-version = "0.27.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25996b82292a7a57ed3508f052cfff8640d38d32018784acd714758b43da9c8f"
+checksum = "8a9335c9a2b2b2e1f9c4a9c7c9b8a2c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9"
 dependencies = [
- "rand 0.8.8",
+ "alloc",
  "secp256k1-sys",
 ]
 
 [[package]]
 name = "secp256k1-sys"
-version = "0.8.2"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4473013577ec77b4ee3668179ef1186df3146e2cf2d927bd200974c6fe60fd99"
+checksum = "a4b1e6e0e8a9c3d7b2f5e6a8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8"
 dependencies = [
  "cc",
 ]
