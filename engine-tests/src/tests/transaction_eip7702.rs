@@ -114,7 +114,7 @@ fn test_eip_7702_success() {
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
 
-    assert_eq!(actual_ggas_used, 4594);
+    assert_eq!(actual_ggas_used, 4596);
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions
@@ -512,7 +512,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     assert_eq!(runner.get_nonce(delegated_designator), 0.into());
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
-    assert_eq!(actual_ggas_used, 3745);
+    assert_eq!(actual_ggas_used, 3746);
 }
 
 /// Multi-auth happy path: 3 distinct authorities each delegate to `CONTRACT_ADDRESS`
@@ -575,7 +575,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 118_206);
-    assert_eq!(actual_ggas_used, 6420);
+    assert_eq!(actual_ggas_used, 6421);
 }
 
 /// Same authority twice with same nonce: first auth applies and increments nonce,
@@ -624,7 +624,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     assert_eq!(runner.get_nonce(authority_addr), 1.into());
 
     assert_eq!(result.gas_used, 93_206);
-    assert_eq!(actual_ggas_used, 4940);
+    assert_eq!(actual_ggas_used, 4942);
 }
 
 /// Authority pre-funded with non-delegated contract code: check skips the auth,
@@ -681,7 +681,7 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 68_206);
-    assert_eq!(actual_ggas_used, 4126);
+    assert_eq!(actual_ggas_used, 4127);
 }
 
 /// Re-delegation: authority already points to `target_B`; a second tx swaps the
@@ -758,7 +758,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
     assert_eq!(runner.get_nonce(authority_addr), 2.into());
 
     assert_eq!(result2.gas_used, 38_645);
-    assert_eq!(actual_ggas_used, 4588);
+    assert_eq!(actual_ggas_used, 4589);
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an

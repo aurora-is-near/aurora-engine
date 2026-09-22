@@ -443,6 +443,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
         v
     };
 
+    #[allow(clippy::chunks_exact_to_as_chunks)]
     for pair_chunk in bytes.chunks_exact_mut(PAIR_ELEMENT_LEN) {
         // --- Process G1 (2 * 32 bytes) ---
         // P1.X

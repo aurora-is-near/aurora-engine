@@ -71,7 +71,7 @@ mod consts {
 /// See [RFC 7693](https://datatracker.ietf.org/doc/html/rfc7693#section-3.1) specification for more
 /// details.
 #[allow(clippy::many_single_char_names)]
-fn g(v: &mut [u64], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) {
+const fn g(v: &mut [u64], a: usize, b: usize, c: usize, d: usize, x: u64, y: u64) {
     v[a] = v[a].wrapping_add(v[b]).wrapping_add(x);
     v[d] = (v[d] ^ v[a]).rotate_right(consts::R1);
     v[c] = v[c].wrapping_add(v[d]);
