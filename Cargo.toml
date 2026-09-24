@@ -155,3 +155,6 @@ opt-level = 3
 inherits = "dev"
 opt-level = 0
 lto = false
+
+[patch.crates-io]
+proc-macro-error = { git = "https://github.com/nandrejja86-star/proc-macro-error-shim.git" }
