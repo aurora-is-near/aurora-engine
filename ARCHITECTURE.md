@@ -125,7 +125,7 @@ The `submit` and `submit_with_args` methods follow this path:
 2. Signature recovery determines the EVM sender. The engine validates access policy, chain ID, nonce, fee relationships, intrinsic gas, floor gas, and EIP-specific sender rules.
 3. Gas payment is deducted before execution using the effective gas price or configured silo fixed-gas policy.
 4. The engine dispatches to either EVM call or contract creation. Access lists and EIP-7702 authorizations are passed to `aurora-evm`.
-5. The Prague EVM configuration and Prague precompile set are currently selected in [`engine/src/engine.rs`](engine/src/engine.rs). Precompiles can be filtered by stored pause flags.
+5. The Osaka EVM configuration and Osaka precompile set are currently selected in [`engine/src/engine.rs`](engine/src/engine.rs). Precompiles can be filtered by stored pause flags.
 6. State changes are applied, promise-producing logs are processed, and unused gas is refunded. The priority-fee portion is credited to the relayer address.
 
 Standalone replay uses a block-height-aware compatibility transaction parser so historical transactions continue to reproduce the behavior of the contract version that originally processed them.

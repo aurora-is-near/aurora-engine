@@ -259,24 +259,21 @@ impl<M: ModExpAlgorithm> Precompile for ModExp<Osaka, M> {
     fn required_gas(input: &[u8]) -> Result<EthGas, ExitError> {
         let (base_len, exp_len, mod_len) = parse_lengths(input);
 
-        if base_len == 0 && mod_len == 0 {
-            Ok(Self::MIN_GAS)
-        } else {
-            let mul = Self::mul_complexity(base_len, mod_len);
-            // EIP-7883: Changed BITS_PER_BYTE from 8 to 16
-            let iter_count =
-                Self::calc_iter_count::<ITER_BITS_PER_BYTE_EIP7883>(exp_len, base_len, input)?;
+        // EIP-7883: no zero-length shortcut, empty base and modulus still cost `16 * iterations`.
+        let mul = Self::mul_complexity(base_len, mod_len);
+        // EIP-7883: Changed BITS_PER_BYTE from 8 to 16
+        let iter_count =
+            Self::calc_iter_count::<ITER_BITS_PER_BYTE_EIP7883>(exp_len, base_len, input)?;
 
-            // With INPUT_SIZE_LIMIT=1024, mul * iter_count bounded by ~2^30 (no overflow)
-            // Old: floor(mult * iter / 3)
-            // New: floor(mult * iter)
-            let gas = mul * iter_count.max(U256::one());
+        // With INPUT_SIZE_LIMIT=1024, mul * iter_count bounded by ~2^30 (no overflow)
+        // Old: floor(mult * iter / 3)
+        // New: floor(mult * iter)
+        let gas = mul * iter_count.max(U256::one());
 
-            Ok(EthGas::new(core::cmp::max(
-                Self::MIN_GAS.as_u64(),
-                saturating_round(gas),
-            )))
-        }
+        Ok(EthGas::new(core::cmp::max(
+            Self::MIN_GAS.as_u64(),
+            saturating_round(gas),
+        )))
     }
 
     fn run(
@@ -948,6 +945,22 @@ mod tests_osaka {
         let input = make_input(32, 40, 32, 0xFF);
         let gas = ModExp::<Osaka>::required_gas(&input).unwrap();
         assert_eq!(gas.as_u64(), 6128, "New iteration multiplier 16 failed");
+    }
+
+    #[test]
+    fn test_osaka_eip7883_zero_base_and_modulus() {
+        // EEST vector `zero-length-base-mod`: zero base/modulus lengths still pay `16 * 254` gas.
+        let input = hex::decode(
+            "\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            0000000000000000000000000000000000000000000000000000000000000020\
+            0000000000000000000000000000000000000000000000000000000000000000\
+            660bfd6246b7f481d4a9955bb2bd9ee970e21063193ae484c413aea066fc949d",
+        )
+        .unwrap();
+        let res = run_modexp(&input, 10_000).unwrap();
+        assert_eq!(res.cost.as_u64(), 4064);
+        assert!(res.output.is_empty());
     }
 
     #[test]
