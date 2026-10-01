@@ -68,11 +68,12 @@ strum = { version = "0.28", features = ["derive"] }
 tempfile = "3"
 test-case = "3"
 tokio = { version = "1", default-features = false, features = ["macros"] }
-walrus = "0.26"
+walrus = "0.27"
 wee_alloc = { version = "0.4", default-features = false }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [workspace.lints.rust]
+warnings = "deny"
 # `fixed_hash::construct_fixed_hash!` expands to `#[cfg(feature = "dev")]`, which is no longer
 # a known feature. Declare it so rustc does not warn about it (used in engine-hashchain).
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("dev"))'] }
@@ -81,6 +82,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("dev"))'] 
 all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 nursery = { level = "deny", priority = -1 }
+as_conversions = "deny"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 module_name_repetitions = "allow"

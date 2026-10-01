@@ -170,8 +170,6 @@ fn test_secp256r1_submit_and_gas() {
         ),
     ];
     for (data, is_success, expected_gas) in inputs {
-        let (_, _, _) = (&data, is_success, expected_gas);
-        // TODO: Enable tests after releasing Osaka hard fork
-        // submit_secp256r1_data(data, is_success, expected_gas);
+        submit_secp256r1_data(data, is_success, expected_gas);
     }
 }

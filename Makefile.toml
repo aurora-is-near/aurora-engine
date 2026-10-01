@@ -91,12 +91,16 @@ command = "${CARGO}"
 args = [
     "clippy",
     "--workspace",
+    "--all-targets"
+]
+
+[tasks.clippy-all-features]
+extend = "clippy-base"
+args = [
+    "clippy",
+    "--workspace",
     "--all-targets",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
+    "--all-features"
 ]
 
 [tasks.clippy-contract]
@@ -106,12 +110,7 @@ args = [
     "--workspace",
     "--all-targets",
     "--features",
-    "contract",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
+    "contract"
 ]
 
 [tasks.clippy-contract-refund]
@@ -121,19 +120,91 @@ args = [
     "--workspace",
     "--all-targets",
     "--features",
-    "contract,error_refund",
-    "--",
-    "-D",
-    "warnings",
-    "-D",
-    "clippy::as_conversions",
+    "contract,error_refund"
+]
+
+[tasks.clippy-wasm]
+category = "Check"
+command = "${CARGO}"
+# Native-only workspace crates cannot be checked for the WASM target.
+args = [
+    "clippy",
+    "--target",
+    "${CARGO_TARGET}",
+    "--no-default-features",
+    "--lib",
+    "--features",
+    "aurora-engine/contract",
+    "-p",
+    "aurora-engine",
+    "-p",
+    "aurora-engine-types",
+    "-p",
+    "aurora-engine-sdk",
+    "-p",
+    "aurora-engine-precompiles",
+    "-p",
+    "aurora-engine-transactions",
+    "-p",
+    "aurora-engine-hashchain",
+    "-p",
+    "aurora-engine-modexp"
+]
+
+[tasks.clippy-xcc-router]
+category = "Check"
+command = "${CARGO}"
+args = [
+    "clippy",
+    "--manifest-path",
+    "etc/xcc-router/Cargo.toml",
+    "--all-targets",
+    "--all-features"
+]
+
+[tasks.clippy-xcc-router-default]
+extend = "clippy-xcc-router"
+args = [
+    "clippy",
+    "--manifest-path",
+    "etc/xcc-router/Cargo.toml",
+    "--all-targets"
+]
+
+[tasks.clippy-xcc-router-wasm]
+extend = "clippy-xcc-router"
+args = [
+    "clippy",
+    "--manifest-path",
+    "etc/xcc-router/Cargo.toml",
+    "--target",
+    "${CARGO_TARGET}",
+    "--all-features",
+    "--lib"
+]
+
+[tasks.clippy-xcc-router-wasm-default]
+extend = "clippy-xcc-router-wasm"
+args = [
+    "clippy",
+    "--manifest-path",
+    "etc/xcc-router/Cargo.toml",
+    "--target",
+    "${CARGO_TARGET}",
+    "--lib"
 ]
 
 [tasks.clippy]
 dependencies = [
     "clippy-base",
+    "clippy-all-features",
     "clippy-contract",
     "clippy-contract-refund",
+    "clippy-wasm",
+    "clippy-xcc-router",
+    "clippy-xcc-router-default",
+    "clippy-xcc-router-wasm",
+    "clippy-xcc-router-wasm-default",
 ]
 
 [tasks.check-fmt]

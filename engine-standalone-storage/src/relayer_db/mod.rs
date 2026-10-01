@@ -74,7 +74,7 @@ where
     let predecessor_account_id: AccountId = "relayer.aurora".parse().unwrap();
     let current_account_id = "aurora".parse().unwrap();
     let relayer_address =
-        aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes());
+        aurora_engine_sdk::types::near_account_to_evm_address(&predecessor_account_id);
     let mut env = env::Fixed {
         signer_account_id,
         current_account_id,
