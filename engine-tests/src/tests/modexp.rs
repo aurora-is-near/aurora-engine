@@ -1,4 +1,5 @@
 use aurora_engine::engine::EngineError;
+use aurora_engine::parameters::TransactionStatus;
 use near_primitives_core::gas::Gas;
 use near_vm_runner::ContractCode;
 use rand::{RngExt, SeedableRng};
@@ -158,14 +159,21 @@ fn test_modexp_oom() {
         "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001060002",
     ];
 
-    let outputs = [Vec::new(), Vec::new(), Vec::new(), vec![0x01]];
+    // EIP-7823 (Osaka): lengths above 1024 bytes are rejected before any allocation.
+    let size_limit = TransactionStatus::Other("ERR_MODEXP_SIZE_LIMIT".into());
+    let statuses = [
+        size_limit.clone(),
+        size_limit.clone(),
+        size_limit,
+        TransactionStatus::Succeed(vec![0x01]),
+    ];
 
-    for (input, output) in inputs.iter().zip(outputs.iter()) {
+    for (input, status) in inputs.iter().zip(statuses) {
         check_wasm_modexp(
             &mut runner,
             &mut signer,
             hex::decode(input).unwrap(),
-            output,
+            &status,
         );
     }
 }
@@ -174,7 +182,7 @@ fn check_wasm_modexp(
     runner: &mut AuroraRunner,
     signer: &mut Signer,
     input: Vec<u8>,
-    expected_output: &[u8],
+    expected_status: &TransactionStatus,
 ) {
     let wasm_result = runner
         .submit_with_signer(signer, |nonce| {
@@ -188,7 +196,7 @@ fn check_wasm_modexp(
             }
         })
         .unwrap();
-    assert_eq!(expected_output, utils::unwrap_success_slice(&wasm_result));
+    assert_eq!(expected_status, &wasm_result.status);
 }
 
 /// Input to the modexp call (base, exp, modulus in big-endian bytes).
