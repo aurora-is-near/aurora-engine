@@ -47,6 +47,8 @@ pub const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
+const CALL: &str = "call";
+const DEPLOY_CODE: &str = "deploy_code";
 const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 pub mod mocked_external;
@@ -248,12 +250,30 @@ impl AuroraRunner {
         self.previous_logs.clone_from(&outcome.logs);
 
         if let Some(standalone_runner) = &mut self.standalone_runner {
-            standalone_runner.submit_raw(
-                method_name,
-                &self.context,
-                &self.promise_results,
-                self.block_random_value,
-            )?;
+            let standalone_result = standalone_runner
+                .submit_raw(
+                    method_name,
+                    &self.context,
+                    &self.promise_results,
+                    self.block_random_value,
+                )
+                .unwrap_or_else(|error| {
+                    panic!("WASM call {method_name} returned normally, but standalone failed: {error:?}");
+                });
+
+            if matches!(method_name, SUBMIT | SUBMIT_WITH_ARGS | CALL | DEPLOY_CODE) {
+                let ReturnData::Value(wasm_output) = &outcome.return_data else {
+                    panic!("WASM execution must return a ReturnData::Value");
+                };
+                let wasm_result = SubmitResult::try_from_slice(wasm_output)
+                    .expect("WASM execution must return a valid Borsh SubmitResult");
+
+                assert_eq!(
+                    wasm_result, standalone_result,
+                    "Execution result mismatch for {method_name}",
+                );
+            }
+
             self.validate_standalone();
         }
 
@@ -522,36 +542,28 @@ impl AuroraRunner {
     fn validate_standalone(&self) {
         if let Some(standalone_runner) = &self.standalone_runner {
             let standalone_state = standalone_runner.get_current_state();
-            // The number of keys in standalone_state may be larger because values are never deleted
-            // (they are replaced with a Deleted identifier instead; this is important for replaying transactions).
-            let fake_trie_len = self.ext.underlying.fake_trie.len();
-            let stand_alone_len = standalone_state.iter().count();
+            let wasm_state = &self.ext.underlying.fake_trie;
 
-            if fake_trie_len > stand_alone_len {
-                let fake_keys = self
-                    .ext
-                    .underlying
-                    .fake_trie
-                    .keys()
-                    .map(Clone::clone)
-                    .collect::<std::collections::HashSet<_>>();
-                let standalone_keys = standalone_state
-                    .iter()
-                    .map(|x| x.0.clone())
-                    .collect::<std::collections::HashSet<_>>();
-                let diff = fake_keys.difference(&standalone_keys).collect::<Vec<_>>();
+            // Deleted entries represent absent keys, not live storage.
+            let standalone_live_keys = standalone_state
+                .iter()
+                .filter_map(|(_, value)| value.value())
+                .count();
 
-                panic!(
-                    "The standalone state has fewer amount of keys: {fake_trie_len} vs {stand_alone_len}\nDiff: {diff:?}"
-                );
-            }
+            assert_eq!(
+                wasm_state.len(),
+                standalone_live_keys,
+                "Live storage key count mismatch: WASM={}, standalone={standalone_live_keys}",
+                wasm_state.len(),
+            );
 
             for (key, value) in standalone_state {
-                let trie_value = self.ext.underlying.fake_trie.get(key).map(Vec::as_slice);
+                let wasm_value = wasm_state.get(key).map(Vec::as_slice);
                 let standalone_value = value.value();
+
                 assert_eq!(
-                    trie_value, standalone_value,
-                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {trie_value:?}",
+                    wasm_value, standalone_value,
+                    "Standalone mismatch at {key:?}.\nStandalone: {standalone_value:?}\nWasm: {wasm_value:?}",
                 );
             }
         }
