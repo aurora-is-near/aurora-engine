@@ -7,6 +7,11 @@ CARGO = "cargo"
 CARGO_TARGET = "wasm32-unknown-unknown"
 CARGO_FEATURES_BUILD = "contract"
 CARGO_FEATURES_BUILD_TEST = "contract,integration-test"
+CARGO_FEATURES_TEST = ""
+# Pass explicit target directories to Cargo and use the same paths when copying artifacts.
+ENGINE_TARGET_DIR = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}"
+XCC_ROUTER_TARGET_DIR = "${CARGO_MAKE_WORKING_DIRECTORY}/etc/xcc-router/target"
+CARGO_MAKE_VERSION = "0.37.24"
 RUSTC_WASM32_BUILD_FLAGS = "--remap-path-prefix ${HOME}=/path/to/home/ --remap-path-prefix ${PWD}=/path/to/source/ -C link-arg=--allow-undefined"
 WASM_FILE = "aurora-engine.wasm"
 WASM_FILE_TEST = "aurora-engine-test.wasm"
@@ -60,11 +65,22 @@ run_task = "clean-flow"
 
 [tasks.fmt]
 category = "Formatting"
+description = "Format the Rust workspace and XCC router"
+dependencies = ["fmt-workspace", "fmt-xcc-router"]
+
+[tasks.fmt-workspace]
+private = true
+category = "Formatting"
 command = "${CARGO}"
 args = [
     "fmt",
     "--all",
 ]
+
+[tasks.fmt-xcc-router]
+category = "Formatting"
+command = "${CARGO}"
+args = ["fmt", "--manifest-path", "etc/xcc-router/Cargo.toml", "--all"]
 
 [tasks.install_udeps_nightly]
 category = "Tools"
@@ -81,6 +97,7 @@ install_crate = { crate_name = "cargo-udeps", binary = "cargo", min_version = "0
 command = "${CARGO}"
 args = [
     "udeps",
+    "--locked",
     "--workspace",
     "--all-targets",
 ]
@@ -90,6 +107,7 @@ category = "Check"
 command = "${CARGO}"
 args = [
     "clippy",
+    "--locked",
     "--workspace",
     "--all-targets"
 ]
@@ -98,6 +116,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--locked",
     "--workspace",
     "--all-targets",
     "--all-features"
@@ -107,6 +126,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--locked",
     "--workspace",
     "--all-targets",
     "--features",
@@ -117,6 +137,7 @@ args = [
 extend = "clippy-base"
 args = [
     "clippy",
+    "--locked",
     "--workspace",
     "--all-targets",
     "--features",
@@ -125,16 +146,18 @@ args = [
 
 [tasks.clippy-wasm]
 category = "Check"
+env = { "CLIPPY_WASM_FEATURES" = "aurora-engine/contract" }
 command = "${CARGO}"
 # Native-only workspace crates cannot be checked for the WASM target.
 args = [
     "clippy",
+    "--locked",
     "--target",
     "${CARGO_TARGET}",
     "--no-default-features",
     "--lib",
     "--features",
-    "aurora-engine/contract",
+    "${CLIPPY_WASM_FEATURES}",
     "-p",
     "aurora-engine",
     "-p",
@@ -151,11 +174,16 @@ args = [
     "aurora-engine-modexp"
 ]
 
+[tasks.clippy-wasm-refund]
+extend = "clippy-wasm"
+env = { "CLIPPY_WASM_FEATURES" = "aurora-engine/contract,aurora-engine/error_refund" }
+
 [tasks.clippy-xcc-router]
 category = "Check"
 command = "${CARGO}"
 args = [
     "clippy",
+    "--locked",
     "--manifest-path",
     "etc/xcc-router/Cargo.toml",
     "--all-targets",
@@ -166,6 +194,7 @@ args = [
 extend = "clippy-xcc-router"
 args = [
     "clippy",
+    "--locked",
     "--manifest-path",
     "etc/xcc-router/Cargo.toml",
     "--all-targets"
@@ -175,6 +204,7 @@ args = [
 extend = "clippy-xcc-router"
 args = [
     "clippy",
+    "--locked",
     "--manifest-path",
     "etc/xcc-router/Cargo.toml",
     "--target",
@@ -187,6 +217,7 @@ args = [
 extend = "clippy-xcc-router-wasm"
 args = [
     "clippy",
+    "--locked",
     "--manifest-path",
     "etc/xcc-router/Cargo.toml",
     "--target",
@@ -201,6 +232,7 @@ dependencies = [
     "clippy-contract",
     "clippy-contract-refund",
     "clippy-wasm",
+    "clippy-wasm-refund",
     "clippy-xcc-router",
     "clippy-xcc-router-default",
     "clippy-xcc-router-wasm",
@@ -209,20 +241,38 @@ dependencies = [
 
 [tasks.check-fmt]
 category = "Check"
+description = "Check formatting of the Rust workspace and XCC router"
+dependencies = ["check-fmt-workspace", "check-fmt-xcc-router"]
+
+[tasks.check-fmt-workspace]
+private = true
+category = "Check"
 command = "${CARGO}"
 args = [
     "fmt",
+    "--all",
     "--",
     "--check",
 ]
 
+[tasks.check-fmt-xcc-router]
+category = "Check"
+command = "${CARGO}"
+args = ["fmt", "--manifest-path", "etc/xcc-router/Cargo.toml", "--all", "--", "--check"]
+
+[tasks.install-contract-dependencies]
+private = true
+category = "Tools"
+cwd = "etc/eth-contracts"
+command = "yarn"
+args = ["install", "--frozen-lockfile", "--non-interactive"]
+
 [tasks.check-contracts]
 category = "Check"
-script = '''
-cd etc/eth-contracts
-yarn
-yarn lint
-'''
+dependencies = ["install-contract-dependencies"]
+cwd = "etc/eth-contracts"
+command = "yarn"
+args = ["lint"]
 
 [tasks.check]
 category = "Check"
@@ -234,6 +284,7 @@ dependencies = [
 ]
 
 [tasks.post-engine-build-env]
+private = true
 category = "Tools"
 script = '''
 echo "Environment:"
@@ -247,6 +298,7 @@ echo "    Extra build args:     ${RELEASE} ${@}"
 '''
 
 [tasks.post-xcc-router-build-env]
+private = true
 category = "Tools"
 script = '''
 echo "Environment:"
@@ -260,22 +312,25 @@ echo "    Extra build args:     ${RELEASE} ${@}"
 '''
 
 [tasks.copy-engine-build]
+private = true
 category = "Post"
 command = "cp"
 args = [
-    "target/${CARGO_TARGET}/${TARGET_DIR}/aurora_engine.wasm",
+    "${ENGINE_TARGET_DIR}/${CARGO_TARGET}/${TARGET_DIR}/aurora_engine.wasm",
     "bin/${WASM_FILE}",
 ]
 
 [tasks.copy-xcc-router-build]
+private = true
 category = "Post"
 command = "cp"
 args = [
-    "etc/xcc-router/target/${CARGO_TARGET}/${TARGET_DIR}/xcc_router.wasm",
+    "${XCC_ROUTER_TARGET_DIR}/${CARGO_TARGET}/${TARGET_DIR}/xcc_router.wasm",
     "bin/${XCC_ROUTER_WASM_FILE}",
 ]
 
 [tasks.make-bin-directory]
+private = true
 category = "Post"
 command = "mkdir"
 args = [
@@ -285,19 +340,23 @@ args = [
 
 [tasks.build-contracts]
 category = "Build"
-script = '''
-cd etc/eth-contracts
-yarn
-yarn build
-'''
+description = "Build Solidity contracts and regenerate committed ERC20 artifacts"
+dependencies = ["install-contract-dependencies"]
+cwd = "etc/eth-contracts"
+command = "yarn"
+args = ["build"]
 
 [tasks.build-engine]
+private = true
 category = "Build"
 command = "${CARGO}"
 args = [
     "build",
+    "--locked",
     "--target",
     "${CARGO_TARGET}",
+    "--target-dir",
+    "${ENGINE_TARGET_DIR}",
     "@@remove-empty(RELEASE)",
     "--no-default-features",
     "--features=${CARGO_FEATURES}",
@@ -306,9 +365,9 @@ args = [
 ]
 
 [tasks.build-engine-flow]
+private = true
 category = "Build"
 dependencies = [
-    "build-contracts",
     "build-engine",
     "make-bin-directory",
     "copy-engine-build",
@@ -317,27 +376,22 @@ dependencies = [
 ]
 
 [tasks.build-engine-flow-docker]
+private = true
 category = "Build"
-dependencies = [
-    "build-engine",
-    "make-bin-directory",
-    "copy-engine-build",
-    "wasm-opt",
-    "post-engine-build-env",
-]
+alias = "build-engine-flow"
 
 [tasks.build-xcc-router-inner]
+private = true
 category = "Build"
 env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_WASM32_BUILD_FLAGS}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
-script = '''
-cd etc/xcc-router
-cargo build --target ${CARGO_TARGET} --release
-cd ../..
-'''
+cwd = "etc/xcc-router"
+command = "${CARGO}"
+args = ["build", "--locked", "--target", "${CARGO_TARGET}", "--target-dir", "${XCC_ROUTER_TARGET_DIR}", "--release"]
 
 [tasks.build-xcc-router]
 category = "Build"
 dependencies = [
+    "check-wasm-opt",
     "build-xcc-router-inner",
     "make-bin-directory",
     "copy-xcc-router-build",
@@ -346,16 +400,31 @@ dependencies = [
 ]
 
 [tasks.build-xcc-router-flow-docker]
+private = true
 category = "Build"
 alias = "build-xcc-router"
 
 [tasks.build-test]
-env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_WASM32_BUILD_FLAGS}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
+description = "Build the integration-test WASM with the selected test features"
+dependencies = ["check-wasm-opt", "build-contracts"]
+env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_WASM32_BUILD_FLAGS}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD_TEST},${CARGO_FEATURES_TEST}", "WASM_FILE" = "${WASM_FILE_TEST}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
+[tasks.check-wasm-opt]
+category = "Check"
+description = "Check that wasm-opt is available before building WASM"
+script = '''
+if ! command -v wasm-opt >/dev/null 2>&1; then
+    echo "wasm-opt is required; see README.md." >&2
+    exit 1
+fi
+'''
+
 [tasks.wasm-opt-common]
+private = true
 category = "Build"
+dependencies = ["check-wasm-opt"]
 script = '''
   filesize_before=$(wc -c bin/${CONTRACT_FILE} | awk '{print $1}')
   wasm-opt -O4 --enable-bulk-memory --enable-nontrapping-float-to-int bin/${CONTRACT_FILE} -o bin/${CONTRACT_FILE} --strip-debug --vacuum
@@ -374,11 +443,14 @@ category = "Build"
 run_task = "wasm-opt-common"
 
 [tasks.build]
+description = "Build and optimize the production engine WASM"
+dependencies = ["check-wasm-opt", "build-contracts"]
 env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_WASM32_BUILD_FLAGS}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow"
 
 [tasks.build-docker-inner]
+dependencies = ["check-wasm-opt"]
 env = { "CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS" = "${RUSTC_WASM32_BUILD_FLAGS}", "CARGO_FEATURES" = "${CARGO_FEATURES_BUILD}", "RELEASE" = "--release", "TARGET_DIR" = "release" }
 category = "Build"
 run_task = "build-engine-flow-docker"
@@ -386,7 +458,7 @@ run_task = "build-engine-flow-docker"
 [tasks.build-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh ${PROFILE}
+docker run --volume "$PWD:/host" -w /host -i --rm -e CARGO_MAKE_VERSION="${CARGO_MAKE_VERSION}" nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-entrypoint.sh
 '''
 
 [tasks.build-xcc-router-docker-inner]
@@ -397,22 +469,21 @@ run_task = "build-xcc-router-flow-docker"
 [tasks.build-xcc-docker]
 category = "Build"
 script = '''
-docker run --volume $PWD:/host -w /host -i --rm nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-xcc-router-entrypoint.sh
+docker run --volume "$PWD:/host" -w /host -i --rm -e CARGO_MAKE_VERSION="${CARGO_MAKE_VERSION}" nearprotocol/contract-builder:master-${BUILDER_HASH_COMMIT}-amd64 ./scripts/docker-xcc-router-entrypoint.sh
 '''
 
 [tasks.test-contracts]
 category = "Test"
 dependencies = ["build-contracts"]
-script = '''
-cd etc/eth-contracts
-yarn
-yarn test
-'''
+cwd = "etc/eth-contracts"
+command = "yarn"
+args = ["test"]
 
 [tasks.test-workspace]
 category = "Test"
+description = "Test the Rust workspace after building matching integration-test WASM"
 command = "${CARGO}"
-dependencies = ["build-test"]
+dependencies = ["check-test-features", "build-test"]
 # `*::workspace::*` tests spawn a neard sandbox (near-workspaces). On startup
 # neard logs ERROR-level advisories about host kernel network sysctls
 # (net.core.rmem_max etc.) that do not match its expectations — harmless, but
@@ -422,15 +493,69 @@ dependencies = ["build-test"]
 env = { "NEAR_ENABLE_SANDBOX_LOG" = "1", "NEAR_SANDBOX_LOG" = "near=error,stats=error,network=error,neard=off" }
 args = [
     "test",
+    "--locked",
     "--workspace",
+    "--features=${CARGO_FEATURES_TEST}",
     "${@}",
 ]
+
+[tasks.check-test-features]
+private = true
+category = "Check"
+# Native-only flags such as skip-bls-tests may still be passed through normally.
+script = '''
+require_refund_features() {
+    case ",${CARGO_FEATURES_TEST}," in
+        *,error_refund,*) ;;
+        *) echo "Use cargo make test-workspace-refund to enable error_refund in both native tests and WASM." >&2; exit 1 ;;
+    esac
+}
+next_is_features=false
+for arg in "$@"; do
+    features=""
+    if [ "$next_is_features" = true ]; then
+        features="$arg"
+        next_is_features=false
+    else
+        case "$arg" in
+            --) break ;;
+            --all-features) require_refund_features ;;
+            --features|-F) next_is_features=true ;;
+            --features=*) features="${arg#--features=}" ;;
+            -F*) features="${arg#-F}" ;;
+        esac
+    fi
+    for feature in $(printf '%s' "$features" | tr ', ' '\n'); do
+        case "$feature" in
+            error_refund|*/error_refund) require_refund_features ;;
+        esac
+    done
+done
+'''
+
+[tasks.test-workspace-refund]
+category = "Test"
+description = "Test error_refund in both native code and integration-test WASM"
+env = { "CARGO_FEATURES_TEST" = "error_refund" }
+run_task = "test-workspace"
+
+[tasks.test-xcc-router]
+category = "Test"
+description = "Run XCC router unit tests with default features"
+command = "${CARGO}"
+args = ["test", "--locked", "--manifest-path", "etc/xcc-router/Cargo.toml"]
+
+[tasks.test-xcc-router-all-features]
+extend = "test-xcc-router"
+description = "Run XCC router unit tests with all promise actions enabled"
+args = ["test", "--locked", "--manifest-path", "etc/xcc-router/Cargo.toml", "--all-features"]
 
 [tasks.bench-modexp-test]
 category = "Test"
 command = "${CARGO}"
 args = [
     "test",
+    "--locked",
     "--release",
     "bench_m",
     "--",
@@ -439,9 +564,13 @@ args = [
 
 [tasks.test-flow]
 category = "Test"
+description = "Test Solidity contracts, the Rust workspace, and both XCC router feature sets"
 dependencies = [
+    "check-wasm-opt",
     "test-contracts",
     "test-workspace",
+    "test-xcc-router",
+    "test-xcc-router-all-features",
 ]
 
 [tasks.bench-modexp]

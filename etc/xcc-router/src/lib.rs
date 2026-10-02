@@ -2,13 +2,13 @@ use aurora_engine_types::parameters::{
     NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
     SimpleNearPromise,
 };
+use near_sdk::BorshStorageKey;
 use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U64;
 use near_sdk::store::LookupMap;
-use near_sdk::BorshStorageKey;
 use near_sdk::{
-    env, near, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
+    AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex, PromiseResult, env, near,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -285,7 +285,9 @@ impl Router {
 
     #[cfg(not(feature = "all-promise-actions"))]
     fn add_batch_actions(_id: PromiseIndex, _actions: &[PromiseAction]) {
-        unimplemented!("NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine")
+        unimplemented!(
+            "NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine"
+        )
     }
 
     #[cfg(feature = "all-promise-actions")]

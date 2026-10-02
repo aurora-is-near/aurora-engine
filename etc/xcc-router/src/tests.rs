@@ -5,7 +5,7 @@ use near_primitives::types::GasWeight;
 use near_sdk::mock::MockAction;
 use near_sdk::test_utils::test_env::{alice, bob, carol};
 use near_sdk::test_utils::{self, VMContextBuilder};
-use near_sdk::{testing_env, Gas, NearToken};
+use near_sdk::{Gas, NearToken, testing_env};
 
 const WNEAR_ACCOUNT: &str = "wrap.near";
 
@@ -38,9 +38,11 @@ fn test_reinitialize_wrong_caller() {
     assert_eq!(contract.parent.get().unwrap(), parent);
     drop(contract);
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     let _contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 }
 
@@ -57,9 +59,11 @@ fn test_execute_wrong_caller() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.execute(PromiseArgs::Create(promise));
 }
 
@@ -133,9 +137,11 @@ fn test_schedule_wrong_caller() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.schedule(PromiseArgs::Create(promise));
 }
 
@@ -166,9 +172,11 @@ fn test_schedule_and_execute() {
 
     // promise executed after calling `execute_scheduled`
     // anyone can call this function
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.execute_scheduled(0.into());
 
     assert_eq!(contract.nonce.get().unwrap(), 1);
@@ -207,10 +215,12 @@ fn validate_function_call_action(
 
 fn create_contract() -> (near_sdk::AccountId, Router) {
     let parent = alice();
-    testing_env!(VMContextBuilder::new()
-        .current_account_id(format!("some_address.{parent}").try_into().unwrap())
-        .predecessor_account_id(parent.clone())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .current_account_id(format!("some_address.{parent}").try_into().unwrap())
+            .predecessor_account_id(parent.clone())
+            .build()
+    );
     let contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 
     (parent, contract)
