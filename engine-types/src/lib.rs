@@ -36,3 +36,15 @@ pub use v0::*;
 pub trait AsBytes {
     fn as_bytes(&self) -> &[u8];
 }
+
+impl AsBytes for str {
+    fn as_bytes(&self) -> &[u8] {
+        self.as_bytes()
+    }
+}
+
+impl<const N: usize> AsBytes for [u8; N] {
+    fn as_bytes(&self) -> &[u8] {
+        self
+    }
+}

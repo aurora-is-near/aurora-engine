@@ -3,15 +3,22 @@ use crate::utils::{
     self, AuroraRunner, ExecutionProfile, Signer,
     solidity::standard_precompiles::{PrecompilesConstructor, PrecompilesContract},
 };
+use aurora_engine_types::parameters::engine::TransactionStatus;
 
 const INITIAL_BALANCE: Wei = Wei::new_u64(1000);
 const INITIAL_NONCE: u64 = 0;
 
 fn precompile_execution_profile(method: &str) -> ExecutionProfile {
     let (mut runner, mut signer, contract) = initialize();
-    let (_result, profile) = runner
+    let (result, profile) = runner
         .submit_with_signer_profiled(&mut signer, |nonce| contract.call_method(method, nonce))
         .unwrap();
+
+    assert!(
+        matches!(result.status, TransactionStatus::Succeed(_)),
+        "Execution failed: {result:?}",
+    );
+
     profile
 }
 

@@ -105,7 +105,7 @@ fn test_eip_1559_example() {
     );
     assert_eq!(runner.get_storage(contract_address, one()), H256::zero());
     // Gas fees were awarded to the address derived from sending account
-    let coinbase = aurora_engine_sdk::types::near_account_to_evm_address(sender.as_bytes());
+    let coinbase = aurora_engine_sdk::types::near_account_to_evm_address(sender);
     assert_eq!(runner.get_balance(coinbase), Wei::new_u64(0x73834));
 }
 

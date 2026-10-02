@@ -45,6 +45,7 @@ pub fn modexp(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(feature = "bench")]
+#[must_use]
 pub fn modexp_ibig(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     use num::Zero;
 
@@ -60,6 +61,7 @@ pub fn modexp_ibig(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(feature = "bench")]
+#[must_use]
 pub fn modexp_num(base: &[u8], exp: &[u8], modulus: &[u8]) -> Vec<u8> {
     use num::Zero;
 

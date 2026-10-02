@@ -892,7 +892,7 @@ fn test_transfer_charging_gas_success() {
     let expected_dest_balance = TRANSFER_AMOUNT;
     let expected_relayer_balance = spent_amount;
     let relayer_address =
-        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_str());
 
     // validate post-state
     utils::validate_address_balance_and_nonce(
@@ -953,7 +953,7 @@ fn test_eth_transfer_charging_gas_not_enough_balance() {
 
     // validate post-state
     let relayer =
-        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_str());
 
     utils::validate_address_balance_and_nonce(
         &runner,

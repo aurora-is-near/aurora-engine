@@ -5,7 +5,7 @@ use near_primitives::types::GasWeight;
 use near_sdk::mock::MockAction;
 use near_sdk::test_utils::test_env::{alice, bob, carol};
 use near_sdk::test_utils::{self, VMContextBuilder};
-use near_sdk::{testing_env, Gas, NearToken};
+use near_sdk::{Gas, NearToken, testing_env};
 
 const WNEAR_ACCOUNT: &str = "wrap.near";
 
@@ -31,21 +31,23 @@ fn test_reinitialize() {
 
 // If an account other than the parent calls `initialize` it panics.
 #[test]
-#[should_panic]
+#[should_panic(expected = "ERR_ILLEGAL_CALLER")]
 fn test_reinitialize_wrong_caller() {
     let (parent, contract) = create_contract();
 
     assert_eq!(contract.parent.get().unwrap(), parent);
     drop(contract);
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     let _contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "ERR_ILLEGAL_CALLER")]
 fn test_execute_wrong_caller() {
     let (_parent, contract) = create_contract();
 
@@ -57,9 +59,11 @@ fn test_execute_wrong_caller() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.execute(PromiseArgs::Create(promise));
 }
 
@@ -121,7 +125,7 @@ fn test_execute_callback() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "ERR_ILLEGAL_CALLER")]
 fn test_schedule_wrong_caller() {
     let (_parent, mut contract) = create_contract();
 
@@ -133,9 +137,11 @@ fn test_schedule_wrong_caller() {
         attached_gas: NearGas::new(100_000_000_000_000),
     };
 
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.schedule(PromiseArgs::Create(promise));
 }
 
@@ -159,17 +165,18 @@ fn test_schedule_and_execute() {
 
     // promise stored and nonce incremented instead
     assert_eq!(contract.nonce.get().unwrap(), 1);
-    let stored_promise = match contract.scheduled_promises.get(&0) {
-        Some(PromiseArgs::Create(promise)) => promise,
-        _ => unreachable!(),
+    let Some(PromiseArgs::Create(stored_promise)) = contract.scheduled_promises.get(&0) else {
+        unreachable!()
     };
     assert_eq!(stored_promise, &promise);
 
     // promise executed after calling `execute_scheduled`
     // anyone can call this function
-    testing_env!(VMContextBuilder::new()
-        .predecessor_account_id(bob())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .predecessor_account_id(bob())
+            .build()
+    );
     contract.execute_scheduled(0.into());
 
     assert_eq!(contract.nonce.get().unwrap(), 1);
@@ -208,11 +215,33 @@ fn validate_function_call_action(
 
 fn create_contract() -> (near_sdk::AccountId, Router) {
     let parent = alice();
-    testing_env!(VMContextBuilder::new()
-        .current_account_id(format!("some_address.{}", parent).try_into().unwrap())
-        .predecessor_account_id(parent.clone())
-        .build());
+    testing_env!(
+        VMContextBuilder::new()
+            .current_account_id(format!("some_address.{parent}").try_into().unwrap())
+            .predecessor_account_id(parent.clone())
+            .build()
+    );
     let contract = Router::initialize(WNEAR_ACCOUNT.parse().unwrap(), false);
 
     (parent, contract)
+}
+
+#[cfg(feature = "all-promise-actions")]
+#[test]
+fn test_public_key_encoding() {
+    use aurora_engine_types::public_key::PublicKey;
+
+    let mut expected_ed25519 = vec![0];
+    expected_ed25519.extend_from_slice(&[7; 32]);
+    assert_eq!(
+        super::to_sdk_pk(&PublicKey::Ed25519([7; 32])).as_bytes(),
+        expected_ed25519
+    );
+
+    let mut expected_secp256k1 = vec![1];
+    expected_secp256k1.extend_from_slice(&[9; 64]);
+    assert_eq!(
+        super::to_sdk_pk(&PublicKey::Secp256k1([9; 64])).as_bytes(),
+        expected_secp256k1
+    );
 }
