@@ -47,7 +47,7 @@ pub const PAUSED_PRECOMPILES: &str = "get_paused_precompiles";
 pub const RESUME_PRECOMPILES: &str = "resume_precompiles";
 pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
-const CALLER_ACCOUNT_ID: &str = "some-account.near";
+pub const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 pub mod mocked_external;
 pub mod one_inch;
@@ -1049,6 +1049,9 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
             match panic_msg.as_str() {
                 "ERR_INVALID_CHAIN_ID" => EngineErrorKind::InvalidChainId,
                 "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
+                "CREATE_CONTRACT_LIMIT" => {
+                    EngineErrorKind::EvmError(aurora_evm::ExitError::CreateContractLimit)
+                }
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,

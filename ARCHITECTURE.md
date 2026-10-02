@@ -122,13 +122,13 @@ The contract method layer intentionally returns `Result` rather than panicking. 
 The `submit` and `submit_with_args` methods follow this path:
 
 1. `engine-transactions` parses the EIP-2718 envelope and normalizes Legacy, EIP-2930, EIP-1559, or EIP-7702 fields into `NormalizedEthTransaction`. EIP-4844 is recognized but not executed.
-2. Signature recovery determines the EVM sender. The engine validates access policy, chain ID, nonce, fee relationships, intrinsic gas, floor gas, and EIP-specific sender rules.
-3. Gas payment is deducted before execution using the effective gas price or configured silo fixed-gas policy.
+2. Signature recovery determines the EVM sender. The engine validates access policy, chain ID, nonce, fee relationships, intrinsic gas, floor gas, and EIP-specific sender rules. A contract creation is additionally rejected when its init code exceeds the EIP-3860 limit.
+3. Gas payment is deducted before execution using the effective gas price or configured silo fixed-gas policy. A contract creation whose `value` is not covered by the remaining balance is rejected at this point, because the EVM would fail it without consuming the nonce, which would make the charged failure replayable.
 4. The engine dispatches to either EVM call or contract creation. Access lists and EIP-7702 authorizations are passed to `aurora-evm`.
 5. The Osaka EVM configuration and Osaka precompile set are currently selected in [`engine/src/engine.rs`](engine/src/engine.rs). Precompiles can be filtered by stored pause flags.
 6. State changes are applied, promise-producing logs are processed, and unused gas is refunded. The priority-fee portion is credited to the relayer address.
 
-Standalone replay uses a block-height-aware compatibility transaction parser so historical transactions continue to reproduce the behavior of the contract version that originally processed them.
+Standalone replay uses a block-height-aware compatibility transaction parser, and applies the creation-transaction checks only from `CREATE_TX_VALIDATION_HEIGHT`, so historical transactions continue to reproduce the behavior of the contract version that originally processed them.
 
 ## State and persistence
 

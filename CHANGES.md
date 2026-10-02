@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+
+- Fixed replayable failed contract deployments: creation transactions with oversized init code (EIP-3860) or with a `value` the sender cannot cover after the gas prepayment are now rejected before execution (`CREATE_CONTRACT_LIMIT` / `ERR_OUT_OF_FUND`) instead of charging gas without consuming the nonce by [@mrLSD].
+
 ## [3.11.0] 2026-09-17
 
 ### Additions
