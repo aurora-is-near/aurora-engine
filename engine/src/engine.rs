@@ -60,6 +60,12 @@ const CHAIN_ID_SIZE: usize = 32;
 /// is deployed. The current value is only approximate; will be updated once the
 /// fix is actually deployed.
 pub const ZERO_ADDRESS_FIX_HEIGHT: u64 = 61_200_152;
+/// Block height from which the standalone engine rejects creation transactions with oversized init
+/// code or insufficient balance for `value` before execution (the contract always does). Set it to
+/// the mainnet height at which the contract version containing this check is deployed: a lower
+/// value makes replay reject creations the old contract executed and charged, a higher value only
+/// delays the rule in the standalone engine (rejected transactions are never replayed).
+pub const CREATE_TX_VALIDATION_HEIGHT: u64 = 1_000_000_000;
 
 #[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {
@@ -238,7 +244,7 @@ pub enum GasPaymentError {
     BalanceOverflow(BalanceOverflow),
     /// Overflow in `gas * gas_price` calculation
     EthAmountOverflow,
-    /// Not enough balance for account to cover the gas cost
+    /// Not enough balance for account to cover the gas cost (and the value of a contract creation)
     OutOfFund,
     /// `max_fee_per_gas` is less than `base_fee_per_gas`
     MaxFeePerGasLessThanBaseFee,
@@ -466,18 +472,28 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         }
     }
 
+    /// Withdraws the gas prepayment from the sender. With `cover_value` the balance left after the
+    /// prepayment must also cover `transaction.value` (contract creations, see `submit`).
     pub fn charge_gas(
         &mut self,
         sender: &Address,
         transaction: &NormalizedEthTransaction,
         max_gas_price: Option<U256>,
         fixed_gas: Option<EthGas>,
+        cover_value: bool,
     ) -> Result<GasPaymentResult, GasPaymentError> {
         let block_base_fee_per_gas = self.block_base_fee_per_gas();
         if transaction.max_fee_per_gas.is_zero()
             && fixed_gas.is_none()
             && block_base_fee_per_gas.is_zero()
         {
+            // Nothing is prepaid here, so only a non-zero `value` is worth the extra balance read.
+            if cover_value
+                && !transaction.value.is_zero()
+                && get_balance(&self.io, sender) < transaction.value
+            {
+                return Err(GasPaymentError::OutOfFund);
+            }
             return Ok(GasPaymentResult::default());
         }
 
@@ -503,6 +519,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         let new_balance = get_balance(&self.io, sender)
             .checked_sub(prepaid_amount)
             .ok_or(GasPaymentError::OutOfFund)?;
+        // Must stay before the write below: a rejected transaction leaves no state change behind.
+        if cover_value && new_balance < transaction.value {
+            return Err(GasPaymentError::OutOfFund);
+        }
 
         set_balance(&mut self.io, sender, &new_balance);
 
@@ -1047,6 +1067,14 @@ pub fn submit_with_alt_modexp<
     // Retrieve the signer of the transaction:
     let sender = transaction.address;
 
+    // The contract always applies the creation-transaction checks below; the standalone engine must
+    // keep reproducing the historical behavior for blocks before the fix was deployed.
+    #[cfg(feature = "contract")]
+    let validate_create_tx = transaction.to.is_none();
+    #[cfg(not(feature = "contract"))]
+    let validate_create_tx =
+        transaction.to.is_none() && env.block_height() >= CREATE_TX_VALIDATION_HEIGHT;
+
     let fixed_gas = silo::get_fixed_gas(&io);
 
     // Check if the sender has rights to submit transactions or deploy code.
@@ -1081,6 +1109,16 @@ pub fn submit_with_alt_modexp<
         return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
+    // EIP-3860: oversized init code is a validity error; executing it would burn the whole gas limit
+    // without consuming the nonce, so the same signed transaction could be charged again.
+    if validate_create_tx
+        && CONFIG
+            .max_initcode_size
+            .is_some_and(|limit| transaction.data.len() > limit)
+    {
+        return Err(EngineErrorKind::EvmError(ExitError::CreateContractLimit).into());
+    }
+
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
         return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
     }
@@ -1099,7 +1137,15 @@ pub fn submit_with_alt_modexp<
         return Err(EngineErrorKind::RejectCallerWithCode.into());
     }
     let max_gas_price = args.max_gas_price.map(Into::into);
-    let prepaid_amount = match engine.charge_gas(&sender, &transaction, max_gas_price, fixed_gas) {
+    // A contract creation must also cover `value` after the gas prepayment: failing inside the EVM
+    // would charge the intrinsic gas without consuming the nonce (unlike a call), i.e. be replayable.
+    let prepaid_amount = match engine.charge_gas(
+        &sender,
+        &transaction,
+        max_gas_price,
+        fixed_gas,
+        validate_create_tx,
+    ) {
         Ok(gas_result) => gas_result,
         Err(err) => {
             return Err(EngineErrorKind::GasPayment(err).into());
@@ -2462,6 +2508,63 @@ mod tests {
     }
 
     #[test]
+    fn test_gas_charge_requires_value_coverage_for_creation() {
+        let origin = Address::zero();
+        let current_account_id = AccountId::default();
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        add_balance(&mut io, &origin, Wei::new_u64(1_000_000)).unwrap();
+        let mut engine: Engine<_, _> =
+            Engine::new_with_state(EngineState::default(), origin, current_account_id, io, &env);
+        let creation = |value: u64, gas_price: u64| NormalizedEthTransaction {
+            address: origin,
+            chain_id: None,
+            nonce: U256::zero(),
+            gas_limit: U256::from(100_000),
+            max_priority_fee_per_gas: U256::from(gas_price),
+            max_fee_per_gas: U256::from(gas_price),
+            to: None,
+            value: Wei::new_u64(value),
+            data: vec![],
+            access_list: vec![],
+            authorization_list: vec![],
+        };
+
+        // The prepayment of 100_000 wei leaves 900_000 wei; a larger value is rejected before any write.
+        assert!(matches!(
+            engine.charge_gas(&origin, &creation(900_001, 1), None, None, true),
+            Err(GasPaymentError::OutOfFund)
+        ));
+        assert_eq!(get_balance(&io, &origin), Wei::new_u64(1_000_000));
+        // Without a prepayment the whole balance must cover the value.
+        assert!(matches!(
+            engine.charge_gas(&origin, &creation(1_000_001, 0), None, None, true),
+            Err(GasPaymentError::OutOfFund)
+        ));
+        assert!(
+            engine
+                .charge_gas(&origin, &creation(1_000_000, 0), None, None, true)
+                .is_ok()
+        );
+        assert_eq!(get_balance(&io, &origin), Wei::new_u64(1_000_000));
+        // Calls are only charged for their gas; the value is checked by the EVM.
+        assert!(
+            engine
+                .charge_gas(&origin, &creation(2_000_000, 1), None, None, false)
+                .is_ok()
+        );
+        assert_eq!(get_balance(&io, &origin), Wei::new_u64(900_000));
+        // An exactly covered value is accepted and only the gas is prepaid.
+        assert!(
+            engine
+                .charge_gas(&origin, &creation(800_000, 1), None, None, true)
+                .is_ok()
+        );
+        assert_eq!(get_balance(&io, &origin), Wei::new_u64(800_000));
+    }
+
+    #[test]
     fn test_gas_charge_for_empty_transaction_is_zero() {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
@@ -2486,7 +2589,7 @@ mod tests {
             authorization_list: vec![],
         };
         let actual_result = engine
-            .charge_gas(&origin, &transaction, None, None)
+            .charge_gas(&origin, &transaction, None, None, false)
             .unwrap();
 
         let expected_result = GasPaymentResult {
@@ -2523,7 +2626,7 @@ mod tests {
             authorization_list: vec![],
         };
         let actual_result = engine
-            .charge_gas(&origin, &transaction, None, None)
+            .charge_gas(&origin, &transaction, None, None, false)
             .unwrap();
 
         let expected_result = GasPaymentResult {
@@ -2535,7 +2638,13 @@ mod tests {
         assert_eq!(expected_result, actual_result);
 
         let actual_result = engine
-            .charge_gas(&origin, &transaction, None, Some(EthGas::new(50_000)))
+            .charge_gas(
+                &origin,
+                &transaction,
+                None,
+                Some(EthGas::new(50_000)),
+                false,
+            )
             .unwrap();
 
         let expected_result = GasPaymentResult {
@@ -2547,7 +2656,7 @@ mod tests {
         assert_eq!(expected_result, actual_result);
 
         let actual_result = engine
-            .charge_gas(&origin, &transaction, Some(5.into()), None)
+            .charge_gas(&origin, &transaction, Some(5.into()), None, false)
             .unwrap();
 
         let expected_result = GasPaymentResult {
