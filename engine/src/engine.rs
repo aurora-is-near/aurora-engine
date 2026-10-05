@@ -5,6 +5,7 @@ use aurora_engine_sdk::{
     env::Env,
     io::{IO, StorageIntermediate},
     promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
+    types::near_account_to_evm_address,
 };
 use aurora_engine_types::parameters::connector::FtTransferMessageData;
 use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
@@ -68,7 +69,7 @@ pub const CREATE_TX_VALIDATION_HEIGHT: u64 = 1_000_000_000;
 
 #[must_use]
 pub fn current_address(current_account_id: &AccountId) -> Address {
-    aurora_engine_sdk::types::near_account_to_evm_address(current_account_id.as_bytes())
+    aurora_engine_sdk::types::near_account_to_evm_address(current_account_id)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -1390,17 +1391,11 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     env: &E,
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
+    let origin = near_account_to_evm_address(&env.predecessor_account_id());
     let current_account_id = env.current_account_id();
     let input = setup_deploy_erc20_input(&current_account_id, metadata);
-    let mut engine: Engine<_, _> = Engine::new(
-        aurora_engine_sdk::types::near_account_to_evm_address(
-            env.predecessor_account_id().as_bytes(),
-        ),
-        current_account_id,
-        io,
-        env,
-    )
-    .map_err(DeployErc20Error::State)?;
+    let mut engine: Engine<_, _> =
+        Engine::new(origin, current_account_id, io, env).map_err(DeployErc20Error::State)?;
 
     let address = match engine.deploy_code_with_input(input, None, handler) {
         Ok(result) => match result.status {
@@ -1429,17 +1424,11 @@ pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
     env: &E,
     handler: &mut P,
 ) -> Result<Address, DeployErc20Error> {
+    let origin = near_account_to_evm_address(&env.predecessor_account_id());
     let current_account_id = env.current_account_id();
     let input = setup_deploy_erc20_input(&current_account_id, Some(erc20_metadata));
-    let mut engine: Engine<_, _> = Engine::new(
-        aurora_engine_sdk::types::near_account_to_evm_address(
-            env.predecessor_account_id().as_bytes(),
-        ),
-        current_account_id,
-        io,
-        env,
-    )
-    .map_err(DeployErc20Error::State)?;
+    let mut engine: Engine<_, _> =
+        Engine::new(origin, current_account_id, io, env).map_err(DeployErc20Error::State)?;
 
     let address = match engine.deploy_code_with_input(input, Some(erc20_address), handler) {
         Ok(result) => match result.status {
@@ -2476,9 +2465,8 @@ mod tests {
     #[test]
     fn test_deploying_token_succeeds() {
         let env = Fixed::default();
-        let origin = aurora_engine_sdk::types::near_account_to_evm_address(
-            env.predecessor_account_id().as_bytes(),
-        );
+        let origin =
+            aurora_engine_sdk::types::near_account_to_evm_address(&env.predecessor_account_id());
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
@@ -2497,9 +2485,7 @@ mod tests {
     #[test]
     fn test_get_erc20_metadata() {
         let env = Fixed::default();
-        let origin = aurora_engine_sdk::types::near_account_to_evm_address(
-            env.predecessor_account_id().as_bytes(),
-        );
+        let origin = near_account_to_evm_address(&env.predecessor_account_id());
         let current_account_id = AccountId::default();
         let storage = RefCell::new(Storage::default());
         let mut io = StoragePointer(&storage);

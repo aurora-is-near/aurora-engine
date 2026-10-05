@@ -26,17 +26,18 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[cfg(target_arch = "wasm32")]
 #[panic_handler]
 #[cfg_attr(not(feature = "log"), allow(unused_variables))]
+/// # Safety
+///
+/// This must only be called by the WASM panic runtime with the current panic information.
 pub unsafe fn on_panic(info: &::core::panic::PanicInfo) -> ! {
     #[cfg(feature = "log")]
     {
         use prelude::ToString;
 
         let msg = info.message();
-        let msg = if let Some(log) = info.location() {
-            prelude::format!("{msg} [{log}]")
-        } else {
-            msg.to_string()
-        };
+        let msg = info
+            .location()
+            .map_or_else(|| msg.to_string(), |log| prelude::format!("{msg} [{log}]"));
         prelude::sdk::panic_utf8(msg.as_bytes());
     }
     #[cfg(not(feature = "log"))]

@@ -192,8 +192,12 @@ The root [`Makefile.toml`](Makefile.toml) orchestrates builds:
 
 - `cargo make build` compiles Solidity artifacts, builds `aurora-engine` for `wasm32-unknown-unknown` with `--no-default-features --features contract`, and optimizes the result with `wasm-opt`.
 - `cargo make build-test` adds the `integration-test` feature and creates the WASM used by integration tests.
+- `cargo make test-workspace-refund` enables `error_refund` in both native tests and the test WASM. The two test modes share the test WASM filename and must run sequentially.
 - `cargo make build-xcc-router` builds the separate router contract.
-- Docker tasks use the pinned contract-builder image to produce reproducible release binaries.
+- `cargo make test-flow` prepares Solidity artifacts once, tests the root workspace, and runs the separate XCC router unit tests with default and all features. Formatting checks also cover the router.
+- Rust validation/build tasks enforce committed lockfiles, and Solidity tasks share a frozen Yarn dependency installation. WASM builds check that `wasm-opt` is available on `PATH` before compilation.
+- Engine builds explicitly use Cargo's resolved workspace target directory; router builds explicitly use `etc/xcc-router/target`. Artifact copying uses these same directories.
+- Docker tasks use the pinned contract-builder image and cargo-make version to produce reproducible release binaries.
 
 Release builds enable LTO, a single codegen unit, overflow checks, abort-on-panic, and symbol stripping. The production artifact is `bin/aurora-engine.wasm`.
 
