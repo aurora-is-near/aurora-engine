@@ -42,7 +42,7 @@ fn assert_untouched(runner: &AuroraRunner, sender: Address, balance: Wei) {
     assert_eq!(runner.get_nonce(sender), U256::zero());
     assert_eq!(runner.get_balance(sender), balance);
     // The relayer (the account calling `submit`) must not be paid for a rejected transaction.
-    let relayer = near_account_to_evm_address(CALLER_ACCOUNT_ID.as_bytes());
+    let relayer = near_account_to_evm_address(CALLER_ACCOUNT_ID);
     assert_eq!(runner.get_balance(relayer), Wei::zero());
 }
 
