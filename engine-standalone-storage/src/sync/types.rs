@@ -496,7 +496,7 @@ impl TransactionKind {
     }
 
     fn get_implicit_address(caller: &AccountId) -> Address {
-        aurora_engine_sdk::types::near_account_to_evm_address(caller.as_bytes())
+        aurora_engine_sdk::types::near_account_to_evm_address(caller)
     }
 
     fn get_implicit_nonce(

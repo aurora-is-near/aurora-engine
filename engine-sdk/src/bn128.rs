@@ -443,7 +443,7 @@ pub fn alt_bn128_pairing(input_bytes: &[u8]) -> Result<bool, Bn254Error> {
         v
     };
 
-    for pair_chunk in bytes.chunks_exact_mut(PAIR_ELEMENT_LEN) {
+    for pair_chunk in bytes.as_chunks_mut::<PAIR_ELEMENT_LEN>().0 {
         // --- Process G1 (2 * 32 bytes) ---
         // P1.X
         pair_chunk[0..FQ_LEN].reverse();

@@ -72,7 +72,7 @@ fn repro_FRcorNv() {
         block_timestamp: 1_650_960_438_774_745_116,
         input_path: "src/tests/res/input_FRcorNv.hex",
         evm_gas_used: 1_239_721,
-        near_gas_used: 110,
+        near_gas_used: 111,
     });
 }
 
@@ -125,7 +125,8 @@ fn repro_Emufid2() {
         block_height: 99_197_180,
         block_timestamp: 1_662_118_048_636_713_538,
         input_path: "src/tests/res/input_Emufid2.hex",
-        evm_gas_used: 1_156_364,
+        // Osaka EIP-7883 re-prices the 34 MODEXP (0x05) calls of this tx: +57_900 vs Prague.
+        evm_gas_used: 1_214_264,
         near_gas_used: 117,
     });
 }

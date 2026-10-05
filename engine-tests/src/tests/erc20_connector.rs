@@ -833,7 +833,7 @@ pub mod workspace {
         // 2. Create account
         let ft_owner = create_sub_account(&aurora.root(), "ft_owner", BALANCE).await?;
         let ft_owner_address =
-            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
+            aurora_engine_sdk::types::near_account_to_evm_address(&ft_owner.id());
         let result = aurora
             .mint_account(ft_owner_address, 0u64, INITIAL_ETH_BALANCE)
             .max_gas()
