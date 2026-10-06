@@ -10,7 +10,7 @@ name: Lints
 jobs:
   rust:
     name: Run ${{ matrix.command }}
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/volume=100gb/extras=s3-cache
     container: rust:latest
     strategy:
       fail-fast: false
@@ -40,7 +40,7 @@ jobs:
 
   contracts:
     name: Contracts
-    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/extras=s3-cache
+    runs-on: runs-on=${{ github.run_id }}/family=c6a.4xlarge/image=ubuntu24-full-x64/volume=100gb/extras=s3-cache
     container: rust:latest
     steps:
       - name: Setup RunsOn
