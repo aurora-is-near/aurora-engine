@@ -32,7 +32,7 @@ metadata:
   links: []
   annotations:
     aurora.dev/security-tier: "1"
-    backstage.io/source-location: url:https://github.com/aurora-is-near/aurora-engine/blob/master/engine-precompiles/src/native.rs
+    backstage.io/source-location: url:https://github.com/aurora-is-near/aurora-engine/tree/master/engine-precompiles/src/native/
 spec:
   owner: bridge-team
   type: contract

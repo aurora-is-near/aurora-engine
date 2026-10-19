@@ -1034,6 +1034,7 @@ pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
 }
 
 /// Checks if `total_gas` is within 1 Tgas of `tgas_bound`.
+#[track_caller]
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
     const TERA: i128 = 1_000_000_000_000;
     let total_gas: i128 = total_gas.into();
