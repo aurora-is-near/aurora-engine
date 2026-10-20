@@ -2,13 +2,13 @@ use aurora_engine_types::parameters::{
     NearPromise, PromiseAction, PromiseArgs, PromiseCreateArgs, PromiseWithCallbackArgs,
     SimpleNearPromise,
 };
+use near_sdk::BorshStorageKey;
 use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U64;
 use near_sdk::store::LookupMap;
-use near_sdk::BorshStorageKey;
 use near_sdk::{
-    env, near, AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex, PromiseResult,
+    AccountId, Gas, NearToken, PanicOnDefault, Promise, PromiseIndex, PromiseResult, env, near,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -30,13 +30,13 @@ const CURRENT_VERSION: u32 = include!("VERSION");
 const ERR_ILLEGAL_CALLER: &str = "ERR_ILLEGAL_CALLER";
 const INITIALIZE_GAS: Gas = Gas::from_tgas(15);
 /// Gas cost estimated from mainnet data. Example:
-/// https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM
+/// `https://explorer.mainnet.near.org/transactions/5NbZ7SfrodNxeLcSkCmLAEdbZfbkk9cjqz3zSDwktKrk#D7un3c3Nxv7Ee3JpQSKiM97LbwCDFPbMo5iLoijGPXPM`
 const WNEAR_REGISTER_GAS: Gas = Gas::from_tgas(5);
 /// Registration amount computed from FT token source code, see
-/// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50
-/// https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101
+/// `https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/core_impl.rs#L50`
+/// `https://github.com/near/near-sdk-rs/blob/master/near-contract-standards/src/fungible_token/storage_impl.rs#L101`
 const WNEAR_REGISTER_AMOUNT: NearToken = NearToken::from_yoctonear(1_250_000_000_000_000_000_000);
-/// Must match aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT
+/// Must match `aurora_engine_precompiles::xcc::state::STORAGE_AMOUNT`
 const REFUND_AMOUNT: NearToken = NearToken::from_near(2);
 
 #[near(serializers = [borsh])]
@@ -63,8 +63,9 @@ pub struct Router {
 
 #[near]
 impl Router {
-    #[init(ignore_state)]
     #[must_use]
+    #[init(ignore_state)]
+    #[allow(clippy::use_self)]
     pub fn initialize(wnear_account: AccountId, must_register: bool) -> Self {
         // The first time this function is called there is no state and the parent is set to be
         // the predecessor account id. In subsequent calls, only the original parent is allowed to
@@ -177,7 +178,7 @@ impl Router {
         let parent = self.get_parent().unwrap_or_else(env_panic);
 
         require_caller(&parent)
-            .and_then(|_| require_no_failed_promises())
+            .and_then(|()| require_no_failed_promises())
             .unwrap_or_else(env_panic);
 
         Promise::new(parent).transfer(REFUND_AMOUNT)
@@ -191,8 +192,9 @@ impl Router {
 
     /// Checks the following preconditions:
     ///   1. Contract is initialized
-    ///   2. predecessor_account_id == self.parent
+    ///   2. `predecessor_account_id` == self.parent
     ///   3. There are no failed promise results
+    ///
     /// These preconditions must be checked on methods where are important for
     /// the security of the contract (e.g. `execute`).
     fn require_preconditions(&self) -> Result<(), Error> {
@@ -283,12 +285,14 @@ impl Router {
 
     #[cfg(not(feature = "all-promise-actions"))]
     fn add_batch_actions(_id: PromiseIndex, _actions: &[PromiseAction]) {
-        unimplemented!("NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine")
+        unimplemented!(
+            "NEAR batch transactions are not supported. Please file an issue at https://github.com/aurora-is-near/aurora-engine"
+        )
     }
 
     #[cfg(feature = "all-promise-actions")]
     fn add_batch_actions(id: PromiseIndex, actions: &[PromiseAction]) {
-        for action in actions.iter() {
+        for action in actions {
             match action {
                 PromiseAction::CreateAccount => env::promise_batch_action_create_account(id),
                 PromiseAction::Transfer { amount } => env::promise_batch_action_transfer(
@@ -296,7 +300,7 @@ impl Router {
                     NearToken::from_yoctonear(amount.as_u128()),
                 ),
                 PromiseAction::DeployContract { code } => {
-                    env::promise_batch_action_deploy_contract(id, code)
+                    env::promise_batch_action_deploy_contract(id, code);
                 }
                 PromiseAction::FunctionCall {
                     name,
@@ -320,7 +324,7 @@ impl Router {
                         id,
                         &to_sdk_pk(public_key),
                         *nonce,
-                    )
+                    );
                 }
                 PromiseAction::AddFunctionCallKey {
                     public_key,
@@ -340,14 +344,14 @@ impl Router {
                         .unwrap(),
                         &receiver_id,
                         function_names,
-                    )
+                    );
                 }
                 PromiseAction::DeleteKey { public_key } => {
-                    env::promise_batch_action_delete_key(id, &to_sdk_pk(public_key))
+                    env::promise_batch_action_delete_key(id, &to_sdk_pk(public_key));
                 }
                 PromiseAction::DeleteAccount { beneficiary_id } => {
                     let beneficiary_id = beneficiary_id.as_ref().parse().unwrap();
-                    env::promise_batch_action_delete_account(id, &beneficiary_id)
+                    env::promise_batch_action_delete_account(id, &beneficiary_id);
                 }
             }
         }
@@ -364,12 +368,8 @@ fn to_sdk_pk(key: &aurora_engine_types::public_key::PublicKey) -> near_sdk::Publ
             (near_sdk::CurveType::SECP256K1, bytes)
         }
     };
-    let mut data = Vec::with_capacity(1 + key_bytes.len());
-    data.push(curve_type as u8);
-    data.extend_from_slice(key_bytes);
-
     // Unwrap should be safe because we only encode valid public keys
-    data.try_into().unwrap()
+    near_sdk::PublicKey::from_parts(curve_type, key_bytes.to_vec()).unwrap()
 }
 
 fn require_caller(caller: &AccountId) -> Result<(), Error> {
@@ -397,7 +397,7 @@ fn env_panic<T>(e: Error) -> T {
     env::panic_str(e.as_ref())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum Error {
     ContractNotInitialized,
     IllegalCaller,

@@ -1,6 +1,7 @@
 use near_crypto::PublicKey;
 use near_primitives_core::hash::{CryptoHash, YieldId};
 use near_primitives_core::types::GasWeight;
+use near_primitives_core::universal_state_init::{RawStateInit, UniversalStateInitCounts};
 use near_vm_runner::logic::mocks::mock_external::MockedExternal;
 use near_vm_runner::logic::types::{
     AccountId, ActionIndex, Balance, Gas, GlobalContractDeployMode, GlobalContractIdentifier,
@@ -208,6 +209,20 @@ impl near_vm_runner::logic::External for MockedExternalWithTrie {
             key,
             value,
         )
+    }
+
+    fn state_init_counts(&self, state_init: &RawStateInit) -> UniversalStateInitCounts {
+        self.underlying.state_init_counts(state_init)
+    }
+
+    fn append_action_universal_state_init(
+        &mut self,
+        receipt_index: ReceiptIndex,
+        state_init: RawStateInit,
+        amount: Balance,
+    ) {
+        self.underlying
+            .append_action_universal_state_init(receipt_index, state_init, amount);
     }
 
     fn append_action_function_call_weight(

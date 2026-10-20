@@ -241,7 +241,7 @@ fn test_relayer_balance_after_transfer() {
         .unwrap();
 
     let relayer =
-        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_bytes());
+        sdk::types::near_account_to_evm_address(runner.context.predecessor_account_id.as_str());
 
     // validate post-state
     validate_address_balance_and_nonce(
@@ -1167,7 +1167,7 @@ pub mod workspace {
             .await
             .unwrap();
         assert!(result.is_success());
-        let fallback_address = near_account_to_evm_address(fallback_account.id().as_bytes());
+        let fallback_address = near_account_to_evm_address(&fallback_account.id());
         // Setting a new fallback address.
         let result = aurora
             .set_erc20_fallback_address(Erc20FallbackAddressArgs {
@@ -1365,8 +1365,7 @@ pub mod workspace {
             .create_subaccount("fallback", NearToken::from_near(10))
             .await
             .unwrap();
-        let fallback_address =
-            aurora_engine_sdk::types::near_account_to_evm_address(fallback_account.id().as_bytes());
+        let fallback_address = near_account_to_evm_address(&fallback_account.id());
 
         // Set silo mode
         let params = Some(SiloParamsArgs {
@@ -1394,8 +1393,7 @@ pub mod workspace {
             .create_subaccount("ft_owner", NearToken::from_near(10))
             .await
             .unwrap();
-        let ft_owner_address =
-            aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
+        let ft_owner_address = near_account_to_evm_address(&ft_owner.id());
 
         let nep_141_account = aurora
             .root()

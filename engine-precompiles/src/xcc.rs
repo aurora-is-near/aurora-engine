@@ -182,9 +182,8 @@ impl<I: IO> HandleBasedPrecompile for CrossContractCall<I> {
             };
         // if some NEAR payment is needed, transfer it from the caller to the engine's implicit address
         if required_near != ZERO_YOCTO {
-            let engine_implicit_address = aurora_engine_sdk::types::near_account_to_evm_address(
-                self.engine_account_id.as_bytes(),
-            );
+            let engine_implicit_address =
+                aurora_engine_sdk::types::near_account_to_evm_address(&self.engine_account_id);
             let tx_data = transfer_from_args(
                 sender.0.into(),
                 engine_implicit_address.raw().0.into(),

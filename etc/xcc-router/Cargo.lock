@@ -131,7 +131,6 @@ dependencies = [
  "bs58 0.5.1",
  "hex",
  "primitive-types 0.13.1",
- "rlp",
  "serde",
  "serde_json",
 ]

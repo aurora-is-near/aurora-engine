@@ -59,6 +59,36 @@ fn assert_ggas_bound(total_gas: u64, ggas_bound: u64, data: &str) {
     );
 }
 
+/// A contract `STATICCALL` to `0x100` with a valid signature must return the EIP-7951 success word.
+#[test]
+fn test_secp256r1_precompile_call_from_contract() {
+    let mut runner = utils::deploy_runner();
+    let mut signer = utils::Signer::random();
+    let constructor = utils::solidity::ContractConstructor::compile_from_source(
+        "src/tests/res",
+        "target/solidity_build",
+        "P256Verify.sol",
+        "P256Verify",
+    );
+    let nonce = signer.use_nonce();
+    let contract = runner.deploy_contract(
+        &signer.secret_key,
+        |c| c.deploy_without_constructor(nonce.into()),
+        constructor,
+    );
+
+    let input = hex::decode("4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4da73bd4903f0ce3b639bbbf6e8e80d16931ff4bcf5993d58468e8fb19086e8cac36dbcd03009df8c59286b162af3bd7fcc0450c9aa81be5d10d312af6c66b1d604aebd3099c618202fcfe16ae7770b0c49ab5eadf74b754204a3bb6060e44eff37618b065f9832de4ca6ca971a7a1adc826d0f7c00181a5fb2ddf79ae00b4e10e").unwrap();
+    let result = runner
+        .submit_with_signer(&mut signer, |nonce| {
+            contract.call_method_with_args("verifyRaw", &[ethabi::Token::Bytes(input)], nonce)
+        })
+        .unwrap();
+
+    let output = utils::unwrap_success_slice(&result);
+    let valid = ethabi::decode(&[ethabi::ParamType::Bool], output).unwrap();
+    assert_eq!(valid, vec![ethabi::Token::Bool(true)]);
+}
+
 #[test]
 fn test_secp256r1_submit_and_gas() {
     let inputs = vec![
@@ -140,8 +170,6 @@ fn test_secp256r1_submit_and_gas() {
         ),
     ];
     for (data, is_success, expected_gas) in inputs {
-        let (_, _, _) = (&data, is_success, expected_gas);
-        // TODO: Enable tests after releasing Osaka hard fork
-        // submit_secp256r1_data(data, is_success, expected_gas);
+        submit_secp256r1_data(data, is_success, expected_gas);
     }
 }

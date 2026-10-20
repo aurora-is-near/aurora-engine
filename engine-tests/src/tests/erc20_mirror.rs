@@ -80,7 +80,7 @@ async fn test_mirroring_erc20_token() {
     assert!(result.is_success());
     assert_eq!(nep_141_balance_of(&nep141, &ft_owner.id()).await, 1_000_000);
 
-    let address = aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
+    let address = aurora_engine_sdk::types::near_account_to_evm_address(&ft_owner.id());
 
     transfer_nep_141_to_erc_20(
         &nep141,
@@ -213,7 +213,7 @@ async fn test_transfer_from_silo_to_silo() {
 
     assert_eq!(nep_141_balance_of(&nep141, &ft_owner.id()).await, 1_000_000);
 
-    let address = aurora_engine_sdk::types::near_account_to_evm_address(ft_owner.id().as_bytes());
+    let address = aurora_engine_sdk::types::near_account_to_evm_address(&ft_owner.id());
     // Deposit address `address` via ft_transfer_call.
     let result = ft_owner
         .call(&nep141.id(), "ft_transfer_call")

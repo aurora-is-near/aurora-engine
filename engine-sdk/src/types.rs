@@ -2,6 +2,7 @@
 use crate::io::IO;
 use crate::prelude::{Address, H256};
 
+use aurora_engine_types::AsBytes;
 #[cfg(not(feature = "contract"))]
 use sha3::{Digest, Keccak256};
 
@@ -24,8 +25,9 @@ pub fn keccak(data: &[u8]) -> H256 {
 }
 
 #[must_use]
-pub fn near_account_to_evm_address(account_id: &[u8]) -> Address {
-    Address::try_from_slice(&keccak(account_id)[12..]).unwrap()
+pub fn near_account_to_evm_address<A: AsBytes + ?Sized>(account_id: &A) -> Address {
+    Address::try_from_slice(&keccak(account_id.as_bytes())[12..])
+        .expect("Keccak suffix is 20 bytes")
 }
 
 #[cfg(feature = "contract")]

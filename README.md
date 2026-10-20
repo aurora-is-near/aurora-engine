@@ -45,15 +45,16 @@ cargo install --force cargo-make
 For WebAssembly optimization we use `wasm-opt` from the [Binaryen toolchain for WebAssembly](https://github.com/WebAssembly/binaryen).
 
 We recommend installing the release:
-https://github.com/WebAssembly/binaryen/releases/tag/version_130
+https://github.com/WebAssembly/binaryen/releases/tag/version_133
 
 `wasm-opt` command should be available for the build process.
+WASM build tasks check that it is available on `PATH` before compiling.
 
 Verify version:
 
 ```bash
 $ wasm-opt --version
-wasm-opt version 130 (version_130)
+wasm-opt version 133 (version_133)
 ```
 
 Please be aware that you don't need to run `wasm-opt` explicitly, The `wasm-opt` runs automatically
@@ -106,9 +107,11 @@ shasum -a 256 bin/aurora-engine.wasm
 
 To run tests, there are a few cargo make tasks we can run:
 - `test-workspace`: tests only the cargo workspace.
+- `test-workspace-refund`: tests the workspace with `error_refund` enabled in both native code and the test WASM.
+- `test-xcc-router` and `test-xcc-router-all-features`: run the separate router's unit tests.
 - `test-contracts`: tests only the contracts.
-- `test`: tests the whole cargo workspace, solidity contracts and runs modexp benchmarks.
-- `test-flow`: tests the whole cargo workspace and solidity contracts.
+- `test`: tests the whole cargo workspace, solidity contracts, XCC router and runs modexp benchmarks.
+- `test-flow`: tests the whole cargo workspace, solidity contracts and both XCC router feature sets.
 - `bench-modexp`: runs modexp benchmarks.
 
 For example, the following will test the whole workspace and solidity contracts:
@@ -117,13 +120,18 @@ For example, the following will test the whole workspace and solidity contracts:
 cargo make test 
 ```
 
+Use `cargo make test-workspace-refund` instead of passing `--features error_refund`
+to `test-workspace`. Both test modes write `bin/aurora-engine-test.wasm`, so run
+them sequentially. Native-only options such as `--features skip-bls-tests` can
+still be passed directly to either task.
+
 #### Running checks and lints
 
 The following tasks are available to run lints and checks:
 
 - `check`: checks the format, clippy and solidity contracts.
 - `check-contracts` runs yarn lints on the solidity contracts.
-- `check-fmt`: checks the workspace Rust format only.
+- `check-fmt`: checks Rust formatting in the workspace and XCC router.
 - `clippy`: checks the Rust workspace with clippy only.
 
 For example, the following command will run the checks. 

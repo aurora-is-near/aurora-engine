@@ -4,7 +4,7 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
-BINARYEN_VERSION=130
+BINARYEN_VERSION=133
 
 # Determine whether sudo is required.
 if [[ "$(id -u)" -eq 0 ]]; then

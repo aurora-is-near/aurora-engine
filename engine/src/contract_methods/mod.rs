@@ -111,5 +111,5 @@ fn require_key_manager_only(
 }
 
 fn predecessor_address(predecessor_account_id: &AccountId) -> Address {
-    aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id.as_bytes())
+    aurora_engine_sdk::types::near_account_to_evm_address(predecessor_account_id)
 }

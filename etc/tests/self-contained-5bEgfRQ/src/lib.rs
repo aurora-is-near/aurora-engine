@@ -42,9 +42,8 @@ pub extern "C" fn run() {
     let in_mem_io = InMemIO::new(&state, INPUT);
 
     let engine_state = aurora_engine::state::get_state(&in_mem_io).unwrap();
-    let relayer_address = aurora_engine_sdk::types::near_account_to_evm_address(
-        local_env.predecessor_account_id.as_bytes(),
-    );
+    let relayer_address =
+        aurora_engine_sdk::types::near_account_to_evm_address(&local_env.predecessor_account_id);
     let mut handler = promise::Noop;
     let result = aurora_engine::engine::submit(
         in_mem_io,

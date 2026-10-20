@@ -236,7 +236,7 @@ fn test_consume_call_message() {
     let caller = "some_account.near";
     let initial_balance = Wei::new_u64(800_000);
     let transfer_amount = Wei::new_u64(115_321);
-    let caller_address = aurora_engine_sdk::types::near_account_to_evm_address(caller.as_bytes());
+    let caller_address = aurora_engine_sdk::types::near_account_to_evm_address(caller);
     let recipient_address = Address::new(H160([1u8; 20]));
     runner.mint_account(caller_address, initial_balance, U256::zero(), None);
 
