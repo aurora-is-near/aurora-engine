@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed replayable failed contract deployments: creation transactions with oversized init code (EIP-3860) or with a `value` the sender cannot cover after the gas prepayment are now rejected before execution (`CREATE_CONTRACT_LIMIT` / `ERR_OUT_OF_FUND`) instead of charging gas without consuming the nonce by [@mrLSD].
 
+## [3.11.1] 2026-10-05
+
+### Additions
+
+- Enabled the Osaka precompile set, including `secp256r1` signature verification and the MODEXP input limits and gas repricing, by [@mrLSD] and [@aleksuss]. ([#1220])
+
+### Changes
+
+- Updated `aurora-evm` to 3.1.0 by [@mrLSD]. ([#1223])
+- Updated the Rust toolchain to 1.99.0 and the NEAR dependencies to 0.38.0-rc.3 by [@mrLSD] and [@aleksuss]. ([#1217] [#1221])
+- Expanded Clippy checks to cover the WASM target and XCC router, enabled `secp256r1` integration tests, and strengthened standalone/WASM state validation by [@aleksuss]. ([#1221])
+
+### Fixes
+
+- Fixed Osaka MODEXP gas accounting for zero-length base and modulus inputs to include exponent iteration costs by [@mrLSD] and [@aleksuss]. ([#1220])
+- Updated the `cxx` crate family to address RUSTSEC-2026-0202 by [@nandrejja86-star]. ([#1216])
+
+[#1216]: https://github.com/aurora-is-near/aurora-engine/pull/1216
+[#1217]: https://github.com/aurora-is-near/aurora-engine/pull/1217
+[#1220]: https://github.com/aurora-is-near/aurora-engine/pull/1220
+[#1221]: https://github.com/aurora-is-near/aurora-engine/pull/1221
+[#1223]: https://github.com/aurora-is-near/aurora-engine/pull/1223
+
 ## [3.11.0] 2026-09-17
 
 ### Additions
