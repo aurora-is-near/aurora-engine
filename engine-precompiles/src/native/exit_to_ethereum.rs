@@ -9,8 +9,8 @@ use aurora_evm::backend::Log;
 use aurora_evm::{Context, ExitError};
 
 use super::{
-    EthConnector, construct_contract_key, events, get_eth_connector_contract_account,
-    get_nep141_from_erc20, parse_amount, to_u128, validate_input_size,
+    construct_contract_key, events, get_eth_connector_contract_account, get_nep141_from_erc20,
+    parse_amount, to_u128, validate_input_size,
 };
 use crate::prelude::types::{EthGas, make_address};
 use crate::prelude::{
@@ -51,13 +51,6 @@ struct ExitPlan {
 impl<I> ExitToEthereum<I> {
     pub const fn new(io: I) -> Self {
         Self { io }
-    }
-}
-
-impl<I: IO> EthConnector for ExitToEthereum<I> {
-    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
-        Ok(eth_connector_account_id)
     }
 }
 
@@ -148,7 +141,7 @@ impl<I: IO> Precompile for ExitToEthereum<I> {
                     .try_into()
                     .map_err(|_| ExitError::Other(Cow::from("ERR_INVALID_RECIPIENT_ADDRESS")))?;
                 let serialize_type = get_withdraw_serialize_type(&self.io)?;
-                let eth_connector_account_id = self.get_eth_connector_contract_account()?;
+                let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
                 let amount = to_u128(context.apparent_value)?;
                 let args = match serialize_type {
                     WithdrawSerializeType::Json => json_args(recipient_address, amount),

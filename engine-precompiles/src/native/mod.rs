@@ -17,10 +17,6 @@ pub use exit_to_near::ExitToNear;
 
 const ERR_TARGET_TOKEN_NOT_FOUND: &str = "Target token not found";
 
-trait EthConnector {
-    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError>;
-}
-
 fn validate_input_size(input: &[u8], allowed: RangeInclusive<usize>) -> Result<(), ExitError> {
     if !allowed.contains(&input.len()) {
         return Err(ExitError::Other(Cow::from("ERR_INVALID_INPUT")));

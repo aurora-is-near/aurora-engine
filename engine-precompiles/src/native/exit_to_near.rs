@@ -10,7 +10,6 @@ use aurora_evm::backend::Log;
 use aurora_evm::{Context, ExitError};
 
 use super::{
-    EthConnector,
     events::{self, ExitToNearLegacy, ExitToNearOmni},
     get_eth_connector_contract_account, get_nep141_from_erc20, parse_amount, to_u128,
     validate_input_size,
@@ -70,12 +69,6 @@ impl<I> ExitToNear<I> {
             current_account_id,
             io,
         }
-    }
-}
-
-impl<I: IO> EthConnector for ExitToNear<I> {
-    fn get_eth_connector_contract_account(&self) -> Result<AccountId, ExitError> {
-        get_eth_connector_contract_account(&self.io)
     }
 }
 
@@ -178,7 +171,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             //  OMNI, or address of receiver in case of transfer tokens to another engine
             //  contract. The `:unwrap` suffix isn't supported for the base token.
             ExitToNearParams::BaseToken(ref exit_params) => {
-                let eth_connector_account_id = self.get_eth_connector_contract_account()?;
+                let eth_connector_account_id = get_eth_connector_contract_account(&self.io)?;
                 exit_base_token_to_near(eth_connector_account_id, context, exit_params)?
             }
             // ERC-20 token transfer
