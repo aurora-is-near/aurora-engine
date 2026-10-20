@@ -8,7 +8,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-aurora-engine-types = { version = "1", default-features = false }
+aurora-engine-types = { version = "3", default-features = false }
 near-sdk = "5"
 near-token = "0.3"
 
