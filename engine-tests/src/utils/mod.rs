@@ -234,6 +234,9 @@ impl AuroraRunner {
             method_name,
         );
 
+        // NEAR discards the storage writes of a failed receipt, but the mocked external keeps them.
+        let trie_snapshot = self.ext.underlying.fake_trie.clone();
+
         let outcome = near_vm_runner::run(
             contract,
             &mut self.ext,
@@ -243,6 +246,7 @@ impl AuroraRunner {
         .unwrap();
 
         if let Some(error) = outcome.aborted.as_ref() {
+            self.ext.underlying.fake_trie = trie_snapshot;
             return Err(into_engine_error(outcome.used_gas.as_gas(), error));
         }
 

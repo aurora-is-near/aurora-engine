@@ -128,7 +128,7 @@ The `submit` and `submit_with_args` methods follow this path:
 5. The Osaka EVM configuration and Osaka precompile set are currently selected in [`engine/src/engine.rs`](engine/src/engine.rs). Precompiles can be filtered by stored pause flags.
 6. State changes are applied, promise-producing logs are processed, and unused gas is refunded. The priority-fee portion is credited to the relayer address.
 
-Standalone replay uses a block-height-aware compatibility transaction parser, and applies the creation-transaction checks only from `CREATE_TX_VALIDATION_HEIGHT`, so historical transactions continue to reproduce the behavior of the contract version that originally processed them.
+Standalone replay uses a block-height-aware compatibility transaction parser so historical transactions continue to reproduce the behavior of the contract version that originally processed them. For the same reason only the contract applies the creation-transaction checks: a creation they reject fails its NEAR receipt, which standalone sync never executes, while creations that earlier contract versions executed are replayed as they were.
 
 ## State and persistence
 

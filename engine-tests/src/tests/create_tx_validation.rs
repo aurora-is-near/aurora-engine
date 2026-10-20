@@ -2,14 +2,13 @@
 //! code, insufficient balance for `value`) must be rejected as invalid instead of being charged:
 //! otherwise the same signed transaction could be submitted and paid for again and again.
 
-use aurora_engine::engine::{CREATE_TX_VALIDATION_HEIGHT, EngineErrorKind, GasPaymentError};
+use aurora_engine::engine::{EngineErrorKind, GasPaymentError};
 use aurora_engine::parameters::TransactionStatus;
 use aurora_engine_sdk::types::near_account_to_evm_address;
 use aurora_engine_transactions::legacy::TransactionLegacy;
 use aurora_engine_types::U256;
 use aurora_engine_types::types::{Address, Wei};
 use aurora_evm::ExitError;
-use engine_standalone_storage::sync;
 
 use crate::utils::{self, AuroraRunner, CALLER_ACCOUNT_ID, Signer, standalone::StandaloneRunner};
 
@@ -38,6 +37,7 @@ fn setup(balance: Wei) -> (AuroraRunner, Signer, Address) {
     (runner, signer, sender)
 }
 
+#[track_caller]
 fn assert_untouched(runner: &AuroraRunner, sender: Address, balance: Wei) {
     assert_eq!(runner.get_nonce(sender), U256::zero());
     assert_eq!(runner.get_balance(sender), balance);
@@ -105,36 +105,60 @@ fn test_deployment_with_uncovered_value_is_rejected_without_charge() {
 }
 
 #[test]
-fn test_creation_tx_checks_are_height_gated_for_standalone_replay() {
+fn test_free_deployment_with_uncovered_value_is_rejected() {
+    let balance = Wei::new_u64(PREPAID_GAS);
+    let (mut runner, signer, sender) = setup(balance);
+    // Nothing is prepaid for a zero gas price, so the whole balance must cover the value.
+    let free_deploy_tx = |value| TransactionLegacy {
+        gas_price: U256::zero(),
+        ..deploy_tx(value, vec![0x00])
+    };
+
+    let error = runner
+        .submit_transaction(
+            &signer.secret_key,
+            free_deploy_tx(Wei::new_u64(PREPAID_GAS + 1)),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error.kind,
+        EngineErrorKind::GasPayment(GasPaymentError::OutOfFund)
+    ));
+    assert_untouched(&runner, sender, balance);
+
+    let result = runner
+        .submit_transaction(&signer.secret_key, free_deploy_tx(balance))
+        .unwrap();
+    assert!(matches!(result.status, TransactionStatus::Succeed(_)));
+    assert_eq!(runner.get_nonce(sender), U256::one());
+}
+
+#[test]
+fn test_standalone_engine_replays_creation_txs_without_checks() {
     let mut runner = StandaloneRunner::default();
     runner.init_evm();
     let signer = Signer::random();
     let sender = utils::address_from_secret_key(&signer.secret_key);
-    runner.mint_account(sender, Wei::new_u64(10 * PREPAID_GAS), U256::zero(), None);
-    let tx = deploy_tx(Wei::zero(), vec![0u8; MAX_INITCODE_SIZE + 1]);
+    let balance = Wei::new_u64(10 * PREPAID_GAS);
+    runner.mint_account(sender, balance, U256::zero(), None);
 
-    // Before the fix height the historical behavior is reproduced: executed, failed with the whole
-    // gas limit charged, nonce untouched. `submit_transaction` increments the height first.
-    runner.env.block_height = CREATE_TX_VALIDATION_HEIGHT - 2;
+    // Only the contract rejects these creations; the standalone engine never executes the failed
+    // receipts and must replay the creations older contract versions executed: failed and charged,
+    // with the nonce untouched.
     let result = runner
-        .submit_transaction(&signer.secret_key, tx.clone())
+        .submit_transaction(
+            &signer.secret_key,
+            deploy_tx(Wei::zero(), vec![0u8; MAX_INITCODE_SIZE + 1]),
+        )
         .unwrap();
     assert_eq!(result.status, TransactionStatus::CreateContractLimit);
     assert_eq!(result.gas_used, GAS_LIMIT);
     assert_eq!(runner.get_nonce(&sender), U256::zero());
+    assert_eq!(runner.get_balance(&sender), Wei::new_u64(9 * PREPAID_GAS));
 
-    // From the fix height on the transaction is rejected before execution.
-    runner.env.block_height = CREATE_TX_VALIDATION_HEIGHT - 1;
-    let error = runner
-        .submit_transaction(&signer.secret_key, tx)
-        .unwrap_err();
-    // The standalone engine reports the contract-method error, i.e. the on-chain panic message.
-    assert!(
-        matches!(
-            &error,
-            sync::error::Error::ContractError(e)
-                if e.message.as_ref().as_ref() == b"CREATE_CONTRACT_LIMIT"
-        ),
-        "unexpected error: {error:?}"
-    );
+    let result = runner
+        .submit_transaction(&signer.secret_key, deploy_tx(balance, vec![0x00]))
+        .unwrap();
+    assert_eq!(result.status, TransactionStatus::OutOfFund);
+    assert_eq!(runner.get_nonce(&sender), U256::zero());
 }
