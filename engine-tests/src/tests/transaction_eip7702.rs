@@ -8,7 +8,10 @@
 //!   * Delegation revocation by an external signer and by the authority itself.
 //!   * `auth.chain_id` mismatch - the auth entry is marked invalid while the
 //!     outer tx still executes and charges gas.
+//!   * Intrinsic gas: `PER_EMPTY_ACCOUNT_COST` per authorization tuple (valid or
+//!     not) is required up front; existing authorities get the refund afterwards.
 
+use aurora_engine::engine::{EngineError, EngineErrorKind};
 use aurora_engine::parameters::SubmitResult;
 use aurora_engine_transactions::eip_7702;
 use aurora_engine_transactions::eip_7702::{
@@ -43,6 +46,16 @@ const AUTHORITY_EXTCODESIZE_PROBE_HEX: &str =
 /// Default EVM `gas_limit` for single-auth EIP-7702 tests.
 const DEFAULT_EVM_GAS_LIMIT: u64 = 0x3d_0900;
 const RELAY_ACCOUNT: &str = "relay.aurora";
+
+/// Gas constants hard-coded from EIP-7702 / EIP-3529 (not read from
+/// `aurora_evm::Config`) so the intrinsic gas tests pin the spec values.
+const TX_BASE_GAS: u64 = 21_000;
+const PER_EMPTY_ACCOUNT_COST: u64 = 25_000;
+const PER_AUTH_BASE_COST: u64 = 12_500;
+const MAX_REFUND_QUOTIENT: u64 = 5;
+/// Gas price paid by txs from `eip7702_tx_with_auth_list`: Aurora has no base
+/// fee, so it is the `max_priority_fee_per_gas`.
+const EFFECTIVE_GAS_PRICE: u64 = 0x0a;
 
 /// Round-trips a single-auth EIP-7702 tx through RLP and verifies that the
 /// recovered sender matches the signer.
@@ -759,6 +772,209 @@ fn test_eip_7702_redelegate_existing_delegation() {
 
     assert_eq!(result2.gas_used, 38_645);
     assert_eq!(near_tgas_used, 4.6);
+}
+
+/// Intrinsic gas boundary for a single authorization tuple.
+#[test]
+fn test_eip_7702_intrinsic_gas_boundary_single_auth() {
+    check_intrinsic_gas_boundary(&[example_authority_signer()]);
+}
+
+/// Intrinsic gas boundary for several authorization tuples: the per-tuple
+/// cost is multiplied by the list length.
+#[test]
+fn test_eip_7702_intrinsic_gas_boundary_multiple_auths() {
+    check_intrinsic_gas_boundary(&[
+        example_authority_signer(),
+        example_authority_signer_with_key(
+            "1111111111111111111111111111111111111111111111111111111111111111",
+        ),
+        example_authority_signer_with_key(
+            "2222222222222222222222222222222222222222222222222222222222222222",
+        ),
+    ]);
+}
+
+/// Authorization tuples that fail validation (here: a foreign `auth.chain_id`)
+/// still count towards `len(authorization_list)` in the intrinsic gas.
+#[test]
+fn test_eip_7702_intrinsic_gas_counts_invalid_authorizations() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let authority = example_authority_signer();
+    let authority_address = utils::address_from_secret_key(&authority.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+
+    let auth_list = vec![sign_eip7702_authorization(
+        10,
+        contract_address,
+        0,
+        &authority.secret_key,
+    )];
+    let intrinsic_gas = TX_BASE_GAS + PER_EMPTY_ACCOUNT_COST;
+
+    let error =
+        submit_7702(&mut runner, &signer, intrinsic_gas - 1, auth_list.clone()).unwrap_err();
+    assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(runner.get_balance(signer_address), INITIAL_BALANCE);
+
+    let result = submit_7702(&mut runner, &signer, intrinsic_gas, auth_list).unwrap();
+    assert!(result.status.is_ok());
+    assert_eq!(result.gas_used, intrinsic_gas);
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(
+        runner.get_balance(signer_address),
+        INITIAL_BALANCE - Wei::new_u64(intrinsic_gas * EFFECTIVE_GAS_PRICE)
+    );
+    // The invalid tuple is skipped: no delegation, no nonce bump.
+    assert!(runner.get_code(authority_address).is_empty());
+    assert_eq!(runner.get_nonce(authority_address), 0.into());
+}
+
+/// An authority that already exists in the state gets
+/// `PER_EMPTY_ACCOUNT_COST - PER_AUTH_BASE_COST` refunded (capped by EIP-3529)
+/// after execution, but the up-front intrinsic gas check still requires the
+/// full `PER_EMPTY_ACCOUNT_COST` for its tuple.
+#[test]
+fn test_eip_7702_intrinsic_gas_with_existing_authority_refund() {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    let authority = example_authority_signer();
+    let authority_address = utils::address_from_secret_key(&authority.secret_key);
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+    // A non-zero balance makes the authority a non-empty account.
+    runner.create_address(authority_address, INITIAL_BALANCE, 0.into());
+
+    let auth_list = vec![sign_eip7702_authorization(
+        0,
+        contract_address,
+        0,
+        &authority.secret_key,
+    )];
+    let intrinsic_gas = TX_BASE_GAS + PER_EMPTY_ACCOUNT_COST;
+
+    // Enough for the post-refund price of the tuple, not for its intrinsic gas.
+    let error = submit_7702(
+        &mut runner,
+        &signer,
+        TX_BASE_GAS + PER_AUTH_BASE_COST,
+        auth_list.clone(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, EngineErrorKind::IntrinsicGasNotMet);
+    assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+    assert_eq!(runner.get_balance(signer_address), INITIAL_BALANCE);
+    assert!(runner.get_code(authority_address).is_empty());
+    assert_eq!(runner.get_nonce(authority_address), 0.into());
+
+    let result = submit_7702(&mut runner, &signer, intrinsic_gas, auth_list).unwrap();
+    assert!(result.status.is_ok());
+    // min(25_000 - 12_500, 46_000 / 5) = 9_200, so 36_800 gas is billed.
+    let refund =
+        (PER_EMPTY_ACCOUNT_COST - PER_AUTH_BASE_COST).min(intrinsic_gas / MAX_REFUND_QUOTIENT);
+    assert_eq!(result.gas_used, intrinsic_gas - refund);
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(
+        runner.get_balance(signer_address),
+        INITIAL_BALANCE - Wei::new_u64(result.gas_used * EFFECTIVE_GAS_PRICE)
+    );
+    assert_eq!(
+        hex::encode(runner.get_code(authority_address)),
+        format!("ef0100{}", hex::encode(contract_address.as_bytes()))
+    );
+    assert_eq!(runner.get_nonce(authority_address), 1.into());
+    assert_eq!(runner.get_balance(authority_address), INITIAL_BALANCE);
+}
+
+/// EIP-7702 intrinsic gas is `21000 + PER_EMPTY_ACCOUNT_COST * len(authorization_list)`
+/// (no calldata or access list here). A gas limit that covers only
+/// `PER_AUTH_BASE_COST` per tuple, or is one gas short, must be rejected with
+/// `ERR_INTRINSIC_GAS` before anything is charged; exactly the intrinsic gas is
+/// enough. The authorities are empty accounts, so no refund applies.
+fn check_intrinsic_gas_boundary(authorities: &[utils::Signer]) {
+    let mut runner = utils::deploy_runner();
+    let signer = example_signer();
+    let signer_address = utils::address_from_secret_key(&signer.secret_key);
+    // `CONTRACT_ADDRESS` has no code here, so the call costs no EVM gas and the
+    // whole bill is the intrinsic gas.
+    let contract_address = utils::address_from_hex(CONTRACT_ADDRESS);
+
+    runner.create_address(signer_address, INITIAL_BALANCE, signer.nonce.into());
+
+    let authority_addresses: Vec<_> = authorities
+        .iter()
+        .map(|authority| utils::address_from_secret_key(&authority.secret_key))
+        .collect();
+    let auth_list: Vec<_> = authorities
+        .iter()
+        .map(|authority| sign_eip7702_authorization(0, contract_address, 0, &authority.secret_key))
+        .collect();
+    let auth_count = u64::try_from(auth_list.len()).unwrap();
+    let intrinsic_gas = TX_BASE_GAS + PER_EMPTY_ACCOUNT_COST * auth_count;
+
+    for gas_limit in [
+        TX_BASE_GAS + PER_AUTH_BASE_COST * auth_count,
+        intrinsic_gas - 1,
+    ] {
+        let error = submit_7702(&mut runner, &signer, gas_limit, auth_list.clone()).unwrap_err();
+        assert_eq!(
+            error.kind,
+            EngineErrorKind::IntrinsicGasNotMet,
+            "gas_limit = {gas_limit}"
+        );
+        assert_eq!(runner.get_nonce(signer_address), signer.nonce.into());
+        assert_eq!(runner.get_balance(signer_address), INITIAL_BALANCE);
+        for &authority_address in &authority_addresses {
+            assert!(runner.get_code(authority_address).is_empty());
+            assert_eq!(runner.get_nonce(authority_address), 0.into());
+        }
+    }
+
+    let result = submit_7702(&mut runner, &signer, intrinsic_gas, auth_list).unwrap();
+    assert!(result.status.is_ok());
+    assert_eq!(result.gas_used, intrinsic_gas);
+    assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
+    assert_eq!(
+        runner.get_balance(signer_address),
+        INITIAL_BALANCE - Wei::new_u64(intrinsic_gas * EFFECTIVE_GAS_PRICE)
+    );
+    let expected_code = format!("ef0100{}", hex::encode(contract_address.as_bytes()));
+    for authority_address in authority_addresses {
+        assert_eq!(
+            hex::encode(runner.get_code(authority_address)),
+            expected_code
+        );
+        assert_eq!(runner.get_nonce(authority_address), 1.into());
+    }
+}
+
+/// Sign an EIP-7702 tx from `signer` (at its current nonce) and submit it via
+/// the relayer, decoding the `SubmitResult` on success.
+fn submit_7702(
+    runner: &mut utils::AuroraRunner,
+    signer: &utils::Signer,
+    gas_limit: u64,
+    auth_list: Vec<AuthorizationTuple>,
+) -> Result<SubmitResult, EngineError> {
+    let tx = eip7702_tx_with_auth_list(
+        runner.chain_id,
+        signer.nonce.into(),
+        gas_limit.into(),
+        auth_list,
+    );
+    let signed_tx = utils::sign_eip_7702_transaction(tx, &signer.secret_key);
+    runner
+        .call(utils::SUBMIT, RELAY_ACCOUNT, encode_signed_7702(&signed_tx))
+        .map(|outcome| {
+            SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap()
+        })
 }
 
 /// Signer for the *transaction sender* role — the EOA that submits an
