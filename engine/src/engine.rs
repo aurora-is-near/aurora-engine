@@ -238,7 +238,7 @@ pub enum GasPaymentError {
     BalanceOverflow(BalanceOverflow),
     /// Overflow in `gas * gas_price` calculation
     EthAmountOverflow,
-    /// Not enough balance for account to cover the gas cost
+    /// Not enough balance for account to cover the gas cost (and the value of a contract creation)
     OutOfFund,
     /// `max_fee_per_gas` is less than `base_fee_per_gas`
     MaxFeePerGasLessThanBaseFee,
@@ -1081,6 +1081,12 @@ pub fn submit_with_alt_modexp<
         return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
+    // Only the contract rejects such creations: a rejected creation fails its NEAR receipt, which the
+    // standalone engine never executes (`TransactionMessage::succeeded`), while creations executed by
+    // older contract versions must be replayed as they were.
+    #[cfg(feature = "contract")]
+    check_init_code_size(&transaction)?;
+
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
         return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
     }
@@ -1105,6 +1111,11 @@ pub fn submit_with_alt_modexp<
             return Err(EngineErrorKind::GasPayment(err).into());
         }
     };
+
+    // Must follow the gas prepayment, which the error discards by failing the NEAR receipt.
+    #[cfg(feature = "contract")]
+    check_value_coverage(&io, &transaction)?;
+
     let gas_limit = transaction
         .gas_limit
         .try_into()
@@ -1452,6 +1463,42 @@ pub fn check_nonce<I: IO>(
         return Err(EngineErrorKind::IncorrectNonce(format!(
             "ERR_INCORRECT_NONCE: ac: {account_nonce}, tx: {transaction_nonce}"
         )));
+    }
+
+    Ok(())
+}
+
+/// EIP-3860: rejects a contract creation with oversized init code. Executing it would burn the
+/// whole gas limit without consuming the nonce, so the same signed transaction could be charged
+/// again.
+#[cfg(feature = "contract")]
+#[inline]
+fn check_init_code_size(transaction: &NormalizedEthTransaction) -> Result<(), EngineErrorKind> {
+    if transaction.to.is_none()
+        && CONFIG
+            .max_initcode_size
+            .is_some_and(|limit| transaction.data.len() > limit)
+    {
+        return Err(EngineErrorKind::EvmError(ExitError::CreateContractLimit));
+    }
+
+    Ok(())
+}
+
+/// Rejects a contract creation whose `value` is not covered by the sender balance left after the
+/// gas prepayment. The EVM would fail it before consuming the nonce (unlike a call), so the charged
+/// failure could be replayed.
+#[cfg(feature = "contract")]
+#[inline]
+fn check_value_coverage<I: IO>(
+    io: &I,
+    transaction: &NormalizedEthTransaction,
+) -> Result<(), EngineErrorKind> {
+    if transaction.to.is_none()
+        && !transaction.value.is_zero()
+        && get_balance(io, &transaction.address) < transaction.value
+    {
+        return Err(EngineErrorKind::GasPayment(GasPaymentError::OutOfFund));
     }
 
     Ok(())
