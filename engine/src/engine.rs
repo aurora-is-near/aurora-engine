@@ -2449,7 +2449,7 @@ mod tests {
         let args = FtOnTransferArgs {
             sender_id: AccountId::default(),
             amount: Balance::default(),
-            msg: receiver.encode(),
+            msg: receiver.encode().to_string(),
         };
         let mut handler = Noop;
         engine
@@ -2883,7 +2883,7 @@ mod tests {
         let created_address = create_legacy_address(&caller, &nonce);
 
         assert_eq!(
-            created_address.encode(),
+            created_address.encode().as_str(),
             "140e8a21d08cbb530929b012581a7c7e696145ef"
         );
     }

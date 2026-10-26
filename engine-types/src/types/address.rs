@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize, io};
 use serde::{Deserialize, Serialize};
 
-use crate::{AsBytes, H160, String, ToString};
+use crate::{AsBytes, H160, ToString, fmt};
 
 /// Base Eth Address type
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -20,10 +20,14 @@ impl Address {
         self.0
     }
 
-    /// Encode address to string
+    /// Encode address as 40 lowercase hexadecimal characters without allocating.
     #[must_use]
-    pub fn encode(&self) -> String {
-        hex::encode(self.0.as_bytes())
+    pub fn encode(&self) -> EncodedAddress {
+        let mut output = [0; 40];
+        hex::encode_to_slice(self.0.as_bytes(), &mut output)
+            .expect("20-byte address encodes to 40 hex characters");
+
+        EncodedAddress(output)
     }
 
     pub fn decode(address: &str) -> Result<Self, error::AddressError> {
@@ -56,6 +60,40 @@ impl Address {
     #[must_use]
     pub const fn zero() -> Self {
         Self::new(H160([0u8; 20]))
+    }
+}
+
+/// A hex-encoded address stored inline, without a `0x` prefix.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct EncodedAddress([u8; 40]);
+
+impl EncodedAddress {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        core::str::from_utf8(&self.0).expect("hex encoding contains only ASCII characters")
+    }
+}
+
+impl core::ops::Deref for EncodedAddress {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for EncodedAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self.as_str(), f)
+    }
+}
+
+impl Serialize for EncodedAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
     }
 }
 
@@ -160,6 +198,7 @@ pub mod error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::format;
 
     const fn u8_to_address(x: u8) -> Address {
         let mut bytes = [0u8; 20];
@@ -179,6 +218,29 @@ mod tests {
     }
 
     #[test]
+    fn test_address_encode() {
+        for (bytes, expected) in [
+            ([0; 20], "0000000000000000000000000000000000000000"),
+            ([u8::MAX; 20], "ffffffffffffffffffffffffffffffffffffffff"),
+            (
+                [
+                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 255,
+                ],
+                "000102030405060708090a0b0c0d0e0f101112ff",
+            ),
+        ] {
+            let encoded = Address::from_array(bytes).encode();
+            assert_eq!(encoded.as_str(), expected);
+            assert_eq!(Address::decode(&encoded).unwrap().as_bytes(), &bytes);
+            assert_eq!(format!("{encoded}"), expected);
+            assert_eq!(
+                serde_json::to_string(&encoded).unwrap(),
+                format!("\"{expected}\"")
+            );
+        }
+    }
+
+    #[test]
     fn test_address_serializer() {
         let eth_address = "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E";
         // borsh serialize
@@ -190,7 +252,7 @@ mod tests {
 
         let addr = Address::try_from_slice(&serialized_addr).unwrap();
         assert_eq!(
-            addr.encode(),
+            addr.encode().as_str(),
             "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_lowercase()
         );
     }
@@ -217,7 +279,7 @@ mod tests {
         // Used serialized data from `RawAddress`
         let addr = Address::try_from_slice(&serialized_addr).unwrap();
         assert_eq!(
-            addr.encode(),
+            addr.encode().as_str(),
             "096DE9C2B8A5B8c22cEe3289B101f6960d68E51E".to_lowercase()
         );
     }
