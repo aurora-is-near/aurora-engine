@@ -226,7 +226,7 @@ impl NormalizedEthTransaction {
 
         let gas_authorization_list = if config.has_authorization_list {
             config
-                .gas_per_auth_base_cost
+                .gas_per_empty_account_cost
                 .checked_mul(
                     u64::try_from(self.authorization_list.len())
                         .map_err(|_e| Error::IntegerConversion)?,
@@ -570,7 +570,7 @@ mod tests {
             authorization_list: vec![authorization],
         };
         let gas = tx.intrinsic_gas(&config).unwrap();
-        let expected = config.gas_transaction_call + config.gas_per_auth_base_cost;
+        let expected = config.gas_transaction_call + config.gas_per_empty_account_cost;
         assert_eq!(gas, expected);
     }
 
