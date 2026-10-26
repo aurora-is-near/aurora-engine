@@ -10,7 +10,7 @@ checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
 
 [[package]]
 name = "aurora-engine"
-version = "3.10.1"
+version = "3.11.1"
 dependencies = [
  "aurora-engine-hashchain",
  "aurora-engine-modexp",
@@ -41,7 +41,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-modexp"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "hex",
  "num",
@@ -49,7 +49,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-precompiles"
-version = "2.1.0"
+version = "2.2.0"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-sdk",
@@ -104,16 +104,15 @@ dependencies = [
  "bs58",
  "hex",
  "primitive-types 0.13.1",
- "rlp",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "aurora-evm"
-version = "2.2.1"
+version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c10d0e428a747ce77dca7bb3e3b99c236b99c3ce549224aa8406b305a5bed1d7"
+checksum = "46464bceefcfdb357ede3b71f1ba57f87b1cd7061a230179246969d3baaef564"
 dependencies = [
  "auto_impl",
  "log",
