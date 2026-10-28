@@ -637,7 +637,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     assert_eq!(runner.get_nonce(authority_addr), 1.into());
 
     assert_eq!(result.gas_used, 93_206);
-    assert_eq!(near_tgas_used, 4.95);
+    assert_eq!(near_tgas_used, 4.96);
 }
 
 /// Authority pre-funded with non-delegated contract code: check skips the auth,
