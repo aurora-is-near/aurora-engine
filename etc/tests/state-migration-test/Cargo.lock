@@ -110,9 +110,9 @@ dependencies = [
 
 [[package]]
 name = "aurora-evm"
-version = "3.1.0"
+version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46464bceefcfdb357ede3b71f1ba57f87b1cd7061a230179246969d3baaef564"
+checksum = "27824eca276b2c822f0529e86b5293777f011eb06d8817216e01d80a16728ccb"
 dependencies = [
  "auto_impl",
  "log",
