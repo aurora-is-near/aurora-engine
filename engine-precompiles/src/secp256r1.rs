@@ -93,7 +93,7 @@ impl Secp256r1 {
         // consensus vulnerability found in original RIP-7212.
         if public_key.verify_prehash(h_bytes, &signature).is_ok() {
             // Spec: "Output is 32 bytes... 0x00...01 for valid signatures"
-            Some(Vec::from(&SUCCESS_RESULT[..]))
+            Some(SUCCESS_RESULT.to_vec())
         } else {
             // Spec: "return `` (failure)"
             None

@@ -19,11 +19,10 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-types"
-version = "1.2.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2b08d3a6b62f455c3d9fc3d511e1d6743236b66eb952ded129aee97f87befc"
+checksum = "81a6fa76e2adf107bd55692e41858715770050a485b78982bbfbdd484e9878a7"
 dependencies = [
- "base64",
  "borsh",
  "bs58",
  "hex",
@@ -337,6 +336,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835c052cb0c08c1acf6ffd71c022172e18723949c8282f2b9f27efbc51e64534"
 dependencies = [
+ "byteorder",
  "static_assertions",
 ]
 
