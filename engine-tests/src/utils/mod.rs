@@ -28,7 +28,7 @@ use rand::Rng;
 use rlp::RlpStream;
 use std::borrow::Cow;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
@@ -594,8 +594,19 @@ impl AuroraRunner {
     }
 
     pub fn set_code(&mut self, code: ContractCode) {
+        self.ext.underlying.code_hash = *code.hash();
         self.ext.underlying.code = Some(Arc::new(code));
     }
+}
+
+/// The compiled-contract cache all runners share. Cranelift spends tens of CPU-seconds on the
+/// engine, and `near-vm-runner` compiles one contract at a time, so a cache per runner queued the
+/// tests behind each other's compilations. It lives in memory only, so nothing outlives the run.
+fn contract_cache() -> MockContractRuntimeCache {
+    static CACHE: LazyLock<MockContractRuntimeCache> =
+        LazyLock::new(MockContractRuntimeCache::default);
+
+    CACHE.clone()
 }
 
 impl Default for AuroraRunner {
@@ -609,12 +620,15 @@ impl Default for AuroraRunner {
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
         let mut mocked_external = MockedExternal::default();
 
-        mocked_external.code = Some(Arc::new(ContractCode::new(evm_wasm_bytes, None)));
+        let code = ContractCode::new(evm_wasm_bytes, None);
+        // The cache finds compiled contracts by this hash, which `MockedExternal` leaves zeroed.
+        mocked_external.code_hash = *code.hash();
+        mocked_external.code = Some(Arc::new(code));
 
         Self {
             aurora_account_id: DEFAULT_AURORA_ACCOUNT_ID.to_string(),
             chain_id: DEFAULT_CHAIN_ID,
-            cache: MockContractRuntimeCache::default(),
+            cache: contract_cache(),
             ext: mocked_external::MockedExternalWithTrie::new(mocked_external),
             context: VMContext {
                 current_account_id: origin_account_id.clone(),
