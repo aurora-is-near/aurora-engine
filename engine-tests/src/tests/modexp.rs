@@ -11,6 +11,9 @@ use crate::utils::{self, AuroraRunner, Signer, standalone::StandaloneRunner};
 
 const MODEXP_ADDRESS: Address = make_address(0, 5);
 
+// This test is marked as ignored because it takes about half a minute, which is most of the
+// `engine-tests` run time. It runs together with the other modexp benchmarks instead.
+#[ignore = "benchmark; run with `cargo make bench-modexp`"]
 #[test]
 fn bench_modexp() {
     let mut context = ModExpBenchContext::default();
