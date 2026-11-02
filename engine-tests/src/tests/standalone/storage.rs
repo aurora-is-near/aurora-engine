@@ -283,7 +283,7 @@ fn test_transaction_index() {
         let mut tmp = engine_standalone_storage::Diff::default();
         let key = aurora_engine_types::storage::bytes_to_key(
             aurora_engine_types::storage::KeyPrefix::Balance,
-            &[1u8; 20],
+            [1u8; 20],
         );
         let value = Wei::new_u64(159).to_bytes().to_vec();
         tmp.modify(key, value);

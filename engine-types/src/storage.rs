@@ -35,6 +35,8 @@ pub enum KeyPrefix {
     Hashchain = 0xc,
     Silo = 0xd,
     Whitelist = 0xe,
+    Nep245Erc20Map = 0xf,
+    Erc20Nep245Map = 0x10,
 }
 
 impl From<KeyPrefix> for u8 {
@@ -55,6 +57,8 @@ impl From<KeyPrefix> for u8 {
             KeyPrefix::Hashchain => 0xc,
             KeyPrefix::Silo => 0xd,
             KeyPrefix::Whitelist => 0xe,
+            KeyPrefix::Nep245Erc20Map => 0xf,
+            KeyPrefix::Erc20Nep245Map => 0x10,
         }
     }
 }
@@ -110,18 +114,23 @@ impl From<KeyPrefixU8> for KeyPrefix {
             0xc => Self::Hashchain,
             0xd => Self::Silo,
             0xe => Self::Whitelist,
+            0xf => Self::Nep245Erc20Map,
+            0x10 => Self::Erc20Nep245Map,
             _ => unreachable!("Unknown key prefix"),
         }
     }
 }
 
-#[allow(dead_code)]
 #[must_use]
-pub fn bytes_to_key(prefix: KeyPrefix, bytes: &[u8]) -> Vec<u8> {
-    [&[u8::from(VersionPrefix::V1)], &[u8::from(prefix)], bytes].concat()
+pub fn bytes_to_key(prefix: KeyPrefix, bytes: impl AsRef<[u8]>) -> Vec<u8> {
+    [
+        &[u8::from(VersionPrefix::V1)],
+        &[u8::from(prefix)],
+        bytes.as_ref(),
+    ]
+    .concat()
 }
 
-#[allow(dead_code)]
 #[must_use]
 pub fn address_to_key(prefix: KeyPrefix, address: &Address) -> [u8; 22] {
     let mut result = [0u8; 22];

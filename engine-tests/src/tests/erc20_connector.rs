@@ -256,8 +256,6 @@ fn test_mint_not_admin() {
 #[test]
 fn test_ft_on_transfer() {
     let mut runner = AuroraRunner::new();
-    // Standalone runner presently does not support ft_on_transfer
-    runner.standalone_runner = None;
     let nep141 = "tt.testnet";
     let alice = "alice";
     let token = runner.deploy_erc20_token(nep141);
@@ -384,7 +382,7 @@ fn test_transfer_erc20_token() {
 
 pub mod workspace {
     use aurora_engine::parameters::{CallArgs, FunctionCallArgsV2};
-    use aurora_engine_types::parameters::engine::TransactionStatus;
+    use aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
     use aurora_engine_workspace::account::Account;
     use aurora_engine_workspace::types::{ExecutionFinalResult, NearToken};
     use aurora_engine_workspace::{EngineContract, RawContract};
@@ -395,8 +393,8 @@ pub mod workspace {
     use crate::utils::solidity::erc20::ERC20;
     use crate::utils::solidity::exit_precompile::TesterConstructor;
     use crate::utils::workspace::{
-        create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_nep_141,
-        nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
+        create_sub_account, deploy_engine, deploy_erc20_from_nep_141, deploy_ft_receiver,
+        deploy_nep_141, nep_141_balance_of, transfer_nep_141, transfer_nep_141_to_erc_20,
     };
 
     const BALANCE: NearToken = NearToken::from_near(50);
@@ -662,6 +660,138 @@ pub mod workspace {
         assert_eq!(
             erc20_balance(&erc20, ft_owner_address, &aurora).await,
             balance
+        );
+    }
+
+    #[tokio::test]
+    async fn test_exit_to_near_ft_transfer_call_settles_unused_tokens() {
+        const EXIT_AMOUNT: u128 = 50_000;
+        const UNUSED_AMOUNT: u128 = 20_000;
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+            aurora,
+            ..
+        } = test_exit_to_near_common().await.unwrap();
+        let receiver = deploy_ft_receiver(&aurora).await.unwrap();
+        // NEP-141 tokens can only be sent to registered accounts.
+        let result = aurora
+            .root()
+            .call(&nep_141.id(), "storage_deposit")
+            .args_json(serde_json::json!({ "account_id": receiver.id() }))
+            .deposit(NearToken::from_near(1))
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success(), "{result:?}");
+        let cases = [
+            ("keep".to_string(), 0),
+            (format!("return:{UNUSED_AMOUNT}"), UNUSED_AMOUNT),
+            ("panic".to_string(), EXIT_AMOUNT),
+            // The token contract caps the unused amount at the transferred one.
+            (format!("return:{}", EXIT_AMOUNT + 1), EXIT_AMOUNT),
+        ];
+        let mut received = 0;
+        let mut locked = FT_TRANSFER_AMOUNT;
+        let mut expected_erc20 = FT_TRANSFER_AMOUNT;
+        let nep_141_id = nep_141.id();
+        let receiver_id = receiver.id();
+
+        for (msg, unused) in cases {
+            // A message after the recipient makes the exit use `ft_transfer_call`.
+            let recipient = format!("{receiver_id}:{msg}");
+            let result = exit_to_near(&ft_owner, &recipient, EXIT_AMOUNT, &erc20, &aurora).await;
+            assert!(
+                result
+                    .receipt_outcomes()
+                    .iter()
+                    .any(|outcome| outcome.executor_id.as_str() == nep_141_id.as_ref()),
+                "missing NEP-141 transfer receipt: {msg}"
+            );
+            let receiver_outcome = result
+                .receipt_outcomes()
+                .iter()
+                .find(|outcome| outcome.executor_id.as_str() == receiver_id.as_ref())
+                .unwrap_or_else(|| panic!("missing receiver receipt: {msg}"));
+            assert_eq!(receiver_outcome.is_failure(), msg == "panic", "{msg}");
+            let submitted: SubmitResult = result.borsh().unwrap();
+            assert!(submitted.status.is_ok(), "{msg}: {submitted:?}");
+
+            let used = EXIT_AMOUNT - unused;
+            received += used;
+            locked -= used;
+            // Without `error_refund` the exit has no callback, so nothing is refunded.
+            expected_erc20 -= if cfg!(feature = "error_refund") {
+                used
+            } else {
+                EXIT_AMOUNT
+            };
+            assert_eq!(
+                nep_141_balance_of(&nep_141, &receiver.id()).await,
+                received,
+                "{msg}"
+            );
+            assert_eq!(
+                nep_141_balance_of(&nep_141, &aurora.id()).await,
+                locked,
+                "{msg}"
+            );
+            assert_eq!(
+                erc20_balance(&erc20, ft_owner_address, &aurora).await,
+                expected_erc20.into(),
+                "{msg}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ft_transfer_call_refunds_only_remaining_balance() {
+        const EXIT_AMOUNT: u128 = 50_000;
+        const SPENT_AMOUNT: u128 = 30_000;
+        let TestExitToNearContext {
+            ft_owner,
+            ft_owner_address,
+            nep_141,
+            erc20,
+            aurora,
+            ..
+        } = test_exit_to_near_common().await.unwrap();
+        let receiver = deploy_ft_receiver(&aurora).await.unwrap();
+        let result = aurora
+            .root()
+            .call(&nep_141.id(), "storage_deposit")
+            .args_json(serde_json::json!({ "account_id": receiver.id() }))
+            .deposit(NearToken::from_near(1))
+            .transact()
+            .await
+            .unwrap();
+        assert!(result.is_success(), "{result:?}");
+        let recipient = format!("{}:spend:{}:{SPENT_AMOUNT}", receiver.id(), ft_owner.id());
+
+        let result = exit_to_near(&ft_owner, &recipient, EXIT_AMOUNT, &erc20, &aurora).await;
+
+        assert!(result.receipt_failures().is_empty(), "{result:?}");
+        let submitted: SubmitResult = result.borsh().unwrap();
+        assert!(submitted.status.is_ok(), "{submitted:?}");
+        assert_eq!(nep_141_balance_of(&nep_141, &receiver.id()).await, 0);
+        assert_eq!(
+            nep_141_balance_of(&nep_141, &ft_owner.id()).await,
+            FT_TOTAL_SUPPLY - FT_TRANSFER_AMOUNT + SPENT_AMOUNT
+        );
+        assert_eq!(
+            nep_141_balance_of(&nep_141, &aurora.id()).await,
+            FT_TRANSFER_AMOUNT - SPENT_AMOUNT
+        );
+        let used = if cfg!(feature = "error_refund") {
+            SPENT_AMOUNT
+        } else {
+            EXIT_AMOUNT
+        };
+        assert_eq!(
+            erc20_balance(&erc20, ft_owner_address, &aurora).await,
+            (FT_TRANSFER_AMOUNT - used).into()
         );
     }
 

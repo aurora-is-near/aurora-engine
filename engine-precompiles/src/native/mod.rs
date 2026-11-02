@@ -1,4 +1,6 @@
-use aurora_engine_types::{account_id::AccountId, storage::EthConnectorStorageId};
+use aurora_engine_types::{
+    account_id::AccountId, parameters::connector::BridgedToken, storage::EthConnectorStorageId,
+};
 use aurora_evm::ExitError;
 use core::ops::RangeInclusive;
 
@@ -25,13 +27,34 @@ fn validate_input_size(input: &[u8], allowed: RangeInclusive<usize>) -> Result<(
     Ok(())
 }
 
-fn get_nep141_from_erc20<I: IO>(erc20_token: &[u8], io: &I) -> Result<AccountId, ExitError> {
+fn get_nep141_from_erc20<I: IO>(
+    erc20_token: impl AsRef<[u8]>,
+    io: &I,
+) -> Result<AccountId, ExitError> {
     AccountId::try_from(
         io.read_storage(bytes_to_key(KeyPrefix::Erc20Nep141Map, erc20_token).as_slice())
             .map(|s| s.to_vec())
             .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?,
     )
     .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")))
+}
+
+fn get_nep_from_erc20<I: IO>(
+    erc20_token: impl AsRef<[u8]>,
+    io: &I,
+) -> Result<BridgedToken, ExitError> {
+    let address = erc20_token.as_ref();
+    if let Some(value) = io.read_storage(&bytes_to_key(KeyPrefix::Erc20Nep141Map, address)) {
+        return AccountId::try_from(value.to_vec())
+            .map(|account_id| BridgedToken::Nep141(account_id.into()))
+            .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP141_ACCOUNT")));
+    }
+
+    io.read_storage(&bytes_to_key(KeyPrefix::Erc20Nep245Map, address))
+        .ok_or(ExitError::Other(Cow::Borrowed(ERR_TARGET_TOKEN_NOT_FOUND)))?
+        .to_value()
+        .map(BridgedToken::Nep245)
+        .map_err(|_| ExitError::Other(Cow::Borrowed("ERR_INVALID_NEP245_TOKEN")))
 }
 
 fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitError> {
@@ -46,7 +69,7 @@ fn get_eth_connector_contract_account<I: IO>(io: &I) -> Result<AccountId, ExitEr
 }
 
 fn construct_contract_key(suffix: EthConnectorStorageId) -> Vec<u8> {
-    bytes_to_key(KeyPrefix::EthConnector, &[u8::from(suffix)])
+    bytes_to_key(KeyPrefix::EthConnector, [u8::from(suffix)])
 }
 
 fn parse_amount(input: &[u8]) -> Result<U256, ExitError> {
@@ -72,6 +95,67 @@ mod tests {
     use super::{exit_to_ethereum, exit_to_near, parse_amount, validate_input_size};
     use crate::prelude::sdk::types::near_account_to_evm_address;
     use aurora_engine_types::U256;
+
+    #[test]
+    fn test_get_nep_from_erc20() {
+        use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+        use aurora_engine_types::{
+            borsh,
+            parameters::connector::{BridgedToken, Nep245Token},
+            storage::{KeyPrefix, bytes_to_key},
+        };
+        use std::cell::RefCell;
+
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+        let account = "multi.near".parse::<super::AccountId>().unwrap();
+        let first = Nep245Token {
+            account_id: account.clone(),
+            token_id: "first".into(),
+        };
+        let second = Nep245Token {
+            token_id: "second".into(),
+            ..first.clone()
+        };
+        for (address, token) in [([1; 20], &first), ([2; 20], &second)] {
+            storage.borrow_mut().kv_store.insert(
+                bytes_to_key(KeyPrefix::Erc20Nep245Map, address),
+                borsh::to_vec(token).unwrap(),
+            );
+            assert_eq!(
+                super::get_nep_from_erc20(address, &io).unwrap(),
+                BridgedToken::Nep245(token.clone())
+            );
+            // The Ethereum exit continues to accept only NEP-141 mappings.
+            assert!(super::get_nep141_from_erc20(address, &io).is_err());
+        }
+        assert!(super::get_nep_from_erc20([3; 20], &io).is_err());
+        storage.borrow_mut().kv_store.insert(
+            bytes_to_key(KeyPrefix::Erc20Nep141Map, [3; 20]),
+            account.as_bytes().to_vec(),
+        );
+        assert_eq!(
+            super::get_nep_from_erc20([3; 20], &io).unwrap(),
+            BridgedToken::Nep141(account.into())
+        );
+        storage
+            .borrow_mut()
+            .kv_store
+            .insert(bytes_to_key(KeyPrefix::Erc20Nep245Map, [4; 20]), vec![0]);
+        assert_eq!(
+            super::get_nep_from_erc20([4; 20], &io).unwrap_err(),
+            super::ExitError::Other("ERR_INVALID_NEP245_TOKEN".into())
+        );
+        // A corrupt NEP-141 mapping must not silently fall back to another asset.
+        storage.borrow_mut().kv_store.insert(
+            bytes_to_key(KeyPrefix::Erc20Nep141Map, [1; 20]),
+            b"invalid@account".to_vec(),
+        );
+        assert_eq!(
+            super::get_nep_from_erc20([1; 20], &io).unwrap_err(),
+            super::ExitError::Other("ERR_INVALID_NEP141_ACCOUNT".into())
+        );
+    }
 
     #[test]
     fn test_precompile_id() {

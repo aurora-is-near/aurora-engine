@@ -108,7 +108,7 @@ fn test_eip_7702_success() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_tgas_used = trunc_near_gas(outcome.used_gas.as_gigagas());
+    let near_tgas_used = outcome.used_gas.as_teragas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     assert_eq!(result.gas_used, 68206);
@@ -127,7 +127,7 @@ fn test_eip_7702_success() {
         "ef0100cccccccccccccccccccccccccccccccccccccccc"
     );
 
-    assert_eq!(near_tgas_used, 4.61);
+    assert_eq!(near_tgas_used, 4);
 }
 
 /// Test: account with EIP-7702 delegated code can send transactions
@@ -505,7 +505,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_tgas_used = trunc_near_gas(outcome.used_gas.as_gigagas());
+    let near_tgas_used = outcome.used_gas.as_teragas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
 
     let delegated_designator = Address::decode("a52a8a2229e3c512d6ed27b6e6e7d39958ca9fb3").unwrap();
@@ -525,7 +525,7 @@ fn test_eip_7702_wrong_auth_chain_id() {
     assert_eq!(runner.get_nonce(delegated_designator), 0.into());
     // Get delegated designator address: in that particular case it should be empty
     assert!(runner.get_code(delegated_designator).is_empty());
-    assert_eq!(near_tgas_used, 3.76);
+    assert_eq!(near_tgas_used, 3);
 }
 
 /// Multi-auth happy path: 3 distinct authorities each delegate to `CONTRACT_ADDRESS`
@@ -574,7 +574,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_tgas_used = trunc_near_gas(outcome.used_gas.as_gigagas());
+    let near_tgas_used = outcome.used_gas.as_teragas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -588,7 +588,7 @@ fn test_eip_7702_multiple_distinct_authorities_succeed() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 118_206);
-    assert_eq!(near_tgas_used, 6.43);
+    assert_eq!(near_tgas_used, 6);
 }
 
 /// Same authority twice with same nonce: first auth applies and increments nonce,
@@ -628,7 +628,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_tgas_used = trunc_near_gas(outcome.used_gas.as_gigagas());
+    let near_tgas_used = outcome.used_gas.as_teragas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -637,7 +637,7 @@ fn test_eip_7702_duplicate_authority_same_nonce_only_first_applies() {
     assert_eq!(runner.get_nonce(authority_addr), 1.into());
 
     assert_eq!(result.gas_used, 93_206);
-    assert_eq!(near_tgas_used, 4.95);
+    assert_eq!(near_tgas_used, 4);
 }
 
 /// Authority pre-funded with non-delegated contract code: check skips the auth,
@@ -685,7 +685,7 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     let tx_bytes = encode_signed_7702(&signed_tx);
 
     let outcome = runner.call(utils::SUBMIT, RELAY_ACCOUNT, tx_bytes).unwrap();
-    let near_tgas_used = trunc_near_gas(outcome.used_gas.as_gigagas());
+    let near_tgas_used = outcome.used_gas.as_teragas();
     let result = SubmitResult::try_from_slice(&outcome.return_data.as_value().unwrap()).unwrap();
     assert!(result.status.is_ok());
 
@@ -694,7 +694,7 @@ fn test_eip_7702_authority_with_contract_code_is_skipped() {
     assert_eq!(runner.get_nonce(signer_address), (signer.nonce + 1).into());
 
     assert_eq!(result.gas_used, 68_206);
-    assert_eq!(near_tgas_used, 4.14);
+    assert_eq!(near_tgas_used, 4);
 }
 
 /// Re-delegation: authority already points to `target_B`; a second tx swaps the
@@ -760,7 +760,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
             encode_signed_7702(&signed_tx2),
         )
         .unwrap();
-    let near_tgas_used = trunc_near_gas(outcome2.used_gas.as_gigagas());
+    let near_tgas_used = outcome2.used_gas.as_teragas();
     let result2 = SubmitResult::try_from_slice(&outcome2.return_data.as_value().unwrap()).unwrap();
     assert!(result2.status.is_ok());
 
@@ -771,7 +771,7 @@ fn test_eip_7702_redelegate_existing_delegation() {
     assert_eq!(runner.get_nonce(authority_addr), 2.into());
 
     assert_eq!(result2.gas_used, 38_645);
-    assert_eq!(near_tgas_used, 4.6);
+    assert_eq!(near_tgas_used, 4);
 }
 
 /// Intrinsic gas boundary for a single authorization tuple.
@@ -1087,20 +1087,4 @@ fn sample_code_for_contract_eip7702(authority_address: Address) -> Vec<u8> {
     code.push(0x55); // SSTORE
     code.push(0x00); // STOP
     code
-}
-
-fn trunc_near_gas(giga_gas: u64) -> f64 {
-    let gas = u32::try_from(giga_gas / 10).unwrap();
-    f64::from(gas) / 100.0
-}
-
-#[test]
-fn test_trunc_gas() {
-    assert_eq!(trunc_near_gas(0), 0.0);
-    assert_eq!(trunc_near_gas(1), 0.0);
-    assert_eq!(trunc_near_gas(10), 0.01);
-    assert_eq!(trunc_near_gas(999), 0.99);
-    assert_eq!(trunc_near_gas(1000), 1.0);
-    assert_eq!(trunc_near_gas(1500), 1.5);
-    assert_eq!(trunc_near_gas(1999), 1.99);
 }

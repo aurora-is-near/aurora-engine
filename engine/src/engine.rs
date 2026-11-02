@@ -7,10 +7,12 @@ use aurora_engine_sdk::{
     promise::{PromiseHandler, PromiseId, ReadOnlyPromiseHandler},
     types::near_account_to_evm_address,
 };
-use aurora_engine_types::parameters::connector::FtTransferMessageData;
 use aurora_engine_types::parameters::connector::errors::ParseOnTransferMessageError;
+use aurora_engine_types::parameters::connector::{
+    BridgedToken, FtTransferMessageData, Nep245Token,
+};
 use aurora_engine_types::{
-    PhantomData,
+    PhantomData, ToBytes,
     parameters::{
         connector::{Erc20Identifier, Erc20Metadata, FtOnTransferArgs, MirrorErc20TokenArgs},
         engine::FunctionCallArgsV2,
@@ -108,6 +110,7 @@ pub enum EngineErrorKind {
     NotOwner,
     NonExistedKey,
     Erc20FromNep141,
+    Erc20FromNep245,
     RejectCallerWithCode,
 }
 
@@ -148,6 +151,7 @@ impl EngineErrorKind {
             Self::NotOwner => errors::ERR_NOT_OWNER,
             Self::NonExistedKey => errors::ERR_FUNCTION_CALL_KEY_NOT_FOUND,
             Self::Erc20FromNep141 => errors::ERR_GETTING_ERC20_FROM_NEP141,
+            Self::Erc20FromNep245 => errors::ERR_GETTING_ERC20_FROM_NEP245,
             Self::RejectCallerWithCode => errors::ERR_REJECT_CALL_WITH_CODE,
             Self::EvmFatal(_) | Self::EvmError(_) => unreachable!(), // unused misc
         }
@@ -302,6 +306,12 @@ impl TryFrom<Vec<u8>> for ERC20Address {
     }
 }
 
+impl From<[u8; 20]> for ERC20Address {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self(Address::from_array(bytes))
+    }
+}
+
 pub struct AddressParseError;
 
 impl AsRef<[u8]> for AddressParseError {
@@ -310,52 +320,42 @@ impl AsRef<[u8]> for AddressParseError {
     }
 }
 
-pub struct NEP141Account(pub AccountId);
-
-impl AsRef<[u8]> for NEP141Account {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
-
-impl TryFrom<Vec<u8>> for NEP141Account {
-    type Error = aurora_engine_types::account_id::ParseAccountError;
-
-    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
-        AccountId::try_from(bytes).map(Self)
-    }
-}
+pub use aurora_engine_types::parameters::connector::Nep141Token as NEP141Account;
 
 #[derive(Debug)]
-pub enum GetErc20FromNep141Error {
-    InvalidNep141AccountId,
+pub enum GetErc20FromNepError {
     Nep141NotFound,
+    Nep245NotFound,
     InvalidAddress,
+    InvalidArguments,
 }
 
-impl AsRef<[u8]> for GetErc20FromNep141Error {
+impl AsRef<[u8]> for GetErc20FromNepError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
             Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
+            Self::Nep245NotFound => errors::ERR_NEP245_NOT_FOUND,
             Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+            Self::InvalidArguments => errors::ERR_INVALID_ARGUMENTS,
         }
     }
 }
 
 #[derive(Debug)]
 pub enum RegisterTokenError {
-    InvalidNep141AccountId,
-    TokenAlreadyRegistered,
+    Nep141AlreadyRegistered,
+    Nep245AlreadyRegistered,
     InvalidAddress,
+    InvalidArguments,
 }
 
 impl AsRef<[u8]> for RegisterTokenError {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::InvalidNep141AccountId => errors::ERR_INVALID_NEP141_ACCOUNT_ID,
-            Self::TokenAlreadyRegistered => errors::ERR_NEP141_TOKEN_ALREADY_REGISTERED,
+            Self::Nep141AlreadyRegistered => errors::ERR_NEP141_TOKEN_ALREADY_REGISTERED,
+            Self::Nep245AlreadyRegistered => errors::ERR_NEP245_TOKEN_ALREADY_REGISTERED,
             Self::InvalidAddress => errors::ERR_PARSE_ADDRESS,
+            Self::InvalidArguments => errors::ERR_INVALID_ARGUMENTS,
         }
     }
 }
@@ -366,6 +366,7 @@ pub enum ReadMetadataError {
     WrongType,
     NoValue,
     Nep141NotFound,
+    Nep245NotFound,
     EngineError(EngineErrorKind),
 }
 
@@ -376,6 +377,7 @@ impl AsRef<[u8]> for ReadMetadataError {
             Self::WrongType => errors::ERR_WRONG_TOKEN_TYPE,
             Self::NoValue => errors::ERR_TOKEN_NO_VALUE,
             Self::Nep141NotFound => errors::ERR_NEP141_NOT_FOUND,
+            Self::Nep245NotFound => errors::ERR_NEP245_NOT_FOUND,
             Self::EngineError(e) => e.as_ref(),
         }
     }
@@ -723,22 +725,35 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     pub fn register_token(
         &mut self,
         erc20_token: Address,
-        nep141_token: AccountId,
+        token: BridgedToken,
     ) -> Result<(), RegisterTokenError> {
-        match get_erc20_from_nep141(&self.io, &nep141_token) {
-            Err(GetErc20FromNep141Error::Nep141NotFound) => (),
-            Err(GetErc20FromNep141Error::InvalidNep141AccountId) => {
-                return Err(RegisterTokenError::InvalidNep141AccountId);
-            }
-            Err(GetErc20FromNep141Error::InvalidAddress) => {
+        match get_erc20_from_nep(&self.io, &token) {
+            Err(GetErc20FromNepError::Nep141NotFound | GetErc20FromNepError::Nep245NotFound) => (),
+            Err(GetErc20FromNepError::InvalidAddress) => {
                 return Err(RegisterTokenError::InvalidAddress);
             }
-            Ok(_) => return Err(RegisterTokenError::TokenAlreadyRegistered),
+            Err(GetErc20FromNepError::InvalidArguments) => {
+                return Err(RegisterTokenError::InvalidArguments);
+            }
+            Ok(_) => {
+                return Err(match token {
+                    BridgedToken::Nep141(_) => RegisterTokenError::Nep141AlreadyRegistered,
+                    BridgedToken::Nep245(_) => RegisterTokenError::Nep245AlreadyRegistered,
+                });
+            }
         }
 
         let erc20_token = ERC20Address(erc20_token);
-        let nep141_token = NEP141Account(nep141_token);
-        nep141_erc20_map(self.io).insert(&nep141_token, &erc20_token);
+
+        match token {
+            BridgedToken::Nep141(nep141_token) => {
+                nep141_erc20_map(self.io).insert(&nep141_token, &erc20_token);
+            }
+            BridgedToken::Nep245(nep245_token) => {
+                nep245_erc20_map(self.io).insert(&nep245_token, &erc20_token);
+            }
+        }
+
         Ok(())
     }
 
@@ -790,39 +805,20 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         Ok(None)
     }
 
-    /// Mint tokens for recipient on a particular ERC-20 token.
+    /// Mint tokens for recipient on the ERC-20 token mapped to a NEP-141 or NEP-245 token.
     ///
     /// IMPORTANT: This function should not panic, otherwise it won't
     /// be possible to return the tokens to the sender.
     pub fn receive_erc20_tokens<P: PromiseHandler>(
         &mut self,
-        token: &AccountId,
-        args: &FtOnTransferArgs,
+        token: &BridgedToken,
+        msg: &str,
+        amount: u128,
         current_account_id: &AccountId,
         handler: &mut P,
     ) -> Result<Option<SubmitResult>, ContractError> {
-        let amount = args.amount.as_u128();
-        // Parse message to determine recipient
-        let mut recipient = {
-            // The message should contain the recipient EOA address.
-            let message = args.msg.strip_prefix("0x").unwrap_or(&args.msg);
-            // Recipient - 40 characters (Address in hex without '0x' prefix)
-            if message.len() < 40 {
-                return Err(ParseOnTransferMessageError::WrongMessageFormat.into());
-            }
-            let mut address_bytes = [0; 20];
-            hex::decode_to_slice(&message[..40], &mut address_bytes)
-                .map_err(|_| ParseOnTransferMessageError::WrongMessageFormat)?;
-            Address::from_array(address_bytes)
-        };
-
-        if let Some(fallback_address) = silo::get_erc20_fallback_address(&self.io)
-            && !silo::is_allow_receive_erc20_tokens(&self.io, &recipient)
-        {
-            recipient = fallback_address;
-        }
-
-        let erc20_token = get_erc20_from_nep141(&self.io, token)?;
+        let recipient = get_erc20_recipient(&self.io, msg)?;
+        let erc20_token = get_erc20_from_nep(&self.io, token)?;
         let erc20_admin_address = current_address(current_account_id);
         let result = self
             .call(
@@ -849,9 +845,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         &self,
         erc20_identifier: &Erc20Identifier,
     ) -> Result<Erc20Metadata, ReadMetadataError> {
-        let erc20_address = self
-            .identifier_to_address(erc20_identifier)
-            .map_err(|_| ReadMetadataError::Nep141NotFound)?;
+        let erc20_address =
+            self.identifier_to_address(erc20_identifier)
+                .map_err(|_| match erc20_identifier {
+                    Erc20Identifier::Nep245 { .. } => ReadMetadataError::Nep245NotFound,
+                    _ => ReadMetadataError::Nep141NotFound,
+                })?;
         let name = self
             .view_with_selector(
                 erc20_address,
@@ -893,9 +892,12 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         erc20_metadata: Erc20Metadata,
         handler: &mut P,
     ) -> EngineResult<SubmitResult> {
-        let erc20_address = self
-            .identifier_to_address(erc20_identifier)
-            .map_err(|_| EngineErrorKind::Erc20FromNep141)?;
+        let erc20_address =
+            self.identifier_to_address(erc20_identifier)
+                .map_err(|_| match erc20_identifier {
+                    Erc20Identifier::Nep245 { .. } => EngineErrorKind::Erc20FromNep245,
+                    _ => EngineErrorKind::Erc20FromNep141,
+                })?;
         let args = ethabi::encode(&[
             ethabi::Token::String(erc20_metadata.name),
             ethabi::Token::String(erc20_metadata.symbol),
@@ -978,10 +980,22 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
     fn identifier_to_address(
         &self,
         identifier: &Erc20Identifier,
-    ) -> Result<Address, GetErc20FromNep141Error> {
+    ) -> Result<Address, GetErc20FromNepError> {
         match identifier {
             Erc20Identifier::Erc20 { address } => Ok(*address),
-            Erc20Identifier::Nep141 { account_id } => get_erc20_from_nep141(&self.io, account_id),
+            Erc20Identifier::Nep141 { account_id } => {
+                get_erc20_from_nep(&self.io, &BridgedToken::Nep141(account_id.clone().into()))
+            }
+            Erc20Identifier::Nep245 {
+                account_id,
+                token_id,
+            } => get_erc20_from_nep(
+                &self.io,
+                &BridgedToken::Nep245(Nep245Token {
+                    account_id: account_id.clone(),
+                    token_id: token_id.clone(),
+                }),
+            ),
         }
     }
 }
@@ -1348,9 +1362,10 @@ pub fn setup_deploy_erc20_input(
     [erc20_contract, deploy_args.as_slice()].concat()
 }
 
-/// Used to bridge NEP-141 tokens from NEAR to Aurora. On Aurora the NEP-141 becomes an ERC-20.
+/// Used to bridge NEP-141 and NEP-245 tokens from NEAR to Aurora. On Aurora the bridged token
+/// becomes an ERC-20.
 pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
-    nep141: AccountId,
+    token: BridgedToken,
     metadata: Option<Erc20Metadata>,
     io: I,
     env: &E,
@@ -1374,7 +1389,7 @@ pub fn deploy_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
 
     sdk::log!("Deployed ERC-20 in Aurora at: {:#?}", address);
     engine
-        .register_token(address, nep141)
+        .register_token(address, token)
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
@@ -1413,7 +1428,7 @@ pub fn mirror_erc20_token<I: IO + Copy, E: Env, P: PromiseHandler>(
         address.encode()
     );
     engine
-        .register_token(address, args.nep141)
+        .register_token(address, args.token)
         .map_err(DeployErc20Error::Register)?;
 
     Ok(address)
@@ -1531,18 +1546,74 @@ pub const fn nep141_erc20_map<I: IO>(io: I) -> BijectionMap<NEP141Account, ERC20
     BijectionMap::new(KeyPrefix::Nep141Erc20Map, KeyPrefix::Erc20Nep141Map, io)
 }
 
+#[must_use]
+pub const fn nep245_erc20_map<I: IO>(io: I) -> BijectionMap<Nep245Token, ERC20Address, I> {
+    BijectionMap::new(KeyPrefix::Nep245Erc20Map, KeyPrefix::Erc20Nep245Map, io)
+}
+
+/// Parse the recipient of bridged ERC-20 tokens from an `ft_on_transfer`/`mt_on_transfer`
+/// message, redirecting it to the silo fallback address if the recipient isn't allowed.
+pub fn get_erc20_recipient<I: IO + Copy>(io: &I, msg: &str) -> Result<Address, ContractError> {
+    // The message should contain the recipient EOA address.
+    let message = msg.strip_prefix("0x").unwrap_or(msg);
+
+    // The first 40 hex characters encode the recipient; trailing data is ignored.
+    let recipient = message
+        .get(..40)
+        .ok_or(ParseOnTransferMessageError::WrongMessageFormat)
+        .and_then(|recipient| {
+            Address::decode(recipient).map_err(|_| ParseOnTransferMessageError::WrongMessageFormat)
+        })?;
+
+    if let Some(fallback_address) = silo::get_erc20_fallback_address(io)
+        && !silo::is_allow_receive_erc20_tokens(io, &recipient)
+    {
+        return Ok(fallback_address);
+    }
+
+    Ok(recipient)
+}
+
+/// Resolve a bridged token using its standard-specific storage key and error.
+pub fn get_erc20_from_nep<I: IO>(
+    io: &I,
+    token: &BridgedToken,
+) -> Result<Address, GetErc20FromNepError> {
+    let (key, not_found) = match token {
+        BridgedToken::Nep141(token) => (
+            bytes_to_key(KeyPrefix::Nep141Erc20Map, token),
+            GetErc20FromNepError::Nep141NotFound,
+        ),
+        BridgedToken::Nep245(token) => {
+            let bytes = token
+                .to_bytes()
+                .map_err(|_| GetErc20FromNepError::InvalidArguments)?;
+            (
+                bytes_to_key(KeyPrefix::Nep245Erc20Map, bytes),
+                GetErc20FromNepError::Nep245NotFound,
+            )
+        }
+    };
+
+    io.read_storage(&key).ok_or(not_found).and_then(|v| {
+        v.to_array()
+            .map(Address::from_array)
+            .map_err(|_| GetErc20FromNepError::InvalidAddress)
+    })
+}
+
 pub fn get_erc20_from_nep141<I: IO>(
     io: &I,
     nep141_account_id: &AccountId,
-) -> Result<Address, GetErc20FromNep141Error> {
-    let key = bytes_to_key(KeyPrefix::Nep141Erc20Map, nep141_account_id.as_bytes());
-    io.read_storage(&key)
-        .map(|v| {
-            let mut buf = [0u8; 20];
-            v.copy_to_slice(&mut buf);
-            Address::from_array(buf)
-        })
-        .ok_or(GetErc20FromNep141Error::Nep141NotFound)
+) -> Result<Address, GetErc20FromNepError> {
+    get_erc20_from_nep(io, &BridgedToken::Nep141(nep141_account_id.clone().into()))
+}
+
+pub fn get_erc20_from_nep245<I: IO>(
+    io: &I,
+    nep245_token: &Nep245Token,
+) -> Result<Address, GetErc20FromNepError> {
+    get_erc20_from_nep(io, &BridgedToken::Nep245(nep245_token.clone()))
 }
 
 pub fn add_balance<I: IO>(
@@ -1590,15 +1661,7 @@ pub fn set_storage<I: IO>(
 
 pub fn get_storage<I: IO>(io: &I, address: &Address, key: &H256, generation: u32) -> H256 {
     io.read_storage(storage_to_key(address, key, generation).as_ref())
-        .and_then(|value| {
-            if value.len() == 32 {
-                let mut buf = [0u8; 32];
-                value.copy_to_slice(&mut buf);
-                Some(H256(buf))
-            } else {
-                None
-            }
-        })
+        .and_then(|value| value.to_array().ok().map(H256))
         .unwrap_or_default()
 }
 
@@ -2428,6 +2491,108 @@ mod tests {
     }
 
     #[test]
+    fn test_get_erc20_from_nep_reads_existing_storage_keys() {
+        let storage = RefCell::new(Storage::default());
+        let mut io = StoragePointer(&storage);
+        let account_id: AccountId = "token.near".parse().unwrap();
+        let nep141 = BridgedToken::Nep141(account_id.clone().into());
+        let nep245_token = Nep245Token {
+            account_id: account_id.clone(),
+            token_id: "coin".into(),
+        };
+        let nep245 = BridgedToken::Nep245(nep245_token.clone());
+        let nep141_address = make_address(1, 1);
+        let nep245_address = make_address(2, 2);
+        // Existing keys contain raw NEP-141 account bytes or a Borsh account/token
+        // pair for NEP-245, without a BridgedToken enum discriminant.
+        io.write_storage(b"\x07\x08token.near", nep141_address.as_bytes());
+        io.write_storage(
+            b"\x07\x0f\x0a\x00\x00\x00token.near\x04\x00\x00\x00coin",
+            nep245_address.as_bytes(),
+        );
+
+        assert_eq!(get_erc20_from_nep(&io, &nep141).unwrap(), nep141_address);
+        assert_eq!(get_erc20_from_nep(&io, &nep245).unwrap(), nep245_address);
+        assert_eq!(
+            get_erc20_from_nep141(&io, &account_id).unwrap(),
+            nep141_address
+        );
+        assert_eq!(
+            get_erc20_from_nep245(&io, &nep245_token).unwrap(),
+            nep245_address
+        );
+
+        let unknown = BridgedToken::Nep245(Nep245Token {
+            account_id,
+            token_id: "unknown".into(),
+        });
+        assert!(matches!(
+            get_erc20_from_nep(&io, &unknown),
+            Err(GetErc20FromNepError::Nep245NotFound)
+        ));
+    }
+
+    #[test_case::test_case(
+        BridgedToken::Nep141("token.near".parse::<AccountId>().unwrap().into()),
+        errors::ERR_NEP141_NOT_FOUND,
+        errors::ERR_NEP141_TOKEN_ALREADY_REGISTERED;
+        "nep141"
+    )]
+    #[test_case::test_case(
+        BridgedToken::Nep245(Nep245Token {
+            account_id: "token.near".parse().unwrap(),
+            token_id: "coin".into(),
+        }),
+        errors::ERR_NEP245_NOT_FOUND,
+        errors::ERR_NEP245_TOKEN_ALREADY_REGISTERED;
+        "nep245"
+    )]
+    fn test_token_error_codes(token: BridgedToken, not_found: &[u8], already_registered: &[u8]) {
+        let env = Fixed::default();
+        let storage = RefCell::new(Storage::default());
+        let io = StoragePointer(&storage);
+        let mut engine: Engine<_, _> = Engine::new_with_state(
+            EngineState::default(),
+            Address::zero(),
+            env.current_account_id(),
+            io,
+            &env,
+        );
+        let identifier = match token.clone() {
+            BridgedToken::Nep141(token) => Erc20Identifier::Nep141 {
+                account_id: token.0,
+            },
+            BridgedToken::Nep245(token) => Erc20Identifier::Nep245 {
+                account_id: token.account_id,
+                token_id: token.token_id,
+            },
+        };
+
+        assert_eq!(
+            engine
+                .identifier_to_address(&identifier)
+                .unwrap_err()
+                .as_ref(),
+            not_found,
+        );
+        assert_eq!(
+            engine.get_erc20_metadata(&identifier).unwrap_err().as_ref(),
+            not_found,
+        );
+
+        let address = make_address(4, 5);
+        engine.register_token(address, token.clone()).unwrap();
+        assert_eq!(
+            engine
+                .register_token(make_address(6, 7), token)
+                .unwrap_err()
+                .as_ref(),
+            already_registered,
+        );
+        assert_eq!(engine.identifier_to_address(&identifier).unwrap(), address);
+    }
+
+    #[test]
     fn test_registering_token_succeeds() {
         let origin = Address::zero();
         let current_account_id = AccountId::default();
@@ -2453,10 +2618,19 @@ mod tests {
         };
         let mut handler = Noop;
         engine
-            .register_token(erc20_token, nep141_token.clone())
+            .register_token(
+                erc20_token,
+                BridgedToken::Nep141(nep141_token.clone().into()),
+            )
             .unwrap();
         let result = engine
-            .receive_erc20_tokens(&nep141_token, &args, &current_account_id, &mut handler)
+            .receive_erc20_tokens(
+                &BridgedToken::Nep141(nep141_token.into()),
+                &args.msg,
+                args.amount.as_u128(),
+                &current_account_id,
+                &mut handler,
+            )
             .unwrap()
             .unwrap();
 
@@ -2473,12 +2647,14 @@ mod tests {
         add_balance(&mut io, &origin, Wei::new_u64(22000)).unwrap();
         state::set_state(&mut io, &EngineState::default()).unwrap();
 
-        let nep141_token = AccountId::new("testcoin").unwrap();
+        let token = AccountId::new("testcoin")
+            .map(Into::into)
+            .map(BridgedToken::Nep141)
+            .unwrap();
         let mut handler = Noop;
         let nonce = U256::zero();
         let expected_address = create_legacy_address(&origin, &nonce);
-        let actual_address =
-            deploy_erc20_token(nep141_token, None, io, &env, &mut handler).unwrap();
+        let actual_address = deploy_erc20_token(token, None, io, &env, &mut handler).unwrap();
 
         assert_eq!(expected_address, actual_address);
     }
@@ -2496,9 +2672,12 @@ mod tests {
 
         let engine: Engine<_, _> =
             Engine::new_with_state(state, origin, current_account_id, io, &env);
-        let nep141 = AccountId::new("testcoin").unwrap();
+        let token = AccountId::new("testcoin")
+            .map(Into::into)
+            .map(BridgedToken::Nep141)
+            .unwrap();
         let mut handler = Noop;
-        let erc20_address = deploy_erc20_token(nep141, None, io, &env, &mut handler).unwrap();
+        let erc20_address = deploy_erc20_token(token, None, io, &env, &mut handler).unwrap();
         let metadata = engine
             .get_erc20_metadata(&Erc20Identifier::Erc20 {
                 address: erc20_address,

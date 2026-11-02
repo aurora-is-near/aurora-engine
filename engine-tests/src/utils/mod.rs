@@ -578,6 +578,9 @@ impl AuroraRunner {
     }
 
     pub fn get_engine_v331_code() -> Vec<u8> {
+        #[cfg(feature = "error_refund")]
+        let path = "src/tests/res/aurora_refund_v3.3.1.wasm";
+        #[cfg(not(feature = "error_refund"))]
         let path = "src/tests/res/aurora_v3.3.1.wasm";
         std::fs::read(path).unwrap()
     }

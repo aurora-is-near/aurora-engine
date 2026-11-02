@@ -1,10 +1,16 @@
+//! Argument and result types for cross-contract calls between the Aurora
+//! Engine and the Eth-connector contract.
+//!
+//! Covers connector initialization, ETH deposits and withdrawals, refunds,
+//! NEP-141 / NEP-245 token transfers, storage management, and the
+//! `exit_to_near` precompile callback.
 use borsh::{BorshDeserialize, BorshSerialize};
 use primitive_types::U256;
 use serde::{Deserialize, Serialize};
 
 use crate::account_id::AccountId;
 use crate::types::{Address, Balance, Fee, NEP141Wei, RawU256, Yocto};
-use crate::{String, ToString, Vec};
+use crate::{Cow, String, ToBytes, ToString, TokenId, Vec};
 
 /// Eth-connector initial args
 #[derive(Debug, Clone, BorshSerialize, BorshDeserialize, PartialEq, Eq)]
@@ -131,6 +137,34 @@ pub struct TransferNearArgs {
 pub struct ExitToNearPrecompileCallbackArgs {
     pub refund: Option<RefundCallArgs>,
     pub transfer_near: Option<TransferNearArgs>,
+    pub transfer_call: TransferCall,
+}
+
+/// Selects exit callback behavior; the default preserves legacy refunds and plain transfers.
+#[derive(Debug, Clone, Copy, BorshSerialize, BorshDeserialize, PartialEq, Eq, Default)]
+pub enum TransferCall {
+    /// Plain transfer or wNEAR unwrap; tag 0 retains the legacy callback behavior.
+    #[default]
+    None,
+    /// Settle a single-token `mt_transfer_call` from its one-element used-amount array.
+    Nep245,
+    /// Settle `ft_transfer_call` from its used amount. Appended to preserve existing tags.
+    Nep141,
+}
+
+impl ExitToNearPrecompileCallbackArgs {
+    /// Decode current arguments or the original two-field layout with legacy refund behavior.
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, borsh::io::Error> {
+        Self::try_from_slice(bytes).or_else(|_| {
+            <(Option<RefundCallArgs>, Option<TransferNearArgs>)>::try_from_slice(bytes).map(
+                |(refund, transfer_near)| Self {
+                    refund,
+                    transfer_near,
+                    ..Self::default()
+                },
+            )
+        })
+    }
 }
 
 /// Arguments for the `ft_transfer_call` transaction.
@@ -196,6 +230,33 @@ pub struct FtOnTransferArgs {
     pub sender_id: AccountId,
     pub amount: Balance,
     pub msg: String,
+}
+/// Parameters for the `mt_on_transfer` transaction for regular NEP-245 tokens.
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize, Deserialize, Serialize, PartialEq, Eq)]
+pub struct MtOnTransferArgs {
+    pub sender_id: AccountId,
+    pub previous_owner_ids: Vec<AccountId>,
+    pub token_ids: Vec<TokenId>,
+    pub amounts: Vec<Balance>,
+    pub msg: String,
+}
+
+impl MtOnTransferArgs {
+    /// Returns the token ID and amount if the transfer contains exactly one token.
+    ///
+    /// Batches aren't supported: each token is minted by a separate EVM call, but a NEAR
+    /// receipt can only represent a single EVM transaction.
+    #[must_use]
+    pub fn single_token(&self) -> Option<(&str, Balance)> {
+        match (
+            self.token_ids.as_slice(),
+            self.amounts.as_slice(),
+            self.previous_owner_ids.as_slice(),
+        ) {
+            ([token_id], [amount], [_]) => Some((token_id, *amount)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(BorshSerialize)]
@@ -270,24 +331,134 @@ impl AsRef<[u8]> for FungibleReferenceHash {
 pub struct MirrorErc20TokenArgs {
     /// `AccountId` of the main Aurora contract which has previously deployed ERC-20.
     pub contract_id: AccountId,
+    /// NEAR token represented by the ERC-20 contract.
+    pub token: BridgedToken,
+}
+
+impl MirrorErc20TokenArgs {
+    /// Accepts tagged token arguments and the original NEP-141 encoding.
+    pub fn deserialize(bytes: &[u8]) -> borsh::io::Result<Self> {
+        Self::try_from_slice(bytes)
+            .or_else(|_| LegacyMirrorErc20TokenArgs::try_from_slice(bytes).map(Into::into))
+    }
+}
+
+/// Original Borsh parameters retained for NEP-141 callers and standalone history.
+#[derive(BorshSerialize, BorshDeserialize, Debug, Eq, PartialEq, Clone)]
+pub struct LegacyMirrorErc20TokenArgs {
+    pub contract_id: AccountId,
     /// `AccountId` of the bridged NEP-141 token.
     pub nep141: AccountId,
+}
+
+impl From<LegacyMirrorErc20TokenArgs> for MirrorErc20TokenArgs {
+    fn from(args: LegacyMirrorErc20TokenArgs) -> Self {
+        Self {
+            contract_id: args.contract_id,
+            token: BridgedToken::Nep141(args.nep141.into()),
+        }
+    }
 }
 
 /// Parameters for `set_erc20_metadata` function.
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SetErc20MetadataArgs {
-    /// Address or corresponding NEP-141 account id of the ERC-20 contract.
+    /// Address or corresponding NEP-141 / NEP-245 token of the ERC-20 contract.
     pub erc20_identifier: Erc20Identifier,
     /// Metadata of the ERC-20 contract.
     pub metadata: Erc20Metadata,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Erc20Identifier {
-    Erc20 { address: Address },
-    Nep141 { account_id: AccountId },
+    Erc20 {
+        address: Address,
+    },
+    Nep141 {
+        account_id: AccountId,
+    },
+    Nep245 {
+        account_id: AccountId,
+        token_id: crate::TokenId,
+    },
+}
+
+impl<'de> Deserialize<'de> for Erc20Identifier {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "snake_case")]
+        enum Field {
+            Address,
+            AccountId,
+            TokenId,
+            #[serde(other)]
+            Other,
+        }
+
+        struct IdentifierVisitor;
+
+        impl<'input> serde::de::Visitor<'input> for IdentifierVisitor {
+            type Value = Erc20Identifier;
+
+            fn expecting(&self, formatter: &mut crate::fmt::Formatter<'_>) -> crate::fmt::Result {
+                formatter.write_str("an ERC-20, NEP-141 or NEP-245 identifier object")
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'input>>(
+                self,
+                mut map: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut address = None;
+                let mut account_id = None;
+                let mut token_id = None;
+
+                while let Some(field) = map.next_key()? {
+                    match field {
+                        Field::Address => {
+                            if address.is_some() {
+                                return Err(serde::de::Error::duplicate_field("address"));
+                            }
+                            address = Some(map.next_value::<Address>()?);
+                        }
+                        Field::AccountId => {
+                            if account_id.is_some() {
+                                return Err(serde::de::Error::duplicate_field("account_id"));
+                            }
+                            account_id = Some(map.next_value::<AccountId>()?);
+                        }
+                        Field::TokenId => {
+                            if token_id.is_some() {
+                                return Err(serde::de::Error::duplicate_field("token_id"));
+                            }
+                            token_id = Some(map.next_value::<crate::TokenId>()?);
+                        }
+                        Field::Other => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                match (address, account_id, token_id) {
+                    (Some(address), None, None) => Ok(Erc20Identifier::Erc20 { address }),
+                    (None, Some(account_id), None) => Ok(Erc20Identifier::Nep141 { account_id }),
+                    (None, Some(account_id), Some(token_id)) => Ok(Erc20Identifier::Nep245 {
+                        account_id,
+                        token_id,
+                    }),
+                    (None, None, Some(_)) => Err(serde::de::Error::missing_field("account_id")),
+                    (None, None, None) => Err(serde::de::Error::custom(
+                        "expected `address` or `account_id`",
+                    )),
+                    _ => Err(serde::de::Error::custom(
+                        "`address` cannot be combined with `account_id` or `token_id`",
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(IdentifierVisitor)
+    }
 }
 
 impl From<Address> for Erc20Identifier {
@@ -299,6 +470,20 @@ impl From<Address> for Erc20Identifier {
 impl From<AccountId> for Erc20Identifier {
     fn from(account_id: AccountId) -> Self {
         Self::Nep141 { account_id }
+    }
+}
+
+impl From<BridgedToken> for Erc20Identifier {
+    fn from(token: BridgedToken) -> Self {
+        match token {
+            BridgedToken::Nep141(token) => Self::Nep141 {
+                account_id: token.0,
+            },
+            BridgedToken::Nep245(token) => Self::Nep245 {
+                account_id: token.account_id,
+                token_id: token.token_id,
+            },
+        }
     }
 }
 
@@ -323,6 +508,114 @@ impl Default for Erc20Metadata {
     }
 }
 
+/// JSON metadata returned by `mt_metadata_base_by_token_id`.
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+pub struct Nep245Metadata {
+    pub name: String,
+    pub symbol: Option<String>,
+    pub decimals: Option<Nep245Decimals>,
+}
+
+/// NEP-245 implementations encode decimals as either a JSON number or a string.
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[serde(untagged)]
+pub enum Nep245Decimals {
+    Number(u8),
+    String(String),
+}
+
+impl TryFrom<Nep245Metadata> for Erc20Metadata {
+    type Error = core::num::ParseIntError;
+
+    fn try_from(metadata: Nep245Metadata) -> Result<Self, Self::Error> {
+        let defaults = Self::default();
+        let decimals = match metadata.decimals {
+            Some(Nep245Decimals::Number(value)) => value,
+            Some(Nep245Decimals::String(value)) => value.parse()?,
+            None => defaults.decimals,
+        };
+
+        Ok(Self {
+            name: metadata.name,
+            symbol: metadata.symbol.unwrap_or(defaults.symbol),
+            decimals,
+        })
+    }
+}
+
+/// Identifies a NEAR token bridged to an ERC-20 contract in Aurora.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq)]
+pub enum BridgedToken {
+    /// NEP-141 fungible token identified by its contract account ID.
+    Nep141(Nep141Token),
+    /// NEP-245 token identified by its contract account ID and token ID.
+    Nep245(Nep245Token),
+}
+
+impl BridgedToken {
+    /// Accepts tagged token arguments and the original NEP-141 `AccountId` encoding.
+    pub fn deserialize(bytes: &[u8]) -> borsh::io::Result<Self> {
+        Self::try_from_slice(bytes).or_else(|_| {
+            AccountId::try_from_slice(bytes).map(|account_id| Self::Nep141(account_id.into()))
+        })
+    }
+
+    /// Account id of the token contract.
+    #[must_use]
+    pub const fn account_id(&self) -> &AccountId {
+        match self {
+            Self::Nep141(token) => &token.0,
+            Self::Nep245(token) => &token.account_id,
+        }
+    }
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq)]
+pub struct Nep141Token(pub AccountId);
+
+impl AsRef<[u8]> for Nep141Token {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+impl TryFrom<Vec<u8>> for Nep141Token {
+    type Error = crate::account_id::ParseAccountError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        AccountId::try_from(bytes).map(Self)
+    }
+}
+
+impl From<AccountId> for Nep141Token {
+    fn from(account_id: AccountId) -> Self {
+        Self(account_id)
+    }
+}
+
+/// Identifies a NEP-245 token by its contract account ID and token ID.
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Eq, PartialEq)]
+pub struct Nep245Token {
+    /// NEAR account ID of the NEP-245 contract.
+    pub account_id: AccountId,
+    /// Identifier of the token within the NEP-245 contract.
+    pub token_id: crate::TokenId,
+}
+
+impl ToBytes for Nep245Token {
+    fn to_bytes(&self) -> borsh::io::Result<Cow<'_, [u8]>> {
+        borsh::to_vec(self).map(Cow::Owned)
+    }
+}
+
+impl TryFrom<Vec<u8>> for Nep245Token {
+    type Error = borsh::io::Error;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from_slice(&bytes)
+    }
+}
+
 pub mod errors {
     #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
     pub enum ParseOnTransferMessageError {
@@ -342,6 +635,366 @@ pub mod errors {
                 Self::InvalidAccount => b"ERR_INVALID_ACCOUNT_ID",
                 Self::OverflowNumber => b"ERR_OVERFLOW_NUMBER",
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        BridgedToken, Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, Nep245Metadata,
+        Nep245Token,
+    };
+
+    #[test]
+    fn test_exit_callback_wire_compatibility() {
+        use super::{
+            ExitToNearPrecompileCallbackArgs, RefundCallArgs, TransferCall, TransferNearArgs,
+        };
+        use crate::types::Address;
+        let refund = RefundCallArgs {
+            recipient_address: Address::from_array([1; 20]),
+            erc20_address: Some(Address::from_array([2; 20])),
+            amount: crate::U256::from(100).to_big_endian(),
+        };
+        assert_eq!(TransferCall::default(), TransferCall::None);
+        for current in [
+            ExitToNearPrecompileCallbackArgs::default(),
+            ExitToNearPrecompileCallbackArgs {
+                refund: Some(refund.clone()),
+                transfer_near: None,
+                ..Default::default()
+            },
+            ExitToNearPrecompileCallbackArgs {
+                refund: None,
+                transfer_near: Some(TransferNearArgs {
+                    target_account_id: "receiver.near".parse().unwrap(),
+                    amount: 100,
+                }),
+                ..Default::default()
+            },
+        ] {
+            let legacy_bytes = borsh::to_vec(&(&current.refund, &current.transfer_near)).unwrap();
+            let bytes = borsh::to_vec(&current).unwrap();
+            assert_eq!(&bytes[..bytes.len() - 1], legacy_bytes);
+            assert_eq!(bytes.last(), Some(&0));
+            assert_eq!(
+                ExitToNearPrecompileCallbackArgs::deserialize(&legacy_bytes).unwrap(),
+                current
+            );
+            assert_eq!(
+                ExitToNearPrecompileCallbackArgs::deserialize(&bytes).unwrap(),
+                current
+            );
+        }
+        let current = ExitToNearPrecompileCallbackArgs {
+            refund: Some(refund),
+            transfer_near: None,
+            transfer_call: TransferCall::Nep245,
+        };
+        let bytes = borsh::to_vec(&current).unwrap();
+        assert_eq!(bytes.last(), Some(&1));
+        assert_eq!(
+            ExitToNearPrecompileCallbackArgs::deserialize(&bytes).unwrap(),
+            current
+        );
+        assert_eq!(
+            ExitToNearPrecompileCallbackArgs::deserialize(&bytes[..bytes.len() - 1]).unwrap(),
+            ExitToNearPrecompileCallbackArgs {
+                transfer_call: TransferCall::None,
+                ..current
+            }
+        );
+        assert!(ExitToNearPrecompileCallbackArgs::deserialize(&bytes[..bytes.len() - 2]).is_err());
+        let mut trailing = bytes;
+        trailing.push(0);
+        assert!(ExitToNearPrecompileCallbackArgs::deserialize(&trailing).is_err());
+        let ft_call = ExitToNearPrecompileCallbackArgs {
+            transfer_call: TransferCall::Nep141,
+            ..Default::default()
+        };
+        assert_eq!(borsh::to_vec(&ft_call).unwrap(), [0, 0, 2]);
+        assert_eq!(
+            ExitToNearPrecompileCallbackArgs::deserialize(&[0, 0, 2]).unwrap(),
+            ft_call
+        );
+        for bytes in [
+            &[][..],
+            &[0][..],
+            &[1][..],
+            &[2][..],
+            &[3][..],
+            &[0, 0, 3][..],
+            &[0, 0, 0, 0][..],
+        ] {
+            assert!(ExitToNearPrecompileCallbackArgs::deserialize(bytes).is_err());
+        }
+    }
+    use crate::{account_id::AccountId, types::Address};
+    use borsh::{self, BorshDeserialize};
+    use serde_json::{Value, json};
+
+    #[test]
+    fn test_mirror_erc20_token_args_formats() {
+        let contract_id = "aurora.near".parse::<AccountId>().unwrap();
+        let nep141 = BridgedToken::Nep141("wrap.near".parse::<AccountId>().unwrap().into());
+        let nep245 = BridgedToken::Nep245(Nep245Token {
+            account_id: "multi.near".parse().unwrap(),
+            token_id: "coin".into(),
+        });
+        let prefix = b"\x0b\x00\x00\x00aurora.near";
+        for (token, suffix) in [
+            (nep141.clone(), b"\x09\x00\x00\x00wrap.near".as_slice()),
+            (nep141, b"\x00\x09\x00\x00\x00wrap.near".as_slice()),
+            (
+                nep245,
+                b"\x01\x0a\x00\x00\x00multi.near\x04\x00\x00\x00coin".as_slice(),
+            ),
+        ] {
+            let input = [prefix.as_slice(), suffix].concat();
+            let args = MirrorErc20TokenArgs::deserialize(&input).unwrap();
+            assert_eq!(args.contract_id, contract_id);
+            assert_eq!(args.token, token);
+            assert_eq!(
+                MirrorErc20TokenArgs::deserialize(&borsh::to_vec(&args).unwrap()).unwrap(),
+                args
+            );
+            let mut truncated = input.clone();
+            truncated.pop();
+            assert!(MirrorErc20TokenArgs::deserialize(&truncated).is_err());
+            let mut trailing = input;
+            trailing.push(0);
+            assert!(MirrorErc20TokenArgs::deserialize(&trailing).is_err());
+        }
+    }
+
+    #[test]
+    fn test_bridged_token_formats() {
+        let nep141 = BridgedToken::Nep141("wrap.near".parse::<AccountId>().unwrap().into());
+        let nep245 = BridgedToken::Nep245(Nep245Token {
+            account_id: "multi.near".parse().unwrap(),
+            token_id: "coin".into(),
+        });
+        for (token, input) in [
+            (nep141.clone(), b"\x09\x00\x00\x00wrap.near".as_slice()),
+            (nep141, b"\x00\x09\x00\x00\x00wrap.near".as_slice()),
+            (
+                nep245,
+                b"\x01\x0a\x00\x00\x00multi.near\x04\x00\x00\x00coin".as_slice(),
+            ),
+        ] {
+            assert_eq!(BridgedToken::deserialize(input).unwrap(), token);
+            assert_eq!(
+                BridgedToken::deserialize(&borsh::to_vec(&token).unwrap()).unwrap(),
+                token
+            );
+            let mut truncated = input.to_vec();
+            truncated.pop();
+            assert!(BridgedToken::deserialize(&truncated).is_err());
+            let mut trailing = input.to_vec();
+            trailing.push(0);
+            assert!(BridgedToken::deserialize(&trailing).is_err());
+        }
+        assert!(BridgedToken::deserialize(&[2, 0, 0, 0]).is_err());
+    }
+
+    #[test]
+    fn test_erc20_identifier_json_formats() {
+        let account_id: AccountId = "multi.near".parse().unwrap();
+        for (json, expected) in [
+            (
+                r#"{"address":"0x1111111111111111111111111111111111111111"}"#,
+                Erc20Identifier::Erc20 {
+                    address: Address::from_array([0x11; 20]),
+                },
+            ),
+            (
+                r#"{"account_id":"multi.near"}"#,
+                Erc20Identifier::Nep141 {
+                    account_id: account_id.clone(),
+                },
+            ),
+            (
+                r#"{"token_id":"coin","account_id":"multi.near"}"#,
+                Erc20Identifier::Nep245 {
+                    account_id,
+                    token_id: "coin".into(),
+                },
+            ),
+        ] {
+            let parsed: Erc20Identifier = serde_json::from_str(json).unwrap();
+            assert_eq!(parsed, expected);
+            assert_eq!(
+                serde_json::to_value(&expected).unwrap(),
+                serde_json::from_str::<Value>(json).unwrap()
+            );
+            assert_eq!(
+                serde_json::from_slice::<Erc20Identifier>(&serde_json::to_vec(&expected).unwrap())
+                    .unwrap(),
+                expected
+            );
+
+            let mut extended = serde_json::to_value(&expected).unwrap();
+            extended["future_extension"] = json!({ "token_id": null, "other": [1, true] });
+            assert_eq!(
+                serde_json::from_value::<Erc20Identifier>(extended).unwrap(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_erc20_identifier_rejects_invalid_fields() {
+        let address = Address::from_array([0x11; 20]);
+        for json in [
+            json!({}),
+            json!(null),
+            json!([]),
+            json!("multi.near"),
+            json!({ "token_id": "coin" }),
+            json!({ "account_id": "multi.near", "token_id": null }),
+            json!({ "account_id": "multi.near", "token_id": 7 }),
+            json!({ "account_id": "multi.near", "token_id": true }),
+            json!({ "account_id": "multi.near", "token_id": {} }),
+            json!({ "account_id": "multi.near", "token_id": [] }),
+            json!({ "account_id": null }),
+            json!({ "account_id": 7 }),
+            json!({ "account_id": "INVALID!", "token_id": "coin" }),
+            json!({ "address": null }),
+            json!({ "address": "invalid" }),
+            json!({ "address": address, "account_id": "multi.near" }),
+            json!({ "address": address, "token_id": "coin" }),
+            json!({ "address": address, "account_id": "multi.near", "token_id": "coin" }),
+        ] {
+            let bytes = serde_json::to_vec(&json).unwrap();
+            assert!(
+                serde_json::from_slice::<Erc20Identifier>(&bytes).is_err(),
+                "Accepted invalid identifier: {json}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_erc20_identifier_rejects_duplicate_fields() {
+        for json in [
+            r#"{"address":"0x1111111111111111111111111111111111111111","address":"0x2222222222222222222222222222222222222222"}"#,
+            r#"{"account_id":"first.near","account_id":"second.near"}"#,
+            r#"{"account_id":"multi.near","token_id":"first","token_id":"second"}"#,
+        ] {
+            let error = serde_json::from_str::<Erc20Identifier>(json).unwrap_err();
+            assert!(error.to_string().starts_with("duplicate field"));
+        }
+    }
+
+    #[test]
+    fn test_erc20_identifier_preserves_borsh_encoding() {
+        let account_id: AccountId = "multi.near".parse().unwrap();
+        for (expected, bytes) in [
+            (
+                Erc20Identifier::Erc20 {
+                    address: Address::from_array([0x11; 20]),
+                },
+                [&[0][..], &[0x11; 20]].concat(),
+            ),
+            (
+                Erc20Identifier::Nep141 {
+                    account_id: account_id.clone(),
+                },
+                b"\x01\x0a\x00\x00\x00multi.near".to_vec(),
+            ),
+            (
+                Erc20Identifier::Nep245 {
+                    account_id,
+                    token_id: "coin".into(),
+                },
+                b"\x02\x0a\x00\x00\x00multi.near\x04\x00\x00\x00coin".to_vec(),
+            ),
+        ] {
+            assert_eq!(borsh::to_vec(&expected).unwrap(), bytes);
+            assert_eq!(Erc20Identifier::try_from_slice(&bytes).unwrap(), expected);
+        }
+    }
+
+    fn to_erc20_metadata(metadata: Value) -> Option<Erc20Metadata> {
+        serde_json::from_value::<Nep245Metadata>(metadata)
+            .ok()
+            .and_then(|metadata| Erc20Metadata::try_from(metadata).ok())
+    }
+
+    #[test]
+    fn test_nep245_metadata_into_erc20_metadata() {
+        for (metadata, symbol, decimals) in [
+            // Fields that `Erc20Metadata` doesn't have are ignored.
+            (
+                json!({ "id": "wnear", "name": "Wrapped NEAR", "symbol": "wNEAR", "decimals": 24, "icon": null }),
+                "wNEAR",
+                24,
+            ),
+            (json!({ "name": "Wrapped NEAR", "decimals": 0 }), "EMPTY", 0),
+            (
+                json!({ "name": "Wrapped NEAR", "decimals": 255 }),
+                "EMPTY",
+                255,
+            ),
+            (
+                json!({ "name": "Wrapped NEAR", "decimals": "0" }),
+                "EMPTY",
+                0,
+            ),
+            (
+                json!({ "name": "Wrapped NEAR", "decimals": "255" }),
+                "EMPTY",
+                255,
+            ),
+            (json!({ "name": "Wrapped NEAR" }), "EMPTY", 0),
+            (
+                json!({ "name": "Wrapped NEAR", "symbol": null, "decimals": null }),
+                "EMPTY",
+                0,
+            ),
+        ] {
+            assert_eq!(
+                to_erc20_metadata(metadata),
+                Some(Erc20Metadata {
+                    name: "Wrapped NEAR".into(),
+                    symbol: symbol.into(),
+                    decimals,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn test_nep245_metadata_rejects_invalid_fields() {
+        let invalid_decimals = [
+            json!(-1),
+            json!(256),
+            json!(1.5),
+            json!(24.0),
+            json!(true),
+            json!({}),
+            json!([]),
+            json!("-1"),
+            json!("256"),
+            json!("1.5"),
+            json!("invalid"),
+            json!(""),
+        ]
+        .map(|decimals| json!({ "name": "Wrapped NEAR", "symbol": "wNEAR", "decimals": decimals }));
+        let invalid_name_or_symbol = [
+            json!({ "symbol": "wNEAR", "decimals": 24 }),
+            json!({ "name": null, "symbol": "wNEAR", "decimals": 24 }),
+            json!({ "name": 24, "symbol": "wNEAR", "decimals": 24 }),
+            json!({ "name": "Wrapped NEAR", "symbol": true, "decimals": 24 }),
+        ];
+
+        for metadata in invalid_decimals.into_iter().chain(invalid_name_or_symbol) {
+            let description = metadata.to_string();
+            assert_eq!(
+                to_erc20_metadata(metadata),
+                None,
+                "Accepted invalid metadata: {description}"
+            );
         }
     }
 }

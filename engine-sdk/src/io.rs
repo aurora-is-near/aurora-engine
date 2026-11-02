@@ -21,6 +21,19 @@ pub trait StorageIntermediate: Sized {
         buf
     }
 
+    fn to_array<const N: usize>(&self) -> Result<[u8; N], error::IncorrectInputLength> {
+        let size = self.len();
+
+        if size != N {
+            return Err(error::IncorrectInputLength);
+        }
+
+        let mut buf = [0u8; N];
+        self.copy_to_slice(&mut buf);
+
+        Ok(buf)
+    }
+
     fn to_value<T: BorshDeserialize>(&self) -> Result<T, error::BorshDeserializeError> {
         let bytes = self.to_vec();
         T::try_from_slice(&bytes).map_err(|_| error::BorshDeserializeError)
@@ -78,28 +91,12 @@ pub trait IO {
 
     /// Convenience function to read the input into a 20-byte array.
     fn read_input_arr20(&self) -> Result<[u8; 20], error::IncorrectInputLength> {
-        let value = self.read_input();
-
-        if value.len() != 20 {
-            return Err(error::IncorrectInputLength);
-        }
-
-        let mut buf = [0u8; 20];
-        value.copy_to_slice(&mut buf);
-        Ok(buf)
+        self.read_input().to_array()
     }
 
     /// Convenience function to read the input into a 32-byte array.
     fn read_input_arr32(&self) -> Result<[u8; 32], error::IncorrectInputLength> {
-        let value = self.read_input();
-
-        if value.len() != 32 {
-            return Err(error::IncorrectInputLength);
-        }
-
-        let mut buf = [0u8; 32];
-        value.copy_to_slice(&mut buf);
-        Ok(buf)
+        self.read_input().to_array()
     }
 
     /// Convenience function to store the input directly in storage under the
@@ -116,13 +113,10 @@ pub trait IO {
             .read_storage(key)
             .ok_or(error::ReadU32Error::MissingValue)?;
 
-        if value.len() != 4 {
-            return Err(error::ReadU32Error::InvalidU32);
-        }
-
-        let mut result = [0u8; 4];
-        value.copy_to_slice(&mut result);
-        Ok(u32::from_le_bytes(result))
+        value
+            .to_array()
+            .map(u32::from_le_bytes)
+            .map_err(|_| error::ReadU32Error::InvalidU32)
     }
 
     /// Convenience function to read a 64-bit unsigned integer from storage
@@ -132,13 +126,10 @@ pub trait IO {
             .read_storage(key)
             .ok_or(error::ReadU64Error::MissingValue)?;
 
-        if value.len() != 8 {
-            return Err(error::ReadU64Error::InvalidU64);
-        }
-
-        let mut result = [0u8; 8];
-        value.copy_to_slice(&mut result);
-        Ok(u64::from_le_bytes(result))
+        value
+            .to_array()
+            .map(u64::from_le_bytes)
+            .map_err(|_| error::ReadU64Error::InvalidU64)
     }
 
     /// Convenience function to read a 256-bit unsigned integer from storage
@@ -148,13 +139,10 @@ pub trait IO {
             .read_storage(key)
             .ok_or(error::ReadU256Error::MissingValue)?;
 
-        if value.len() != 32 {
-            return Err(error::ReadU256Error::InvalidU256);
-        }
-
-        let mut result = [0u8; 32];
-        value.copy_to_slice(&mut result);
-        Ok(U256::from_big_endian(&result))
+        value
+            .to_array::<32>()
+            .map(|bytes| U256::from_big_endian(&bytes))
+            .map_err(|_| error::ReadU256Error::InvalidU256)
     }
 
     fn write_borsh<T: BorshSerialize>(

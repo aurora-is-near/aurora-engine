@@ -103,9 +103,11 @@ pub enum TransactionKind {
     /// New bridged token
     DeployErc20(engine::DeployErc20TokenArgs),
     /// Callback for the `deploy_erc20_token` method
-    DeployErc20Callback(AccountId),
+    DeployErc20Callback(connector::BridgedToken),
     /// This type of transaction can impact the aurora state because of the bridge
     FtOnTransfer(connector::FtOnTransferArgs),
+    /// This type of transaction can impact the aurora state because of the bridge
+    MtOnTransfer(connector::MtOnTransferArgs),
     /// Bytes here will be parsed into `aurora_engine::proof::Proof`
     Deposit(Vec<u8>),
     /// This can change balances on aurora in the case that `receiver_id == aurora`.
@@ -133,8 +135,12 @@ pub enum TransactionKind {
     SetPausedFlags(connector::PauseEthConnectorArgs),
     /// Ad entry mapping from address to relayer NEAR account
     RegisterRelayer(Address),
-    /// Callback called by `ExitToNear` precompile, also can refund on fail
-    ExitToNear(Option<connector::ExitToNearPrecompileCallbackArgs>),
+    /// Callback called by `ExitToNear` precompile. New records store the
+    /// promise result for both plain transfers and transfer calls; historical records omit it.
+    ExitToNear(
+        Option<connector::ExitToNearPrecompileCallbackArgs>,
+        Option<types::PromiseResult>,
+    ),
     /// Update eth-connector config
     SetConnectorData(connector::SetContractDataCallArgs),
     /// Initialize eth-connector
@@ -268,123 +274,183 @@ impl TransactionKind {
                 }
             }
             Self::FtOnTransfer(args) => {
-                if engine_account == caller {
-                    let recipient = FtTransferMessageData::try_from(args.msg.as_str())
-                        .map(|data| data.recipient)
-                        .unwrap_or_default();
-                    let value = Wei::new(U256::from(args.amount.as_u128()));
-                    // This transaction mints new ETH, so we'll say it comes from the zero address.
-                    NormalizedEthTransaction {
-                        address: Address::default(),
-                        chain_id: None,
-                        nonce: U256::zero(),
-                        gas_limit: U256::from(u64::MAX),
-                        max_priority_fee_per_gas: U256::zero(),
-                        max_fee_per_gas: U256::zero(),
-                        to: Some(recipient),
-                        value,
-                        data: Vec::new(),
-                        access_list: Vec::new(),
-                        authorization_list: Vec::new(),
-                    }
-                } else {
-                    let from = Self::get_implicit_address(engine_account);
-                    let nonce = Self::get_implicit_nonce(
-                        &from,
-                        block_height,
-                        transaction_position,
-                        storage,
-                    );
-                    let to = storage
-                        .with_engine_access(block_height, transaction_position, &[], |io| {
-                            aurora_engine::engine::get_erc20_from_nep141(&io, caller)
-                        })
-                        .result
-                        .unwrap_or_default();
-                    let erc20_recipient = hex::decode(&args.msg.as_bytes()[0..40])
-                        .ok()
-                        .and_then(|bytes| Address::try_from_slice(&bytes).ok())
-                        .unwrap_or_default();
-                    let data = aurora_engine::engine::setup_receive_erc20_tokens_input(
-                        &erc20_recipient,
-                        args.amount.as_u128(),
-                    );
-                    NormalizedEthTransaction {
-                        address: from,
-                        chain_id: None,
-                        nonce,
-                        gas_limit: U256::from(u64::MAX),
-                        max_priority_fee_per_gas: U256::zero(),
-                        max_fee_per_gas: U256::zero(),
-                        to: Some(to),
-                        value: Wei::zero(),
-                        data,
-                        access_list: Vec::new(),
-                        authorization_list: Vec::new(),
-                    }
+                let amount = args.amount.as_u128();
+                let mint = storage
+                    .with_engine_access(block_height, transaction_position, &[], |io| {
+                        // The connector account isn't stored for blocks where the engine itself
+                        // acted as the eth-connector.
+                        let connector_account =
+                            aurora_engine::contract_methods::connector::get_connector_account_id(
+                                &io,
+                            )
+                            .unwrap_or_else(|_| engine_account.clone());
+
+                        if caller == &connector_account {
+                            let recipient = FtTransferMessageData::try_from(args.msg.as_str())
+                                .ok()?
+                                .recipient;
+                            // This transaction mints new ETH, so we'll say it comes from the zero address.
+                            Some((
+                                Address::zero(),
+                                U256::zero(),
+                                recipient,
+                                Wei::new_u128(amount),
+                                Vec::new(),
+                            ))
+                        } else {
+                            let erc20_token =
+                                aurora_engine::engine::get_erc20_from_nep141(&io, caller).ok()?;
+                            let recipient =
+                                aurora_engine::engine::get_erc20_recipient(&io, &args.msg).ok()?;
+                            let from = Self::get_implicit_address(engine_account);
+                            let nonce = aurora_engine::engine::get_nonce(&io, &from);
+                            let data = aurora_engine::engine::setup_receive_erc20_tokens_input(
+                                &recipient, amount,
+                            );
+
+                            Some((from, nonce, erc20_token, Wei::zero(), data))
+                        }
+                    })
+                    .result;
+
+                // The engine refunds deposits it fails to process, so there is no EVM execution.
+                let Some((address, nonce, to, value, data)) = mint else {
+                    return Self::no_evm_execution("ft_on_transfer");
+                };
+
+                NormalizedEthTransaction {
+                    address,
+                    chain_id: None,
+                    nonce,
+                    gas_limit: U256::from(u64::MAX),
+                    max_priority_fee_per_gas: U256::zero(),
+                    max_fee_per_gas: U256::zero(),
+                    to: Some(to),
+                    value,
+                    data,
+                    access_list: Vec::new(),
+                    authorization_list: Vec::new(),
                 }
             }
-            Self::ExitToNear(maybe_args) => {
+            Self::MtOnTransfer(args) => {
+                // The engine rejects batches and malformed arguments.
+                let Some((token_id, amount)) = args.single_token() else {
+                    return Self::no_evm_execution("mt_on_transfer");
+                };
+                let token = connector::Nep245Token {
+                    account_id: caller.clone(),
+                    token_id: token_id.into(),
+                };
+                let amount = amount.as_u128();
+                let mint = storage
+                    .with_engine_access(block_height, transaction_position, &[], |io| {
+                        let erc20_token =
+                            aurora_engine::engine::get_erc20_from_nep245(&io, &token).ok()?;
+                        let recipient =
+                            aurora_engine::engine::get_erc20_recipient(&io, &args.msg).ok()?;
+                        let from = Self::get_implicit_address(engine_account);
+                        let nonce = aurora_engine::engine::get_nonce(&io, &from);
+                        let data = aurora_engine::engine::setup_receive_erc20_tokens_input(
+                            &recipient, amount,
+                        );
+
+                        Some((from, nonce, erc20_token, data))
+                    })
+                    .result;
+
+                // A failed deposit aborts the receipt and is refunded, so there is no EVM execution.
+                let Some((address, nonce, to, data)) = mint else {
+                    return Self::no_evm_execution("mt_on_transfer");
+                };
+
+                NormalizedEthTransaction {
+                    address,
+                    chain_id: None,
+                    nonce,
+                    gas_limit: U256::from(u64::MAX),
+                    max_priority_fee_per_gas: U256::zero(),
+                    max_fee_per_gas: U256::zero(),
+                    to: Some(to),
+                    value: Wei::zero(),
+                    data,
+                    access_list: Vec::new(),
+                    authorization_list: Vec::new(),
+                }
+            }
+            Self::ExitToNear(maybe_args, result) => {
                 let method_name = "exit_to_near_precompile_callback";
-                maybe_args.map_or_else(
+                let refund =
+                    maybe_args.and_then(|args| match (args.transfer_call, result.as_ref()) {
+                        (_, Some(result)) => {
+                            aurora_engine::contract_methods::connector::resolve_exit_to_near_refund(
+                                &args,
+                                Some(result),
+                            )
+                            .ok()
+                            .flatten()
+                        }
+                        // Preserve the representation of historical records without a stored result.
+                        (connector::TransferCall::None, None) => args.refund,
+                        (
+                            connector::TransferCall::Nep141 | connector::TransferCall::Nep245,
+                            None,
+                        ) => None,
+                    });
+                refund.map_or_else(
                     || Self::no_evm_execution(method_name),
                     |args| {
-                        args.refund.map_or_else(
-                            || Self::no_evm_execution(method_name),
-                            |args| {
-                                args.erc20_address.map_or_else(|| {
-                                    // ETH refund
-                                    let value = Wei::new(U256::from_big_endian(&args.amount));
-                                    let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
-                                    let nonce = Self::get_implicit_nonce(
-                                        &from,
-                                        block_height,
-                                        transaction_position,
-                                        storage,
-                                    );
-                                    NormalizedEthTransaction {
-                                        address: from,
-                                        chain_id: None,
-                                        nonce,
-                                        gas_limit: U256::from(u64::MAX),
-                                        max_priority_fee_per_gas: U256::zero(),
-                                        max_fee_per_gas: U256::zero(),
-                                        to: Some(args.recipient_address),
-                                        value,
-                                        data: Vec::new(),
-                                        access_list: Vec::new(),
-                                        authorization_list: Vec::new(),
-                                    }
-                                },
-                                   |erc20_address| {
-                                       // ERC-20 refund
-                                       let from = Self::get_implicit_address(engine_account);
-                                       let nonce = Self::get_implicit_nonce(
-                                           &from,
-                                           block_height,
-                                           transaction_position,
-                                           storage,
-                                       );
-                                       let to = erc20_address;
-                                       let data = aurora_engine::engine::setup_refund_on_error_input(
-                                           U256::from_big_endian(&args.amount),
-                                           args.recipient_address,
-                                       );
-                                       NormalizedEthTransaction {
-                                           address: from,
-                                           chain_id: None,
-                                           nonce,
-                                           gas_limit: U256::from(u64::MAX),
-                                           max_priority_fee_per_gas: U256::zero(),
-                                           max_fee_per_gas: U256::zero(),
-                                           to: Some(to),
-                                           value: Wei::zero(),
-                                           data,
-                                           access_list: Vec::new(),
-                                           authorization_list: Vec::new(),
-                                       }
-                                   },
-                                )
+                        args.erc20_address.map_or_else(
+                            || {
+                                // ETH refund
+                                let value = Wei::new(U256::from_big_endian(&args.amount));
+                                let from = aurora_engine_precompiles::native::exit_to_near::ADDRESS;
+                                let nonce = Self::get_implicit_nonce(
+                                    &from,
+                                    block_height,
+                                    transaction_position,
+                                    storage,
+                                );
+                                NormalizedEthTransaction {
+                                    address: from,
+                                    chain_id: None,
+                                    nonce,
+                                    gas_limit: U256::from(u64::MAX),
+                                    max_priority_fee_per_gas: U256::zero(),
+                                    max_fee_per_gas: U256::zero(),
+                                    to: Some(args.recipient_address),
+                                    value,
+                                    data: Vec::new(),
+                                    access_list: Vec::new(),
+                                    authorization_list: Vec::new(),
+                                }
+                            },
+                            |erc20_address| {
+                                // ERC-20 refund
+                                let from = Self::get_implicit_address(engine_account);
+                                let nonce = Self::get_implicit_nonce(
+                                    &from,
+                                    block_height,
+                                    transaction_position,
+                                    storage,
+                                );
+                                let to = erc20_address;
+                                let data = aurora_engine::engine::setup_refund_on_error_input(
+                                    U256::from_big_endian(&args.amount),
+                                    args.recipient_address,
+                                );
+                                NormalizedEthTransaction {
+                                    address: from,
+                                    chain_id: None,
+                                    nonce,
+                                    gas_limit: U256::from(u64::MAX),
+                                    max_priority_fee_per_gas: U256::zero(),
+                                    max_fee_per_gas: U256::zero(),
+                                    to: Some(to),
+                                    value: Wei::zero(),
+                                    data,
+                                    access_list: Vec::new(),
+                                    authorization_list: Vec::new(),
+                                }
                             },
                         )
                     },
@@ -531,6 +597,8 @@ pub enum TransactionKindTag {
     DeployErc20Callback,
     #[strum(serialize = "ft_on_transfer")]
     FtOnTransfer,
+    #[strum(serialize = "mt_on_transfer")]
+    MtOnTransfer,
     #[strum(serialize = "deposit")]
     Deposit,
     #[strum(serialize = "ft_transfer_call")]
@@ -630,6 +698,7 @@ impl TransactionKind {
             Self::DeployErc20(args) => to_borsh(args),
             Self::DeployErc20Callback(args) => to_borsh(args),
             Self::FtOnTransfer(args) => to_json(args),
+            Self::MtOnTransfer(args) => to_json(args),
             Self::FtTransferCall(args) => to_json(args),
             Self::FinishDeposit(args) => to_borsh(args),
             Self::ResolveTransfer(args, _) => to_borsh(args),
@@ -644,9 +713,9 @@ impl TransactionKind {
             Self::RegisterRelayer(address) | Self::FactorySetWNearAddress(address) => {
                 address.as_bytes().to_vec()
             }
-            Self::ExitToNear(maybe_args) => maybe_args
+            Self::ExitToNear(maybe_args, _) => maybe_args
                 .as_ref()
-                .and_then(|args| borsh::to_vec(&args).ok())
+                .and_then(|args| borsh::to_vec(args).ok())
                 .unwrap_or_default(),
             Self::NewConnector(args) | Self::SetConnectorData(args) => to_borsh(args),
             Self::NewEngine(args) => to_borsh(args),
@@ -695,6 +764,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::DeployErc20(_) => Self::DeployErc20,
             TransactionKind::DeployErc20Callback(_) => Self::DeployErc20Callback,
             TransactionKind::FtOnTransfer(_) => Self::FtOnTransfer,
+            TransactionKind::MtOnTransfer(_) => Self::MtOnTransfer,
             TransactionKind::Deposit(_) => Self::Deposit,
             TransactionKind::FtTransferCall(_) => Self::FtTransferCall,
             TransactionKind::FinishDeposit(_) => Self::FinishDeposit,
@@ -706,7 +776,7 @@ impl From<&TransactionKind> for TransactionKindTag {
             TransactionKind::StorageWithdraw(_) => Self::StorageWithdraw,
             TransactionKind::SetPausedFlags(_) => Self::SetPausedFlags,
             TransactionKind::RegisterRelayer(_) => Self::RegisterRelayer,
-            TransactionKind::ExitToNear(_) => Self::ExitToNear,
+            TransactionKind::ExitToNear(..) => Self::ExitToNear,
             TransactionKind::SetConnectorData(_) => Self::SetConnectorData,
             TransactionKind::NewConnector(_) => Self::NewConnector,
             TransactionKind::NewEngine(_) => Self::NewEngine,
@@ -848,8 +918,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
     fn try_from(t: BorshableTransactionMessage<'a>) -> Result<Self, Self::Error> {
         match t {
             BorshableTransactionMessage::V1(t) => {
-                let transaction: TransactionKind = t.transaction.try_into()?;
-                let raw_input = transaction.raw_bytes();
+                let (transaction, raw_input) = t.transaction.into_transaction_and_input()?;
                 Ok(Self {
                     block_hash: H256(t.block_hash),
                     near_receipt_id: H256(t.near_receipt_id),
@@ -865,8 +934,7 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
                 })
             }
             BorshableTransactionMessage::V2(t) => {
-                let transaction: TransactionKind = t.transaction.try_into()?;
-                let raw_input = transaction.raw_bytes();
+                let (transaction, raw_input) = t.transaction.into_transaction_and_input()?;
                 Ok(Self {
                     block_hash: H256(t.block_hash),
                     near_receipt_id: H256(t.near_receipt_id),
@@ -911,6 +979,11 @@ impl<'a> TryFrom<BorshableTransactionMessage<'a>> for TransactionMessage {
     }
 }
 
+type LegacyExitToNearCallbackArgs = (
+    Option<connector::RefundCallArgs>,
+    Option<connector::TransferNearArgs>,
+);
+
 /// Same as `TransactionKind`, but with `Submit` variant replaced with raw bytes
 /// so that it can derive the Borsh traits. All non-copy elements are `Cow` also
 /// so that this type can be cheaply created from a `TransactionKind` reference.
@@ -937,7 +1010,8 @@ enum BorshableTransactionKind<'a> {
     StorageWithdraw(Cow<'a, connector::StorageWithdrawArgs>),
     SetPausedFlags(Cow<'a, connector::PauseEthConnectorArgs>),
     RegisterRelayer(Cow<'a, Address>),
-    ExitToNear(Cow<'a, Option<connector::ExitToNearPrecompileCallbackArgs>>),
+    // Decode-only legacy layout: preserve its position and payload.
+    LegacyExitToNear(Cow<'a, Option<LegacyExitToNearCallbackArgs>>),
     SetConnectorData(Cow<'a, connector::SetContractDataCallArgs>),
     NewConnector(Cow<'a, connector::InitCallArgs>),
     NewEngine(Cow<'a, engine::NewCallArgs>),
@@ -965,12 +1039,41 @@ enum BorshableTransactionKind<'a> {
     RemoveEntryFromWhitelist(Cow<'a, silo::WhitelistArgs>),
     SetWhitelistStatus(Cow<'a, silo::WhitelistStatusArgs>),
     SetEthConnectorContractAccount(Cow<'a, connector::SetEthConnectorContractAccountArgs>),
-    MirrorErc20TokenCallback(Cow<'a, connector::MirrorErc20TokenArgs>),
+    // Decode-only legacy layout: preserve its position and payload.
+    LegacyMirrorErc20TokenCallback(Cow<'a, connector::LegacyMirrorErc20TokenArgs>),
     WithdrawWnearToRouter(Cow<'a, WithdrawWnearToRouterArgs>),
     StoreRelayerKeyCallback(Cow<'a, engine::RelayerKeyArgs>),
     SetWhitelistsStatuses(Cow<'a, [silo::WhitelistStatusArgs]>),
     SetErc20FallbackAddress(Cow<'a, silo::Erc20FallbackAddressArgs>),
-    DeployErc20Callback(Cow<'a, AccountId>),
+    // Decode-only legacy layout: preserve its position and payload.
+    LegacyDeployErc20Callback(Cow<'a, AccountId>),
+    DeployErc20Callback(Cow<'a, connector::BridgedToken>),
+    MtOnTransfer(Cow<'a, connector::MtOnTransferArgs>),
+    MirrorErc20TokenCallback(Cow<'a, connector::MirrorErc20TokenArgs>),
+    ExitToNear(
+        Cow<'a, Option<connector::ExitToNearPrecompileCallbackArgs>>,
+        Cow<'a, Option<types::PromiseResult>>,
+    ),
+}
+
+impl BorshableTransactionKind<'_> {
+    /// V1/V2 messages predate `raw_input`; reconstruct it from the stored layout.
+    fn into_transaction_and_input(
+        self,
+    ) -> Result<(TransactionKind, Vec<u8>), aurora_engine_transactions::Error> {
+        let legacy_input = match &self {
+            Self::LegacyExitToNear(args) => {
+                Some(args.as_ref().as_ref().map_or_else(Vec::new, to_borsh))
+            }
+            Self::LegacyDeployErc20Callback(args) => Some(to_borsh(args)),
+            Self::LegacyMirrorErc20TokenCallback(args) => Some(to_borsh(args)),
+            _ => None,
+        };
+        let transaction: TransactionKind = self.try_into()?;
+        let raw_input = legacy_input.unwrap_or_else(|| transaction.raw_bytes());
+
+        Ok((transaction, raw_input))
+    }
 }
 
 impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
@@ -986,6 +1089,7 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::DeployErc20(x) => Self::DeployErc20(Cow::Borrowed(x)),
             TransactionKind::DeployErc20Callback(x) => Self::DeployErc20Callback(Cow::Borrowed(x)),
             TransactionKind::FtOnTransfer(x) => Self::FtOnTransfer(Cow::Borrowed(x)),
+            TransactionKind::MtOnTransfer(x) => Self::MtOnTransfer(Cow::Borrowed(x)),
             TransactionKind::Deposit(x) => Self::Deposit(Cow::Borrowed(x)),
             TransactionKind::FtTransferCall(x) => Self::FtTransferCall(Cow::Borrowed(x)),
             TransactionKind::FinishDeposit(x) => Self::FinishDeposit(Cow::Borrowed(x)),
@@ -999,7 +1103,9 @@ impl<'a> From<&'a TransactionKind> for BorshableTransactionKind<'a> {
             TransactionKind::StorageWithdraw(x) => Self::StorageWithdraw(Cow::Borrowed(x)),
             TransactionKind::SetPausedFlags(x) => Self::SetPausedFlags(Cow::Borrowed(x)),
             TransactionKind::RegisterRelayer(x) => Self::RegisterRelayer(Cow::Borrowed(x)),
-            TransactionKind::ExitToNear(x) => Self::ExitToNear(Cow::Borrowed(x)),
+            TransactionKind::ExitToNear(args, result) => {
+                Self::ExitToNear(Cow::Borrowed(args), Cow::Borrowed(result))
+            }
             TransactionKind::SetConnectorData(x) => Self::SetConnectorData(Cow::Borrowed(x)),
             TransactionKind::NewConnector(x) => Self::NewConnector(Cow::Borrowed(x)),
             TransactionKind::NewEngine(x) => Self::NewEngine(Cow::Borrowed(x)),
@@ -1074,10 +1180,14 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::Call(x) => Ok(Self::Call(x.into_owned())),
             BorshableTransactionKind::Deploy(x) => Ok(Self::Deploy(x.into_owned())),
             BorshableTransactionKind::DeployErc20(x) => Ok(Self::DeployErc20(x.into_owned())),
+            BorshableTransactionKind::LegacyDeployErc20Callback(x) => Ok(
+                Self::DeployErc20Callback(connector::BridgedToken::Nep141(x.into_owned().into())),
+            ),
             BorshableTransactionKind::DeployErc20Callback(x) => {
                 Ok(Self::DeployErc20Callback(x.into_owned()))
             }
             BorshableTransactionKind::FtOnTransfer(x) => Ok(Self::FtOnTransfer(x.into_owned())),
+            BorshableTransactionKind::MtOnTransfer(x) => Ok(Self::MtOnTransfer(x.into_owned())),
             BorshableTransactionKind::Deposit(x) => Ok(Self::Deposit(x.into_owned())),
             BorshableTransactionKind::FtTransferCall(x) => Ok(Self::FtTransferCall(x.into_owned())),
             BorshableTransactionKind::FinishDeposit(x) => Ok(Self::FinishDeposit(x.into_owned())),
@@ -1095,7 +1205,19 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::RegisterRelayer(x) => {
                 Ok(Self::RegisterRelayer(x.into_owned()))
             }
-            BorshableTransactionKind::ExitToNear(x) => Ok(Self::ExitToNear(x.into_owned())),
+            BorshableTransactionKind::LegacyExitToNear(x) => Ok(Self::ExitToNear(
+                x.into_owned().map(|(refund, transfer_near)| {
+                    connector::ExitToNearPrecompileCallbackArgs {
+                        refund,
+                        transfer_near,
+                        ..Default::default()
+                    }
+                }),
+                None,
+            )),
+            BorshableTransactionKind::ExitToNear(args, result) => {
+                Ok(Self::ExitToNear(args.into_owned(), result.into_owned()))
+            }
             BorshableTransactionKind::SetConnectorData(x) => {
                 Ok(Self::SetConnectorData(x.into_owned()))
             }
@@ -1153,6 +1275,9 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             BorshableTransactionKind::SetWhitelistStatus(x) => {
                 Ok(Self::SetWhitelistStatus(x.into_owned()))
             }
+            BorshableTransactionKind::LegacyMirrorErc20TokenCallback(x) => {
+                Ok(Self::MirrorErc20TokenCallback(x.into_owned().into()))
+            }
             BorshableTransactionKind::MirrorErc20TokenCallback(x) => {
                 Ok(Self::MirrorErc20TokenCallback(x.into_owned()))
             }
@@ -1164,6 +1289,259 @@ impl<'a> TryFrom<BorshableTransactionKind<'a>> for TransactionKind {
             }
             BorshableTransactionKind::SetErc20FallbackAddress(x) => {
                 Ok(Self::SetErc20FallbackAddress(x.into_owned()))
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exit_to_near_callback_kind_encoding() {
+        let args = connector::ExitToNearPrecompileCallbackArgs {
+            refund: Some(connector::RefundCallArgs {
+                recipient_address: Address::from_array([1; 20]),
+                erc20_address: Some(Address::from_array([2; 20])),
+                amount: U256::from(100).to_big_endian(),
+            }),
+            transfer_near: None,
+            transfer_call: connector::TransferCall::Nep245,
+        };
+        let result = Some(types::PromiseResult::Successful(br#"["60"]"#.to_vec()));
+        let expected = TransactionKind::ExitToNear(Some(args.clone()), result.clone());
+        let bytes = [
+            b"\x35\x01".as_slice(),
+            &borsh::to_vec(&args).unwrap(),
+            &borsh::to_vec(&result).unwrap(),
+        ]
+        .concat();
+        let serialized: BorshableTransactionKind<'_> = (&expected).into();
+        assert_eq!(borsh::to_vec(&serialized).unwrap(), bytes);
+        let parsed = BorshableTransactionKind::try_from_slice(&bytes).unwrap();
+        let (transaction, input) = parsed.into_transaction_and_input().unwrap();
+        assert_eq!(transaction, expected);
+        assert_eq!(input, borsh::to_vec(&args).unwrap());
+
+        for (bytes, args) in [
+            (b"\x10\x00".as_slice(), None),
+            (
+                b"\x10\x01\x00\x00".as_slice(),
+                Some(connector::ExitToNearPrecompileCallbackArgs::default()),
+            ),
+        ] {
+            let legacy = BorshableTransactionKind::try_from_slice(bytes).unwrap();
+            assert_eq!(borsh::to_vec(&legacy).unwrap(), bytes);
+            let (transaction, input) = legacy.into_transaction_and_input().unwrap();
+            assert_eq!(transaction, TransactionKind::ExitToNear(args.clone(), None));
+            assert_eq!(
+                input,
+                args.map_or_else(Vec::new, |args| borsh::to_vec(&(
+                    args.refund,
+                    args.transfer_near
+                ))
+                .unwrap())
+            );
+        }
+    }
+
+    #[test]
+    fn test_legacy_exit_callback_messages_preserve_input() {
+        let args = connector::ExitToNearPrecompileCallbackArgs {
+            refund: Some(connector::RefundCallArgs {
+                recipient_address: Address::from_array([1; 20]),
+                erc20_address: Some(Address::from_array([2; 20])),
+                amount: U256::from(100).to_big_endian(),
+            }),
+            ..Default::default()
+        };
+        let raw_input = borsh::to_vec(&(&args.refund, &args.transfer_near)).unwrap();
+        let header = borsh::to_vec(&(
+            [1u8; 32],
+            [2u8; 32],
+            0u16,
+            true,
+            "sender.near".parse::<AccountId>().unwrap(),
+            "aurora.near".parse::<AccountId>().unwrap(),
+            0u128,
+        ))
+        .unwrap();
+        let payload = [header.as_slice(), b"\x10\x01", &raw_input].concat();
+        let promises = borsh::to_vec(&vec![Some(b"result".to_vec())]).unwrap();
+        let recorded_input = borsh::to_vec(&raw_input).unwrap();
+        for bytes in [
+            payload.clone(),
+            [b"\x00".as_slice(), &payload].concat(),
+            [b"\x01".as_slice(), &payload, &promises].concat(),
+            [b"\x02".as_slice(), &payload, &promises, &recorded_input].concat(),
+        ] {
+            let message = TransactionMessage::try_from_slice(&bytes).unwrap();
+            assert_eq!(
+                message.transaction,
+                TransactionKind::ExitToNear(Some(args.clone()), None)
+            );
+            assert_eq!(message.raw_input, raw_input);
+            assert_eq!(
+                TransactionMessage::try_from_slice(&message.to_bytes()).unwrap(),
+                message
+            );
+        }
+    }
+
+    #[test]
+    fn test_borshable_kind_encoding() {
+        let mt_args = connector::MtOnTransferArgs {
+            sender_id: "alice.near".parse().unwrap(),
+            previous_owner_ids: vec!["alice.near".parse().unwrap()],
+            token_ids: vec!["coin".into()],
+            amounts: vec![types::Balance::new(5)],
+            msg: "11".repeat(20),
+        };
+        let cases = [
+            (
+                TransactionKind::DeployErc20Callback(connector::BridgedToken::Nep141(
+                    "wrap.near".parse::<AccountId>().unwrap().into(),
+                )),
+                b"\x32\x00\x09\x00\x00\x00wrap.near".to_vec(),
+            ),
+            (
+                TransactionKind::DeployErc20Callback(connector::BridgedToken::Nep245(
+                    connector::Nep245Token {
+                        account_id: "multi.near".parse().unwrap(),
+                        token_id: "coin".into(),
+                    },
+                )),
+                b"\x32\x01\x0a\x00\x00\x00multi.near\x04\x00\x00\x00coin".to_vec(),
+            ),
+            (
+                TransactionKind::MtOnTransfer(mt_args.clone()),
+                [b"\x33".as_slice(), &borsh::to_vec(&mt_args).unwrap()].concat(),
+            ),
+            (
+                TransactionKind::MirrorErc20TokenCallback(connector::MirrorErc20TokenArgs {
+                    contract_id: "main.near".parse().unwrap(),
+                    token: connector::BridgedToken::Nep141(
+                        "wrap.near".parse::<AccountId>().unwrap().into(),
+                    ),
+                }),
+                b"\x34\x09\x00\x00\x00main.near\x00\x09\x00\x00\x00wrap.near".to_vec(),
+            ),
+            (
+                TransactionKind::MirrorErc20TokenCallback(connector::MirrorErc20TokenArgs {
+                    contract_id: "main.near".parse().unwrap(),
+                    token: connector::BridgedToken::Nep245(connector::Nep245Token {
+                        account_id: "multi.near".parse().unwrap(),
+                        token_id: "coin".into(),
+                    }),
+                }),
+                b"\x34\x09\x00\x00\x00main.near\x01\x0a\x00\x00\x00multi.near\x04\x00\x00\x00coin"
+                    .to_vec(),
+            ),
+        ];
+
+        for (expected, bytes) in cases {
+            if matches!(
+                expected,
+                TransactionKind::DeployErc20Callback(_)
+                    | TransactionKind::MirrorErc20TokenCallback(_)
+            ) {
+                assert_eq!(expected.raw_bytes(), bytes[1..]);
+            }
+            let serialized: BorshableTransactionKind<'_> = (&expected).into();
+            assert_eq!(borsh::to_vec(&serialized).unwrap(), bytes);
+            let parsed = BorshableTransactionKind::try_from_slice(&bytes).unwrap();
+            let (transaction, input) = parsed.into_transaction_and_input().unwrap();
+            assert_eq!(transaction, expected);
+            assert_eq!(input, expected.raw_bytes());
+        }
+    }
+
+    fn legacy_callback_cases() -> [(TransactionKind, &'static [u8]); 2] {
+        let token =
+            connector::BridgedToken::Nep141("wrap.near".parse::<AccountId>().unwrap().into());
+        [
+            (
+                TransactionKind::DeployErc20Callback(token.clone()),
+                b"\x31\x09\x00\x00\x00wrap.near",
+            ),
+            (
+                TransactionKind::MirrorErc20TokenCallback(connector::MirrorErc20TokenArgs {
+                    contract_id: "main.near".parse().unwrap(),
+                    token,
+                }),
+                b"\x2c\x09\x00\x00\x00main.near\x09\x00\x00\x00wrap.near",
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_legacy_callback_kind_encoding() {
+        for (expected, bytes) in legacy_callback_cases() {
+            let legacy = BorshableTransactionKind::try_from_slice(bytes).unwrap();
+            assert_eq!(borsh::to_vec(&legacy).unwrap(), bytes);
+            assert_eq!(TransactionKind::try_from(legacy).unwrap(), expected);
+
+            let current: BorshableTransactionKind<'_> = (&expected).into();
+            assert!(matches!(
+                current,
+                BorshableTransactionKind::DeployErc20Callback(_)
+                    | BorshableTransactionKind::MirrorErc20TokenCallback(_)
+            ));
+            assert_ne!(borsh::to_vec(&current).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn test_legacy_callback_messages_preserve_input() {
+        let header = borsh::to_vec(&(
+            [1u8; 32],
+            [2u8; 32],
+            0u16,
+            true,
+            "sender.near".parse::<AccountId>().unwrap(),
+            "aurora.near".parse::<AccountId>().unwrap(),
+            0u128,
+        ))
+        .unwrap();
+        let promises = borsh::to_vec(&vec![Some(b"metadata".to_vec())]).unwrap();
+
+        for (expected, legacy_bytes) in legacy_callback_cases() {
+            let payload = [header.as_slice(), legacy_bytes].concat();
+            let current_input = expected.raw_bytes();
+            let encoded_input = borsh::to_vec(&current_input).unwrap();
+            let cases = [
+                // The original unversioned V1 encoding is still accepted.
+                (payload.clone(), &legacy_bytes[1..]),
+                ([b"\x00".as_slice(), &payload].concat(), &legacy_bytes[1..]),
+                (
+                    [b"\x01".as_slice(), &payload, &promises].concat(),
+                    &legacy_bytes[1..],
+                ),
+                // Explicit raw_input takes precedence over the legacy kind in V3/V4.
+                (
+                    [b"\x02".as_slice(), &payload, &promises, &encoded_input].concat(),
+                    current_input.as_slice(),
+                ),
+                (
+                    [
+                        b"\x03".as_slice(),
+                        &payload,
+                        &promises,
+                        &encoded_input,
+                        &[0u8; 32],
+                    ]
+                    .concat(),
+                    current_input.as_slice(),
+                ),
+            ];
+
+            for (bytes, expected_input) in cases {
+                let parsed = TransactionMessage::try_from_slice(&bytes).unwrap();
+                assert_eq!(parsed.transaction, expected);
+                assert_eq!(parsed.raw_input, expected_input);
+                let rewritten = TransactionMessage::try_from_slice(&parsed.to_bytes()).unwrap();
+                assert_eq!(rewritten, parsed);
             }
         }
     }
