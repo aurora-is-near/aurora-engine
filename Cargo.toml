@@ -2,7 +2,6 @@
 authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2024"
 keywords = ["aurora", "engine", "evm", "blockchain"]
-homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
 license = "CC0-1.0"
 readme = "README.md"
@@ -77,6 +76,12 @@ warnings = "deny"
 # `fixed_hash::construct_fixed_hash!` expands to `#[cfg(feature = "dev")]`, which is no longer
 # a known feature. Declare it so rustc does not warn about it (used in engine-hashchain).
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("dev"))'] }
+
+[workspace.lints.cargo]
+unused_workspace_dependencies = "deny"
+unused_workspace_package_fields = "deny"
+redundant_homepage = "deny"
+missing_lints_inheritance = "deny"
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

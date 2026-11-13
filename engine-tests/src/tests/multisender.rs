@@ -11,13 +11,11 @@ const INITIAL_NONCE: u64 = 0;
 fn test_multisender_eth() {
     let (mut runner, mut signer, contract_address) = initialize();
     let mut multi_send_eth = |num_addr: usize| -> (u64, u64) {
-        let destinations: Vec<(Address, U256)> = (0..num_addr)
-            .map(|_| {
-                let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
-                let amount = Wei::from_eth(U256::one()).unwrap().raw();
-                (address, amount)
-            })
-            .collect();
+        let destinations = Vec::from_fn(num_addr, |_| {
+            let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
+            let amount = Wei::from_eth(U256::one()).unwrap().raw();
+            (address, amount)
+        });
 
         let (result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {
@@ -64,13 +62,11 @@ fn test_multisender_erc20() {
     utils::unwrap_success_slice(&result);
 
     let mut multi_send_erc20 = |num_addr: usize| -> (u64, u64) {
-        let destinations: Vec<(Address, U256)> = (0..num_addr)
-            .map(|_| {
-                let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
-                let amount = U256::from(1);
-                (address, amount)
-            })
-            .collect();
+        let destinations = Vec::from_fn(num_addr, |_| {
+            let address = utils::address_from_secret_key(&utils::Signer::random().secret_key);
+            let amount = U256::from(1);
+            (address, amount)
+        });
 
         let (result, profile) = runner
             .submit_with_signer_profiled(&mut signer, |nonce| {

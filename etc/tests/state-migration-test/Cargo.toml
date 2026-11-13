@@ -6,7 +6,6 @@ edition = "2024"
 description = ""
 documentation = ""
 readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
 license = "CC0-1.0"
 publish = false

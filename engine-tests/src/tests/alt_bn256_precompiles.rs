@@ -48,8 +48,8 @@ impl PrecompileStandalone {
 /// It executes precompile it two ways: run directly and check result with expected output
 fn run_alt_bn128(precompile: &impl Precompile, address: Address, data: &str, gas_limit: u64) {
     for data in PrecompileStandalone::new(data).precompile_data {
-        let input = hex::decode(data.input.clone()).unwrap();
-        let output = hex::decode(data.output.clone()).unwrap();
+        let input = hex::decode(data.input).unwrap();
+        let output = hex::decode(data.output).unwrap();
 
         let ctx = aurora_evm::Context {
             address: H160::default(),

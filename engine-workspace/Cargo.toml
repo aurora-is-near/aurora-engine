@@ -5,7 +5,6 @@ description = "Environment for testing Aurora EVM contract"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-homepage.workspace = true
 repository.workspace = true
 readme.workspace = true
 publish.workspace = true

@@ -854,7 +854,7 @@ fn test_modexp_random_against_biguint() {
             (self.next() >> 33) as u8
         }
         fn bytes(&mut self, n: usize) -> Vec<u8> {
-            (0..n).map(|_| self.byte()).collect()
+            Vec::from_fn(n, |_| self.byte())
         }
         fn range(&mut self, lo: usize, hi: usize) -> usize {
             lo + (self.next() as usize) % (hi - lo + 1)
@@ -958,13 +958,11 @@ fn test_modexp_random_against_biguint() {
 #[test]
 fn test_modexp_sparse_exponents() {
     for n in [8usize, 32, 64, 128] {
-        let mut modulus: Vec<u8> = (0..n).map(|i| u8::try_from(i % 256).unwrap()).collect();
+        let mut modulus = Vec::from_fn(n, |i| u8::try_from(i % 256).unwrap());
         modulus[0] |= 0x80;
         let last = modulus.len() - 1;
         modulus[last] |= 1;
-        let base: Vec<u8> = (0..n)
-            .map(|i| u8::try_from((i * 97 + 3) % 256).unwrap())
-            .collect();
+        let base = Vec::from_fn(n, |i| u8::try_from((i * 97 + 3) % 256).unwrap());
 
         // `2^k`, with `k` inside every `montgomery_window_width` bracket and on
         // both sides of its boundaries.

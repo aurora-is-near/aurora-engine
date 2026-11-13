@@ -4,7 +4,6 @@ version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
 description = "Aurora engine standalone tracing library. Provides functions and types for extracting geth-like traces from standalone engine execution."
-homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 publish.workspace = true
