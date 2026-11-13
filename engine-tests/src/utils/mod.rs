@@ -1008,12 +1008,7 @@ pub fn validate_address_balance_and_nonce(
 }
 
 pub fn address_from_hex(address: &str) -> Address {
-    let bytes = address.strip_prefix("0x").map_or_else(
-        || hex::decode(address).unwrap(),
-        |address| hex::decode(address).unwrap(),
-    );
-
-    Address::try_from_slice(&bytes).unwrap()
+    Address::decode(address.trim_prefix("0x")).unwrap()
 }
 
 pub fn str_to_account_id(account_id: &str) -> AccountId {

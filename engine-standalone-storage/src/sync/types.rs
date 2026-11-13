@@ -270,8 +270,7 @@ impl TransactionKind {
             Self::FtOnTransfer(args) => {
                 if engine_account == caller {
                     let recipient = FtTransferMessageData::try_from(args.msg.as_str())
-                        .map(|data| data.recipient)
-                        .unwrap_or_default();
+                        .map_or_default(|data| data.recipient);
                     let value = Wei::new(U256::from(args.amount.as_u128()));
                     // This transaction mints new ETH, so we'll say it comes from the zero address.
                     NormalizedEthTransaction {

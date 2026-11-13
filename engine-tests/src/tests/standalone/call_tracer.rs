@@ -279,13 +279,7 @@ fn test_contract_create_too_large() {
     let tx_data = {
         let tx_data_hex =
             std::fs::read_to_string("src/tests/res/contract_data_too_large.hex").unwrap();
-        hex::decode(
-            tx_data_hex
-                .strip_prefix("0x")
-                .unwrap_or(&tx_data_hex)
-                .trim(),
-        )
-        .unwrap()
+        hex::decode(tx_data_hex.trim_prefix("0x").trim()).unwrap()
     };
     let tx = aurora_engine_transactions::legacy::TransactionLegacy {
         nonce: U256::zero(),
