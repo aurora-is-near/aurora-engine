@@ -727,6 +727,10 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         erc20_token: Address,
         token: BridgedToken,
     ) -> Result<(), RegisterTokenError> {
+        if matches!(token, BridgedToken::Nep141(_)) && token.account_id().as_bytes().is_empty() {
+            return Err(RegisterTokenError::InvalidArguments);
+        }
+
         match get_erc20_from_nep(&self.io, &token) {
             Err(GetErc20FromNepError::Nep141NotFound | GetErc20FromNepError::Nep245NotFound) => (),
             Err(GetErc20FromNepError::InvalidAddress) => {
