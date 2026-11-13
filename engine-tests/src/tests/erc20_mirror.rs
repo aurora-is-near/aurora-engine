@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_lines)]
 use aurora_engine_types::parameters::connector::{
-    Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
+    BridgedToken, Erc20Identifier, Erc20Metadata, MirrorErc20TokenArgs, SetErc20MetadataArgs,
     WithdrawSerializeType,
 };
 use aurora_engine_workspace::account::Account;
@@ -49,7 +49,7 @@ async fn test_mirroring_erc20_token() {
     let result = silo_contract
         .mirror_erc20_token(MirrorErc20TokenArgs {
             contract_id: main_contract.id(),
-            nep141: nep141.id(),
+            token: BridgedToken::Nep141(nep141.id().into()),
         })
         .max_gas()
         .transact()
@@ -181,7 +181,7 @@ async fn test_transfer_from_silo_to_silo() {
     let result = silo_contract
         .mirror_erc20_token(MirrorErc20TokenArgs {
             contract_id: main_contract.id(),
-            nep141: nep141.id(),
+            token: BridgedToken::Nep141(nep141.id().into()),
         })
         .max_gas()
         .transact()
@@ -279,12 +279,12 @@ async fn test_deploy_erc20_token_with_meta() {
     assert_eq!(metadata.decimals, 24);
 }
 
-async fn deploy_main_contract() -> EngineContract {
+pub async fn deploy_main_contract() -> EngineContract {
     let code = AuroraRunner::get_engine_code();
     deploy_engine_with_code(code).await
 }
 
-async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract {
+pub async fn deploy_silo_contract(main_contract: &EngineContract) -> EngineContract {
     let silo_account = main_contract
         .root()
         .create_subaccount("silo", NearToken::from_near(50))

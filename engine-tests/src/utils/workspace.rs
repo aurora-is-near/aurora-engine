@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use aurora_engine_types::U256;
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{FungibleTokenMetadata, WithdrawSerializeType};
@@ -18,9 +20,12 @@ use crate::utils::solidity::erc20::{ERC20, ERC20Constructor};
 const CONNECTOR_URL: &str = "https://github.com/Near-One/aurora-eth-connector/releases/download/eth-connector-v0.6.5/eth-connector-v0-6-5.zip";
 const WASM_FILE_NAME: &str = "aurora_eth_connector.wasm";
 const FT_PATH: &str = "src/tests/res/fungible_token.wasm";
+const FT_RECEIVER_PATH: &str = "../etc/tests/ft-receiver";
 const STORAGE_AMOUNT: NearToken = NearToken::from_near(50);
 const AURORA_ETH_CONNECTOR: &str = "aurora_eth_connector";
 static ETH_CONNECTOR_WASM: OnceCell<Vec<u8>> = OnceCell::const_new();
+static FT_RECEIVER_WASM: LazyLock<Vec<u8>> =
+    LazyLock::new(|| std::fs::read(utils::rust::compile(FT_RECEIVER_PATH)).unwrap());
 
 /// Deploy Aurora smart contract with external eth-connector.
 pub async fn deploy_engine_with_code(code: Vec<u8>) -> EngineContract {
@@ -105,6 +110,15 @@ pub async fn get_xcc_router_version(aurora: &EngineContract, xcc_account: &Accou
         .unwrap()
         .json::<u32>()
         .unwrap()
+}
+
+/// Deploys `etc/tests/ft-receiver` to the `receiver` sub-account of the root account.
+/// Its `ft_on_transfer` and `mt_on_transfer` read the transfer message to decide how many
+/// tokens to return: `return:N`, `panic`, or `spend:account:N` to forward tokens before
+/// requesting a full refund. Other messages keep all tokens.
+pub async fn deploy_ft_receiver(aurora: &EngineContract) -> anyhow::Result<RawContract> {
+    let account = create_sub_account(&aurora.root(), "receiver", NearToken::from_near(10)).await?;
+    account.deploy(&FT_RECEIVER_WASM).await
 }
 
 pub async fn create_sub_account(
@@ -254,6 +268,36 @@ pub async fn transfer_nep_141(
     assert!(result.is_success());
 
     Ok(())
+}
+
+/// Downloads a contract from `url` into the `target/downloaded-wasm` cache and checks it
+/// against the hex-encoded SHA-256 `checksum`. A cached file with that checksum is reused.
+pub async fn download_wasm(url: &str, file_name: &str, checksum: &str) -> anyhow::Result<Vec<u8>> {
+    let cache_dir = std::env::current_dir()?
+        .join("target")
+        .join("downloaded-wasm");
+    let wasm_path = cache_dir.join(file_name);
+    let sha256 = |bytes: &[u8]| hex::encode(aurora_engine_sdk::sha256(bytes).as_bytes());
+
+    if let Ok(bytes) = tokio::fs::read(&wasm_path).await
+        && sha256(&bytes) == checksum
+    {
+        return Ok(bytes);
+    }
+
+    tokio::fs::create_dir_all(&cache_dir).await?;
+
+    let bytes = reqwest::get(url)
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?
+        .to_vec();
+
+    anyhow::ensure!(sha256(&bytes) == checksum, "checksum mismatch for {url}");
+    tokio::fs::write(&wasm_path, &bytes).await?;
+
+    Ok(bytes)
 }
 
 /// Downloads a zip archive from `url`, extracts it into a cache directory under

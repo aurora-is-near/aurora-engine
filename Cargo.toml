@@ -117,6 +117,7 @@ exclude = [
     "etc/tests/fibonacci",
     "etc/tests/modexp-bench",
     "etc/tests/mock-controller",
+    "etc/tests/mt-token",
     "etc/xcc-router",
 ]
 

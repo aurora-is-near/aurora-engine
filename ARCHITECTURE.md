@@ -156,9 +156,25 @@ This design supports deterministic replay, snapshot import/export, and compariso
 
 ### Token connector
 
-The connector layer maps NEP-141 account IDs to ERC-20 addresses, receives token transfers, deploys embedded ERC-20 bytecode, mints or burns the EVM representation, and schedules calls to the configured ETH connector or token contract. Standard NEP-141 entry points use their required JSON formats; internal Aurora parameters are generally Borsh encoded.
+The connector layer maps NEP-141 account IDs and NEP-245 `(account_id, token_id)` pairs to ERC-20 addresses, receives token transfers, deploys embedded ERC-20 bytecode, mints or burns the EVM representation, and schedules calls to the configured ETH connector or token contract. Standard token entry points use their required JSON formats; internal Aurora parameters are generally Borsh encoded.
+
+Both standards share one bridge flow keyed by the Borsh `BridgedToken` enum. NEP-245 mappings are stored as Borsh `(account_id, token_id)` pairs under their own key prefixes, so existing NEP-141 mapping bytes are unchanged. The JSON `Erc20Identifier` selects the standard by its fields: `address`, `account_id`, or `account_id` with `token_id`.
+
+`mt_on_transfer` accepts exactly one token, so each bridge deposit stays one EVM transaction per NEAR receipt. Unlike `ft_on_transfer`, which returns a failed deposit as an unused amount, any `mt_on_transfer` failure fails the receipt and the token contract refunds the transfer.
+
+`deploy_erc20_token` reads NEP-245 metadata with `mt_metadata_base_by_token_id`. Unlike NEP-141, missing or unavailable NEP-245 metadata falls back to the default ERC-20 metadata, while malformed metadata fails before deployment. Mirroring queries the source engine's standard-specific address getter and its metadata getter. The deployment and mirroring callbacks, and `mirror_erc20_token`, also accept the pre-NEP-245 NEP-141 Borsh arguments, so receipts in flight during an upgrade and recorded history still decode.
+
+Standalone replay runs these callbacks and `mt_on_transfer` through the same contract methods on the recorded `raw_input`. Persisted transaction kinds keep legacy callback variants at their original Borsh discriminants and append new ones, so existing records need no migration.
+
+`ExitToNear` resolves an ERC-20 caller through the reverse NEP-141 or NEP-245 mapping. Its EVM input format is unchanged: the NEP-245 token ID comes from storage. It calls `ft_transfer`/`ft_transfer_call` or `mt_transfer`/`mt_transfer_call` accordingly; only the configured NEP-141 wNEAR token can use `near_withdraw`. The base-token branch still uses the configured NEP-141 ETH connector.
+
+With `error_refund`, plain `ft_transfer`/`mt_transfer` and wNEAR unwrap use `TransferCall::None`: a failed promise refunds the full amount, and success does not refund. `ft_transfer_call` uses `TransferCall::Nep141` and reads a single used amount; `mt_transfer_call` uses `TransferCall::Nep245` and reads a one-element used-amount array. Only a successful resolver result with a used amount at most the withdrawn amount permits refunding the unused remainder. A failed or malformed transfer-call result fails the callback without minting: resolver failure does not prove that the preceding transfer was reversed. Such unresolved withdrawals require separate recovery; without `error_refund`, exits do not schedule refunds.
+
+Callback arguments append the `transfer_call` field; old two-field arguments decode with the default `TransferCall::None`, retaining their legacy behavior. Callback mode tag 0 retains that behavior, tag 1 remains NEP-245 settlement, and tag 2 adds NEP-141 settlement. Standalone preserves the old stored transaction tag and raw callback input. New callback records require exactly one promise result and store it for both plain transfers and transfer calls, so their EVM representation uses the same refund calculation as contract execution. Only historical records omit the result and use the legacy representation.
 
 The bytecode embedded by the engine is generated from [`etc/eth-contracts/contracts`](etc/eth-contracts/contracts/) and committed under `etc/eth-contracts/res/`. The `error_refund` feature selects the ERC-20 variant that supports the corresponding refund behavior.
+
+Only the precompile depends on `error_refund`: it decides whether exit callbacks carry refund arguments. The callback and standalone replay settle refunds from those recorded arguments in every build, so replay does not depend on how it was compiled.
 
 ### Cross-contract calls
 
@@ -183,6 +199,10 @@ The test suite exercises the same behavior at progressively wider boundaries:
 | Solidity fixtures | Compiles or loads Solidity contracts and drives them through Ethereum transactions | ERC-20, Uniswap, precompile, and application-level compatibility. |
 
 Many `AuroraRunner` tests also maintain a standalone runner and compare resulting key/value state. This catches divergence between on-chain execution semantics and the replay path.
+
+Standalone connector replay is tested in `engine-tests/src/tests/standalone/sync.rs`; Borsh transaction-kind compatibility fixtures live beside their types in `engine-standalone-storage`.
+
+NEP-245 connector flows are tested in `engine-tests/src/tests/nep245/` against the `etc/tests/mt-token` and `etc/tests/ft-receiver` fixtures. One sandbox test downloads the pinned Defuse release WASM to check exit gas against a real multi-token contract.
 
 The canonical validation tasks and their prerequisites are documented in [`AGENTS.md`](AGENTS.md) and [`README.md`](README.md).
 

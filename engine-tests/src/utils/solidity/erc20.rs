@@ -190,6 +190,24 @@ impl ERC20 {
             data,
         }
     }
+
+    pub fn total_supply(&self, nonce: U256) -> TransactionLegacy {
+        let data = self
+            .0
+            .abi
+            .function("totalSupply")
+            .unwrap()
+            .encode_input(&[])
+            .unwrap();
+        TransactionLegacy {
+            nonce,
+            gas_price: U256::default(),
+            gas_limit: u64::MAX.into(),
+            to: Some(self.0.address),
+            value: Wei::default(),
+            data,
+        }
+    }
 }
 
 pub fn legacy_into_normalized_tx(tx: TransactionLegacy) -> NormalizedEthTransaction {

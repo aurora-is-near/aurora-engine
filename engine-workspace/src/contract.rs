@@ -5,24 +5,25 @@ use crate::operation::{
     CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token,
     CallDeployErc20TokenLegacy, CallDeployUpgrade, CallFactorySetWNearAddress, CallFactoryUpdate,
     CallFactoryUpdateAddressVersion, CallFtOnTransfer, CallFtTransfer, CallFtTransferCall,
-    CallFundXccSubAccount, CallMintAccount, CallMirrorErc20Token, CallNew, CallPauseContract,
-    CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer, CallRemoveEntryFromWhitelist,
-    CallRemoveRelayerKey, CallResumeContract, CallResumePrecompiles, CallSetErc20FallbackAddress,
-    CallSetErc20Metadata, CallSetEthConnectorContractAccount, CallSetFixedGas, CallSetKeyManager,
-    CallSetOwner, CallSetPausedFlags, CallSetSiloParams, CallSetWhitelistStatus, CallStageUpgrade,
-    CallStateMigration, CallStorageDeposit, CallStorageUnregister, CallStorageWithdraw, CallSubmit,
-    CallUpgrade, CallWithdraw, ViewBalance, ViewBlockHash, ViewChainId, ViewCode,
-    ViewErc20FromNep141, ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtTotalSupply,
-    ViewGetErc20Metadata, ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams,
-    ViewGetWhitelistStatus, ViewNep141FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
+    CallFundXccSubAccount, CallMintAccount, CallMirrorErc20Token, CallMtOnTransfer, CallNew,
+    CallPauseContract, CallPausePrecompiles, CallRefundOnError, CallRegisterRelayer,
+    CallRemoveEntryFromWhitelist, CallRemoveRelayerKey, CallResumeContract, CallResumePrecompiles,
+    CallSetErc20FallbackAddress, CallSetErc20Metadata, CallSetEthConnectorContractAccount,
+    CallSetFixedGas, CallSetKeyManager, CallSetOwner, CallSetPausedFlags, CallSetSiloParams,
+    CallSetWhitelistStatus, CallStageUpgrade, CallStateMigration, CallStorageDeposit,
+    CallStorageUnregister, CallStorageWithdraw, CallSubmit, CallUpgrade, CallWithdraw, ViewBalance,
+    ViewBlockHash, ViewChainId, ViewCode, ViewErc20FromNep141, ViewErc20FromNep245,
+    ViewFactoryWnearAddress, ViewFtBalanceOf, ViewFtTotalSupply, ViewGetErc20Metadata,
+    ViewGetEthConnectorContractAccount, ViewGetFixedGas, ViewGetSiloParams, ViewGetWhitelistStatus,
+    ViewNep141FromErc20, ViewNep245FromErc20, ViewNonce, ViewOwner, ViewPausedFlags,
     ViewPausedPrecompiles, ViewStorageAt, ViewStorageBalanceOf, ViewUpgradeIndex, ViewVersion,
     ViewView,
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
 use aurora_engine_types::parameters::connector::{
-    Erc20Identifier, MirrorErc20TokenArgs, PausedMask, SetErc20MetadataArgs,
-    SetEthConnectorContractAccountArgs, WithdrawSerializeType,
+    Erc20Identifier, FtOnTransferArgs, MirrorErc20TokenArgs, MtOnTransferArgs, Nep245Token,
+    PausedMask, SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
 };
 use aurora_engine_types::parameters::engine::{
     CallArgs, DeployErc20TokenArgs, FullAccessKeyArgs, FunctionCallArgsV2, NewCallArgs,
@@ -249,17 +250,13 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn ft_on_transfer(
-        &self,
-        sender_id: &AccountId,
-        amount: U128,
-        message: &str,
-    ) -> CallFtOnTransfer {
-        CallFtOnTransfer::call(&self.contract).args_json(json!({
-            "sender_id": sender_id,
-            "amount": amount,
-            "message": message
-        }))
+    pub fn ft_on_transfer(&self, args: &FtOnTransferArgs) -> CallFtOnTransfer {
+        CallFtOnTransfer::call(&self.contract).args_json(args)
+    }
+
+    #[must_use]
+    pub fn mt_on_transfer(&self, args: &MtOnTransferArgs) -> CallMtOnTransfer {
+        CallMtOnTransfer::call(&self.contract).args_json(args)
     }
 
     #[must_use]
@@ -484,7 +481,7 @@ impl EngineContract {
     }
 
     #[must_use]
-    pub fn get_view(
+    pub fn view(
         &self,
         sender: Address,
         address: Address,
@@ -502,6 +499,16 @@ impl EngineContract {
     #[must_use]
     pub fn get_nep141_from_erc20(&self, address: Address) -> ViewNep141FromErc20<'_> {
         ViewNep141FromErc20::view(&self.contract).args_borsh(address)
+    }
+
+    #[must_use]
+    pub fn get_erc20_from_nep245(&self, token: Nep245Token) -> ViewErc20FromNep245<'_> {
+        ViewErc20FromNep245::view(&self.contract).args_borsh(token)
+    }
+
+    #[must_use]
+    pub fn get_nep245_from_erc20(&self, address: Address) -> ViewNep245FromErc20<'_> {
+        ViewNep245FromErc20::view(&self.contract).args_borsh(address)
     }
 
     #[must_use]
