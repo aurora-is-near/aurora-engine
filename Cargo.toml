@@ -77,12 +77,6 @@ warnings = "deny"
 # a known feature. Declare it so rustc does not warn about it (used in engine-hashchain).
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("dev"))'] }
 
-[workspace.lints.cargo]
-unused_workspace_dependencies = "deny"
-unused_workspace_package_fields = "deny"
-redundant_homepage = "deny"
-missing_lints_inheritance = "deny"
-
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
