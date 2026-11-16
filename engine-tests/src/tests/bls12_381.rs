@@ -200,8 +200,8 @@ fn run_bls12_381_standalone(precompile: &impl Precompile, address: Address, data
         {
             continue;
         }
-        let input = hex::decode(data.input.clone()).unwrap();
-        let output = hex::decode(data.output.clone()).unwrap();
+        let input = hex::decode(data.input).unwrap();
+        let output = hex::decode(data.output).unwrap();
 
         let ctx = aurora_evm::Context {
             address: H160::default(),

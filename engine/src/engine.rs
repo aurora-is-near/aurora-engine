@@ -1285,8 +1285,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 pub fn get_authorizer<I: IO + Copy>(io: &I) -> EngineAuthorizer {
     // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
     state::get_state(io)
-        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
-        .unwrap_or_default()
+        .map_or_default(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
 }
 
 pub fn refund_unused_gas<I: IO>(
@@ -1448,8 +1447,7 @@ pub fn remove_code<I: IO>(io: &mut I, address: &Address) {
 
 pub fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
     io.read_storage(&address_to_key(KeyPrefix::Code, address))
-        .map(|s| s.to_vec())
-        .unwrap_or_default()
+        .map_or_default(|s| s.to_vec())
 }
 
 pub fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
@@ -1559,7 +1557,7 @@ pub const fn nep245_erc20_map<I: IO>(io: I) -> BijectionMap<Nep245Token, ERC20Ad
 /// message, redirecting it to the silo fallback address if the recipient isn't allowed.
 pub fn get_erc20_recipient<I: IO + Copy>(io: &I, msg: &str) -> Result<Address, ContractError> {
     // The message should contain the recipient EOA address.
-    let message = msg.strip_prefix("0x").unwrap_or(msg);
+    let message = msg.trim_prefix("0x");
 
     // The first 40 hex characters encode the recipient; trailing data is ignored.
     let recipient = message
