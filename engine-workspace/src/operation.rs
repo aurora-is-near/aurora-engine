@@ -1,5 +1,5 @@
 use aurora_engine_types::account_id::AccountId;
-use aurora_engine_types::parameters::connector::{Erc20Metadata, WithdrawResult};
+use aurora_engine_types::parameters::connector::{Erc20Metadata, Nep245Token, WithdrawResult};
 use aurora_engine_types::parameters::engine::{StorageBalance, SubmitResult, TransactionStatus};
 use aurora_engine_types::parameters::silo::{FixedGasArgs, SiloParamsArgs, WhitelistStatusArgs};
 use aurora_engine_types::types::Address;
@@ -66,6 +66,7 @@ impl_call_return![
     (CallCall => SubmitResult, Call::Call, borsh),
     (CallSubmit => SubmitResult, Call::Submit, borsh),
     (CallFtOnTransfer => U128, Call::FtOnTransfer, json),
+    (CallMtOnTransfer => Vec<U128>, Call::MtOnTransfer, json),
 ];
 
 impl_view_return![
@@ -85,6 +86,8 @@ impl_view_return![
     (ViewView => TransactionStatus, View::View, borsh),
     (ViewErc20FromNep141 => Address, View::Erc20FromNep141, borsh),
     (ViewNep141FromErc20 => AccountId, View::Nep141FromErc20, borsh),
+    (ViewErc20FromNep245 => Address, View::Erc20FromNep245, borsh),
+    (ViewNep245FromErc20 => Nep245Token, View::Nep245FromErc20, borsh),
     (ViewPausedFlags => u8, View::PausedFlags, borsh),
     (ViewGetEthConnectorContractAccount => AccountId, View::GetEthConnectorContractAccount, borsh),
     (ViewGetFixedGas => FixedGasArgs, View::GetFixedGas, borsh),
@@ -107,6 +110,7 @@ pub(crate) enum Call {
     SetOwner,
     RegisterRelayer,
     FtOnTransfer,
+    MtOnTransfer,
     Withdraw,
     FtTransfer,
     FtTransferCall,
@@ -155,6 +159,7 @@ impl AsRef<str> for Call {
             Self::SetOwner => "set_owner",
             Self::RegisterRelayer => "register_relayer",
             Self::FtOnTransfer => "ft_on_transfer",
+            Self::MtOnTransfer => "mt_on_transfer",
             Self::Withdraw => "withdraw",
             Self::FtTransfer => "ft_transfer",
             Self::FtTransferCall => "ft_transfer_call",
@@ -216,6 +221,8 @@ pub enum View {
     PausedFlags,
     Erc20FromNep141,
     Nep141FromErc20,
+    Erc20FromNep245,
+    Nep245FromErc20,
     AccountsCounter,
     GetEthConnectorContractAccount,
     GetFixedGas,
@@ -239,7 +246,7 @@ impl AsRef<str> for View {
             Self::Balance => "get_balance",
             Self::Nonce => "get_nonce",
             Self::StorageAt => "get_storage_at",
-            Self::View => "get_view",
+            Self::View => "view",
             Self::IsUsedProof => "is_used_proof",
             Self::FtTotalSupply => "ft_total_supply",
             Self::FtBalanceOf => "ft_balance_of",
@@ -249,6 +256,8 @@ impl AsRef<str> for View {
             Self::PausedFlags => "get_paused_flags",
             Self::Erc20FromNep141 => "get_erc20_from_nep141",
             Self::Nep141FromErc20 => "get_nep141_from_erc20",
+            Self::Erc20FromNep245 => "get_erc20_from_nep245",
+            Self::Nep245FromErc20 => "get_nep245_from_erc20",
             Self::AccountsCounter => "get_accounts_counter",
             Self::GetEthConnectorContractAccount => "get_eth_connector_contract_account",
             Self::GetFixedGas => "get_fixed_gas",

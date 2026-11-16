@@ -265,7 +265,7 @@ mod tests {
         let recipient = Address::from_array([3; 20]);
         let storage = RefCell::new(Storage::default());
         storage.borrow_mut().kv_store.insert(
-            super::super::construct_contract_key(EthConnectorStorageId::EthConnectorAccount),
+            super::construct_contract_key(EthConnectorStorageId::EthConnectorAccount),
             borsh::to_vec(&connector_account_id).unwrap(),
         );
         let precompile = ExitToEthereum::new(StoragePointer(&storage));
@@ -276,7 +276,7 @@ mod tests {
         };
         let input = [&[0][..], recipient.as_bytes()].concat();
         let serialize_type_key =
-            super::super::construct_contract_key(EthConnectorStorageId::WithdrawSerializationType);
+            super::construct_contract_key(EthConnectorStorageId::WithdrawSerializationType);
         let overflow_context = Context {
             apparent_value: U256::from(u128::MAX) + 1,
             ..context

@@ -1041,7 +1041,7 @@ pub mod workspace {
             gas_limit: u64::MAX.into(),
             to: Some(cross_contract_call::ADDRESS),
             value: Wei::zero(),
-            data: borsh::to_vec(&xcc_args).unwrap(),
+            data: borsh::to_vec(&xcc_args)?,
         };
         let signed_transaction =
             utils::sign_transaction(transaction, Some(chain_id), &signer.secret_key);
@@ -1054,8 +1054,7 @@ pub mod workspace {
         match &result.value().status {
             TransactionStatus::Succeed(_) => Ok(()),
             TransactionStatus::Revert(b) => {
-                let revert_message = ethabi::decode(&[ethabi::ParamType::String], &b[4..])
-                    .unwrap()
+                let revert_message = ethabi::decode(&[ethabi::ParamType::String], &b[4..])?
                     .pop()
                     .unwrap()
                     .into_string()

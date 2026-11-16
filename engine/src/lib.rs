@@ -50,14 +50,15 @@ mod contract {
     use aurora_engine_sdk::io::{IO, StorageIntermediate};
     use aurora_engine_sdk::near_runtime::{Runtime, ViewEnv};
     use aurora_engine_types::account_id::AccountId;
-    use aurora_engine_types::borsh;
+    use aurora_engine_types::parameters::connector::Nep245Token;
     use aurora_engine_types::parameters::silo::{
         Erc20FallbackAddressArgs, FixedGasArgs, SiloParamsArgs, WhitelistArgs, WhitelistKindArgs,
         WhitelistStatusArgs,
     };
+    use aurora_engine_types::{ToBytes, borsh};
 
     use crate::contract_methods::{require_owner_and_running, require_running};
-    use crate::engine::{self, Engine};
+    use crate::engine::{self, ERC20Address, Engine};
     use crate::errors;
     use crate::parameters::{GetStorageAtArgs, ViewCallArgs};
     use crate::prelude::sdk::types::{SdkExpect, SdkUnwrap};
@@ -610,7 +611,35 @@ mod contract {
             .sdk_unwrap();
     }
 
-    /// Deploy ERC20 token mapped to a NEP141
+    /// External entry point for the NEP-245 multi-token transfer receiver callback.
+    ///
+    /// This function is invoked by the multi-token contract when tokens are
+    /// transferred to this contract via a `mt_transfer_call`. It instantiates
+    /// the [`Runtime`] as the I/O layer, execution environment, and event
+    /// handler, then delegates the actual processing to
+    /// [`contract_methods::connector::mt_on_transfer`].
+    ///
+    /// The function is exported with the C ABI under the unmangled symbol name
+    /// `mt_on_transfer` so that the NEAR runtime can call it as a contract
+    /// method.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying `mt_on_transfer` implementation returns an
+    /// error. The error is first converted into a [`ContractError`] message and
+    /// then surfaced via `sdk_unwrap`, which aborts contract execution and
+    /// reverts any state changes.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn mt_on_transfer() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::connector::mt_on_transfer(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
+    /// Deploy ERC20 token mapped to a NEP141 or NEP245 token
     #[unsafe(no_mangle)]
     pub extern "C" fn deploy_erc20_token() {
         let io = Runtime;
@@ -720,13 +749,40 @@ mod contract {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn get_erc20_from_nep245() {
+        let mut io = Runtime;
+        let nep245: Nep245Token = io.read_input_borsh().sdk_unwrap();
+
+        io.return_output(
+            engine::get_erc20_from_nep245(&io, &nep245)
+                .sdk_unwrap()
+                .as_bytes(),
+        );
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn get_nep141_from_erc20() {
         let mut io = Runtime;
-        let erc20_address: engine::ERC20Address = io.read_input().to_vec().try_into().sdk_unwrap();
+        let erc20_address: ERC20Address = io.read_input().to_array().map(Into::into).sdk_unwrap();
         io.return_output(
             engine::nep141_erc20_map(io)
                 .lookup_right(&erc20_address)
                 .sdk_expect("ERC20_NOT_FOUND")
+                .as_ref(),
+        );
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn get_nep245_from_erc20() {
+        let mut io = Runtime;
+        let erc20_address: ERC20Address = io.read_input().to_array().map(Into::into).sdk_unwrap();
+
+        io.return_output(
+            engine::nep245_erc20_map(io)
+                .lookup_right(&erc20_address)
+                .sdk_expect("ERC20_NOT_FOUND")
+                .to_bytes()
+                .sdk_expect("ERR_SERIALIZE")
                 .as_ref(),
         );
     }

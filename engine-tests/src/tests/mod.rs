@@ -13,6 +13,7 @@ mod ghsa_3p69_m8gg_fwmf;
 mod hashchain;
 pub mod modexp;
 mod multisender;
+mod nep245;
 mod one_inch;
 mod pausable_precompiles;
 mod pause_contract;
