@@ -50,7 +50,8 @@ impl_call_return![
     (CallAddEntryToWhitelistBatch, Call::AddEntryToWhitelistBatch),
     (CallRemoveEntryFromWhitelist, Call::RemoveEntryFromWhitelist),
     (CallSetErc20Metadata, Call::SetErc20Metadata),
-    (CallAttachFullAccessKey, Call::AttachFullAccessKey)
+    (CallAttachFullAccessKey, Call::AttachFullAccessKey),
+    (CallAdminCall, Call::AdminCall)
 ];
 
 impl_call_return![
@@ -141,6 +142,7 @@ pub(crate) enum Call {
     RemoveEntryFromWhitelist,
     SetErc20Metadata,
     AttachFullAccessKey,
+    AdminCall,
 }
 
 impl AsRef<str> for Call {
@@ -189,6 +191,7 @@ impl AsRef<str> for Call {
             Self::RemoveEntryFromWhitelist => "remove_entry_from_whitelist",
             Self::SetErc20Metadata => "set_erc20_metadata",
             Self::AttachFullAccessKey => "attach_full_access_key",
+            Self::AdminCall => "admin_call",
         }
     }
 }
