@@ -6,7 +6,6 @@ edition = "2024"
 description = "A wasm contract that reproduces a transaction from mainnet: https://explorer.mainnet.near.org/transactions/5bEgfRQ5TSJfN9XCqYkMr9cgBLToM7JmS1bNzKpDXJhT"
 documentation = ""
 readme = true
-homepage = "https://github.com/aurora-is-near/aurora-engine"
 repository = "https://github.com/aurora-is-near/aurora-engine"
 license = "CC0-1.0"
 publish = false

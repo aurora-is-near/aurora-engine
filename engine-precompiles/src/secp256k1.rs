@@ -74,13 +74,11 @@ impl Precompile for ECRecover {
         signature[64] = v_bit; // v
 
         let address_res = ecrecover(H256::from_slice(&hash), &signature);
-        let output = address_res
-            .map(|a| {
-                let mut output = [0u8; 32];
-                output[12..32].copy_from_slice(a.as_bytes());
-                output.to_vec()
-            })
-            .unwrap_or_default();
+        let output = address_res.map_or_default(|a| {
+            let mut output = [0u8; 32];
+            output[12..32].copy_from_slice(a.as_bytes());
+            output.to_vec()
+        });
 
         Ok(PrecompileOutput::without_logs(cost, output))
     }

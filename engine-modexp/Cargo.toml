@@ -6,21 +6,23 @@ keywords = ["modexp", "aurora", "engine"]
 authors.workspace = true
 edition.workspace = true
 readme.workspace = true
-homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 autobenches = false
 publish = true
 
 [dependencies]
+ibig = { workspace = true, optional = true }
+num = { workspace = true, optional = true }
+
+[dev-dependencies]
 hex.workspace = true
 num.workspace = true
-ibig = { workspace = true, optional = true }
 
 [lints]
 workspace = true
 
 [features]
 default = ["std"]
-std = ["num/std", "hex/std"]
-bench = ["ibig"]
+std = ["num?/std"]
+bench = ["ibig", "num"]
