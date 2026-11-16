@@ -45,7 +45,7 @@ impl ParseTransactionKindError {
     ) -> Self {
         Self::FailedDeserialization {
             transaction_kind_tag: tag,
-            error_message: error.map(|e| format!("{e:?}")).unwrap_or_default(),
+            error_message: error.map_or_default(|e| format!("{e:?}")),
         }
     }
 }
