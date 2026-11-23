@@ -25,6 +25,7 @@ fn test_admin_call_creates_batch_receipt() {
     let owner = runner.aurora_account_id.clone();
     let call = r#"{"FunctionCall":{"method_name":"f","args":"e30=","deposit":"2","gas":3}}"#;
     let input = input(RECEIVER, &format!("{call},{TRANSFER}"));
+    let expected_log_args: serde_json::Value = serde_json::from_slice(&input).unwrap();
 
     let outcome = runner.call("admin_call", &owner, input).unwrap();
 
@@ -48,6 +49,10 @@ fn test_admin_call_creates_batch_receipt() {
         },
     ];
     assert_eq!(runner.ext.underlying.action_log, expected);
+    assert_eq!(outcome.logs.len(), 1);
+    let log_args = outcome.logs[0].strip_prefix("admin_call: ").unwrap();
+    let logged_args: serde_json::Value = serde_json::from_str(log_args).unwrap();
+    assert_eq!(logged_args, expected_log_args);
     // The receipt is the return value of the call, so the caller gets the result of the batch.
     assert!(matches!(outcome.return_data, ReturnData::ReceiptIndex(0)));
 }
@@ -129,6 +134,7 @@ mod workspace {
     }
 
     fn assert_failed_with(result: ExecutionFinalResult, expected: &str) {
+        assert!(result.logs().is_empty(), "{result:?}");
         let err = format!("{:?}", result.into_result().unwrap_err());
         assert!(err.contains(expected), "{err}");
     }

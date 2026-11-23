@@ -562,6 +562,11 @@ pub fn admin_call<I: IO + Copy, E: Env, H: PromiseHandler>(
         return Err(errors::ERR_INVALID_ACTIONS_NUMBER.into());
     }
 
+    aurora_engine_sdk::log!(
+        "admin_call: {}",
+        serde_json::to_string_pretty(&args).unwrap_or_default()
+    );
+
     let promise_id = handler.promise_create_batch(&args.into());
 
     handler.promise_return(promise_id);
