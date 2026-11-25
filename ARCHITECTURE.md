@@ -191,7 +191,7 @@ Router code and version mappings are managed by owner-controlled factory methods
 - The receiver must not be the engine account. A receipt from the engine to itself passes the private-call checks of the engine's own callbacks, and its EVM calls are sent from the engine's address, which is the admin of the bridged ERC-20 contracts.
 - Subaccounts of the engine, including XCC routers, are allowed receivers. A router runs `execute` and `schedule` only for its parent, so the owner can act through any router. This is accepted so that funds stuck on a router can be recovered.
 
-The engine logs the validated receiver and actions as JSON, then schedules the batch and returns its promise to the caller. The method writes no engine state and is not recorded in the hashchain. Standalone replay therefore has no transaction kind for it, like the other owner calls that only schedule a promise (`upgrade`, `attach_full_access_key`).
+The engine logs the validated receiver and actions as compact JSON, then schedules the batch and returns its promise to the caller. The log encodes function-call arguments of up to 512 raw bytes as base64. For longer arguments, it writes `"args":"<omitted: too long>"` and reports the raw byte count in `args_len`. The receipt always carries the full arguments. The method writes no engine state and is not recorded in the hashchain. Standalone replay therefore has no transaction kind for it, like the other owner calls that only schedule a promise (`upgrade`, `attach_full_access_key`).
 
 ### Hashchain
 
