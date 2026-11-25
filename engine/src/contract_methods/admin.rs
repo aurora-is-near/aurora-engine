@@ -14,6 +14,7 @@ use aurora_engine_sdk::{
     io::{IO, StorageIntermediate},
     promise::PromiseHandler,
 };
+use aurora_engine_types::parameters::admin::AdminCallArgs;
 use aurora_engine_types::parameters::engine::{FullAccessKeyArgs, UpgradeParams};
 use aurora_engine_types::types::{NearGas, ZERO_YOCTO};
 use aurora_engine_types::{
@@ -512,10 +513,228 @@ pub fn attach_full_access_key<I: IO + Copy, E: Env, H: PromiseHandler>(
     Ok(())
 }
 
+/// Schedules a batch of NEAR transfers and function calls from the engine account.
+///
+/// Reads JSON-encoded [`AdminCallArgs`] from `io` and sends the actions, in order, to
+/// `receiver_id`. Transfers and function-call deposits are funded from the engine's balance.
+/// The engine must be initialized and running, the predecessor must be its owner, and the
+/// call must attach a nonzero deposit in `yoctoNEAR`.
+///
+/// The receiver must not be the engine account itself. A receipt from the engine to itself
+/// passes `assert_private_call`, so it would let the owner invoke the engine's private
+/// callbacks with arbitrary arguments, and its EVM calls would be sent from the engine's own
+/// address, which is the admin of the bridged ERC-20 contracts.
+///
+/// Sub-accounts of the engine are not restricted. This includes the XCC routers, which accept
+/// `execute` calls from the engine only, so the owner can make a router run arbitrary
+/// promises. It is left open so that funds stuck on a router can be recovered.
+///
+/// Returns the batch promise through `handler` so the caller receives its result.
+/// `Ok(())` indicates that the batch was scheduled; execution happens asynchronously.
+///
+/// # Errors
+///
+/// Returns an error if the engine state cannot be loaded, the engine is paused, the
+/// predecessor is not the owner, no deposit is attached, the input cannot be deserialized
+/// as [`AdminCallArgs`], the receiver is the engine account, or the action list is empty.
+pub fn admin_call<I: IO + Copy, E: Env, H: PromiseHandler>(
+    io: I,
+    env: &E,
+    handler: &mut H,
+) -> Result<(), ContractError> {
+    let state = state::get_state(&io)?;
+
+    require_running(&state)?;
+    require_owner_only(&state, &env.predecessor_account_id())?;
+
+    if env.attached_deposit() == 0 {
+        return Err(errors::ERR_DEPOSIT_REQUIRED.into());
+    }
+
+    let args = serde_json::from_slice::<AdminCallArgs>(&io.read_input().to_vec())
+        .map_err(|_| errors::ERR_JSON_DESERIALIZE)?;
+
+    if args.receiver_id == env.current_account_id() {
+        return Err(errors::ERR_INVALID_RECEIVER.into());
+    }
+
+    if args.actions.is_empty() {
+        return Err(errors::ERR_INVALID_ACTIONS_NUMBER.into());
+    }
+
+    aurora_engine_sdk::log!(
+        "admin_call: {}",
+        serde_json::to_string_pretty(&args).unwrap_or_default()
+    );
+
+    let promise_id = handler.promise_create_batch(&args.into());
+
+    handler.promise_return(promise_id);
+
+    Ok(())
+}
+
 fn internal_get_upgrade_index<I: IO>(io: &I) -> Result<u64, ContractError> {
     match io.read_u64(&storage::bytes_to_key(KeyPrefix::Config, CODE_STAGE_KEY)) {
         Ok(index) => Ok(index),
         Err(ReadU64Error::InvalidU64) => Err(errors::ERR_INVALID_UPGRADE.into()),
         Err(ReadU64Error::MissingValue) => Err(errors::ERR_NO_UPGRADE.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aurora_engine_sdk::env::Fixed;
+    use aurora_engine_sdk::promise::PromiseId;
+    use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+    use aurora_engine_test_doubles::promise::{PromiseArgs, PromiseTracker};
+    use aurora_engine_types::account_id::AccountId;
+    use std::cell::RefCell;
+    use test_case::test_case;
+
+    const ENGINE: &str = "aurora";
+    const OWNER: &str = "owner.near";
+    const STRANGER: &str = "stranger.near";
+    const RECEIVER: &str = "token.near";
+    const TRANSFER: &str = r#"{"Transfer":{"amount":"1"}}"#;
+
+    fn account(id: &str) -> AccountId {
+        id.parse().unwrap()
+    }
+
+    /// `admin_call` input that sends the given actions, written as JSON, to `receiver`.
+    fn input(receiver: &str, actions: &str) -> Vec<u8> {
+        format!(r#"{{"receiver_id":"{receiver}","actions":[{actions}]}}"#).into_bytes()
+    }
+
+    /// Storage of a running engine owned by `OWNER`, with the given call input.
+    fn init_storage(input: Vec<u8>) -> RefCell<Storage> {
+        let storage = RefCell::new(Storage {
+            input,
+            ..Storage::default()
+        });
+        let state = EngineState {
+            owner_id: account(OWNER),
+            ..EngineState::default()
+        };
+        state::set_state(&mut StoragePointer(&storage), &state).unwrap();
+
+        storage
+    }
+
+    /// Environment of a call to the engine sent and signed by `predecessor`.
+    fn call_env(predecessor: &str, deposit: u128) -> Fixed {
+        Fixed {
+            signer_account_id: account(predecessor),
+            current_account_id: account(ENGINE),
+            predecessor_account_id: account(predecessor),
+            attached_deposit: deposit,
+            ..Fixed::default()
+        }
+    }
+
+    /// Runs a call that must succeed and returns the batch it scheduled. The batch must be
+    /// the only promise and the one returned from the call, and storage must stay untouched.
+    fn scheduled_batch(storage: &RefCell<Storage>, env: &Fixed) -> PromiseBatchAction {
+        let kv_store = storage.borrow().kv_store.clone();
+        let mut handler = PromiseTracker::default();
+
+        admin_call(StoragePointer(storage), env, &mut handler).unwrap();
+
+        assert_eq!(storage.borrow().kv_store, kv_store);
+        assert_eq!(handler.scheduled_promises.len(), 1);
+
+        let id = handler.returned_promise.map(PromiseId::raw).unwrap();
+        match handler.scheduled_promises.remove(&id) {
+            Some(PromiseArgs::Batch(batch)) => batch,
+            other => panic!("expected the returned promise to be a batch, got {other:?}"),
+        }
+    }
+
+    /// Runs a call that must fail with `expected` without scheduling a promise.
+    fn assert_rejected(storage: &RefCell<Storage>, env: &Fixed, expected: &[u8]) {
+        let mut handler = PromiseTracker::default();
+
+        let err = admin_call(StoragePointer(storage), env, &mut handler).unwrap_err();
+
+        assert_eq!(
+            str::from_utf8(err.message.as_ref().as_ref()),
+            str::from_utf8(expected)
+        );
+        assert!(handler.scheduled_promises.is_empty());
+    }
+
+    #[test]
+    fn test_admin_call_schedules_batch() {
+        let call = r#"{"FunctionCall":{"method_name":"f","args":"e30=","deposit":"2","gas":3}}"#;
+        let storage = init_storage(input(RECEIVER, &format!("{call},{TRANSFER}")));
+
+        // Any non-zero deposit will do, not only one yocto.
+        let batch = scheduled_batch(&storage, &call_env(OWNER, 5));
+
+        let expected = PromiseBatchAction {
+            target_account_id: account(RECEIVER),
+            actions: vec![
+                PromiseAction::FunctionCall {
+                    name: "f".to_string(),
+                    args: b"{}".to_vec(),
+                    attached_yocto: Yocto::new(2),
+                    gas: NearGas::new(3),
+                },
+                PromiseAction::Transfer {
+                    amount: Yocto::new(1),
+                },
+            ],
+        };
+        assert_eq!(batch, expected);
+    }
+
+    #[test]
+    fn test_admin_call_accepts_engine_sub_account_as_receiver() {
+        // Only the engine account itself is off limits. Its sub-accounts, such as this XCC
+        // router, stay reachable so that funds stuck on them can be recovered.
+        let router = "f39fd6e51aad88f6f4ce6ab8827279cfffb92266.aurora";
+        let storage = init_storage(input(router, TRANSFER));
+
+        let batch = scheduled_batch(&storage, &call_env(OWNER, 1));
+
+        assert_eq!(batch.target_account_id, account(router));
+    }
+
+    #[test_case(STRANGER, 1, input(RECEIVER, TRANSFER), errors::ERR_NOT_ALLOWED; "caller is not the owner")]
+    #[test_case(ENGINE, 1, input(RECEIVER, TRANSFER), errors::ERR_NOT_ALLOWED; "engine is not the owner")]
+    #[test_case(OWNER, 0, input(RECEIVER, TRANSFER), errors::ERR_DEPOSIT_REQUIRED; "no deposit")]
+    #[test_case(OWNER, 1, input(ENGINE, TRANSFER), errors::ERR_INVALID_RECEIVER; "engine as receiver")]
+    #[test_case(OWNER, 1, input(RECEIVER, ""), errors::ERR_INVALID_ACTIONS_NUMBER; "no actions")]
+    #[test_case(OWNER, 1, b"not json".to_vec(), errors::ERR_JSON_DESERIALIZE.as_bytes(); "not json")]
+    #[test_case(OWNER, 1, input(RECEIVER, r#""CreateAccount""#), errors::ERR_JSON_DESERIALIZE.as_bytes(); "unsupported action")]
+    fn test_admin_call_rejects(predecessor: &str, deposit: u128, input: Vec<u8>, expected: &[u8]) {
+        let storage = init_storage(input);
+
+        assert_rejected(&storage, &call_env(predecessor, deposit), expected);
+    }
+
+    #[test]
+    fn test_admin_call_checks_predecessor_not_signer() {
+        // The owner signed the transaction, but the call reaches the engine from a contract.
+        let storage = init_storage(input(RECEIVER, TRANSFER));
+        let env = Fixed {
+            signer_account_id: account(OWNER),
+            ..call_env(STRANGER, 1)
+        };
+
+        assert_rejected(&storage, &env, errors::ERR_NOT_ALLOWED);
+    }
+
+    #[test]
+    fn test_admin_call_requires_running_engine() {
+        let storage = init_storage(input(RECEIVER, TRANSFER));
+        let mut io = StoragePointer(&storage);
+        let mut state = state::get_state(&io).unwrap();
+        state.is_paused = true;
+        state::set_state(&mut io, &state).unwrap();
+
+        assert_rejected(&storage, &call_env(OWNER, 1), errors::ERR_PAUSED);
     }
 }
