@@ -3,9 +3,11 @@
 //! `workspace` module), which executes that receipt.
 
 use crate::utils;
+use aurora_engine_sdk::base64;
 use near_primitives_core::types::{Balance, Gas, GasWeight};
 use near_vm_runner::logic::mocks::mock_external::MockAction;
 use near_vm_runner::logic::types::ReturnData;
+use serde_json::json;
 
 const RECEIVER: &str = "token.near";
 const TRANSFER: &str = r#"{"Transfer":{"amount":"1"}}"#;
@@ -23,13 +25,24 @@ fn test_admin_call_creates_batch_receipt() {
     runner.context.attached_deposit = Balance::from_yoctonear(1);
     // `deploy_runner` makes the engine account its own owner.
     let owner = runner.aurora_account_id.clone();
-    let call = r#"{"FunctionCall":{"method_name":"f","args":"e30=","deposit":"2","gas":3}}"#;
-    let input = input(RECEIVER, &format!("{call},{TRANSFER}"));
-    let expected_log_args: serde_json::Value = serde_json::from_slice(&input).unwrap();
+    let short_args = vec![0xab; 256];
+    let long_args = vec![0xcd; 513];
+    let short_args_base64 = base64::encode(&short_args);
+    let call = |args: &str| {
+        format!(r#"{{"FunctionCall":{{"method_name":"f","args":"{args}","deposit":"2","gas":3}}}}"#)
+    };
+    let input = input(
+        RECEIVER,
+        &format!(
+            "{},{TRANSFER},{}",
+            call(&short_args_base64),
+            call(&base64::encode(&long_args)),
+        ),
+    );
 
     let outcome = runner.call("admin_call", &owner, input).unwrap();
 
-    // One receipt to the receiver carrying both actions in the given order.
+    // One receipt with the original actions in order and both argument payloads intact.
     let expected = [
         MockAction::CreateReceipt {
             receipt_indices: vec![],
@@ -38,7 +51,7 @@ fn test_admin_call_creates_batch_receipt() {
         MockAction::FunctionCallWeight {
             receipt_index: 0,
             method_name: b"f".to_vec(),
-            args: b"{}".to_vec(),
+            args: short_args,
             attached_deposit: Balance::from_yoctonear(2),
             prepaid_gas: Gas::from_gas(3),
             gas_weight: GasWeight(0),
@@ -47,12 +60,33 @@ fn test_admin_call_creates_batch_receipt() {
             receipt_index: 0,
             deposit: Balance::from_yoctonear(1),
         },
+        MockAction::FunctionCallWeight {
+            receipt_index: 0,
+            method_name: b"f".to_vec(),
+            args: long_args,
+            attached_deposit: Balance::from_yoctonear(2),
+            prepaid_gas: Gas::from_gas(3),
+            gas_weight: GasWeight(0),
+        },
     ];
     assert_eq!(runner.ext.underlying.action_log, expected);
     assert_eq!(outcome.logs.len(), 1);
     let log_args = outcome.logs[0].strip_prefix("admin_call: ").unwrap();
     let logged_args: serde_json::Value = serde_json::from_str(log_args).unwrap();
-    assert_eq!(logged_args, expected_log_args);
+    assert_eq!(
+        logged_args,
+        json!({
+            "receiver_id": RECEIVER,
+            "actions": [
+                {"FunctionCall": {"method_name": "f", "args": short_args_base64, "deposit": "2", "gas": 3}},
+                {"Transfer": {"amount": "1"}},
+                {"FunctionCall": {
+                    "method_name": "f", "args": "<omitted: too long>", "args_len": 513, "deposit": "2", "gas": 3
+                }},
+            ],
+        })
+    );
+    assert_eq!(log_args.len(), logged_args.to_string().len());
     // The receipt is the return value of the call, so the caller gets the result of the batch.
     assert!(matches!(outcome.return_data, ReturnData::ReceiptIndex(0)));
 }
