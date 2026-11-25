@@ -562,16 +562,77 @@ pub fn admin_call<I: IO + Copy, E: Env, H: PromiseHandler>(
         return Err(errors::ERR_INVALID_ACTIONS_NUMBER.into());
     }
 
-    aurora_engine_sdk::log!(
-        "admin_call: {}",
-        serde_json::to_string_pretty(&args).unwrap_or_default()
-    );
+    aurora_engine_sdk::log!("admin_call: {}", format_admin_call_log(&args));
 
     let promise_id = handler.promise_create_batch(&args.into());
 
     handler.promise_return(promise_id);
 
     Ok(())
+}
+
+#[cfg(feature = "log")]
+fn format_admin_call_log(args: &AdminCallArgs) -> aurora_engine_types::String {
+    use aurora_engine_types::account_id::AccountId;
+    use aurora_engine_types::parameters::admin::AdminCallAction;
+    use aurora_engine_types::{Cow, Vec};
+    use serde::Serialize;
+
+    const MAX_LOGGED_ARGS_LEN: usize = 512;
+
+    #[derive(Serialize)]
+    struct AdminCallLog<'a> {
+        receiver_id: &'a AccountId,
+        actions: Vec<ActionLog<'a>>,
+    }
+
+    #[derive(Serialize)]
+    enum ActionLog<'a> {
+        Transfer {
+            amount: Yocto,
+        },
+        FunctionCall {
+            method_name: &'a str,
+            args: Cow<'static, str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            args_len: Option<usize>,
+            deposit: Yocto,
+            gas: NearGas,
+        },
+    }
+
+    let actions = args
+        .actions
+        .iter()
+        .map(|action| match action {
+            AdminCallAction::Transfer { amount } => ActionLog::Transfer { amount: *amount },
+            AdminCallAction::FunctionCall {
+                method_name,
+                args,
+                deposit,
+                gas,
+            } => {
+                let (args, args_len) = if args.len() <= MAX_LOGGED_ARGS_LEN {
+                    (Cow::Owned(aurora_engine_sdk::base64::encode(args)), None)
+                } else {
+                    (Cow::Borrowed("<omitted: too long>"), Some(args.len()))
+                };
+                ActionLog::FunctionCall {
+                    method_name,
+                    args,
+                    args_len,
+                    deposit: *deposit,
+                    gas: *gas,
+                }
+            }
+        })
+        .collect();
+
+    serde_json::to_string(&AdminCallLog {
+        receiver_id: &args.receiver_id,
+        actions,
+    })
+    .unwrap_or_default()
 }
 
 fn internal_get_upgrade_index<I: IO>(io: &I) -> Result<u64, ContractError> {
