@@ -460,6 +460,17 @@ mod contract {
             .sdk_unwrap();
     }
 
+    /// Allows the owner make the engine account send one batch of NEAR actions to another account.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn admin_call() {
+        let io = Runtime;
+        let env = Runtime;
+        let mut handler = Runtime;
+        contract_methods::admin::admin_call(io, &env, &mut handler)
+            .map_err(ContractError::msg)
+            .sdk_unwrap();
+    }
+
     ///
     /// READ-ONLY METHODS
     ///

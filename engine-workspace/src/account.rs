@@ -4,6 +4,8 @@ use std::str::FromStr;
 
 use crate::contract::RawContract;
 use aurora_engine_types::public_key::PublicKey;
+use near_workspaces::AccessKey;
+use near_workspaces::result::ExecutionFinalResult;
 use near_workspaces::types::NearToken;
 
 #[derive(Debug, Clone)]
@@ -48,6 +50,24 @@ impl Account {
             .await?
             .into_result()
             .map(|inner| Self { inner })
+            .map_err(Into::into)
+    }
+
+    /// Adds an access key to this account that may only call `method_names` of `receiver_id`.
+    pub async fn add_function_call_key(
+        &self,
+        public_key: near_workspaces::types::PublicKey,
+        receiver_id: &AccountId,
+        method_names: &[&str],
+    ) -> anyhow::Result<ExecutionFinalResult> {
+        let receiver_id = near_workspaces::AccountId::from_str(receiver_id.as_ref())?;
+        let access_key = AccessKey::function_call_access(&receiver_id, method_names, None);
+
+        self.inner
+            .batch(self.inner.id())
+            .add_key(public_key, access_key)
+            .transact()
+            .await
             .map_err(Into::into)
     }
 

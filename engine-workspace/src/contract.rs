@@ -1,7 +1,7 @@
 use crate::account::Account;
 use crate::node::Node;
 use crate::operation::{
-    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey,
+    CallAddEntryToWhitelist, CallAddEntryToWhitelistBatch, CallAddRelayerKey, CallAdminCall,
     CallAttachFullAccessKey, CallCall, CallDeployCode, CallDeployErc20Token,
     CallDeployErc20TokenLegacy, CallDeployUpgrade, CallFactorySetWNearAddress, CallFactoryUpdate,
     CallFactoryUpdateAddressVersion, CallFtOnTransfer, CallFtTransfer, CallFtTransferCall,
@@ -21,6 +21,7 @@ use crate::operation::{
 };
 use crate::transaction::{CallTransaction, ViewTransaction};
 use aurora_engine_types::account_id::AccountId;
+use aurora_engine_types::parameters::admin::AdminCallArgs;
 use aurora_engine_types::parameters::connector::{
     Erc20Identifier, FtOnTransferArgs, MirrorErc20TokenArgs, MtOnTransferArgs, Nep245Token,
     PausedMask, SetErc20MetadataArgs, SetEthConnectorContractAccountArgs, WithdrawSerializeType,
@@ -404,6 +405,11 @@ impl EngineContract {
     #[must_use]
     pub fn attach_full_access_key(&self, args: FullAccessKeyArgs) -> CallAttachFullAccessKey {
         CallAttachFullAccessKey::call(&self.contract).args_json(args)
+    }
+
+    #[must_use]
+    pub fn admin_call(&self, args: AdminCallArgs) -> CallAdminCall {
+        CallAdminCall::call(&self.contract).args_json(args)
     }
 
     #[must_use]
