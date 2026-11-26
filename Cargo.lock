@@ -294,7 +294,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aurora-engine"
-version = "3.11.1"
+version = "3.12.0"
 dependencies = [
  "aurora-engine-hashchain",
  "aurora-engine-modexp",
@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-precompiles"
-version = "2.2.0"
+version = "3.0.0"
 dependencies = [
  "aurora-engine-modexp",
  "aurora-engine-sdk",
@@ -354,7 +354,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-sdk"
-version = "2.0.1"
+version = "3.0.0"
 dependencies = [
  "ark-bn254",
  "ark-ec",
@@ -439,7 +439,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-transactions"
-version = "1.4.0"
+version = "2.0.0"
 dependencies = [
  "aurora-engine-sdk",
  "aurora-engine-types",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "aurora-engine-types"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "base64 0.23.1",
  "borsh",
