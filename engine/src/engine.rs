@@ -238,7 +238,7 @@ pub enum GasPaymentError {
     BalanceOverflow(BalanceOverflow),
     /// Overflow in `gas * gas_price` calculation
     EthAmountOverflow,
-    /// Not enough balance for account to cover the gas cost
+    /// Not enough balance for account to cover the gas cost (and the value of a contract creation)
     OutOfFund,
     /// `max_fee_per_gas` is less than `base_fee_per_gas`
     MaxFeePerGasLessThanBaseFee,
@@ -805,7 +805,7 @@ impl<'env, I: IO + Copy, E: Env, M: ModExpAlgorithm> Engine<'env, I, E, M> {
         // Parse message to determine recipient
         let mut recipient = {
             // The message should contain the recipient EOA address.
-            let message = args.msg.strip_prefix("0x").unwrap_or(&args.msg);
+            let message = args.msg.trim_prefix("0x");
             // Recipient - 40 characters (Address in hex without '0x' prefix)
             if message.len() < 40 {
                 return Err(ParseOnTransferMessageError::WrongMessageFormat.into());
@@ -1081,6 +1081,12 @@ pub fn submit_with_alt_modexp<
         return Err(EngineErrorKind::IntrinsicGasNotMet.into());
     }
 
+    // Only the contract rejects such creations: a rejected creation fails its NEAR receipt, which the
+    // standalone engine never executes (`TransactionMessage::succeeded`), while creations executed by
+    // older contract versions must be replayed as they were.
+    #[cfg(feature = "contract")]
+    check_init_code_size(&transaction)?;
+
     if transaction.max_priority_fee_per_gas > transaction.max_fee_per_gas {
         return Err(EngineErrorKind::MaxPriorityGasFeeTooLarge.into());
     }
@@ -1105,6 +1111,11 @@ pub fn submit_with_alt_modexp<
             return Err(EngineErrorKind::GasPayment(err).into());
         }
     };
+
+    // Must follow the gas prepayment, which the error discards by failing the NEAR receipt.
+    #[cfg(feature = "contract")]
+    check_value_coverage(&io, &transaction)?;
+
     let gas_limit = transaction
         .gas_limit
         .try_into()
@@ -1256,8 +1267,7 @@ pub fn compute_block_hash(chain_id: [u8; 32], block_height: u64, account_id: &[u
 pub fn get_authorizer<I: IO + Copy>(io: &I) -> EngineAuthorizer {
     // TODO: a temporary use the owner account only until the engine adapts std with near-plugins
     state::get_state(io)
-        .map(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
-        .unwrap_or_default()
+        .map_or_default(|state| EngineAuthorizer::from_accounts(once(state.owner_id)))
 }
 
 pub fn refund_unused_gas<I: IO>(
@@ -1418,8 +1428,7 @@ pub fn remove_code<I: IO>(io: &mut I, address: &Address) {
 
 pub fn get_code<I: IO>(io: &I, address: &Address) -> Vec<u8> {
     io.read_storage(&address_to_key(KeyPrefix::Code, address))
-        .map(|s| s.to_vec())
-        .unwrap_or_default()
+        .map_or_default(|s| s.to_vec())
 }
 
 pub fn get_code_size<I: IO>(io: &I, address: &Address) -> usize {
@@ -1452,6 +1461,42 @@ pub fn check_nonce<I: IO>(
         return Err(EngineErrorKind::IncorrectNonce(format!(
             "ERR_INCORRECT_NONCE: ac: {account_nonce}, tx: {transaction_nonce}"
         )));
+    }
+
+    Ok(())
+}
+
+/// EIP-3860: rejects a contract creation with oversized init code. Executing it would burn the
+/// whole gas limit without consuming the nonce, so the same signed transaction could be charged
+/// again.
+#[cfg(feature = "contract")]
+#[inline]
+fn check_init_code_size(transaction: &NormalizedEthTransaction) -> Result<(), EngineErrorKind> {
+    if transaction.to.is_none()
+        && CONFIG
+            .max_initcode_size
+            .is_some_and(|limit| transaction.data.len() > limit)
+    {
+        return Err(EngineErrorKind::EvmError(ExitError::CreateContractLimit));
+    }
+
+    Ok(())
+}
+
+/// Rejects a contract creation whose `value` is not covered by the sender balance left after the
+/// gas prepayment. The EVM would fail it before consuming the nonce (unlike a call), so the charged
+/// failure could be replayed.
+#[cfg(feature = "contract")]
+#[inline]
+fn check_value_coverage<I: IO>(
+    io: &I,
+    transaction: &NormalizedEthTransaction,
+) -> Result<(), EngineErrorKind> {
+    if transaction.to.is_none()
+        && !transaction.value.is_zero()
+        && get_balance(io, &transaction.address) < transaction.value
+    {
+        return Err(EngineErrorKind::GasPayment(GasPaymentError::OutOfFund));
     }
 
     Ok(())
@@ -2402,7 +2447,7 @@ mod tests {
         let args = FtOnTransferArgs {
             sender_id: AccountId::default(),
             amount: Balance::default(),
-            msg: receiver.encode(),
+            msg: receiver.encode().to_string(),
         };
         let mut handler = Noop;
         engine
@@ -2836,7 +2881,7 @@ mod tests {
         let created_address = create_legacy_address(&caller, &nonce);
 
         assert_eq!(
-            created_address.encode(),
+            created_address.encode().as_str(),
             "140e8a21d08cbb530929b012581a7c7e696145ef"
         );
     }

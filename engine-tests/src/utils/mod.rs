@@ -28,7 +28,7 @@ use rand::Rng;
 use rlp::RlpStream;
 use std::borrow::Cow;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use crate::prelude::parameters::{StartHashchainArgs, SubmitResult, TransactionStatus};
 use crate::prelude::transactions::{
@@ -39,6 +39,7 @@ use crate::prelude::transactions::{
 use crate::prelude::{Address, H256, U256, Wei, sdk};
 use crate::utils::solidity::{ContractConstructor, DeployedContract};
 
+pub const CALLER_ACCOUNT_ID: &str = "some-account.near";
 pub const DEFAULT_AURORA_ACCOUNT_ID: &str = "aurora";
 pub const SUBMIT: &str = "submit";
 pub const SUBMIT_WITH_ARGS: &str = "submit_with_args";
@@ -49,7 +50,6 @@ pub const DEFAULT_CHAIN_ID: u64 = 1_313_161_556; // NEAR localnet
 
 const CALL: &str = "call";
 const DEPLOY_CODE: &str = "deploy_code";
-const CALLER_ACCOUNT_ID: &str = "some-account.near";
 
 pub mod mocked_external;
 pub mod one_inch;
@@ -234,6 +234,9 @@ impl AuroraRunner {
             method_name,
         );
 
+        // NEAR discards the storage writes of a failed receipt, but the mocked external keeps them.
+        let trie_snapshot = self.ext.underlying.fake_trie.clone();
+
         let outcome = near_vm_runner::run(
             contract,
             &mut self.ext,
@@ -243,6 +246,7 @@ impl AuroraRunner {
         .unwrap();
 
         if let Some(error) = outcome.aborted.as_ref() {
+            self.ext.underlying.fake_trie = trie_snapshot;
             return Err(into_engine_error(outcome.used_gas.as_gas(), error));
         }
 
@@ -590,8 +594,19 @@ impl AuroraRunner {
     }
 
     pub fn set_code(&mut self, code: ContractCode) {
+        self.ext.underlying.code_hash = *code.hash();
         self.ext.underlying.code = Some(Arc::new(code));
     }
+}
+
+/// The compiled-contract cache all runners share. Cranelift spends tens of CPU-seconds on the
+/// engine, and `near-vm-runner` compiles one contract at a time, so a cache per runner queued the
+/// tests behind each other's compilations. It lives in memory only, so nothing outlives the run.
+fn contract_cache() -> MockContractRuntimeCache {
+    static CACHE: LazyLock<MockContractRuntimeCache> =
+        LazyLock::new(MockContractRuntimeCache::default);
+
+    CACHE.clone()
 }
 
 impl Default for AuroraRunner {
@@ -605,12 +620,15 @@ impl Default for AuroraRunner {
             DEFAULT_AURORA_ACCOUNT_ID.parse().unwrap();
         let mut mocked_external = MockedExternal::default();
 
-        mocked_external.code = Some(Arc::new(ContractCode::new(evm_wasm_bytes, None)));
+        let code = ContractCode::new(evm_wasm_bytes, None);
+        // The cache finds compiled contracts by this hash, which `MockedExternal` leaves zeroed.
+        mocked_external.code_hash = *code.hash();
+        mocked_external.code = Some(Arc::new(code));
 
         Self {
             aurora_account_id: DEFAULT_AURORA_ACCOUNT_ID.to_string(),
             chain_id: DEFAULT_CHAIN_ID,
-            cache: MockContractRuntimeCache::default(),
+            cache: contract_cache(),
             ext: mocked_external::MockedExternalWithTrie::new(mocked_external),
             context: VMContext {
                 current_account_id: origin_account_id.clone(),
@@ -990,12 +1008,7 @@ pub fn validate_address_balance_and_nonce(
 }
 
 pub fn address_from_hex(address: &str) -> Address {
-    let bytes = address.strip_prefix("0x").map_or_else(
-        || hex::decode(address).unwrap(),
-        |address| hex::decode(address).unwrap(),
-    );
-
-    Address::try_from_slice(&bytes).unwrap()
+    Address::decode(address.trim_prefix("0x")).unwrap()
 }
 
 pub fn str_to_account_id(account_id: &str) -> AccountId {
@@ -1034,6 +1047,7 @@ pub fn panic_on_fail(status: TransactionStatus) -> Option<String> {
 }
 
 /// Checks if `total_gas` is within 1 Tgas of `tgas_bound`.
+#[track_caller]
 pub fn assert_gas_bound(total_gas: u64, tgas_bound: u64) {
     const TERA: i128 = 1_000_000_000_000;
     let total_gas: i128 = total_gas.into();
@@ -1061,6 +1075,9 @@ fn into_engine_error(gas_used: u64, aborted: &FunctionCallError) -> EngineError 
             match panic_msg.as_str() {
                 "ERR_INVALID_CHAIN_ID" => EngineErrorKind::InvalidChainId,
                 "ERR_OUT_OF_FUND" => EngineErrorKind::GasPayment(GasPaymentError::OutOfFund),
+                "CREATE_CONTRACT_LIMIT" => {
+                    EngineErrorKind::EvmError(aurora_evm::ExitError::CreateContractLimit)
+                }
                 "ERR_GAS_OVERFLOW" => EngineErrorKind::GasOverflow,
                 "ERR_INTRINSIC_GAS" => EngineErrorKind::IntrinsicGasNotMet,
                 "ERR_NOT_ALLOWED" => EngineErrorKind::NotAllowed,

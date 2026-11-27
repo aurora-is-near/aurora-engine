@@ -7,7 +7,18 @@ use primitive_types::U256;
 use serde::{Deserialize, Serialize};
 
 #[derive(
-    Default, BorshSerialize, BorshDeserialize, Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd,
+    Default,
+    BorshSerialize,
+    BorshDeserialize,
+    Deserialize,
+    Serialize,
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
 )]
 /// Near gas type which wraps an underlying u64.
 pub struct NearGas(u64);

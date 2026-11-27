@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.12.0] 2026-11-25
+
+### Additions
+
+- Added the owner-only `admin_call` contract method for batching NEAR transfers and function calls from the engine account by [@aleksuss]. It requires a running engine, a non-zero attached deposit, and a receiver distinct from the engine account. The larger WASM added about 0.019 Tgas of loading cost per call in the macOS integration build. ([#1239])
+
+### Changes
+
+- Switched the `admin_call` log to compact JSON by [@aleksuss]. The log base64-encodes function-call arguments of up to 512 raw bytes. For longer arguments, it records `<omitted: too long>` and the original byte length in `args_len`. Scheduled receipts carry the full arguments. ([#1241])
+- Bumped `aurora-engine-types` to 4.0.0 for a breaking Rust API change by [@aleksuss]. The return type of `Address::encode()` changed from `String` to an allocation-free `EncodedAddress`. Use `.as_str()` to borrow the 40-character lowercase hexadecimal string or `.to_string()` to own it. ([#1231])
+- Bumped `aurora-engine-sdk` and `aurora-engine-precompiles` to 3.0.0 and `aurora-engine-transactions` to 2.0.0 because their public Rust APIs now use types from `aurora-engine-types` 4.0.0. Upgrade the crates together when passing shared types between them.
+- Split the native exit precompiles into separate modules for NEAR exits, Ethereum exits, and event encoding by [@aleksuss]. ([#1229])
+- Updated `aurora-evm` to 3.2.0 by [@mrLSD]. ([#1234])
+- Updated the Rust toolchain to 1.100.0 and applied new lints by [@aleksuss]. ([#1238])
+- Updated NEAR dependencies to 0.38.0, `near-workspaces` to 0.24.0, and `zip` to 9 by [@aleksuss]. ([#1235])
+- Updated the Solidity tooling dependencies `proxy-addr` to 2.0.8, `handlebars` to 4.7.10, `follow-redirects` to 1.16.2, and `fast-uri` to 3.1.9. ([#1227] [#1228] [#1230] [#1232] [#1236])
+- Updated the two `brace-expansion` versions in the Solidity tooling lockfile to 1.1.22 and 2.1.8. ([#1240])
+- Increased the CI disk volume to 100 GB for the Rust and contract lint jobs. ([#1226])
+- Shared the compiled-contract cache across test runners, preserved generated Solidity artifacts when their contents match, and moved the MODEXP benchmark out of standard test runs by [@aleksuss]. ([#1235])
+
+### Fixes
+
+- Fixed contract creation fee handling by [@mrLSD]. Oversized init code (EIP-3860) yields `CREATE_CONTRACT_LIMIT`, and insufficient balance to cover the transferred value after gas prepayment yields `ERR_OUT_OF_FUND`. Both rejections preserve the sender's balance and nonce. ([#1222])
+- Fixed EIP-7702 intrinsic gas accounting by [@aleksuss]. It now requires 25,000 gas up front for each authorization tuple, including invalid tuples. Refunds for existing authorities remain subject to the EIP-3529 refund cap. ([#1233])
+- Fixed ERC-20 exit input validation by [@aleksuss]. Both native exit precompiles now return `ERR_INVALID_INPUT` when the amount field is truncated. ([#1229])
+
+[#1222]: https://github.com/aurora-is-near/aurora-engine/pull/1222
+[#1226]: https://github.com/aurora-is-near/aurora-engine/pull/1226
+[#1227]: https://github.com/aurora-is-near/aurora-engine/pull/1227
+[#1228]: https://github.com/aurora-is-near/aurora-engine/pull/1228
+[#1229]: https://github.com/aurora-is-near/aurora-engine/pull/1229
+[#1230]: https://github.com/aurora-is-near/aurora-engine/pull/1230
+[#1231]: https://github.com/aurora-is-near/aurora-engine/pull/1231
+[#1232]: https://github.com/aurora-is-near/aurora-engine/pull/1232
+[#1233]: https://github.com/aurora-is-near/aurora-engine/pull/1233
+[#1234]: https://github.com/aurora-is-near/aurora-engine/pull/1234
+[#1235]: https://github.com/aurora-is-near/aurora-engine/pull/1235
+[#1236]: https://github.com/aurora-is-near/aurora-engine/pull/1236
+[#1238]: https://github.com/aurora-is-near/aurora-engine/pull/1238
+[#1239]: https://github.com/aurora-is-near/aurora-engine/pull/1239
+[#1240]: https://github.com/aurora-is-near/aurora-engine/pull/1240
+[#1241]: https://github.com/aurora-is-near/aurora-engine/pull/1241
+
 ## [3.11.1] 2026-10-05
 
 ### Additions
@@ -897,7 +940,8 @@ struct SubmitResult {
 
 ## [1.0.0] - 2021-05-12
 
-[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.11.1...develop
+[Unreleased]: https://github.com/aurora-is-near/aurora-engine/compare/3.12.0...develop
+[3.12.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.11.1...3.12.0
 [3.11.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.11.0...3.11.1
 [3.11.0]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.1...3.11.0
 [3.10.1]: https://github.com/aurora-is-near/aurora-engine/compare/3.10.0...3.10.1

@@ -19,7 +19,7 @@ The design is driven by four constraints:
 flowchart LR
     Eth["Ethereum clients / relayers"] -->|signed Ethereum transactions| Engine
     Near["NEAR users and contracts"] -->|contract calls and NEP-141 transfers| Engine
-    Admin["Owner / key manager"] -->|configuration and upgrades| Engine
+    Admin["Owner / key manager"] -->|configuration, upgrades, and admin calls| Engine
 
     subgraph NearRuntime["NEAR runtime"]
         Engine["Aurora Engine WASM"]
@@ -122,13 +122,13 @@ The contract method layer intentionally returns `Result` rather than panicking. 
 The `submit` and `submit_with_args` methods follow this path:
 
 1. `engine-transactions` parses the EIP-2718 envelope and normalizes Legacy, EIP-2930, EIP-1559, or EIP-7702 fields into `NormalizedEthTransaction`. EIP-4844 is recognized but not executed.
-2. Signature recovery determines the EVM sender. The engine validates access policy, chain ID, nonce, fee relationships, intrinsic gas, floor gas, and EIP-specific sender rules.
-3. Gas payment is deducted before execution using the effective gas price or configured silo fixed-gas policy.
+2. Signature recovery determines the EVM sender. The engine validates access policy, chain ID, nonce, fee relationships, intrinsic gas, floor gas, and EIP-specific sender rules. A contract creation is additionally rejected when its init code exceeds the EIP-3860 limit.
+3. Gas payment is deducted before execution using the effective gas price or configured silo fixed-gas policy. A contract creation whose `value` is not covered by the remaining balance is rejected at this point, because the EVM would fail it without consuming the nonce, which would make the charged failure replayable.
 4. The engine dispatches to either EVM call or contract creation. Access lists and EIP-7702 authorizations are passed to `aurora-evm`.
 5. The Osaka EVM configuration and Osaka precompile set are currently selected in [`engine/src/engine.rs`](engine/src/engine.rs). Precompiles can be filtered by stored pause flags.
 6. State changes are applied, promise-producing logs are processed, and unused gas is refunded. The priority-fee portion is credited to the relayer address.
 
-Standalone replay uses a block-height-aware compatibility transaction parser so historical transactions continue to reproduce the behavior of the contract version that originally processed them.
+Standalone replay uses a block-height-aware compatibility transaction parser so historical transactions continue to reproduce the behavior of the contract version that originally processed them. For the same reason only the contract applies the creation-transaction checks: a creation they reject fails its NEAR receipt, which standalone sync never executes, while creations that earlier contract versions executed are replayed as they were.
 
 ## State and persistence
 
@@ -165,6 +165,17 @@ The bytecode embedded by the engine is generated from [`etc/eth-contracts/contra
 The XCC precompile lets EVM contracts request NEAR calls without exposing unrestricted access to the engine account. It emits a specially structured internal log; the engine recognizes that log, applies XCC funding/router rules, and schedules the permitted promise chain.
 
 Router code and version mappings are managed by owner-controlled factory methods. Per-address router contracts are deployed under subaccounts of the engine account, with wNEAR configuration used for attached-value flows.
+
+### Administrative calls
+
+`admin_call` lets the owner make the engine account send one batch of NEAR actions to another account. Here the caller, not engine code, chooses the receiver, method, and arguments of a promise created by the engine account, so the method is deliberately narrow:
+
+- The input is the JSON-encoded `AdminCallArgs` from `engine-types`. The type can express only transfers and function calls, so deploying code, managing access keys, staking, and creating or deleting accounts fail at deserialization rather than at a runtime check.
+- The engine must be running, the predecessor must be the owner, and the call must attach a non-zero deposit, which a function-call access key cannot do.
+- The receiver must not be the engine account. A receipt from the engine to itself passes the private-call checks of the engine's own callbacks, and its EVM calls are sent from the engine's address, which is the admin of the bridged ERC-20 contracts.
+- Subaccounts of the engine, including XCC routers, are allowed receivers. A router runs `execute` and `schedule` only for its parent, so the owner can act through any router. This is accepted so that funds stuck on a router can be recovered.
+
+The engine logs the validated receiver and actions as compact JSON, then schedules the batch and returns its promise to the caller. The log encodes function-call arguments of up to 512 raw bytes as base64. For longer arguments, it writes `"args":"<omitted: too long>"` and reports the raw byte count in `args_len`. The receipt always carries the full arguments. The method writes no engine state and is not recorded in the hashchain. Standalone replay therefore has no transaction kind for it, like the other owner calls that only schedule a promise (`upgrade`, `attach_full_access_key`).
 
 ### Hashchain
 
@@ -215,7 +226,7 @@ Release builds enable LTO, a single codegen unit, overflow checks, abort-on-pani
 ## Architectural invariants
 
 - On-chain and standalone execution must produce equivalent EVM state for the same ordered inputs and environment.
-- Only validated engine-owned encodings may cause the engine account to create privileged NEAR promises.
+- Only validated engine-owned encodings may cause the engine account to create privileged NEAR promises. The single caller-defined path is the owner-only `admin_call`, which is limited to transfers and function calls and never targets the engine account itself.
 - Persistent keys and serialized layouts are append-only compatibility surfaces unless accompanied by an explicit migration.
 - EVM state application must not create ETH except through an authorized mint/bridge path.
 - Gas charging, refunding, and relayer rewards use checked arithmetic and must remain consistent across success, revert, and error paths.
