@@ -262,7 +262,7 @@ pub mod state {
         let key = storage::bytes_to_key(KeyPrefix::CrossContractCall, WNEAR_KEY);
         io.read_storage(&key).map_or_else(
             || panic!("{ERR_MISSING_WNEAR_ADDRESS}"),
-            |bytes| Address::try_from_slice(&bytes.to_vec()).expect(ERR_CORRUPTED_STORAGE),
+            |bytes| Address::from_array(bytes.to_array().expect(ERR_CORRUPTED_STORAGE)),
         )
     }
 

@@ -45,6 +45,7 @@ fn submit_secp256r1_data(data: &str, is_success: bool, gas_limit: u64) {
 }
 
 /// Checks if `total_gas` is within 1 Ggas of `ggas_bound`.
+#[track_caller]
 fn assert_ggas_bound(total_gas: u64, ggas_bound: u64, data: &str) {
     const GIGA: i128 = 1_000_000_000;
     let total_gas: i128 = total_gas.into();
@@ -142,31 +143,31 @@ fn test_secp256r1_submit_and_gas() {
             false,
             27_820,
         ),
-        ("4cee90eb86eaa050036147a12d49004b6a", false, 3550),
+        ("4cee90eb86eaa050036147a12d49004b6a", false, 3560),
         (
             "4cee90eb86eaa050036147a12d49004b6a958b991cfd78f16537fe6d1f4afd10273384db08bdfc843562a22b0626766686f6aec8247599f40bfe01bec0e0ecf17b4319559022d4d9bf007fe929943004eb4866760dedf319",
             false,
-            3550,
+            3560,
         ),
         (
             "4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4da73bd4903f0ce3b639bbbf6e8e80d16931ff4bcf5993d58468e8fb19086e8cac36dbcd03009df8c59286b162af3bd7fcc0450c9aa81be5d10d312af6c66b1d604aebd3099c618202fcfe16ae7770b0c49ab5eadf74b754204a3bb6060e44eff37618b065f9832de4ca6ca971a7a1adc826d0f7c00181a5fb2ddf79ae00b4e10e00",
             false,
-            3550,
+            3560,
         ),
         (
             "4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4dffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff4aebd3099c618202fcfe16ae7770b0c49ab5eadf74b754204a3bb6060e44eff37618b065f9832de4ca6ca971a7a1adc826d0f7c00181a5fb2ddf79ae00b4e10e",
             false,
-            3550,
+            3560,
         ),
         (
             "4cee90eb86eaa050036147a12d49004b6b9c72bd725d39d4785011fe190f0b4da73bd4903f0ce3b639bbbf6e8e80d16931ff4bcf5993d58468e8fb19086e8cac36dbcd03009df8c59286b162af3bd7fcc0450c9aa81be5d10d312af6c66b1d6000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
             false,
-            3550,
+            3560,
         ),
         (
             "b5a77e7a90aa14e0bf5f337f06f597148676424fae26e175c6e5621c34351955289f319789da424845c9eac935245fcddd805950e2f02506d09be7e411199556d262144475b1fa46ad85250728c600c53dfd10f8b3f4adf140e27241aec3c2daaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaef8afe82d200a5bb36b5462166e8ce77f2d831a52ef2135b2af188110beaefb1",
             false,
-            3550,
+            3560,
         ),
     ];
     for (data, is_success, expected_gas) in inputs {

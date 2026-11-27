@@ -6,6 +6,8 @@ pub mod public_key;
 pub mod storage;
 pub mod types;
 
+pub type TokenId = String;
+
 mod v0 {
     extern crate alloc;
     extern crate core;
@@ -46,5 +48,15 @@ impl AsBytes for str {
 impl<const N: usize> AsBytes for [u8; N] {
     fn as_bytes(&self) -> &[u8] {
         self
+    }
+}
+
+pub trait ToBytes {
+    fn to_bytes(&self) -> borsh::io::Result<Cow<'_, [u8]>>;
+}
+
+impl<T: AsRef<[u8]>> ToBytes for T {
+    fn to_bytes(&self) -> borsh::io::Result<Cow<'_, [u8]>> {
+        Ok(Borrowed(self.as_ref()))
     }
 }

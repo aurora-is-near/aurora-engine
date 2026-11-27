@@ -74,16 +74,24 @@ pub fn parse_transaction_kind(
             TransactionKind::DeployErc20(deploy_args)
         }
         TransactionKindTag::DeployErc20Callback => {
-            let args = AccountId::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::BridgedToken::deserialize(&bytes).map_err(f)?;
             TransactionKind::DeployErc20Callback(args)
         }
         TransactionKindTag::FtOnTransfer => {
-            let transfer_args: connector::FtOnTransferArgs =
-                serde_json::from_slice(bytes.as_slice()).map_err(|e| {
+            let transfer_args: connector::FtOnTransferArgs = serde_json::from_slice(&bytes)
+                .map_err(|e| {
                     ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
                 })?;
 
             TransactionKind::FtOnTransfer(transfer_args)
+        }
+        TransactionKindTag::MtOnTransfer => {
+            let transfer_args: connector::MtOnTransferArgs = serde_json::from_slice(&bytes)
+                .map_err(|e| {
+                    ParseTransactionKindError::failed_deserialization(tx_kind_tag, Some(e))
+                })?;
+
+            TransactionKind::MtOnTransfer(transfer_args)
         }
         TransactionKindTag::Deposit => TransactionKind::Deposit(bytes),
         TransactionKindTag::FtTransferCall => {
@@ -159,13 +167,21 @@ pub fn parse_transaction_kind(
             TransactionKind::RegisterRelayer(address)
         }
         TransactionKindTag::ExitToNear => {
-            if promise_data.first().and_then(Option::as_ref).is_none() {
-                TransactionKind::ExitToNear(None)
-            } else {
-                let args = connector::ExitToNearPrecompileCallbackArgs::try_from_slice(&bytes)
-                    .map_err(f)?;
-                TransactionKind::ExitToNear(Some(args))
-            }
+            let args =
+                connector::ExitToNearPrecompileCallbackArgs::deserialize(&bytes).map_err(f)?;
+            let [result] = promise_data else {
+                return Err(ParseTransactionKindError::failed_deserialization(
+                    tx_kind_tag,
+                    Some("Expected exactly one exit callback promise result"),
+                ));
+            };
+            let result = result
+                .as_ref()
+                .map_or(aurora_engine_types::types::PromiseResult::Failed, |bytes| {
+                    aurora_engine_types::types::PromiseResult::Successful(bytes.clone())
+                });
+
+            TransactionKind::ExitToNear(Some(args), Some(result))
         }
         TransactionKindTag::SetConnectorData => {
             let args = connector::SetContractDataCallArgs::try_from_slice(&bytes).map_err(f)?;
@@ -277,7 +293,7 @@ pub fn parse_transaction_kind(
             TransactionKind::SetEthConnectorContractAccount(args)
         }
         TransactionKindTag::MirrorErc20TokenCallback => {
-            let args = connector::MirrorErc20TokenArgs::try_from_slice(&bytes).map_err(f)?;
+            let args = connector::MirrorErc20TokenArgs::deserialize(&bytes).map_err(f)?;
             TransactionKind::MirrorErc20TokenCallback(args)
         }
         TransactionKindTag::Unknown => {
@@ -526,6 +542,13 @@ fn non_submit_execute<I: IO + Copy>(
 
             maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
         }
+        TransactionKind::MtOnTransfer(_) => {
+            // No promises can be created by `mt_on_transfer`
+            let mut handler = crate::promise::NoScheduler { promise_data };
+            let maybe_output = contract_methods::connector::mt_on_transfer(io, env, &mut handler)?;
+
+            maybe_output.map(|result| TransactionExecutionResult::Submit(Ok(result)))
+        }
         TransactionKind::FtTransferCall(_) => None,
         TransactionKind::ResolveTransfer(_, _) => None,
         TransactionKind::FtTransfer(_) => None,
@@ -540,7 +563,7 @@ fn non_submit_execute<I: IO + Copy>(
             contract_methods::admin::register_relayer(io, env)?;
             None
         }
-        TransactionKind::ExitToNear(_) => {
+        TransactionKind::ExitToNear(..) => {
             let mut handler = crate::promise::NoScheduler { promise_data };
             let maybe_result = contract_methods::connector::exit_to_near_precompile_callback(
                 io,

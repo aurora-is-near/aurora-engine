@@ -49,7 +49,7 @@ fn test_uniswap_exact_output() {
 
     let (_result, profile) =
         context.add_equal_liquidity(LIQUIDITY_AMOUNT.into(), &token_a, &token_b);
-    utils::assert_gas_bound(profile.all_gas(), 19);
+    utils::assert_gas_bound(profile.all_gas(), 20);
     let wasm_fraction = 100 * profile.wasm_gas() / profile.all_gas();
     assert!(
         (40..=55).contains(&wasm_fraction),

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Vec,
     account_id::AccountId,
+    parameters::connector::Nep245Token,
     public_key::PublicKey,
     types::{Address, RawH256, RawU256, WeiU256, Yocto},
 };
@@ -352,6 +353,7 @@ pub struct ViewCallArgs {
 pub enum DeployErc20TokenArgs {
     Legacy(AccountId),
     WithMetadata(AccountId),
+    Nep245(Nep245Token),
 }
 
 impl DeployErc20TokenArgs {

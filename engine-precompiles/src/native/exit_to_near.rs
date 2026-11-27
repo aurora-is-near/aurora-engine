@@ -3,7 +3,10 @@ use aurora_engine_types::{
     borsh,
     parameters::{
         PromiseWithCallbackArgs,
-        connector::{ExitToNearPrecompileCallbackArgs, TransferNearArgs},
+        connector::{
+            BridgedToken, ExitToNearPrecompileCallbackArgs, Nep245Token, TransferCall,
+            TransferNearArgs,
+        },
     },
 };
 use aurora_evm::backend::Log;
@@ -11,7 +14,7 @@ use aurora_evm::{Context, ExitError};
 
 use super::{
     events::{self, ExitToNearLegacy, ExitToNearOmni},
-    get_eth_connector_contract_account, get_nep141_from_erc20, parse_amount, to_u128,
+    get_eth_connector_contract_account, get_nep_from_erc20, parse_amount, to_u128,
     validate_input_size,
 };
 use crate::prelude::types::{EthGas, NearGas, make_address};
@@ -44,8 +47,9 @@ mod costs {
     /// Value determined experimentally based on tests and mainnet data. Example:
     /// `https://explorer.mainnet.near.org/transactions/5CD7NrqWpK3H8MAAU4mYEPuuWz9AqR9uJkkZJzw5b8PM#D1b5NVRrAsJKUX2ZGs3poKViu1Rgt4RJZXtTfMgdxH4S`
     pub(super) const FT_TRANSFER_GAS: NearGas = NearGas::new(10_000_000_000_000);
-
+    pub(super) const MT_TRANSFER_GAS: NearGas = NearGas::new(15_000_000_000_000);
     pub(super) const FT_TRANSFER_CALL_GAS: NearGas = NearGas::new(70_000_000_000_000);
+    pub(super) const MT_TRANSFER_CALL_GAS: NearGas = NearGas::new(80_000_000_000_000);
 
     /// Value determined experimentally based on tests.
     pub(super) const EXIT_TO_NEAR_CALLBACK_GAS: NearGas = NearGas::new(10_000_000_000_000);
@@ -96,6 +100,8 @@ struct ExitPlan {
 enum NearMethod {
     FtTransfer,
     FtTransferCall,
+    MtTransfer,
+    MtTransferCall,
     NearWithdraw,
 }
 
@@ -103,6 +109,8 @@ impl NearMethod {
     const fn name(self) -> &'static str {
         match self {
             Self::FtTransfer => "ft_transfer",
+            Self::MtTransfer => "mt_transfer",
+            Self::MtTransferCall => "mt_transfer_call",
             Self::FtTransferCall => "ft_transfer_call",
             Self::NearWithdraw => "near_withdraw",
         }
@@ -112,6 +120,8 @@ impl NearMethod {
         match self {
             Self::FtTransferCall => costs::FT_TRANSFER_CALL_GAS,
             Self::FtTransfer | Self::NearWithdraw => costs::FT_TRANSFER_GAS,
+            Self::MtTransfer => costs::MT_TRANSFER_GAS,
+            Self::MtTransferCall => costs::MT_TRANSFER_CALL_GAS,
         }
     }
 }
@@ -181,7 +191,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             // Input slice format:
             //  amount (U256 big-endian bytes) - the amount that was burned
             //  recipient_account_id (bytes) - the NEAR recipient account which will receive
-            //  NEP-141 tokens, or also can contain the `:unwrap` suffix in case of withdrawing
+            //  NEP-141 or NEP-245 tokens, or the `:unwrap` suffix in case of withdrawing
             //  wNEAR, or another message of JSON in case of OMNI, or address of receiver in case
             //  of transfer tokens to another engine contract.
             ExitToNearParams::Erc20TokenParams(ref exit_params) => {
@@ -195,6 +205,13 @@ impl<I: IO> Precompile for ExitToNear<I> {
             #[cfg(not(feature = "error_refund"))]
             refund: None,
             transfer_near: transfer_near_args,
+            transfer_call: match method {
+                NearMethod::FtTransferCall => TransferCall::Nep141,
+                NearMethod::MtTransferCall => TransferCall::Nep245,
+                NearMethod::FtTransfer | NearMethod::MtTransfer | NearMethod::NearWithdraw => {
+                    TransferCall::None
+                }
+            },
         };
 
         let transfer_promise = PromiseCreateArgs {
@@ -205,7 +222,7 @@ impl<I: IO> Precompile for ExitToNear<I> {
             attached_gas: method.attached_gas(),
         };
 
-        let promise = if callback_args == ExitToNearPrecompileCallbackArgs::default() {
+        let promise = if callback_args.refund.is_none() && callback_args.transfer_near.is_none() {
             PromiseArgs::Create(transfer_promise)
         } else {
             PromiseArgs::Callback(PromiseWithCallbackArgs {
@@ -300,19 +317,21 @@ fn exit_erc20_token_to_near<I: IO>(
     }
 
     let erc20_address = context.caller; // because ERC-20 contract calls the precompile.
-    let nep141_account_id = get_nep141_from_erc20(erc20_address.as_bytes(), io)?;
+    let token = get_nep_from_erc20(erc20_address.as_bytes(), io)?;
 
     match exit_params.message {
         // wNEAR address should be set via the `factory_set_wnear_address` transaction first.
-        Some(Message::UnwrapWnear) if erc20_address == get_wnear_address(io).raw() =>
+        Some(Message::UnwrapWnear)
+            if matches!(token, BridgedToken::Nep141(_))
+                && erc20_address == get_wnear_address(io).raw() =>
         // The flow is following here:
         // 1. We call `near_withdraw` on wNEAR account id on `aurora` behalf.
-        // In such way we unwrap wNEAR to NEAR.
+        // In such way we unwrap wrapped NEAR to native NEAR.
         // 2. After that, we call callback `exit_to_near_precompile_callback` on the `aurora`
-        // in which make transfer of unwrapped NEAR to the `target_account_id`.
+        // in which we transfer of unwrapped NEAR to the `target_account_id`.
         {
             Ok(ExitPlan {
-                target_account_id: nep141_account_id,
+                target_account_id: token.account_id().clone(),
                 args: format!(r#"{{"amount":"{}"}}"#, exit_params.amount),
                 method: NearMethod::NearWithdraw,
                 transfer_near_args: Some(TransferNearArgs {
@@ -327,33 +346,41 @@ fn exit_erc20_token_to_near<I: IO>(
                 }),
             })
         }
-        // In this flow, we're just forwarding the `msg` to the `ft_transfer_call` transaction.
-        Some(Message::Omni(msg)) => Ok(ExitPlan {
-            target_account_id: nep141_account_id,
-            args: ft_transfer_call_args(&exit_params.receiver_account_id, exit_params.amount, msg)?,
-            method: NearMethod::FtTransferCall,
-            transfer_near_args: None,
-            event: events::ExitToNear::Omni(ExitToNearOmni {
-                sender: Address::new(erc20_address),
-                erc20_address: Address::new(erc20_address),
-                dest: exit_params.receiver_account_id.to_string(),
-                amount: exit_params.amount,
-                msg: msg.to_string(),
-            }),
-        }),
+        Some(Message::Omni(msg)) => {
+            let (method, args) = token_transfer_args(
+                &token,
+                &exit_params.receiver_account_id,
+                exit_params.amount,
+                Some(msg),
+            )?;
+            Ok(ExitPlan {
+                target_account_id: token.account_id().clone(),
+                args,
+                method,
+                transfer_near_args: None,
+                event: events::ExitToNear::Omni(ExitToNearOmni {
+                    sender: Address::new(erc20_address),
+                    erc20_address: Address::new(erc20_address),
+                    dest: exit_params.receiver_account_id.to_string(),
+                    amount: exit_params.amount,
+                    msg: msg.to_string(),
+                }),
+            })
+        }
         // The legacy flow. Just withdraw the tokens to the NEAR account id.
         // P.S. We use underscore here instead of `None` to handle the case when a user
         // could add the `unwrap` suffix for non wNEAR ERC-20 token by mistake.
         _ => {
-            // There is no way to inject json, given the encoding of both arguments
-            // as decimal and valid account id respectively.
+            let (method, args) = token_transfer_args(
+                &token,
+                &exit_params.receiver_account_id,
+                exit_params.amount,
+                None,
+            )?;
             Ok(ExitPlan {
-                target_account_id: nep141_account_id,
-                args: format!(
-                    r#"{{"receiver_id":"{}","amount":"{}"}}"#,
-                    exit_params.receiver_account_id, exit_params.amount
-                ),
-                method: NearMethod::FtTransfer,
+                target_account_id: token.account_id().clone(),
+                args,
+                method,
                 transfer_near_args: None,
                 event: events::ExitToNear::Legacy(ExitToNearLegacy {
                     sender: Address::new(erc20_address),
@@ -364,6 +391,38 @@ fn exit_erc20_token_to_near<I: IO>(
             })
         }
     }
+}
+
+fn token_transfer_args(
+    token: &BridgedToken,
+    receiver_id: &AccountId,
+    amount: U256,
+    msg: Option<&str>,
+) -> Result<(NearMethod, String), ExitError> {
+    let (method, args) = match token {
+        BridgedToken::Nep141(_) => match msg {
+            Some(msg) => (
+                NearMethod::FtTransferCall,
+                ft_transfer_call_args(receiver_id, amount, msg)?,
+            ),
+            None => (
+                NearMethod::FtTransfer,
+                ft_transfer_args(receiver_id, amount)?,
+            ),
+        },
+        BridgedToken::Nep245(token) => match msg {
+            Some(msg) => (
+                NearMethod::MtTransferCall,
+                mt_transfer_call_args(receiver_id, token, amount, msg)?,
+            ),
+            None => (
+                NearMethod::MtTransfer,
+                mt_transfer_args(receiver_id, token, amount)?,
+            ),
+        },
+    };
+
+    Ok((method, args))
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -492,10 +551,23 @@ fn parse_recipient(recipient: &[u8]) -> Result<Recipient<'_>, ExitError> {
 }
 
 #[derive(serde::Serialize)]
-struct FtTransferCallArgs<'a> {
+struct TransferArgs<'a> {
     receiver_id: &'a AccountId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token_id: Option<&'a str>,
     amount: String,
-    msg: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    msg: Option<&'a str>,
+}
+
+fn ft_transfer_args(receiver_id: &AccountId, amount: U256) -> Result<String, ExitError> {
+    serde_json::to_string(&TransferArgs {
+        receiver_id,
+        token_id: None,
+        amount: to_u128(amount)?.to_string(),
+        msg: None,
+    })
+    .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
 }
 
 fn ft_transfer_call_args(
@@ -503,10 +575,40 @@ fn ft_transfer_call_args(
     amount: U256,
     msg: &str,
 ) -> Result<String, ExitError> {
-    serde_json::to_string(&FtTransferCallArgs {
+    serde_json::to_string(&TransferArgs {
         receiver_id,
+        token_id: None,
         amount: to_u128(amount)?.to_string(),
-        msg,
+        msg: Some(msg),
+    })
+    .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
+}
+
+fn mt_transfer_args(
+    receiver_id: &AccountId,
+    token: &Nep245Token,
+    amount: U256,
+) -> Result<String, ExitError> {
+    serde_json::to_string(&TransferArgs {
+        receiver_id,
+        token_id: Some(&token.token_id),
+        amount: to_u128(amount)?.to_string(),
+        msg: None,
+    })
+    .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
+}
+
+fn mt_transfer_call_args(
+    receiver_id: &AccountId,
+    token: &Nep245Token,
+    amount: U256,
+    msg: &str,
+) -> Result<String, ExitError> {
+    serde_json::to_string(&TransferArgs {
+        receiver_id,
+        token_id: Some(&token.token_id),
+        amount: to_u128(amount)?.to_string(),
+        msg: Some(msg),
     })
     .map_err(|_| ExitError::Other(Cow::from("ERR_SERIALIZE_JSON")))
 }
@@ -903,7 +1005,20 @@ mod tests {
             let promise = PromiseArgs::try_from_slice(&output.logs[0].data).unwrap();
             let call = match &promise {
                 PromiseArgs::Create(call) => call,
-                PromiseArgs::Callback(callback) => &callback.base,
+                PromiseArgs::Callback(callback) => {
+                    let args =
+                        ExitToNearPrecompileCallbackArgs::deserialize(&callback.callback.args)
+                            .unwrap();
+                    assert_eq!(
+                        args.transfer_call,
+                        if method == "ft_transfer_call" {
+                            super::TransferCall::Nep141
+                        } else {
+                            super::TransferCall::None
+                        }
+                    );
+                    &callback.base
+                }
                 PromiseArgs::Recursive(_) => panic!("unexpected recursive promise"),
             };
             assert_eq!(call.method, method);
@@ -991,6 +1106,134 @@ mod tests {
         let expected =
             format!(r#"{{"receiver_id":"{receiver_id}","amount":"{amount}","msg":"{msg}"}}"#);
         assert_eq!(args, expected);
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn test_nep245_exit_promises() {
+        use crate::Precompile;
+        use aurora_engine_test_doubles::io::{Storage, StoragePointer};
+        use aurora_engine_types::{
+            borsh::{self, BorshDeserialize},
+            parameters::{PromiseArgs, connector::Nep245Token},
+            storage::{KeyPrefix, bytes_to_key},
+            types::Yocto,
+        };
+        use std::cell::RefCell;
+
+        let caller = Address::from_array([2; 20]);
+        let token = Nep245Token {
+            account_id: "multi.near".parse().unwrap(),
+            token_id: "coin\",\"amount\":\"0\\\n🦀".into(),
+        };
+        let storage = RefCell::new(Storage::default());
+        storage.borrow_mut().kv_store.insert(
+            bytes_to_key(KeyPrefix::Erc20Nep245Map, caller.as_bytes()),
+            borsh::to_vec(&token).unwrap(),
+        );
+        // Even an incorrectly configured wNEAR address must not unwrap a NEP-245 token.
+        storage.borrow_mut().kv_store.insert(
+            bytes_to_key(KeyPrefix::CrossContractCall, crate::xcc::state::WNEAR_KEY),
+            borsh::to_vec(&caller).unwrap(),
+        );
+        let engine_account: AccountId = "engine.near".parse().unwrap();
+        let precompile = super::ExitToNear::new(engine_account, StoragePointer(&storage));
+        let mut context = crate::utils::new_context();
+        context.address = super::ADDRESS.raw();
+        context.caller = caller.raw();
+        let amount = U256::from(u128::MAX);
+        for (suffix, msg) in [
+            ("", None),
+            (":unwrap", None),
+            (":{\"msg\":\"a:b\\c\"}", Some("{\"msg\":\"a:b\\c\"}")),
+            (":", Some("")),
+        ] {
+            let input = [
+                &[1][..],
+                #[cfg(feature = "error_refund")]
+                &[3; 20][..],
+                amount.to_big_endian().as_slice(),
+                format!("receiver.near{suffix}").as_bytes(),
+            ]
+            .concat();
+            let output = precompile.run(&input, None, &context, false).unwrap();
+            assert_eq!(output.logs.len(), 2);
+            assert_eq!(output.logs[0].address, super::ADDRESS.raw());
+            assert!(output.logs[0].topics.is_empty());
+            let promise = PromiseArgs::try_from_slice(&output.logs[0].data).unwrap();
+            let call = match &promise {
+                PromiseArgs::Create(call) => call,
+                PromiseArgs::Callback(callback) => &callback.base,
+                PromiseArgs::Recursive(_) => panic!("unexpected recursive promise"),
+            };
+            assert_eq!(call.target_account_id, token.account_id);
+            assert_eq!(call.attached_balance, Yocto::new(1));
+            assert_eq!(
+                call.method,
+                if msg.is_some() {
+                    "mt_transfer_call"
+                } else {
+                    "mt_transfer"
+                }
+            );
+            assert_eq!(
+                call.attached_gas,
+                if msg.is_some() {
+                    super::costs::MT_TRANSFER_CALL_GAS
+                } else {
+                    super::costs::MT_TRANSFER_GAS
+                }
+            );
+            let mut expected = serde_json::json!({
+                "receiver_id": "receiver.near",
+                "token_id": token.token_id,
+                "amount": u128::MAX.to_string(),
+            });
+            if let Some(msg) = msg {
+                expected["msg"] = msg.into();
+            }
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&call.args).unwrap(),
+                expected
+            );
+            #[cfg(feature = "error_refund")]
+            {
+                let PromiseArgs::Callback(callback) = promise else {
+                    panic!("expected refund callback")
+                };
+                assert_eq!(
+                    callback.callback.target_account_id,
+                    precompile.current_account_id
+                );
+                assert_eq!(callback.callback.method, "exit_to_near_precompile_callback");
+                let args =
+                    super::ExitToNearPrecompileCallbackArgs::deserialize(&callback.callback.args)
+                        .unwrap();
+                let refund = super::RefundCallArgs {
+                    recipient_address: Address::from_array([3; 20]),
+                    erc20_address: Some(caller),
+                    amount: amount.to_big_endian(),
+                };
+                let expected = super::ExitToNearPrecompileCallbackArgs {
+                    refund: Some(refund),
+                    transfer_near: None,
+                    transfer_call: if msg.is_some() {
+                        super::TransferCall::Nep245
+                    } else {
+                        super::TransferCall::None
+                    },
+                };
+                assert_eq!(args, expected);
+            }
+            #[cfg(not(feature = "error_refund"))]
+            assert!(matches!(promise, PromiseArgs::Create(_)));
+            context.apparent_value = U256::from(1);
+            assert_eq!(
+                precompile.run(&input, None, &context, false).unwrap_err(),
+                ExitError::Other("ERR_ETH_ATTACHED_FOR_ERC20_EXIT".into())
+            );
+            context.apparent_value = U256::zero();
+        }
     }
 
     #[test]

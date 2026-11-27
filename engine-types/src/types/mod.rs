@@ -8,7 +8,7 @@ pub mod fee;
 pub mod gas;
 pub mod wei;
 
-pub use address::{Address, make_address};
+pub use address::{Address, EncodedAddress, make_address};
 pub use balance::*;
 pub use fee::*;
 pub use gas::*;
